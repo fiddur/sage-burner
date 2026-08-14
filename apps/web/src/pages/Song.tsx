@@ -24,6 +24,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { Faces } from '../components/Faces.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Heart } from '../components/Heart.tsx'
+import { Icon } from '../components/Icon.tsx'
 import { IconButton } from '../components/IconButton.tsx'
 import { MusicIcon } from '../components/MusicIcon.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
@@ -177,7 +178,7 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
           {song.deleted_at === null && (
             <p class="row">
               <IconButton
-                icon="✏️"
+                icon="edit"
                 label={`Edit ${song.title}`}
                 disabled={busy}
                 onClick={() => setEditing(true)}
@@ -302,19 +303,25 @@ const Words = ({ body }: { body: string }) => {
       {anyChords && (
         <p class="song-aids">
           <span class="song-key-label">Transpose</span>
-          <IconButton
-            icon="♭"
-            label="A semitone down"
+          <button
+            type="button"
+            class="link-button"
+            aria-label="A semitone down"
             disabled={semitones <= -MOST_SEMITONES}
             onClick={() => setSemitones(shifted(semitones, -1))}
-          />
+          >
+            ♭
+          </button>
           <span class="song-key">{semitones > 0 ? `+${semitones}` : semitones}</span>
-          <IconButton
-            icon="♯"
-            label="A semitone up"
+          <button
+            type="button"
+            class="link-button"
+            aria-label="A semitone up"
             disabled={semitones >= MOST_SEMITONES}
             onClick={() => setSemitones(shifted(semitones, 1))}
-          />
+          >
+            ♯
+          </button>
           {semitones !== 0 && (
             <button type="button" class="link-button" onClick={() => setSemitones(0)}>
               Back to how it is written
@@ -346,7 +353,7 @@ const Words = ({ body }: { body: string }) => {
 
       <p class="song-play">
         <button type="button" class="link-button" aria-pressed={rolling} onClick={() => setRolling(!rolling)}>
-          {rolling ? '⏸ Stop scrolling' : '▶️ Scroll it'}
+          <Icon name={rolling ? 'pause' : 'play'} /> {rolling ? 'Stop scrolling' : 'Scroll it'}
         </button>
 
         <label class="song-speed">
@@ -501,7 +508,7 @@ const Fields = ({
               <li key={link.url}>
                 {link.url}
                 <IconButton
-                  icon="🗑️"
+                  icon="destroy"
                   label={`Take off the link to ${link.url}`}
                   onClick={() => setLinks(links.filter((one) => one.url !== link.url))}
                 />

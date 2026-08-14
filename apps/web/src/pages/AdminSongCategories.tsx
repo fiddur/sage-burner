@@ -86,7 +86,7 @@ export const AdminSongCategories = ({ api }: { api: SongCategoriesApi }) => {
                 <>
                   <span class="reorder-name">{category.label}</span>
                   <IconButton
-                    icon="✏️"
+                    icon="edit"
                     label={`Edit ${category.label}`}
                     disabled={busy}
                     onClick={() => {

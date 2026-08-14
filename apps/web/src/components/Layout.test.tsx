@@ -233,7 +233,9 @@ describe('the link to the map of the area', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
 
-    expect((await screen.findByRole('link', { name: /Map of area/ })).textContent).toContain('↗')
+    const away = await screen.findByRole('link', { name: /Map of area/ })
+
+    expect(away.querySelector('[data-icon="away"]')).not.toBeNull()
   })
 
   it('is not there at all where nobody has set one', async () => {

@@ -25,7 +25,7 @@ export const Destroy = ({
 
   if (!asking) {
     return trigger === undefined ? (
-      <IconButton icon="🗑️" label={`${verb} ${what}`} disabled={busy} onClick={() => setAsking(true)} />
+      <IconButton icon="destroy" label={`${verb} ${what}`} disabled={busy} onClick={() => setAsking(true)} />
     ) : (
       <button
         type="button"

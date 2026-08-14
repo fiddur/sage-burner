@@ -174,7 +174,7 @@ repeatable dream is withdrawn by hand once it has been planned in everywhere.
 Chips carry a ↻, in the pool and on the Dreams list, so it is visible which ones
 behave that way before anyone drags one.
 
-### Helpers, and the ❤️‍🔥
+### Helpers, and the heart
 
 Two tables, `session_helper` and `session_support`, both keyed on `attendance`
 rather than `account` — the same reason a lead role's team is. Only somebody coming
@@ -199,7 +199,7 @@ somebody there can carry the cushions, so a named person with no attendance is a
 **400** — not a 403: they may be a member in good standing, and the pairing is what is
 wrong. But arranging a burn is a job somebody can hold without attending it, and the
 lead-roles register has always let any approved account appoint, so the two used to
-disagree: an organiser saw 👉 on this strip and clicking it through to a name always
+disagree: an organiser saw the appoint control on this strip and clicking it through to a name always
 failed. The heart still needs the caller's own attendance, because the row is keyed by
 it. A dream at a burn that has ended is a 404, like every other member-facing write
 here.
@@ -211,7 +211,7 @@ it; `supported_by_me` exists because the supporters are a count and nothing more
 ### Clicking a chip
 
 Clicking a dream opens a panel over the grid: when and where, the description as
-markdown, the ❤️‍🔥, and two 🙋/👉 strips — one for whoever is facilitating, one for
+markdown, the heart, and two hand-up/appoint strips — one for whoever is facilitating, one for
 the helpers. It edits and withdraws too, and the Dreams page opens this
 same panel (#342) rather than a form of its own — see below.
 
@@ -262,7 +262,7 @@ beside. The row is a single button that opens the panel now, and withdrawing is 
 it — one confirmation, `WithdrawDream`, so the same act cannot end up guarded on one
 page and not the other (#209).
 
-**Facilitating is a 🙋/👉 strip like every other job** (#283), not a field only the
+**Facilitating is a hand-up/appoint strip like every other job** (#283), not a field only the
 edit form could reach. One person holds it, so a filled spot offers only ✕ and a
 handover is unassign then assign — two steps, and each tells the person it happened
 to. Never the person who clicked.

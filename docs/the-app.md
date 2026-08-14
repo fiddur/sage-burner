@@ -46,7 +46,8 @@ different empties: a spot the page deliberately closed — a chore's lead, which
 — and a burn nobody has joined yet, where `getEventAttendees` answers nothing. The second is
 every burn on the day it opens, and it is the state #503 is most about, so the person the nudge
 is for saw no hand at all on exactly the burn they were looking at. `shut` is now a prop the
-chore sites pass, it suppresses 🙋 and 👉 together, and an empty `candidates` list means only
+chore sites pass, it suppresses the hand and the appoint control together, and an empty
+`candidates` list means only
 what it says: nobody to appoint. Joining is what opens the rest, which is what the nudge says.
 
 **`viewerAttending` went with it.** Eight call sites passed the same
@@ -308,6 +309,38 @@ Three rules the pages follow, all of them things a phone found first:
   `field-sizing: content` would measure it exactly and is not used — it makes the
   browser ignore `rows`, so the fields that ask for a taller empty box would open at
   the stylesheet's floor in Chrome and at their own everywhere else.
+
+## The icons (#621)
+
+**Colour names what a thing is; grey line art is what you can press.** The pages keep their
+emoji — 🎵 Songbook, 🛻 Rideshares, 🍽️ Meals — and so do the marks on the feed's activity
+lines and the before/during/after phases on Leads. Those say _what this is_, and a grey
+outline pan is worse than 🍳. Every control went the other way: a pencil, a trashcan, a
+bell, a heart, a hand, one weight and one colour. A row may hold both — a page's own mark
+beside the arrow saying it opens elsewhere — but two _controls_ in one row are never one of
+each.
+
+The twenty-four the app uses are the twenty-four it ships. They are
+[Lucide](https://lucide.dev)'s, pasted as path data into `Icon.tsx` exactly as #492 pasted
+Simple Icons' brand marks into `MusicIcon.tsx`, with the ISC notice in
+[THIRD-PARTY.md](../THIRD-PARTY.md). No dependency: a package would bring six hundred
+icons and a tree-shaking argument to have with Rollup, and the reason `packages/shared`
+sets `sideEffects: false` is that this app has already lost that argument once.
+
+**`currentColor` and `em` are what kept it to one new rule.** `.icon` is `1.1em` square and
+the drawing is `fill: none; stroke: currentColor`, so every rule that already set a control's
+colour and its `:hover` reaches the icon untouched, in both themes, and each place decides
+the size from its own `font-size`. The bell gained something in the move: it was greyed with
+`filter: grayscale(1)`, which does nothing to a drawing that is one colour already, so
+unseen notifications turn it `--ember` instead.
+
+**The drawing is `aria-hidden` and the name stays on the button**, which was already true of
+the emoji and is why six assertions in eighteen hundred had to change — a control is found by
+what it does. Where a test does need to know which face is showing, the homepage's pencil
+wearing an hourglass while a re-read is in flight, the `<svg>` carries `data-icon`.
+
+**♭** and **♯** stayed as they were. They transpose a song; they are text, not icons, and
+nothing in a line-icon set says what a flat says.
 
 ## Destroying something asks first (#594)
 
@@ -630,7 +663,7 @@ lever is editing that or their contact list. Comments follow the dream rule — 
 deletes their own, and an admin may delete any.
 
 **What leaves a quiet line, and what does not.** Offered, facilitated, handed over, a
-hand up or down, renamed, moved, edited, withdrawn. A ❤️‍🔥 does not — the faces are on
+hand up or down, renamed, moved, edited, withdrawn. A heart does not — the faces are on
 the dream already, and twenty hearts is twenty lines nobody reads.
 
 **A heart on every card** (#479), and it stays that quiet everywhere: no notification, no
@@ -779,7 +812,7 @@ three readers order by — it was `(thread_id, created_at)`, which served none o
 
 **A heart does not unfold the card** (#487). Every write on a thread answers with the whole thread,
 which is right for saying, rewording and deleting a comment — you have just written in it — and
-surprising for ♡ and for the bell's follow switch, where pressing one on a card with ten comments
+surprising for the heart and for the bell's follow switch, where pressing one on a card with ten comments
 unfolded all ten and made "show the whole thread" vanish. The fold is the client's, not the
 server's, so the fix is there: those two paths keep the `entries` and `entry_count` the card was
 already showing and take everything else from the answer. Keeping the fold rather than folding to

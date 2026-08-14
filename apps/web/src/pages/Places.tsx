@@ -149,7 +149,7 @@ export const Places = ({ api }: { api: PlacesApi }) => {
                 <span class="place-color-name">{row.color}</span>
 
                 <IconButton
-                  icon="✏️"
+                  icon="edit"
                   label={`Edit ${row.name}`}
                   disabled={busy}
                   onClick={() => setEditing(row.id)}

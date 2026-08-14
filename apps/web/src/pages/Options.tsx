@@ -162,7 +162,7 @@ const OptionList = ({
                 </span>
 
                 <IconButton
-                  icon="✏️"
+                  icon="edit"
                   label={`Edit ${row.label}`}
                   disabled={busy}
                   onClick={() => setEditing(row.id)}

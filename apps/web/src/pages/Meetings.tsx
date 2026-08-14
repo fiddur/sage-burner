@@ -453,7 +453,7 @@ const NextMeeting = ({
     {next !== undefined && (
       <p class="row">
         <IconButton
-          icon="✏️"
+          icon="edit"
           label={`Edit ${next.title}`}
           disabled={busy}
           onClick={() => onEditing(!editing)}
@@ -561,7 +561,7 @@ const Point = ({
 
       <p class="point-actions">
         <IconButton
-          icon="💬"
+          icon="comment"
           label={`${opened ? 'Hide' : 'Show'} what has been said about ${point.title}`}
           disabled={busy}
           onClick={onOpen}
@@ -575,7 +575,12 @@ const Point = ({
           </button>
         )}
         {mine && (
-          <IconButton icon="✏️" label={`Edit ${point.title}`} disabled={busy} onClick={() => onEdit(true)} />
+          <IconButton
+            icon="edit"
+            label={`Edit ${point.title}`}
+            disabled={busy}
+            onClick={() => onEdit(true)}
+          />
         )}
         {(mine || admin) && (
           <Destroy

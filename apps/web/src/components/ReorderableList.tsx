@@ -3,6 +3,7 @@ import type { ComponentChildren } from 'preact'
 import { useState } from 'preact/hooks'
 
 import { moveTo, swap } from '../reorder.ts'
+import { Icon } from './Icon.tsx'
 import { IconButton } from './IconButton.tsx'
 
 export const ReorderableList = <Row extends { id: string }>({
@@ -63,17 +64,17 @@ export const ReorderableList = <Row extends { id: string }>({
                 move(swap(ids, index, by))
               }}
             >
-              ⠿
+              <Icon name="drag" />
             </button>
 
             <IconButton
-              icon="↑"
+              icon="up"
               label={`Move ${labelFor(row)} up`}
               disabled={busy || index === 0}
               onClick={() => move(swap(ids, index, -1))}
             />
             <IconButton
-              icon="↓"
+              icon="down"
               label={`Move ${labelFor(row)} down`}
               disabled={busy || index === rows.length - 1}
               onClick={() => move(swap(ids, index, 1))}

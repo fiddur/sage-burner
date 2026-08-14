@@ -102,7 +102,7 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
                   <>
                     <span class="reorder-name">{item.label}</span>
                     <IconButton
-                      icon="✏️"
+                      icon="edit"
                       label={`Edit ${item.label}`}
                       disabled={busy}
                       onClick={() => {

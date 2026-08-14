@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import type { NavPage } from './Layout.tsx'
 
 import { useOverlay } from '../overlay.ts'
+import { Icon } from './Icon.tsx'
 
 export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
   const [open, setOpen] = useState(false)
@@ -53,7 +54,7 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
         aria-controls={showing ? 'menu-drawer' : undefined}
         onClick={() => setOpen((was) => !was)}
       >
-        <span aria-hidden="true">☰</span>
+        <Icon name="menu" />
       </button>
 
       {showing && (
@@ -71,14 +72,14 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
                 <span aria-hidden="true">{page.icon}</span> {page.label}
                 {page.away === true && (
                   <span class="menu-away" aria-label="opens elsewhere">
-                    ↗
+                    <Icon name="away" />
                   </span>
                 )}
               </a>
             ))}
 
             <button type="button" class="menu-close" onClick={close}>
-              ✕ Close
+              <Icon name="close" /> Close
             </button>
           </nav>
         </>

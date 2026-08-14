@@ -388,7 +388,7 @@ const RoleRow = ({
       </td>
 
       <td class="lead-actions">
-        <IconButton icon="✏️" label={`Edit ${role.title}`} disabled={busy} onClick={onEdit} />
+        <IconButton icon="edit" label={`Edit ${role.title}`} disabled={busy} onClick={onEdit} />
 
         <Destroy what={role.title} because="Everyone on it goes too." busy={busy} onDestroy={onRemove} />
       </td>

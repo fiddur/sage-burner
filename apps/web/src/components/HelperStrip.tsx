@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks'
 
+import { Icon } from './Icon.tsx'
 import { IconButton } from './IconButton.tsx'
 import { NAMELESS, PersonBadge } from './PersonBadge.tsx'
 
@@ -65,7 +66,7 @@ export const HelperStrip = ({
             avatar={everyone.find((who) => who.account_id === person.account_id)?.avatar ?? null}
           />
           <IconButton
-            icon="✕"
+            icon="close"
             label={`Take ${nameOf(person)} off ${label}`}
             disabled={busy}
             onClick={() => onRemove(person.account_id)}
@@ -87,7 +88,7 @@ export const HelperStrip = ({
                   aria-label={`Take the spot on ${label}`}
                   onClick={() => onAdd(viewerId)}
                 >
-                  🙋
+                  <Icon name="volunteer" />
                 </button>
               )}
               {offerable.length > 0 && (
@@ -99,7 +100,7 @@ export const HelperStrip = ({
                   aria-expanded={picking}
                   onClick={() => setPicking(!picking)}
                 >
-                  👉
+                  <Icon name="appoint" />
                 </button>
               )}
             </span>

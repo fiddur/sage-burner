@@ -101,7 +101,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
                 />
               )}
               <IconButton
-                icon="✏️"
+                icon="edit"
                 label="Edit these words"
                 disabled={busy}
                 onClick={() => setEditingIntro(true)}

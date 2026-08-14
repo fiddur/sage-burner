@@ -216,7 +216,7 @@ phone" means 360px.
       links to the details page rather than refusing — from an opened dream panel and
       a meal dialog as well as from a page, since that is where it is pressed.
 - [ ] On a burn nobody has joined yet, the lead-role, meal-crew and helping 🙋 are all
-      offered (and 👉 is not, there being nobody to appoint). A chore's cook offers
+      offered (and the appoint control is not, there being nobody to appoint). A chore's cook offers
       neither.
 - [ ] Leave the burn with a pledge outstanding: the hand is gone from the item
       and the item is not.
@@ -312,6 +312,17 @@ phone" means 360px.
       appear with title, time and place; nothing personal — no contacts, no
       allergies, no payment.
 - [ ] Rotate the token: the old URL stops answering, the new one works.
+
+## The icons
+
+- [ ] Every control is a line drawing in the colour of the text beside it — the pencil,
+      the trashcan, the bell, the heart, the hand, the menu, the toolbar's link and list.
+      Nothing coloured is a button.
+- [ ] The pages keep their emoji: the phone's bottom bar, the drawer's entries, the
+      feed's activity marks and the before/during/after phases on Leads.
+- [ ] The bell is quiet with nothing unseen and turns ember when something is. Hearting
+      something fills its heart, ember too; taking the heart back empties it.
+- [ ] In dark mode every icon is still legible, and hovering a control still lightens it.
 
 ## On a phone
 

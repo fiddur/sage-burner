@@ -237,7 +237,7 @@ const Half = ({
             {row.account_id === mine && (
               <p class="ride-actions">
                 <IconButton
-                  icon="✏️"
+                  icon="edit"
                   label={`Edit your journey from ${row.from}`}
                   disabled={busy}
                   onClick={() => onEdit(row.id)}

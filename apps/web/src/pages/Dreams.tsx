@@ -10,6 +10,7 @@ import type { Opened } from '../components/OpenedDream.tsx'
 import { useSelectedBurn } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Icon } from '../components/Icon.tsx'
 import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
@@ -158,7 +159,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
                 {dream.title}
                 {dream.repeatable && (
                   <span class="dream-repeats">
-                    <span aria-hidden="true">↻</span>
+                    <Icon name="repeats" />
                     <span class="visually-hidden">Can be planned more than once</span>
                   </span>
                 )}
