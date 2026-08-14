@@ -455,7 +455,7 @@ describe('the heart on a card', () => {
 
     const heart = await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' })
 
-    expect(heart.textContent).toBe('')
+    expect(heart.textContent).toBe('♡')
   })
 })
 

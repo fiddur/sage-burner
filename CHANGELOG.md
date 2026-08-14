@@ -9,16 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-14
 
-- **The buttons are drawings now, not emoji.** The pencil, the trashcan, the bell, the heart, the
-  raised hand, the menu — every control the app offers is one set of grey line icons, drawn the same
+- **The buttons are drawings now, not emoji.** The pencil, the trashcan, the bell, the raised
+  hand, the menu — every control the app offers is one set of grey line icons, drawn the same
   weight and the same size wherever it appears, instead of whatever your phone or laptop happened to
   make of an emoji. The pages keep their emoji: the bar at the bottom, the drawer, the marks on the
-  feed. Colour is what a thing is; grey is what you can press.
+  feed. The heart keeps its ❤️‍🔥. Colour is what a thing is; grey is what you can press.
 - **Adding a picture is a button in the toolbar now.** It was the words _Add a picture_ below the
   box, louder than anything else in the composer; it is the picture icon at the end of the row the
   bold and italic buttons are in, where every other app puts it. Pasting and dropping still work
   exactly as before.
-
 - **The bell says more.** It used to grey out with nothing unseen; now it goes the app's own orange
   when something is waiting for you.
 

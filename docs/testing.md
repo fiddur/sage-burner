@@ -316,12 +316,13 @@ phone" means 360px.
 ## The icons
 
 - [ ] Every control is a line drawing in the colour of the text beside it — the pencil,
-      the trashcan, the bell, the heart, the hand, the menu, the toolbar's link and list.
-      Nothing coloured is a button.
+      the trashcan, the bell, the hand, the menu, the toolbar's link, list and picture.
+      Nothing coloured is a button except the heart.
 - [ ] The pages keep their emoji: the phone's bottom bar, the drawer's entries, the
       feed's activity marks and the before/during/after phases on Leads.
-- [ ] The bell is quiet with nothing unseen and turns ember when something is. Hearting
-      something fills its heart, ember too; taking the heart back empties it.
+- [ ] The bell is quiet with nothing unseen and turns ember when something is.
+- [ ] Hearting something fills ♡ to ❤️‍🔥 — the heart is the one control that is not a line
+      drawing — and taking the heart back empties it.
 - [ ] In dark mode every icon is still legible, and hovering a control still lightens it.
 
 ## The composer

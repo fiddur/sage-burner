@@ -11,7 +11,6 @@ import { DreamPanel } from './DreamPanel.tsx'
 import { DreamThread } from './DreamThread.tsx'
 import { Faces } from './Faces.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
-import { Icon } from './Icon.tsx'
 import { IconButton } from './IconButton.tsx'
 import { WithdrawDream } from './WithdrawDream.tsx'
 
@@ -98,8 +97,7 @@ export const DreamDetails = ({
               aria-label={dream.supported_by_me ? 'Take back your support' : 'Show support'}
               onClick={() => onSupport(!dream.supported_by_me)}
             >
-              <Icon name="heart" class={dream.supported_by_me ? 'is-given' : undefined} />{' '}
-              {dream.support_count}
+              <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span> {dream.support_count}
             </button>
             {dream.supporters.length === 0 ? (
               <span class="form-note">Nobody has said they want this yet.</span>
