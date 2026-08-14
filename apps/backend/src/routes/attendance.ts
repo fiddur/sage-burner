@@ -18,6 +18,7 @@ import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
 import { cardEntry, JOINED } from './threads.ts'
+import { tellAboutTheWaitingList } from './waiting-list.ts'
 
 export const isAlreadyJoined = (error: unknown) => isUniqueViolation(error, 'attendance.event_id')
 
@@ -187,6 +188,7 @@ export const registerAttendanceRoutes = (
 
       if (joined.created) {
         await announceJoined(db, notify, { stay: joined.stay, account_id: viewer.account_id }, now)
+        await tellAboutTheWaitingList(db, joined.stay.event_id, notify)
       }
 
       const answer = { attendance: joined.stay } satisfies AttendanceResponse

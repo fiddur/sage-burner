@@ -153,6 +153,12 @@ const givenSubscribed = async (accountId: string) => {
 const list = (server: FastifyInstance, cookie: string) =>
   server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })
 
+const join = (server: FastifyInstance, cookie: string) =>
+  server.inject({ method: 'POST', url: `/api/events/${BURN}/attendance/me`, headers: { cookie } })
+
+const leave = (server: FastifyInstance, cookie: string) =>
+  server.inject({ method: 'DELETE', url: `/api/events/${BURN}/attendance/me`, headers: { cookie } })
+
 const setPaid = (server: FastifyInstance, cookie: string, accountId: string) =>
   server.inject({
     method: 'PATCH',
@@ -585,6 +591,90 @@ describe('the waiting list', () => {
 
     const theirs = (await list(server, second.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).not.toContain('waiting_list_pushed')
+  })
+
+  it('tells somebody who joins a burn that is already full (#564)', async () => {
+    // The line, not the payment, is what has to trigger the telling: every place here is
+    // paid, so nothing this member does and nothing an admin does will move it — the hook
+    // would never have fired for them at all.
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    await givenComing(paid.id)
+    await setPaid(server, admin.cookie, paid.id)
+    const late = await givenAccount()
+
+    expect((await join(server, late.cookie)).statusCode).toBe(201)
+
+    const theirs = (await list(server, late.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).toEqual(['waiting_list_pushed'])
+  })
+
+  it('says nothing to somebody who joins a burn with room in it', async () => {
+    // The passing sibling: telling on every join would satisfy the one above while
+    // greeting every new member of every burn with a waiting-list warning.
+    const server = await build()
+    await givenBurn(20)
+    const joiner = await givenAccount()
+
+    expect((await join(server, joiner.cookie)).statusCode).toBe(201)
+
+    expect((await list(server, joiner.cookie)).json().notifications).toEqual([])
+  })
+
+  it('does not tell the others again when somebody else joins', async () => {
+    // A join cannot change how many places are left — the joiner is unpaid — so the
+    // sentence is the one they already have, and saying it twice is what teaches people
+    // to stop reading them.
+    const server = await build()
+    await givenBurn(2)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const waiting = await givenAccount()
+    await givenComing(paid.id)
+    await givenComing(waiting.id)
+    await setPaid(server, admin.cookie, paid.id)
+    const late = await givenAccount()
+
+    await join(server, late.cookie)
+
+    const theirs = (await list(server, waiting.cookie)).json().notifications
+    expect(theirs.filter((one: { category: string }) => one.category === 'waiting_list_near')).toHaveLength(1)
+  })
+
+  it('tells the joiner the count the others were told', async () => {
+    const server = await build()
+    await givenBurn(2)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    await givenComing(paid.id)
+    await setPaid(server, admin.cookie, paid.id)
+    const late = await givenAccount()
+
+    await join(server, late.cookie)
+
+    const [told] = (await list(server, late.cookie)).json().notifications
+    expect(told.body).toContain('1 place left')
+  })
+
+  it('says nothing when somebody leaves, because an unpaid place was never one of the places', async () => {
+    // `left` is the cap less what has been paid for, and leaving only ever removes an
+    // unpaid row — so the line cannot move and there is nothing new to say. The decision
+    // is recorded here rather than in a route that does not call anything.
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    await givenComing(paid.id)
+    await setPaid(server, admin.cookie, paid.id)
+    const late = await givenAccount()
+    await join(server, late.cookie)
+    const before = (await list(server, late.cookie)).json().notifications.length
+
+    expect((await leave(server, late.cookie)).statusCode).toBe(204)
+
+    expect((await list(server, late.cookie)).json().notifications).toHaveLength(before)
   })
 
   it('says nothing at all while the burn is nowhere near full', async () => {

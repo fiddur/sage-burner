@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-14
 
+- **Joining a burn that is already full now tells you so.** You would land on the waiting list, see
+  it on the Members page if you went and looked, and hear nothing — and with every place already paid
+  for, nothing that happened afterwards would have told you either. The message arrives on joining
+  now, the same one everybody else on the list has.
+
 - **The emails look like the app now.** Invites, decisions, notifications and the new summary all
   arrive in the app's own colours and typeface, with the link as a button rather than a bare URL in
   a wall of plain text. They still carry a plain-text version underneath, so a mail reader that

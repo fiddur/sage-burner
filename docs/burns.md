@@ -554,10 +554,23 @@ who recorded more payments than places silenced it altogether — without #506's
 which said more than the data supports. The roster still draws the line, because for a **paid**
 member it is a real fact and the page is where somebody looks to see it.
 
-**Told once per burn** that it is full, since recording the next payment changes nothing for somebody
-already out. The countdown repeats, because the number in it changes. The link carries the burn
-(`/members?burn=…`, per #333), which is also what makes "have we said this already" a query rather
-than a column.
+**Told once per burn, per sentence** — the query asks whether this account already has _this exact
+message_ about _this burn_, so recording the next payment says nothing to somebody already out, while
+the countdown repeats whenever the number in it has actually changed. That is one rule where there
+were two, and it is what lets the line be recomputed as often as it likes without anybody hearing the
+same thing twice. The link carries the burn (`/members?burn=…`, per #333), which is what makes "have
+we said this already" a query rather than a column.
+
+**The line is what triggers the telling, not the payment** (#564). It used to be called from the
+payment route alone, which left out the one person most likely to care: somebody joining a burn that
+is _already_ full changes nothing an admin will touch, so with every place paid for, nothing would
+ever have fired for them — they were below the line on the roster and had heard nothing about it.
+Joining recomputes it too.
+
+**Leaving does not**, and that is not an omission. `left` is the cap less what has been paid for, and
+leaving only ever removes an **unpaid** row — so the line cannot move, and there is nothing new to
+say to anybody. Handing a place over does not move it either: it marks the taker paid and deletes the
+giver, who was.
 
 ## Handing a place over
 
