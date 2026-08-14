@@ -195,6 +195,28 @@ describe('the digest preview', () => {
     await waitFor(() => expect(preview).toHaveBeenCalledWith({ hours: 72 }))
   })
 
+  it('leaves the other button alone while it is sending', async () => {
+    // The field is not part of the settings, so nothing about it should reach the form: it
+    // shared the test button's flag, and carried `min`/`max` inside the form, where a number
+    // outside them refused an unrelated Save.
+    let finish = (_: { sent: boolean; to: string; reason: string | null }) => undefined as void
+    render(
+      <MailField
+        api={stub({
+          getMailSettings: () => Promise.resolve({ mail: STORED }),
+          sendDigestPreview: () => new Promise((resolve) => (finish = resolve)),
+        })}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send it' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sending…' })).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Send a test to me' })).toHaveProperty('disabled', false)
+
+    finish({ sent: true, to: 'admin@example.org', reason: null })
+  })
+
   it('is not offered where no mail server has been set up', async () => {
     render(<MailField api={stub()} />)
 
