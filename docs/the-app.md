@@ -1329,11 +1329,15 @@ has. The protocol is a handful of lines; STARTTLS negotiation, AUTH mechanisms,
 dot-stuffing and MIME encoding of anything that is not ASCII are not, and a
 gathering called "Sagegården" would find that last one on the first message.
 
-Every message is plain text. Nothing sent from here is worth a second rendering to
-keep in step with the first, and it means no address or member-written line is ever
-interpolated into markup on the way out. The `From:` display name is quoted per RFC
-5322 and stripped of anything that could end a header, since an installation calls
-itself whatever it likes.
+Every message is written once and sent twice over (#631) — `messages.ts` builds a list
+of blocks and `template.ts` renders that one list into both the plain-text part and the
+HTML one. It used to be text alone, on the reasoning that a second rendering is a second
+thing to keep in step and that nothing member-written would then reach markup. The first
+half is answered by there being one list rather than two copies of each sentence; the
+second by escaping at the one place interpolation happens. `docs/accounts.md` has the
+whole of it, including why the palette is written out as hex there. The `From:` display
+name is quoted per RFC 5322 and stripped of anything that could end a header, since an
+installation calls itself whatever it likes.
 
 **A notification's email leaves the request** (#356). `sendWithSmtp` opens a
 connection per message and `notifyBurn` fans out over the whole attendance, so a full

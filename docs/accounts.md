@@ -1152,8 +1152,15 @@ have been corrected in one part and not the other.
 and what most spam scoring reads, so it keeps the guarantee it always had: `wrapped` fills to
 76 columns because quoted-printable soft-wraps past that, and **a word longer than the width
 keeps its own line** rather than being split — a URL broken down the middle is a URL nobody
-can click. That guarantee used to be asserted for the invite alone; every message has it now
-because they all render through the same function.
+can click.
+
+Every kind that carries prose goes through it — a paragraph, a heading, a note, and a list
+entry, which wraps with a hanging indent so continuations line up under the first word rather
+than under the dash. A bare URL on its own line is the deliberate exception, and it is the
+whole reason for the rule. The guarantee used to be asserted for the invite alone, and the
+heading and the list entry were pushed whole until #631's review found it — which mattered
+because the digest is the message built from exactly those two, and its entry bodies carry
+member-written titles.
 
 **The HTML is inline styles and a table, and asks for nothing when it is opened.** A mail
 client strips `<style>` and knows nothing of the custom properties `styles.css` is built on,

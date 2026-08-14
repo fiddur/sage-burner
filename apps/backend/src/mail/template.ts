@@ -18,11 +18,6 @@ const ESCAPES: Record<string, string> = {
 export const escapeHtml = (value: string): string =>
   value.replaceAll(/[&<>"']/gu, (one) => ESCAPES[one] ?? one)
 
-/**
- * Quoted-printable soft-wraps past 76 columns and decoders put it back, but a URL broken in
- * the middle is a URL nobody can click — so a word longer than the width keeps its own line
- * rather than being split.
- */
 export const wrapped = (text: string, width = WRAP_AT): string[] => {
   const lines: string[] = []
   let line = ''
@@ -44,6 +39,13 @@ export const wrapped = (text: string, width = WRAP_AT): string[] => {
 
 const isNote = (block: Block): block is { note: string } => 'note' in block
 
+/** Continuations line up under the first word rather than under the dash. */
+const bulleted = (text: string, width = WRAP_AT): string[] => {
+  const [first = '', ...rest] = wrapped(text, width - 2)
+
+  return [`- ${first}`, ...rest.map((line) => `  ${line}`)]
+}
+
 export const textFrom = (blocks: readonly Block[]): string => {
   const firstNote = blocks.findIndex(isNote)
   const out: string[] = []
@@ -52,14 +54,14 @@ export const textFrom = (blocks: readonly Block[]): string => {
     if (at === firstNote) out.push('--')
 
     if ('paragraph' in block) out.push(...wrapped(block.paragraph), '')
-    else if ('heading' in block) out.push(block.heading, '')
+    else if ('heading' in block) out.push(...wrapped(block.heading), '')
     else if ('action' in block) out.push(block.action.href, '')
     else if ('note' in block) {
       out.push(...wrapped(block.note))
       if (block.link !== undefined) out.push(block.link.href)
     } else {
       for (const line of block.lines) {
-        out.push(`- ${line.text}`)
+        out.push(...bulleted(line.text))
         if (line.href !== undefined) out.push(`  ${line.href}`)
       }
       out.push('')
@@ -114,11 +116,6 @@ const htmlBlock = (block: Block): string => {
   return `<ul style="margin:0 0 14px;padding-inline-start:20px;">${items}</ul>`
 }
 
-/**
- * Inline styles and a table, because a mail client strips `<style>` and knows nothing of the
- * custom properties `styles.css` is built on. The palette is written out here as a result, and
- * `docs/accounts.md` says why that copy is the one duplication worth keeping.
- */
 export const htmlFrom = ({
   installation,
   blocks,

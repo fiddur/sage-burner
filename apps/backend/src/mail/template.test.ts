@@ -12,17 +12,35 @@ describe('wrapping the plain-text part', () => {
   })
 
   it('leaves a word longer than the width whole', () => {
-    // Quoted-printable puts a soft wrap back; a URL split down the middle is a URL
-    // nobody can click, so the one line that has to survive is never broken.
     const link = 'https://burn.example.org/invite/a-token-longer-than-any-sensible-width'
 
     expect(wrapped(link, 20)).toEqual([link])
   })
 
-  it('keeps every line inside the width across a whole message', () => {
-    const blocks: Block[] = [{ paragraph: 'a '.repeat(200).trim() }, { note: 'b '.repeat(200).trim() }]
+  it('keeps every line inside the width, for every kind that carries prose', () => {
+    // One block per kind because three of the four were pushed whole: a heading, and a list
+    // entry whose text is a member-written title, are where a long line actually comes from,
+    // and the digest is the message built from those two.
+    const long = (of: string) => `${of} `.repeat(200).trim()
+    const blocks: Block[] = [
+      { paragraph: long('a') },
+      { heading: long('b') },
+      { lines: [{ text: long('c'), href: 'https://burn.example.org/dreams/1' }] },
+      { note: long('d') },
+    ]
 
     for (const line of textFrom(blocks).split('\n')) expect(line.length).toBeLessThanOrEqual(WRAP_AT)
+  })
+
+  it('hangs a wrapped list entry under its first word rather than under the dash', () => {
+    const entry = `${'word '.repeat(30).trim()}`
+    const lines = textFrom([{ lines: [{ text: entry }] }])
+      .split('\n')
+      .filter((line) => line !== '')
+
+    expect(lines.length).toBeGreaterThan(1)
+    expect(lines[0]?.startsWith('- ')).toBe(true)
+    for (const line of lines.slice(1)) expect(line.startsWith('  ')).toBe(true)
   })
 })
 
@@ -67,8 +85,6 @@ describe('the html part', () => {
   })
 
   it('fetches nothing when it is opened', () => {
-    // A remote image is a read receipt and a webfont is ignored anyway. Links are a
-    // different thing — they are fetched when somebody chooses to follow one.
     const html = htmlFrom({ installation: 'X', blocks })
 
     expect(html).not.toContain('<img')
