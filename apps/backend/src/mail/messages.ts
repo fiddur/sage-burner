@@ -7,6 +7,8 @@ const OFF_SWITCH = 'You can turn these emails off under Your details → Notific
 
 const DIGEST_SWITCH = 'You can change how often this arrives, or stop it, under Your details → Notifications.'
 
+const DIGEST_SWITCH_LINKED = 'You can change how often this arrives, or stop it:'
+
 export const absolute = (origin: string | undefined, path: string): string | undefined =>
   origin === undefined ? undefined : `${origin}${path}`
 
@@ -150,10 +152,12 @@ export const digestMessage = ({
           },
         ]
       }),
-      {
-        note: DIGEST_SWITCH,
-        ...(settings === undefined ? {} : { link: { href: settings, label: 'Your details' } }),
-      },
+      settings === undefined
+        ? { note: DIGEST_SWITCH }
+        : {
+            note: DIGEST_SWITCH_LINKED,
+            link: { href: settings, label: 'Your details → Notifications' },
+          },
     ],
   })
 }

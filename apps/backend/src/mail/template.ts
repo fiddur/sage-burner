@@ -39,7 +39,6 @@ export const wrapped = (text: string, width = WRAP_AT): string[] => {
 
 const isNote = (block: Block): block is { note: string } => 'note' in block
 
-/** Continuations line up under the first word rather than under the dash. */
 const bulleted = (text: string, width = WRAP_AT): string[] => {
   const [first = '', ...rest] = wrapped(text, width - 2)
 
@@ -113,7 +112,7 @@ const htmlBlock = (block: Block): string => {
     })
     .join('')
 
-  return `<ul style="margin:0 0 14px;padding-inline-start:20px;">${items}</ul>`
+  return `<ul style="margin:0 0 14px;padding-left:20px;">${items}</ul>`
 }
 
 export const htmlFrom = ({

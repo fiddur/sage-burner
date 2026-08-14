@@ -1200,6 +1200,14 @@ heading and the list entry were pushed whole until #631's review found it — wh
 because the digest is the message built from exactly those two, and its entry bodies carry
 member-written titles.
 
+**Lengths are spelled the way a mail client reads them**, not the way a browser does: Outlook
+renders with Word, which ignores logical properties, so a `padding-inline-start` on a list
+silently falls back to the default indent. `padding-left` is the spelling here.
+
+**A footer says where the settings are once.** The sentence names them when there is no link to
+give, and steps aside for the link's own label when there is — both renderings come from the one
+block either way, which is the whole point of the block list.
+
 **The HTML is inline styles and a table, and asks for nothing when it is opened.** A mail
 client strips `<style>` and knows nothing of the custom properties `styles.css` is built on,
 so the palette is written out as hex in `template.ts` — the one copy of it worth keeping, and

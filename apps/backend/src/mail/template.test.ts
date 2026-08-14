@@ -18,9 +18,6 @@ describe('wrapping the plain-text part', () => {
   })
 
   it('keeps every line inside the width, for every kind that carries prose', () => {
-    // One block per kind because three of the four were pushed whole: a heading, and a list
-    // entry whose text is a member-written title, are where a long line actually comes from,
-    // and the digest is the message built from those two.
     const long = (of: string) => `${of} `.repeat(200).trim()
     const blocks: Block[] = [
       { paragraph: long('a') },
@@ -70,6 +67,25 @@ describe('what the plain-text part is made of', () => {
   })
 })
 
+describe('the footer note', () => {
+  it('does not say where the settings are twice when it links them', () => {
+    const html = htmlFrom({
+      installation: 'X',
+      blocks: [{ note: 'Change it:', link: { href: 'https://x/profile', label: 'Your details' } }],
+    })
+
+    expect(html.match(/Your details/gu)).toHaveLength(1)
+  })
+
+  it('puts the link on its own line in the plain-text part, where there is nothing to click', () => {
+    const text = textFrom([
+      { note: 'Change it:', link: { href: 'https://x/profile', label: 'Your details' } },
+    ])
+
+    expect(text.split('\n')).toContain('https://x/profile')
+  })
+})
+
 describe('the html part', () => {
   const blocks: Block[] = [{ paragraph: 'Hello' }, { note: 'Bye' }]
 
@@ -82,6 +98,15 @@ describe('the html part', () => {
 
     expect(html).not.toContain('<style')
     expect(html).not.toContain('<link')
+  })
+
+  it('spells its lengths the way a mail client reads them, not the way a browser does', () => {
+    // Outlook renders with Word, which ignores logical properties — a list would fall back
+    // to the default indent rather than the one asked for.
+    const html = htmlFrom({ installation: 'X', blocks: [{ lines: [{ text: 'one' }] }] })
+
+    expect(html).toContain('padding-left')
+    expect(html).not.toContain('padding-inline-start')
   })
 
   it('fetches nothing when it is opened', () => {
