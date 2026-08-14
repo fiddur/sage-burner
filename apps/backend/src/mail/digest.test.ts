@@ -211,7 +211,7 @@ describe('what a digest holds', () => {
     )
   })
 
-  it('carries everything since somebody was last here, not only since the last digest', async () => {
+  it('carries everything after the moment it is given', async () => {
     build()
     const accountId = await givenAccount()
     await givenUnseen(accountId, { body: 'while they were away', at: ago(5 * DAY) })
@@ -374,6 +374,86 @@ describe('the nightly sweep', () => {
 
     const [row] = await db().select({ sent: account.digest_sent_at }).from(account)
     expect(row?.sent).toBe(NOW.toISOString())
+  })
+
+  it('cuts at the last digest where that is later than the last visit', async () => {
+    // Both marks matter: the visit is what makes a digest worth sending to somebody who has
+    // been gone for weeks, and the last digest is what stops the next one repeating it.
+    build()
+    await givenMailServer()
+    const accountId = await givenAccount({ lastActive: ago(10 * DAY), digestSent: ago(2 * DAY) })
+    await givenUnseen(accountId, { body: 'already sent to them', at: ago(5 * DAY) })
+    await givenUnseen(accountId, { body: 'since that digest', at: ago(HOUR) })
+    const sent: Message[] = []
+
+    await sweepDigests(
+      {
+        db: db(),
+        send: (_transport, message) => {
+          sent.push(message)
+
+          return Promise.resolve()
+        },
+        origin: 'https://burn.example',
+        log: () => undefined,
+      },
+      NOW,
+    )
+
+    expect(sent[0]?.text).toContain('since that digest')
+    expect(sent[0]?.text).not.toContain('already sent to them')
+  })
+
+  it('cuts at the last visit where that is later than the last digest', async () => {
+    // The other half, and the one a `since`-only cut passes silently: they came back after
+    // that digest and read the page, so anything up to the visit is not news to them.
+    build()
+    await givenMailServer()
+    const accountId = await givenAccount({ lastActive: ago(5 * DAY), digestSent: ago(10 * DAY) })
+    await givenUnseen(accountId, { body: 'before they came back', at: ago(7 * DAY) })
+    await givenUnseen(accountId, { body: 'after they left again', at: ago(HOUR) })
+    const sent: Message[] = []
+
+    await sweepDigests(
+      {
+        db: db(),
+        send: (_transport, message) => {
+          sent.push(message)
+
+          return Promise.resolve()
+        },
+        origin: 'https://burn.example',
+        log: () => undefined,
+      },
+      NOW,
+    )
+
+    expect(sent[0]?.text).toContain('after they left again')
+    expect(sent[0]?.text).not.toContain('before they came back')
+  })
+
+  it('cuts at the last visit where nobody has had a digest yet', async () => {
+    build()
+    await givenMailServer()
+    const accountId = await givenAccount({ lastActive: ago(10 * DAY) })
+    await givenUnseen(accountId, { body: 'while they were gone', at: ago(5 * DAY) })
+    const sent: Message[] = []
+
+    await sweepDigests(
+      {
+        db: db(),
+        send: (_transport, message) => {
+          sent.push(message)
+
+          return Promise.resolve()
+        },
+        origin: 'https://burn.example',
+        log: () => undefined,
+      },
+      NOW,
+    )
+
+    expect(sent[0]?.text).toContain('while they were gone')
   })
 
   it('sends nothing where no mail server has been set up', async () => {

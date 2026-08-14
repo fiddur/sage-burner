@@ -1128,20 +1128,28 @@ A digest goes out only when **all** of these hold: a mail server is configured; 
 is not `off`; something is unseen; something unseen is newer than the last digest; and the
 account has not been on the site inside the window — 24 hours or 7 days.
 
-**It then carries everything unseen since they were last here** (#654). Not since the last
-digest: somebody who signed up, looked once and never came back should be told about the dreams
-that were offered and the points that were raised in the meantime, every time, until they come
-back — that is the whole of what would bring them back. The cut is `last_active_at`, and an
-account that has never been here has none, so it gets everything.
+**It then carries everything unseen since the later of two marks** (#654): when they were
+last on the site, and when the last digest went. Both are needed and each answers a different
+question.
 
-**`digest_sent_at` no longer cuts anything; it only decides whether to write at all.** With the
-content anchored to the last visit, a nightly sweep would otherwise post the same growing list
-for ever, so a digest goes only when something unseen is newer than the last one. The
-consequence is deliberate and is the reverse of what #644 decided: **a digest does repeat what
-the last one carried**, because it is a running summary of everything you have missed rather
-than a delta. #620 called it the whole of what is waiting, #644 made it a delta, and this is
-the third answer, chosen once it was clear the second one has nothing to say to somebody who
-registered and never returned. `MOST_PER_SECTION` is what keeps a long absence readable.
+**The visit** is what makes a first digest worth having. Somebody who signed up, looked once
+and never came back gets the whole stretch since that look — the dreams offered, the points
+raised, all of it — because a digest of the last day would mention almost nothing on the one
+night that "what you have missed" is the right message.
+
+**The last digest** is what stops the next one repeating it. Anchored to the visit alone, a
+nightly sweep would post the same growing list for ever.
+
+So the shape is: the first one is the history, and each one after it is what is new. Coming back
+moves the cut forward to the visit, which is right — they read the page while they were here.
+`digest_sent_at` also decides _whether_ to write at all, since a digest with nothing new in it
+is not worth a message.
+
+**The mark is the sweep's own tick, not the moment of the send.** It is taken before any account
+is read, so a notification written while the sweep is grinding through the list is either read
+into this digest or is strictly newer than the mark and lands in the next — never neither. That
+direction is the safe one, and it is why the mark must not be "tidied" to the moment the message
+actually went.
 
 **`account.last_active_at` is what "has been here" means**, and nothing recorded it before:
 a session is a signed cookie with no row behind it. An `onRequest` hook stamps it for

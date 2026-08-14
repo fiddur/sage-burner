@@ -48,6 +48,13 @@ const isRepeating = (choice: DigestChoice): choice is Repeating => choice !== 'o
 
 const away = (stamp: string | null, edge: string): boolean => stamp === null || stamp < edge
 
+export const laterOf = (one: string | null, other: string | null): string | null => {
+  if (one === null) return other
+  if (other === null) return one
+
+  return one > other ? one : other
+}
+
 export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandidate[]> => {
   const rows = await db
     .select({
@@ -136,7 +143,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
 
   for (const candidate of await dueForDigest(deps.db, at)) {
     const sections = await unseenFor(deps.db, candidate.account_id, {
-      after: candidate.lastActive,
+      after: laterOf(candidate.lastActive, candidate.since),
       since: candidate.since,
       origin: deps.origin,
     })
