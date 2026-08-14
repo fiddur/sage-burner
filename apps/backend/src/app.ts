@@ -174,20 +174,20 @@ const throttles = (bounds: NonNullable<AppDeps['bounds']>, now: () => number) =>
 
 const ADMIN_PREFIX = '/api/admin'
 
-/**
- * Only `/api/` and only with a session cookie, so nothing static or signed-out pays for it. The
- * viewer is memoised per request, so a route that needs it anyway is not read twice.
- */
 const registerActivityHook = (app: FastifyInstance, deps: GuardDeps & { now: () => Date }) => {
   app.addHook('onRequest', async (request) => {
     const pattern = request.routeOptions.url
     if (pattern === undefined || !pattern.startsWith(`${API_PREFIX}/`)) return
     if (readSessionCookie(request.headers.cookie) === undefined) return
 
-    const viewer = await viewerFor(request, deps)
-    if (viewer === undefined) return
+    try {
+      const viewer = await viewerFor(request, deps)
+      if (viewer === undefined) return
 
-    await markActive(deps.db, viewer.account_id, deps.now())
+      await markActive(deps.db, viewer.account_id, deps.now())
+    } catch (failure: unknown) {
+      request.log.warn({ err: failure }, 'recording that somebody has been here')
+    }
   })
 }
 

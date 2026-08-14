@@ -1,6 +1,11 @@
 import type { DigestChoice, NotificationCategory } from '@sage-burner/shared'
 
-import { DEFAULT_DIGEST, notificationCategories, notificationCategoryInfo } from '@sage-burner/shared'
+import {
+  DEFAULT_DIGEST,
+  detailsPage,
+  notificationCategories,
+  notificationCategoryInfo,
+} from '@sage-burner/shared'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
@@ -16,12 +21,11 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 export const digestWindowMs = (choice: Repeating): number => (choice === 'daily' ? DAY_MS : 7 * DAY_MS)
 
-/**
- * The container's clock decides what these mean, and the sweep runs hourly, so a digest lands in
- * the small hours rather than mid-afternoon. Nothing else depends on the hour: the window guard
- * below is what stops a second one going out, whenever the sweep happens to wake.
- */
 export const NIGHT_HOURS: readonly number[] = [2, 3, 4]
+
+export const MOST_PER_SECTION = 5
+
+const HOUR_MS = 60 * 60 * 1000
 
 export const isNightHour = (hour: number): boolean => NIGHT_HOURS.includes(hour)
 
@@ -35,6 +39,7 @@ export interface DigestCandidate {
 export interface DigestSection {
   category: NotificationCategory
   label: string
+  total: number
   entries: { body: string; link: string | undefined }[]
 }
 
@@ -57,19 +62,14 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
     const choice = row.digest ?? DEFAULT_DIGEST
     if (!isRepeating(choice)) return []
 
-    const edge = new Date(at.getTime() - digestWindowMs(choice)).toISOString()
-    if (!away(row.last_active_at, edge)) return []
-    if (!away(row.digest_sent_at, edge)) return []
+    const window = digestWindowMs(choice)
+    if (!away(row.last_active_at, new Date(at.getTime() - window).toISOString())) return []
+    if (!away(row.digest_sent_at, new Date(at.getTime() - window + HOUR_MS).toISOString())) return []
 
     return [{ account_id: row.id, email: row.email, choice, since: row.digest_sent_at }]
   })
 }
 
-/**
- * Everything still unseen, not only what arrived since the last digest — a digest is the whole of
- * what is waiting. `since` decides whether one goes out at all: with nothing newer than the last
- * one, somebody away for a month would otherwise get the same list every night.
- */
 export const unseenFor = async (
   db: Database,
   accountId: string,
@@ -98,7 +98,8 @@ export const unseenFor = async (
       {
         category,
         label: notificationCategoryInfo[category].label,
-        entries: mine.map((row) => ({
+        total: mine.length,
+        entries: mine.slice(0, MOST_PER_SECTION).map((row) => ({
           body: row.body,
           link: row.link === null ? undefined : absolute(origin, row.link),
         })),
@@ -128,7 +129,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
         installation,
         to: candidate.email,
         sections,
-        settings: absolute(deps.origin, '/profile'),
+        settings: absolute(deps.origin, detailsPage()),
       }),
     )
 

@@ -1135,7 +1135,24 @@ one alone would leave the rest unmentioned for ever.
 a session is a signed cookie with no row behind it. An `onRequest` hook stamps it for
 `/api/` requests carrying a session, and the staleness test is the `UPDATE`'s own `WHERE`,
 so it is one write, no read, and a no-op on all but the first request of an hour. That also
-sets the resolution: an hour is the finest question this data can answer.
+sets the resolution: an hour is the finest question this data can answer. It is bookkeeping,
+so a failure is logged and swallowed — it must not fail the read it rode in on.
+
+**A tab nobody is looking at is not somebody being here** (#632). `NotificationBell` polls
+every 60s, and that poll is a request with a session on it, so without a guard a pinned
+background tab would keep an account fresh for ever and the digest would never reach the one
+population it exists for. The poll skips while `visibilityState` is `hidden` and catches up on
+`visibilitychange` and `focus`, which is what `load.ts` already does — so the bell is as fresh
+as before to anybody actually watching it.
+
+**A section carries at most `MOST_PER_SECTION` lines** and says "and N more" for the rest, and
+the count in the subject is what is waiting rather than what was printed. Without it, somebody
+away six months gets every unseen row in one message — and since nothing prunes `notification`,
+that is every row ever written for them.
+
+**The `digest_sent_at` guard has an hour of slack.** The tick offset moves on every redeploy,
+so against a strict `now - 24h` a sweep waking a few minutes earlier than the night before finds
+nobody due, and the next one is 48 hours away. The window is a night, not a minute.
 
 **`account.digest_sent_at` is set only on a send that succeeded.** A mail server that is
 down therefore costs a delay rather than a digest — the next sweep tries the same person
@@ -1176,9 +1193,10 @@ every one of them. It is an hourly unref'd interval that does nothing outside 02
 the container's clock. Nothing depends on the hour being right; the window guard is what
 stops a second digest, whenever the sweep happens to wake.
 
-The wire carries both lists in full — `{ on: [...], email: [...] }` — for the same
+The wire carries the whole state — `{ on: [...], email: [...], digest }` — for the same
 reason it carries `on` in full: two lists meaning two different things is exactly what
-the `muted` rewrite got rid of.
+the `muted` rewrite got rid of, and a payload that is sometimes a delta is the same trap
+one field along.
 
 With no mail server there is **no column**, rather than one that cannot do anything: a
 switch that does nothing reads as a promise. Setting one up puts it there without a

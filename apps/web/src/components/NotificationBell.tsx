@@ -48,12 +48,21 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
         .catch(() => undefined)
     }
 
+    const askIfWatched = () => {
+      if (globalThis.document?.visibilityState === 'hidden') return
+      ask()
+    }
+
     ask()
-    const timer = setInterval(ask, ASK_EVERY_MS)
+    const timer = setInterval(askIfWatched, ASK_EVERY_MS)
+    globalThis.addEventListener('visibilitychange', askIfWatched)
+    globalThis.addEventListener('focus', askIfWatched)
 
     return () => {
       controller.abort()
       clearInterval(timer)
+      globalThis.removeEventListener('visibilitychange', askIfWatched)
+      globalThis.removeEventListener('focus', askIfWatched)
     }
   }, [api, path])
 

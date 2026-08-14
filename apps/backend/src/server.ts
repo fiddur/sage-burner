@@ -28,11 +28,6 @@ await announceDeploy(
   app.log.error({ err: failure }, 'could not announce the deploy')
 })
 
-/**
- * Here rather than in `createApp`, exactly as `announceDeploy` is: the suite builds an app per
- * test and a timer wired into that would tick in every one of them. Unref'd, so it never holds
- * the process open, and hourly, since the night window is the only thing it has to land inside.
- */
 const digests = setInterval(
   () => {
     const at = new Date()
