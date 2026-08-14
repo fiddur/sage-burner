@@ -73,8 +73,7 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
 export const unseenFor = async (
   db: Database,
   accountId: string,
-  since: string | null,
-  origin: string | undefined,
+  { since, origin }: { since: string | null; origin: string | undefined },
 ): Promise<DigestSection[]> => {
   const rows = await db
     .select({
@@ -87,11 +86,10 @@ export const unseenFor = async (
     .where(and(eq(notification.account_id, accountId), isNull(notification.seen_at)))
     .orderBy(desc(notification.created_at), desc(notification.id))
 
-  if (rows.length === 0) return []
-  if (since !== null && !rows.some((row) => row.created_at > since)) return []
+  const within = since === null ? rows : rows.filter((row) => row.created_at > since)
 
   return notificationCategories.flatMap((category) => {
-    const mine = rows.filter((row) => row.category === category)
+    const mine = within.filter((row) => row.category === category)
     if (mine.length === 0) return []
 
     return [
@@ -120,7 +118,10 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
   let sent = 0
 
   for (const candidate of await dueForDigest(deps.db, at)) {
-    const sections = await unseenFor(deps.db, candidate.account_id, candidate.since, deps.origin)
+    const sections = await unseenFor(deps.db, candidate.account_id, {
+      since: candidate.since,
+      origin: deps.origin,
+    })
     if (sections.length === 0) continue
 
     const posted = await post(

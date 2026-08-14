@@ -1126,10 +1126,31 @@ the lists are carried whole.
 
 A digest goes out only when **all** of these hold: a mail server is configured; the choice
 is not `off`; something is unseen; something unseen is newer than the last digest; and the
-account has not been on the site inside the window — 24 hours or 7 days. It then carries
-**everything** still unseen, not only what arrived since the last one: a digest is the whole
-of what is waiting, and the newer thing is only what makes it worth sending. Sending the new
-one alone would leave the rest unmentioned for ever.
+account has not been on the site inside the window — 24 hours or 7 days.
+
+**It then carries what has happened since the last one** (#644). #620 had it carry everything
+still unseen, which is right for the first digest and wrong for every one after it: somebody
+who never opens the bell has their notifications stay unseen for ever, so night after night the
+same list arrived with one new line on top, and the message meant to bring them back becomes
+the one they filter.
+
+**The cut is the last digest and never the clock.** A window measured back from the sweep looks
+like the same rule and is not: eligibility needs `last_active_at` older than the window, so the
+earliest sweep that can write to somebody is a whole window after their last visit — and a
+clock-anchored cut would by then have moved past a notification that arrived an hour after they
+left. That is the population this exists for, and nothing else would ever carry it. It would
+also silently undo the failed-send retry, which leaves `digest_sent_at` unset precisely so the
+next sweep sends the same stretch.
+
+So a daily digest holds a day's worth because it goes out daily, not because a day is measured
+— and where the gap is longer, the digest is longer, which is the honest answer. `MOST_PER_SECTION`
+is what bounds it.
+
+**The first one is the exception, and `since` is what makes it one.** An account that has never
+had a digest has no `digest_sent_at`, and that absence is read as "carry everything" — so a
+member's first is the whole backlog, which is the single night when _what you have missed_ is
+exactly the right message. The subject counts what is waiting rather than what was printed, so
+a large first digest is still a readable one.
 
 **`account.last_active_at` is what "has been here" means**, and nothing recorded it before:
 a session is a signed cookie with no row behind it. An `onRequest` hook stamps it for
