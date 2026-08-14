@@ -21,6 +21,7 @@ export const sendWithSmtp: Send = async (transport, message) => {
       to: message.to,
       subject: message.subject,
       text: message.text,
+      html: message.html,
     })
   } finally {
     mailer.close()

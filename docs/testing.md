@@ -238,6 +238,10 @@ phone" means 360px.
       stays folded, "show the whole thread" still offered.
 - [ ] Subscribe to push in one browser; a notification tapped lands on the
       right page in the open app rather than a new window.
+- [ ] Any of the emails — the test message, an invite, a notification — arrives wearing
+      the installation's name, the app's colours and its serif body, with the action as a
+      filled button. Read it in a client with images off: nothing is missing, because there
+      are none. Read it as plain text: the same words, and every link on a line of its own.
 - [ ] With SMTP configured (⚙️ → Settings), the test message goes to the
       admin's own address, and the Email column appears on the notification
       settings — unticked for every kind until asked. The digest below the tables
