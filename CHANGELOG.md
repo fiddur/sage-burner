@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-14
 
+- **The emails look like the app now.** Invites, decisions, notifications and the new summary all
+  arrive in the app's own colours and typeface, with the link as a button rather than a bare URL in
+  a wall of plain text. They still carry a plain-text version underneath, so a mail reader that
+  shows no formatting shows the same words.
+
 - **A summary by email when you have been away.** If something happens and you have not been on the
   site for a day, you get one message listing what you have not seen, grouped and linked. It arrives
   only when there is something new and only when you have actually been away, so a day you have read

@@ -34,7 +34,12 @@ const dbAnswering = (row: typeof SETTINGS | undefined): Database => {
   return { select: () => chain } as unknown as Database
 }
 
-const A_MESSAGE: Message = { to: 'ada@example.org', subject: 'Hello', text: 'Hello.' }
+const A_MESSAGE: Message = {
+  to: 'ada@example.org',
+  subject: 'Hello',
+  text: 'Hello.',
+  html: '<p>Hello.</p>',
+}
 
 describe('the from address', () => {
   it('is the bare address when nobody has named the installation', () => {

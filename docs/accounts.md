@@ -1142,6 +1142,34 @@ down therefore costs a delay rather than a digest — the next sweep tries the s
 again — which is the one place the "a failed send costs a message" rule is worth bending,
 since nothing else will carry that backlog.
 
+**Every message is written once and rendered twice** (#631). `messages.ts` builds a list of
+blocks — a paragraph, a heading, an action, a list of lines, a note — and `template.ts` turns
+that one list into both the `text` part and the `html` one. The alternative was writing each
+sentence twice, which is the shape that goes one step stale: the wording that matters would
+have been corrected in one part and not the other.
+
+**The plain-text part is not a fallback nobody reads.** It is what a text-only client shows
+and what most spam scoring reads, so it keeps the guarantee it always had: `wrapped` fills to
+76 columns because quoted-printable soft-wraps past that, and **a word longer than the width
+keeps its own line** rather than being split — a URL broken down the middle is a URL nobody
+can click.
+
+Every kind that carries prose goes through it — a paragraph, a heading, a note, and a list
+entry, which wraps with a hanging indent so continuations line up under the first word rather
+than under the dash. A bare URL on its own line is the deliberate exception, and it is the
+whole reason for the rule. The guarantee used to be asserted for the invite alone, and the
+heading and the list entry were pushed whole until #631's review found it — which mattered
+because the digest is the message built from exactly those two, and its entry bodies carry
+member-written titles.
+
+**The HTML is inline styles and a table, and asks for nothing when it is opened.** A mail
+client strips `<style>` and knows nothing of the custom properties `styles.css` is built on,
+so the palette is written out as hex in `template.ts` — the one copy of it worth keeping, and
+the reason to keep it small. No image and no webfont: a remote image is a read receipt, and a
+webfont is ignored anyway. Everything a member or an admin wrote is escaped, in the text of a
+line and in the `href` alike, since a notification body is member-authored and the
+installation's name is admin-authored.
+
 **The sweep is in `server.ts`, not `createApp`** — exactly where `announceDeploy` is, and for
 the same reason: the suite builds an app per test, and a timer wired into that would tick in
 every one of them. It is an hourly unref'd interval that does nothing outside 02:00–05:00 by
