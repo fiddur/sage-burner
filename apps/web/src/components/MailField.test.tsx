@@ -195,6 +195,41 @@ describe('the digest preview', () => {
     await waitFor(() => expect(preview).toHaveBeenCalledWith({ hours: 72 }))
   })
 
+  it('leaves the other button alone while it is sending', async () => {
+    let finish = (_: { sent: boolean; to: string; reason: string | null }) => undefined as void
+    render(
+      <MailField
+        api={stub({
+          getMailSettings: () => Promise.resolve({ mail: STORED }),
+          sendDigestPreview: () => new Promise((resolve) => (finish = resolve)),
+        })}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send it' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sending…' })).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Send a test to me' })).toHaveProperty('disabled', false)
+
+    finish({ sent: true, to: 'admin@example.org', reason: null })
+  })
+
+  it('will not send a stretch the route would refuse', async () => {
+    const preview = vi.fn(() => Promise.resolve({ sent: true, to: 'admin@example.org', reason: null }))
+    render(
+      <MailField
+        api={stub({ getMailSettings: () => Promise.resolve({ mail: STORED }), sendDigestPreview: preview })}
+      />,
+    )
+
+    fireEvent.input(await screen.findByLabelText(/Send me a digest of the last/), {
+      target: { value: '5000' },
+    })
+
+    expect(screen.getByRole('button', { name: 'Send it' })).toHaveProperty('disabled', true)
+    expect(preview).not.toHaveBeenCalled()
+  })
+
   it('is not offered where no mail server has been set up', async () => {
     render(<MailField api={stub()} />)
 

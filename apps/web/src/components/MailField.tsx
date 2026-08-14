@@ -73,7 +73,6 @@ export const MailField = ({ api }: { api: MailApi }) => {
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState<string | undefined>(undefined)
-  const [hours, setHours] = useState(String(DIGEST_PREVIEW_HOURS))
   const [error, setError] = useFormError()
 
   useEffect(() => {
@@ -149,20 +148,6 @@ export const MailField = ({ api }: { api: MailApi }) => {
       setResult(answer.sent ? `Sent to ${answer.to}. Check your inbox.` : `Not sent: ${answer.reason ?? ''}`)
     } catch (failure) {
       setError(isApiError(failure) ? failure.message : 'Could not send the test. Please try again.')
-    } finally {
-      setTesting(false)
-    }
-  }
-
-  const preview = async () => {
-    setTesting(true)
-    setError(undefined)
-    setResult(undefined)
-    try {
-      const answer = await api.sendDigestPreview({ hours: Number(hours) })
-      setResult(answer.sent ? `Sent to ${answer.to}. Check your inbox.` : `Not sent: ${answer.reason ?? ''}`)
-    } catch (failure) {
-      setError(isApiError(failure) ? failure.message : 'Could not send that. Please try again.')
     } finally {
       setTesting(false)
     }
@@ -287,30 +272,7 @@ export const MailField = ({ api }: { api: MailApi }) => {
           </p>
         )}
 
-        {stored !== null && (
-          <p class="row digest-preview">
-            <label>
-              <span>Send me a digest of the last</span>{' '}
-              <input
-                type="number"
-                min={1}
-                max={MOST_PREVIEW_HOURS}
-                value={hours}
-                disabled={busy || testing}
-                onInput={(inputEvent) => setHours(inputEvent.currentTarget.value)}
-              />{' '}
-              <span>hours</span>
-            </label>
-            <PendingButton
-              busy={testing}
-              label="Send it"
-              busyLabel="Sending…"
-              type="button"
-              disabled={busy || Number(hours) < 1 || Number(hours) > MOST_PREVIEW_HOURS}
-              onClick={() => void preview()}
-            />
-          </p>
-        )}
+        {stored !== null && <DigestPreview api={api} disabled={busy || testing} />}
 
         <p class="row">
           <PendingButton busy={busy} label="Save" busyLabel="Saving…" type="submit" disabled={testing} />
@@ -336,5 +298,59 @@ export const MailField = ({ api }: { api: MailApi }) => {
         </p>
       </form>
     </section>
+  )
+}
+
+const DigestPreview = ({ api, disabled }: { api: Pick<MailApi, 'sendDigestPreview'>; disabled: boolean }) => {
+  const [hours, setHours] = useState(String(DIGEST_PREVIEW_HOURS))
+  const [sending, setSending] = useState(false)
+  const [said, setSaid] = useState<string | undefined>(undefined)
+
+  const wanted = Number(hours)
+  const usable = Number.isInteger(wanted) && wanted >= 1 && wanted <= MOST_PREVIEW_HOURS
+
+  const send = async () => {
+    setSending(true)
+    setSaid(undefined)
+    try {
+      const answer = await api.sendDigestPreview({ hours: wanted })
+      setSaid(answer.sent ? `Sent to ${answer.to}. Check your inbox.` : `Not sent: ${answer.reason ?? ''}`)
+    } catch (failure) {
+      setSaid(isApiError(failure) ? failure.message : 'Could not send that. Please try again.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <>
+      <p class="row digest-preview">
+        <label>
+          <span>Send me a digest of the last</span>{' '}
+          <input
+            type="text"
+            inputMode="numeric"
+            value={hours}
+            disabled={disabled || sending}
+            onInput={(inputEvent) => setHours(inputEvent.currentTarget.value)}
+          />{' '}
+          <span>hours</span>
+        </label>
+        <PendingButton
+          busy={sending}
+          label="Send it"
+          busyLabel="Sending…"
+          type="button"
+          disabled={disabled || !usable}
+          onClick={() => void send()}
+        />
+      </p>
+
+      {said !== undefined && (
+        <p class="form-note" role="status">
+          {said}
+        </p>
+      )}
+    </>
   )
 }
