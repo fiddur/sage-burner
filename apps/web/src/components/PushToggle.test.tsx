@@ -174,7 +174,7 @@ describe('PushToggle', () => {
     render(<PushToggle api={stub()} browser={aBrowser({ permission: () => 'denied' })} />)
 
     expect(await screen.findByText(/blocking notifications/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /notifying me here/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /me here/i })).toBeNull()
   })
 
   it('shows it as already on when this browser has a subscription', async () => {

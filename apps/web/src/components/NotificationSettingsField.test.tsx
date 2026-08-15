@@ -66,7 +66,7 @@ const open = async (heading: string) => {
 }
 
 describe('what to be told about', () => {
-  it('starts collapsed, with one switch per section rather than thirty-eight', async () => {
+  it('starts collapsed, with one switch per section rather than one per category', async () => {
     render(<NotificationSettingsField api={stub()} />)
 
     expect(await screen.findAllByRole('checkbox')).toHaveLength(3)
@@ -246,8 +246,6 @@ describe('what to be told about', () => {
   })
 
   it('shows the section switch as mixed where its categories differ', async () => {
-    // Six of the eighteen personal ones are on by default, so this section is the
-    // half-and-half case; the ones nobody has asked for are the passing sibling below.
     render(<NotificationSettingsField api={stub()} />)
 
     await screen.findByLabelText('What happens to you — Here')

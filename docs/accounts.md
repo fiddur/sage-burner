@@ -1043,7 +1043,7 @@ read shows.
 **Most people are expected never to open a section.** The switches that get used are the
 🔔 in a card's corner and the ⋯ on a notification (#680) — both are about the thing in
 front of you, which is when somebody actually knows whether they want to hear about it
-again. Thirty-eight rows in one flat list was a page nobody could answer.
+again. Every category in one flat list was a page nobody could answer.
 
 ### Switching one off from the notification itself (#680)
 

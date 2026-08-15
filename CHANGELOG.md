@@ -9,7 +9,7 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
-- **The notification settings are four switches, not thirty-eight.** Your details →
+- **The notification settings are four switches, not a row per kind.** Your details →
   Notifications was one long list of every kind of thing the app can tell you about, which is a
   page nobody could answer. It is four sections now — what happens to you, what others are
   doing, a new version of the app, and what you look after — each with a switch for Here and one
