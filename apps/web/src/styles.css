@@ -619,15 +619,46 @@ a:hover {
   overflow: hidden;
 }
 
-/* Where the Write/Preview tabs were. A mode switch is the chrome that reads as a technical
-   tool (#473); what sits here now writes the syntax rather than talking about it. */
+/* Write | Preview, back after #473 took them away and #638 decided the other way: a preview under
+   the box says "how it will read" about words nobody has finished writing, and the tab is also
+   where somebody finds out there is anything to preview. The toolbar below it is what writes the
+   syntax rather than talking about it. */
+.md-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem 0.25rem 0;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.md-tab {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.md-tab.is-on {
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* The help line belongs to the box above it rather than to the next field, so it sits closer. */
+.md-field-help {
+  margin-top: 0.25rem;
+}
+
 .syntax-row {
   display: flex;
 }
 
-/* The strip only reads as one inside the bordered box; over a comment box it is a bare row of
-   controls. */
-.md-field > .syntax-row {
+.md-field .syntax-row {
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
@@ -683,11 +714,11 @@ a:hover {
   outline-offset: -2px;
 }
 
-/* Quiet, and only there once the text has syntax in it: a preview of plain words beside the
-   plain words is noise, and it is the tab that made this read as a tool (#473). */
+/* The panel behind the Preview tab. */
 .md-field-preview {
-  border-left: 2px solid var(--line);
-  padding-left: 0.75rem;
+  min-height: 5rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--paper);
 }
 
 .md-field-preview .markdown-preview > :first-child {
@@ -1827,8 +1858,9 @@ a.person-badge:focus-visible span:last-child {
   margin: 0;
 }
 
-/* The box and its button on one row on a wide screen, stacked on a phone — a comment
-   box that shrinks to a slit beside a button is the thing this avoids. */
+/* The editor and its button on one row on a wide screen, stacked on a phone — a comment box
+   that shrinks to a slit beside a button is the thing this avoids. The field is the flexible
+   one, and `min-width: 0` is what lets it shrink rather than pushing the button off the side. */
 .thread-say,
 .thread-editing {
   margin: 0;
@@ -1836,6 +1868,12 @@ a.person-badge:focus-visible span:last-child {
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: flex-start;
+}
+
+.thread-say > .field,
+.thread-editing > .field {
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 
 /* Who an `@` may name (#439). A row rather than a floating popover: the box it belongs to is
@@ -1852,16 +1890,6 @@ a.person-badge:focus-visible span:last-child {
 
 .mention-menu button {
   font-size: 0.9rem;
-}
-
-.thread-box {
-  flex: 1 1 12rem;
-  font: inherit;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 0.4rem;
-  background: var(--paper);
-  color: var(--ink);
 }
 
 /* The "seed this burn from a previous one" control, on the places grid and the
@@ -2976,4 +3004,25 @@ a.song-row:hover .song-what {
 
 .song-speed input {
   width: 8rem;
+}
+
+/* What you type beside how it reads (#638). The source column keeps its newlines, being the one
+   place in the app where the marks themselves are the content. */
+.formatting-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.formatting-table th,
+.formatting-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+  vertical-align: top;
+}
+
+.formatting-source {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.85rem;
 }

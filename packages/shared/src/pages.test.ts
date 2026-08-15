@@ -4,6 +4,7 @@ import {
   applyingOutcomes,
   applyPage,
   bringPage,
+  formattingPage,
   linkingOutcomes,
   loginPage,
   meetingsPage,
@@ -78,5 +79,11 @@ describe('the lead-roles register', () => {
 
   it('encodes it, so an id cannot invent a parameter', () => {
     expect(rolesPage('a&b')).toBe('/roles?burn=a%26b')
+  })
+})
+
+describe('the formatting help', () => {
+  it('belongs to no burn and takes no parameter, an applicant reading it as well', () => {
+    expect(formattingPage()).toBe('/formatting')
   })
 })

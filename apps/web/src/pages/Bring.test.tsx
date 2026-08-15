@@ -206,6 +206,21 @@ describe('the bring list', () => {
     )
   })
 
+  it('refuses to add it while a picture is still going up', async () => {
+    // The placeholder would be stored as the comment, and the form blanks on save, so the
+    // finished upload has nothing left to rewrite.
+    renderPage(stub())
+
+    fireEvent.input(await screen.findByRole('textbox', { name: 'What is it?' }), {
+      target: { value: 'Drums to use around the fire' },
+    })
+    fireEvent.input(screen.getByLabelText('Anything else about it?'), {
+      target: { value: '![Uploading drums.jpg…]()' },
+    })
+
+    expect(screen.getByRole('button', { name: 'Add it' }).hasAttribute('disabled')).toBe(true)
+  })
+
   it('adds an offer when the tick says you are bringing it', async () => {
     const addBringItem = vi.fn<BringApi['addBringItem']>(() => Promise.reject(new Error('stop here')))
     renderPage(stub({ addBringItem }))
