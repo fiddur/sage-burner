@@ -70,6 +70,11 @@ const tick = async (name?: string) => {
   fireEvent.change(box, { target: { checked: true } })
 }
 
+/** The sections start collapsed (#682), so a per-category switch has to be uncovered first. */
+const uncover = async (heading: string) => {
+  fireEvent.click(await screen.findByRole('button', { name: heading }))
+}
+
 /** Waits out the mount effect: until it has answered, the nudge is hidden by the state alone. */
 const settled = async () => await screen.findAllByRole('button', { name: 'Notify me here' })
 
@@ -137,6 +142,7 @@ describe('the nudge', () => {
 
   it('stays away for every later switch in the same sitting, once refused', async () => {
     app(stub(), aBrowser(false))
+    await uncover('What others are doing')
     await tick('Somebody offers a dream — Here')
     await screen.findByText(NUDGE)
     fireEvent.click(screen.getByRole('button', { name: 'Do not ask me here' }))

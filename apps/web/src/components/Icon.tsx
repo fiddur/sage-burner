@@ -3,6 +3,8 @@ export type IconName =
   | 'away'
   | 'bullets'
   | 'calendar'
+  | 'chevron-down'
+  | 'chevron-right'
   | 'close'
   | 'comment'
   | 'destroy'
@@ -11,6 +13,7 @@ export type IconName =
   | 'edit'
   | 'link'
   | 'menu'
+  | 'more'
   | 'organise'
   | 'pause'
   | 'picture'
@@ -39,6 +42,8 @@ export const ICONS: Record<IconName, readonly string[]> = {
     'M3 9h18',
     'M8 2v3',
   ],
+  'chevron-down': ['m6 9 6 6 6-6'],
+  'chevron-right': ['m9 18 6-6-6-6'],
   close: ['M18 6 6 18', 'm6 6 12 12'],
   comment: [
     'M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719',
@@ -68,6 +73,7 @@ export const ICONS: Record<IconName, readonly string[]> = {
     'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
   ],
   menu: ['M4 5h16', 'M4 12h16', 'M4 19h16'],
+  more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
   organise: [
     'M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915',
     'M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0',

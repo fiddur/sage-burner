@@ -562,6 +562,11 @@ export const apiRoutes = {
     fastify: '/api/me/notifications',
     path: () => '/api/me/notifications',
   },
+  deleteMyNotification: {
+    method: 'DELETE',
+    fastify: '/api/me/notifications/:id',
+    path: (id: string) => `/api/me/notifications/${encodeURIComponent(id)}`,
+  },
   getMyNotificationSettings: {
     method: 'GET',
     fastify: '/api/me/notification-settings',

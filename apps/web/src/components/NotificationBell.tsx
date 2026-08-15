@@ -6,11 +6,20 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { markFavicon } from '../favicon.ts'
+import { useNotificationRows } from '../notification-rows.ts'
 import { useShown } from '../shown.tsx'
 import { usePhone } from '../viewport.ts'
+import { ErrorText } from './ErrorText.tsx'
 import { NotificationList } from './NotificationList.tsx'
 
-export type BellApi = Pick<ApiClient, 'getMyNotifications' | 'markNotificationsSeen'>
+export type BellApi = Pick<
+  ApiClient,
+  | 'deleteMyNotification'
+  | 'getMyNotifications'
+  | 'getMyNotificationSettings'
+  | 'markNotificationsSeen'
+  | 'updateMyNotificationSettings'
+>
 
 const ASK_EVERY_MS = 60_000
 
@@ -64,6 +73,13 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
       globalThis.removeEventListener('focus', askIfWatched)
     }
   }, [api, path])
+
+  const rows = useNotificationRows(api, (answered) => {
+    if (answered === undefined) return
+
+    setItems(answered.notifications)
+    setUnseen(answered.unseen)
+  })
 
   const badged = unseen > 0
   useEffect(() => markFavicon(badged), [badged])
@@ -137,7 +153,14 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
 
       {open && (
         <div class="bell-panel">
-          <NotificationList items={items} onFollow={() => setOpen(false)} />
+          <ErrorText message={rows.error} />
+          <NotificationList
+            items={items}
+            busy={rows.busy}
+            onFollow={() => setOpen(false)}
+            onStop={rows.stop}
+            onRemove={rows.remove}
+          />
         </div>
       )}
     </span>
