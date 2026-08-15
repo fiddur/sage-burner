@@ -83,6 +83,9 @@ const clientWith = (
   postComment: () => Promise.reject(new Error('postComment is not stubbed in this file')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed in this file')),
   deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed in this file')),
+  supportComment: () => Promise.reject(new Error('supportComment is not stubbed in this file')),
+  withdrawSupportForComment: () =>
+    Promise.reject(new Error('withdrawSupportForComment is not stubbed in this file')),
   login: () => Promise.reject(new Error('login is not stubbed in this file')),
   getAdminAccounts: () => Promise.reject(new Error('getAdminAccounts is not stubbed in this file')),
   setAccountRoles: () => Promise.reject(new Error('setAccountRoles is not stubbed in this file')),

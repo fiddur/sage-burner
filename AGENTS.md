@@ -40,8 +40,9 @@ type definitions. All layers import from it — never duplicate a schema.
   (what an uploaded icon may be, and `flameIcon` — the app's own mark, which the
   backend serves when nobody has uploaded one), `routes.ts` (`apiRoutes`, every
   endpoint's path and verb), `pages.ts` (the client-side paths a link is built from),
-  and `mentions.ts` (the `@[Name](mention:id)` token, which `markdown.ts` renders).
-  Nothing under `schemas/`.
+  `mentions.ts` (the `@[Name](mention:id)` token, which `markdown.ts` renders), and
+  `dates.ts` (`dayName`, which names a plain calendar day for the backend's meal cards
+  and the web's day headings alike). Nothing under `schemas/`.
 - **Every endpoint lives in `routes.ts` and nowhere else.** The client builds its
   path from it and the route file registers `fastify` from it, so the two spellings
   of one endpoint cannot drift; `routes.test.ts` checks that each built path routes

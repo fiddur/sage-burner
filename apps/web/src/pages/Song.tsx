@@ -21,7 +21,6 @@ import type { Mentionable } from '../mentioning.ts'
 import { Destroy } from '../components/Destroy.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
-import { Faces } from '../components/Faces.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Heart } from '../components/Heart.tsx'
 import { Icon } from '../components/Icon.tsx'
@@ -63,6 +62,8 @@ export type SongApi = Pick<
   | 'getApprovedAccounts'
   | 'supportThread'
   | 'withdrawSupportForThread'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
 >
 
 interface Held {
@@ -584,11 +585,12 @@ const Talk = ({
 
   return (
     <section>
-      <p class="song-hearts">
+      <div class="song-hearts">
         <Heart
           what={held.title}
           hearted={held.supported_by_me}
           count={held.support_count}
+          people={held.supporters}
           busy={busy}
           onHeart={(hearting) =>
             run(
@@ -601,8 +603,7 @@ const Talk = ({
             )
           }
         />
-        <Faces people={held.supporters} />
-      </p>
+      </div>
 
       <h2>What people say</h2>
       <ErrorText message={error} />
@@ -626,6 +627,15 @@ const Talk = ({
         }
         onRemove={(id) =>
           run(async () => setThread((await api.deleteComment(id)).thread), 'Could not take that back.')
+        }
+        onHeart={(id, hearting) =>
+          run(
+            async () =>
+              setThread(
+                (hearting ? await api.supportComment(id) : await api.withdrawSupportForComment(id)).thread,
+              ),
+            'Could not do that just now.',
+          )
         }
         onShowAll={() =>
           run(async () => setThread((await api.getThread(held.id)).thread), 'Could not load the rest of it.')

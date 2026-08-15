@@ -10,6 +10,7 @@ import { localDay } from '../datetime.ts'
 import { stillUploading } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { Destroy } from './Destroy.tsx'
+import { Heart } from './Heart.tsx'
 import { IconButton } from './IconButton.tsx'
 import { MarkdownField } from './MarkdownField.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
@@ -54,6 +55,7 @@ export const DreamThread = ({
   onSay,
   onRewrite,
   onRemove,
+  onHeart,
   onShowAll,
 }: {
   thread: Thread | undefined
@@ -66,6 +68,7 @@ export const DreamThread = ({
   onSay: (body: string, done: () => void) => void
   onRewrite: (id: string, body: string) => void
   onRemove: (id: string) => void
+  onHeart: (id: string, hearting: boolean) => void
   onShowAll?: () => void
 }) => {
   const [saying, setSaying] = useState('')
@@ -137,7 +140,15 @@ export const DreamThread = ({
                     class="markdown-preview"
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.body) }}
                   />
-                  <p class="thread-mine">
+                  <div class="thread-foot">
+                    <Heart
+                      what={`what ${nameOf(entry)} said`}
+                      hearted={entry.supported_by_me}
+                      count={entry.support_count}
+                      people={entry.supporters}
+                      busy={busy}
+                      onHeart={(hearting) => onHeart(entry.id, hearting)}
+                    />
                     {entry.author?.account_id === viewerId && (
                       <IconButton
                         icon="edit"
@@ -154,7 +165,7 @@ export const DreamThread = ({
                         onDestroy={() => onRemove(entry.id)}
                       />
                     )}
-                  </p>
+                  </div>
                 </>
               )}
             </li>

@@ -860,6 +860,103 @@ describe('naming somebody in a comment', () => {
   })
 })
 
+describe('the heart on a comment', () => {
+  const love = (server: FastifyInstance, cookie: string, id: string) =>
+    server.inject({ method: 'POST', url: `/api/comments/${id}/support/me`, headers: { cookie } })
+
+  const unlove = (server: FastifyInstance, cookie: string, id: string) =>
+    server.inject({ method: 'DELETE', url: `/api/comments/${id}/support/me`, headers: { cookie } })
+
+  const setUp = async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, ada.cookie, id, 'is one mat enough?')
+    const [said] = (await entriesOf(server, ada.cookie, id)).filter((entry) => entry.kind === 'comment')
+    if (said === undefined) throw new Error('no comment')
+
+    return { server, ada, card: id, comment: said }
+  }
+
+  it('gives one, and says whose it is', async () => {
+    const { server, ada, card, comment } = await setUp()
+
+    const given = await love(server, ada.cookie, comment.id)
+
+    expect(given.statusCode).toBe(200)
+    const [after] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind === 'comment')
+    expect(after?.support_count).toBe(1)
+    expect(after?.supported_by_me).toBe(true)
+    expect(after?.supporters.map((person) => person.name)).toEqual(['Ada'])
+  })
+
+  it('takes it back', async () => {
+    const { server, ada, card, comment } = await setUp()
+    await love(server, ada.cookie, comment.id)
+
+    await unlove(server, ada.cookie, comment.id)
+
+    const [after] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind === 'comment')
+    expect(after?.support_count).toBe(0)
+    expect(after?.supported_by_me).toBe(false)
+  })
+
+  it('counts one heart per person however many times it is given', async () => {
+    const { server, ada, card, comment } = await setUp()
+
+    await love(server, ada.cookie, comment.id)
+    await love(server, ada.cookie, comment.id)
+
+    const [after] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind === 'comment')
+    expect(after?.support_count).toBe(1)
+  })
+
+  it('is somebody else’s to give as well, and each is their own', async () => {
+    const { server, ada, card, comment } = await setUp()
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+
+    await love(server, bea.cookie, comment.id)
+
+    const [mine] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind === 'comment')
+    expect(mine?.support_count).toBe(1)
+    expect(mine?.supported_by_me).toBe(false)
+    const [theirs] = (await entriesOf(server, bea.cookie, card)).filter((one) => one.kind === 'comment')
+    expect(theirs?.supported_by_me).toBe(true)
+  })
+
+  it('goes with the comment when it is taken back', async () => {
+    const { server, ada, comment } = await setUp()
+    await love(server, ada.cookie, comment.id)
+
+    await remove(server, ada.cookie, comment.id)
+
+    expect(client().prepare('select count(*) as n from entry_support').get()?.n).toBe(0)
+  })
+
+  it('is refused to somebody who is not approved', async () => {
+    const { server, comment } = await setUp()
+    const nobody = await givenAccount('Nobody', [])
+
+    expect((await love(server, nobody.cookie, comment.id)).statusCode).toBe(403)
+  })
+
+  it('answers 404 for a comment nobody has', async () => {
+    const { server, ada } = await setUp()
+
+    expect((await love(server, ada.cookie, randomUUID())).statusCode).toBe(404)
+  })
+
+  it('answers 404 for an entry that is not a comment, a done thing being nobody’s to love', async () => {
+    const { server, ada, card } = await setUp()
+    const [done] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind !== 'comment')
+
+    expect((await love(server, ada.cookie, done?.id ?? '')).statusCode).toBe(404)
+  })
+})
+
 describe('the heart on a card', () => {
   const heart = (server: FastifyInstance, cookie: string, id: string) =>
     server.inject({ method: 'POST', url: `/api/threads/${id}/support/me`, headers: { cookie } })

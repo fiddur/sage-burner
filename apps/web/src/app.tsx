@@ -84,6 +84,8 @@ export type RoutesApi = Pick<
   | 'postComment'
   | 'updateComment'
   | 'deleteComment'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
   | 'getAllergyItems'
   | 'getChangelog'
   | 'getPrivacy'

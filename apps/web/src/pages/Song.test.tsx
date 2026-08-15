@@ -61,6 +61,9 @@ const aThread = (over: Partial<Thread> = {}): Thread => ({
       body: 'put it in the book',
       created_at: '2026-07-02T00:00:00.000Z',
       edited_at: null,
+      supporters: [],
+      support_count: 0,
+      supported_by_me: false,
     },
   ],
   ...over,
@@ -81,6 +84,8 @@ const stub = (
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
   supportThread: () => Promise.reject(new Error('supportThread is not stubbed here')),
   withdrawSupportForThread: () => Promise.reject(new Error('withdrawSupportForThread is not stubbed here')),
+  supportComment: () => Promise.reject(new Error('supportComment is not stubbed here')),
+  withdrawSupportForComment: () => Promise.reject(new Error('withdrawSupportForComment is not stubbed here')),
 
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
@@ -391,7 +396,9 @@ describe('a song’s page', () => {
 
     const heart = await screen.findByRole('button', { name: 'Take back your heart for Fire in the sky' })
     expect(heart.getAttribute('aria-pressed')).toBe('true')
-    expect(heart.textContent).toContain('2')
+
+    fireEvent.click(screen.getByRole('button', { name: '2 gave a heart to Fire in the sky' }))
+
     expect(screen.getByRole('link', { name: 'Ada' })).toBeTruthy()
   })
 

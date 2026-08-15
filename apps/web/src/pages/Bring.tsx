@@ -40,6 +40,8 @@ export type BringApi = Pick<
   | 'postComment'
   | 'updateComment'
   | 'deleteComment'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
   | 'uploadImage'
 >
 
@@ -355,6 +357,7 @@ const Row = ({
           onSay={talk.say}
           onRewrite={talk.rewrite}
           onRemove={talk.remove}
+          onHeart={talk.heart}
         />
       )}
     </li>

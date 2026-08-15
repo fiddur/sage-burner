@@ -12,6 +12,9 @@ const anEntry = (over: Partial<ThreadEntry> & Pick<ThreadEntry, 'id' | 'body'>):
   author: { account_id: 'a-1', name: 'Ada' },
   created_at: '2026-08-07T18:00:00.000Z',
   edited_at: null,
+  supporters: [],
+  support_count: 0,
+  supported_by_me: false,
   ...over,
 })
 
@@ -38,10 +41,16 @@ const aThread = (entries: ThreadEntry[]): Thread => ({
 const show = (
   thread: Thread | undefined,
   over: Partial<Parameters<typeof DreamThread>[0]> = {},
-): { say: ReturnType<typeof vi.fn>; rewrite: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> } => {
+): {
+  say: ReturnType<typeof vi.fn>
+  rewrite: ReturnType<typeof vi.fn>
+  remove: ReturnType<typeof vi.fn>
+  heart: ReturnType<typeof vi.fn>
+} => {
   const say = vi.fn()
   const rewrite = vi.fn()
   const remove = vi.fn()
+  const heart = vi.fn()
 
   render(
     <DreamThread
@@ -54,11 +63,12 @@ const show = (
       onSay={say}
       onRewrite={rewrite}
       onRemove={remove}
+      onHeart={heart}
       {...over}
     />,
   )
 
-  return { say, rewrite, remove }
+  return { say, rewrite, remove, heart }
 }
 
 describe('a conversation about a dream', () => {
@@ -236,6 +246,60 @@ describe('a conversation about a dream', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Show the whole thread/ }))
     expect(showAll).toHaveBeenCalled()
+  })
+})
+
+describe('the heart on a comment', () => {
+  it('gives one, naming the comment by whoever said it', () => {
+    const { heart } = show(aThread([anEntry({ id: 't-1', body: 'bring a towel' })]))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Give a heart to what Ada said' }))
+
+    expect(heart).toHaveBeenCalledWith('t-1', true)
+  })
+
+  it('takes one back', () => {
+    const { heart } = show(
+      aThread([
+        anEntry({
+          id: 't-1',
+          body: 'bring a towel',
+          support_count: 1,
+          supported_by_me: true,
+          supporters: [{ account_id: 'a-1', name: 'Ada', avatar: null }],
+        }),
+      ]),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Take back your heart for what Ada said' }))
+
+    expect(heart).toHaveBeenCalledWith('t-1', false)
+  })
+
+  it('unfolds whoever gave one under the comment itself', () => {
+    show(
+      aThread([
+        anEntry({
+          id: 't-1',
+          body: 'bring a towel',
+          support_count: 2,
+          supporters: [
+            { account_id: 'a-1', name: 'Ada', avatar: null },
+            { account_id: 'a-2', name: 'Bea', avatar: null },
+          ],
+        }),
+      ]),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '2 gave a heart to what Ada said' }))
+
+    expect(screen.getByRole('link', { name: 'Bea' }).getAttribute('href')).toBe('/members/a-2')
+  })
+
+  it('offers none on a line the app wrote, a done thing being nobody’s to love', () => {
+    show(aThread([anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' })]))
+
+    expect(screen.queryByRole('button', { name: /heart/ })).toBeNull()
   })
 })
 

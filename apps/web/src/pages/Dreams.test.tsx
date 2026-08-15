@@ -62,6 +62,8 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
   deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),
+  supportComment: () => Promise.reject(new Error('supportComment is not stubbed here')),
+  withdrawSupportForComment: () => Promise.reject(new Error('withdrawSupportForComment is not stubbed here')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
   getEventAttendees: () =>
     Promise.resolve({
@@ -594,6 +596,9 @@ describe('Dreams', () => {
               body: 'is one mat enough?',
               created_at: '2026-08-07T18:00:00.000Z',
               edited_at: null,
+              supporters: [],
+              support_count: 0,
+              supported_by_me: false,
             },
           ],
         },

@@ -34,6 +34,8 @@ export type DreamsApi = Pick<
   | 'postComment'
   | 'updateComment'
   | 'deleteComment'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
   | 'uploadImage'
 >
 

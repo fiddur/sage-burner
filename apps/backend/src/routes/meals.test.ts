@@ -1163,11 +1163,25 @@ describe('the card a sitting carries', () => {
 
     const card = await cardFor(server, ada.cookie, meal.id)
     expect(card.entity_type).toBe('meal')
-    expect(card.title).toBe('Dinner')
+    expect(card.title).toBe('Dinner · Sat 1')
     expect(card.link).toBe(`/meals?burn=${BURN}`)
     expect(card.entries.map((entry) => [entry.author?.name, entry.kind, entry.body])).toEqual([
       ['Ada', 'facilitator', 'is cooking it'],
     ])
+  })
+
+  it('heads each sitting of one slot by its own day, so three dinners are three cards', async () => {
+    const { server, ada } = await setUp()
+    const { meals } = await listMeals(server, ada.cookie)
+
+    for (const sitting of meals) {
+      await send(server, 'PUT', `/api/meals/${sitting.id}/lead`, ada.cookie, { account_id: ada.id })
+    }
+
+    const titles = await Promise.all(
+      meals.map(async (sitting: { id: string }) => (await cardFor(server, ada.cookie, sitting.id)).title),
+    )
+    expect(titles).toEqual(['Dinner · Sat 1', 'Dinner · Sun 2', 'Dinner · Mon 3'])
   })
 
   it('says which way the cooking went, in the words of whoever did it', async () => {

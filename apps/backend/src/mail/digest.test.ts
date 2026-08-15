@@ -304,6 +304,9 @@ describe('a card in one line', () => {
     author: name === null ? null : { account_id: randomUUID(), name },
     created_at: ago(HOUR),
     edited_at: null,
+    supporters: [],
+    support_count: 0,
+    supported_by_me: false,
   })
 
   it('says the title and what was done', () => {

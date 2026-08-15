@@ -1,6 +1,6 @@
 import type { EventAttendeesResponse, Meal, MealsResponse } from '@sage-burner/shared'
 
-import { MAX_OPTION_LABEL, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
+import { dayName, MAX_OPTION_LABEL, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -15,7 +15,6 @@ import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
-import { dayName } from '../datetime.ts'
 import { stillUploading } from '../image-upload.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'

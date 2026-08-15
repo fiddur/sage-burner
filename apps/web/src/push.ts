@@ -89,3 +89,25 @@ export const dismissPushNudge = (store?: Storage): void => {
     held?.setItem(NUDGE_DISMISSED_KEY, 'yes')
   } catch {}
 }
+
+// Session storage rather than local, and that is the whole of what "for now" means (#695): the
+// bell's strip is meant to come back, so its ✕ lasts until the browser is closed and no longer.
+export const NUDGE_LATER_KEY = 'sage-burner:push-nudge-later'
+
+export const nudgedLater = (store?: Storage): boolean => {
+  try {
+    const held = store ?? globalThis.sessionStorage
+
+    return typeof held?.getItem(NUDGE_LATER_KEY) === 'string'
+  } catch {
+    return false
+  }
+}
+
+export const nudgeLater = (store?: Storage): void => {
+  try {
+    const held = store ?? globalThis.sessionStorage
+
+    held?.setItem(NUDGE_LATER_KEY, 'yes')
+  } catch {}
+}

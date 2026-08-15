@@ -52,6 +52,8 @@ export type FeedApi = Pick<
   | 'getApprovedAccounts'
   | 'supportThread'
   | 'withdrawSupportForThread'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
   | 'setThreadFollow'
 >
 
@@ -106,7 +108,13 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   }
 
   const heldKeepingFold = (shown: Thread, fresh: Thread) => {
-    held({ ...fresh, entries: shown.entries, entry_count: shown.entry_count })
+    const fresher = new Map(fresh.entries.map((entry) => [entry.id, entry]))
+
+    held({
+      ...fresh,
+      entries: shown.entries.map((entry) => fresher.get(entry.id) ?? entry),
+      entry_count: shown.entry_count,
+    })
   }
 
   const forget = (threadId: string) => {
@@ -208,6 +216,17 @@ export const Feed = ({ api }: { api: FeedApi }) => {
             card,
             (hearting ? await api.supportThread(card.id) : await api.withdrawSupportForThread(card.id))
               .thread,
+          ),
+        'Could not do that just now.',
+      )
+    },
+    heartComment: (card: Thread, id: string, hearting: boolean) => {
+      onComment(
+        card,
+        async () =>
+          heldKeepingFold(
+            card,
+            (hearting ? await api.supportComment(id) : await api.withdrawSupportForComment(id)).thread,
           ),
         'Could not do that just now.',
       )
@@ -504,6 +523,7 @@ const Card = ({
     reword: (threadId: string, id: string, title: string, body: string, done: () => void) => void
     takeBack: (threadId: string, id: string) => void
     heart: (card: Thread, hearting: boolean) => void
+    heartComment: (card: Thread, id: string, hearting: boolean) => void
     follow: (card: Thread, following: boolean) => void
   }
   upload: UploadImage
@@ -564,19 +584,21 @@ const Card = ({
         onSay={(body, done) => talk.say(card, body, done)}
         onRewrite={(id, body) => talk.rewrite(card, id, body)}
         onRemove={(id) => talk.remove(card, id)}
+        onHeart={(id, hearting) => talk.heartComment(card, id, hearting)}
         onShowAll={() => talk.showAll(card)}
       />
 
       {!card.gone && (
-        <p class="feed-card-foot">
+        <div class="feed-card-foot">
           <Heart
             what={card.title}
             hearted={card.supported_by_me}
             count={card.support_count}
+            people={card.supporters}
             busy={busy}
             onHeart={(hearting) => talk.heart(card, hearting)}
           />
-        </p>
+        </div>
       )}
     </li>
   )
