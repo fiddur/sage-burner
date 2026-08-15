@@ -27,6 +27,9 @@ const one = (over: Partial<Notification> = {}): Notification => ({
 const stub = (over: Partial<BellApi> = {}): BellApi => ({
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
   markNotificationsSeen: () => Promise.resolve({ notifications: [], unseen: 0 }),
+  deleteMyNotification: () => Promise.resolve({ notifications: [], unseen: 0 }),
+  getMyNotificationSettings: () => Promise.resolve({ on: ['meal_role'], email: [], digest: 'daily' }),
+  updateMyNotificationSettings: () => Promise.resolve({ on: [], email: [], digest: 'daily' }),
   ...over,
 })
 

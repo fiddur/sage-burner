@@ -1,7 +1,9 @@
 import type { NotificationCategory } from '@sage-burner/shared'
 
 import { notificationCategoryInfo } from '@sage-burner/shared'
-import { useEffect, useId, useRef, useState } from 'preact/hooks'
+import { useId, useState } from 'preact/hooks'
+
+import { useAway } from '../dropdown.ts'
 
 export const CardBell = ({
   what,
@@ -21,27 +23,8 @@ export const CardBell = ({
   onFollow: (following: boolean) => void
 }) => {
   const [open, setOpen] = useState(false)
-  const wrap = useRef<HTMLDivElement>(null)
   const panelId = useId()
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    const away = (event: Event) => {
-      if (!(event.target instanceof Node) || wrap.current?.contains(event.target) !== true) setOpen(false)
-    }
-    const escape = (keyEvent: KeyboardEvent) => {
-      if (keyEvent.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('pointerdown', away)
-    document.addEventListener('keydown', escape)
-
-    return () => {
-      document.removeEventListener('pointerdown', away)
-      document.removeEventListener('keydown', escape)
-    }
-  }, [open])
+  const wrap = useAway<HTMLDivElement>(open, () => setOpen(false))
 
   return (
     <div ref={wrap} class="card-bell">

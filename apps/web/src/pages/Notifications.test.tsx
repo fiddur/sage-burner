@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Viewer } from '../viewer.tsx'
 import type { NotificationsApi } from './Notifications.tsx'
 
+import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
 import { Notifications } from './Notifications.tsx'
 
@@ -40,6 +41,11 @@ const TWO: Notification[] = [
 const stub = (over: Partial<NotificationsApi> = {}, held = TWO, unseen = held.length): NotificationsApi => ({
   getMyNotifications: () => Promise.resolve({ notifications: held, unseen }),
   markNotificationsSeen: () => Promise.resolve({ notifications: held, unseen: 0 }),
+  deleteMyNotification: () => Promise.resolve({ notifications: held.slice(1), unseen: 0 }),
+  getMyNotificationSettings: () =>
+    Promise.resolve({ on: ['meal_role'], email: ['meal_role'], digest: 'daily' }),
+  updateMyNotificationSettings: () =>
+    Promise.resolve({ on: ['meal_role'], email: ['meal_role'], digest: 'daily' }),
   ...over,
 })
 
@@ -49,6 +55,75 @@ const renderPage = (api: NotificationsApi, viewer: Viewer = ADA) =>
       <Notifications api={api} />
     </ViewerProvider>,
   )
+
+describe('what a row offers', () => {
+  const menuOn = async (said: string) => {
+    fireEvent.click(await screen.findByRole('button', { name: `What to do with “${said}”` }))
+  }
+
+  it('switches the category off on both channels at once', async () => {
+    const update = vi.fn(() => Promise.resolve({ on: [], email: [], digest: 'daily' as const }))
+    renderPage(
+      stub({
+        getMyNotificationSettings: () =>
+          Promise.resolve({ on: ['meal_role', 'payment'], email: ['meal_role'], digest: 'daily' }),
+        updateMyNotificationSettings: update,
+      }),
+    )
+
+    await menuOn('You are on helper for Dinner')
+    fireEvent.click(screen.getByRole('button', { name: /Stop telling me about this/ }))
+
+    await waitFor(() => expect(update).toHaveBeenCalledWith({ on: ['payment'], email: [], digest: 'daily' }))
+  })
+
+  it('says which kind it is switching off, the row itself not saying', async () => {
+    renderPage(stub())
+
+    await menuOn('You are on helper for Dinner')
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Stop telling me about this (Put on or taken off a meal)',
+      }),
+    ).toBeTruthy()
+  })
+
+  it('removes the row, and it is gone from what the page reads back', async () => {
+    let held = TWO
+    const remove = vi.fn((id: string) => {
+      held = held.filter((item) => item.id !== id)
+      return Promise.resolve({ notifications: held, unseen: 0 })
+    })
+    renderPage(
+      stub({
+        getMyNotifications: () => Promise.resolve({ notifications: held, unseen: 0 }),
+        deleteMyNotification: remove,
+      }),
+    )
+
+    await menuOn('You are on helper for Dinner')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this notification' }))
+
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('n-1'))
+    await waitFor(() => expect(screen.queryByText('You are on helper for Dinner')).toBeNull())
+    expect(screen.getByText('Your place is paid for')).toBeTruthy()
+  })
+
+  it('says so where the removal fails, rather than dropping the row anyway', async () => {
+    renderPage(
+      stub({
+        deleteMyNotification: () => Promise.reject(apiError(500, 'internal_error', 'Nope.')),
+      }),
+    )
+
+    await menuOn('You are on helper for Dinner')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this notification' }))
+
+    expect(await screen.findByText('Nope.')).toBeTruthy()
+    expect(screen.getByText('You are on helper for Dinner')).toBeTruthy()
+  })
+})
 
 describe('what has happened to you', () => {
   it('lists them in the order the server sent them', async () => {

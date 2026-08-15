@@ -128,6 +128,7 @@ export type RoutesApi = Pick<
   | 'getInviteState'
   | 'redeemInvite'
   | 'getMyProfile'
+  | 'deleteMyNotification'
   | 'getMyNotifications'
   | 'markNotificationsSeen'
   | 'getMyNotificationSettings'

@@ -229,6 +229,64 @@ describe('the bell', () => {
   })
 })
 
+describe('taking one off your own list', () => {
+  const givenOne = async (server: Awaited<ReturnType<typeof build>>) => {
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+    await setPaid(server, admin.cookie, ada.id)
+
+    const [only] = (await list(server, ada.cookie)).json().notifications
+
+    return { ada, only }
+  }
+
+  const drop = (server: Awaited<ReturnType<typeof build>>, cookie: string | undefined, id: string) =>
+    server.inject({
+      method: 'DELETE',
+      url: `/api/me/notifications/${id}`,
+      ...(cookie === undefined ? {} : { headers: { cookie } }),
+    })
+
+  it('removes it, and settles the count it was part of', async () => {
+    const server = await build()
+    const { ada, only } = await givenOne(server)
+
+    const gone = await drop(server, ada.cookie, only.id)
+
+    expect(gone.statusCode).toBe(200)
+    expect(gone.json().notifications).toHaveLength(0)
+    expect(gone.json().unseen).toBe(0)
+    expect((await list(server, ada.cookie)).json().notifications).toHaveLength(0)
+  })
+
+  it('refuses to take somebody else’s off, and leaves it where it was', async () => {
+    const server = await build()
+    const { ada, only } = await givenOne(server)
+    const bea = await givenAccount()
+
+    expect((await drop(server, bea.cookie, only.id)).statusCode).toBe(404)
+    expect((await list(server, ada.cookie)).json().notifications).toHaveLength(1)
+  })
+
+  it('refuses somebody who is not signed in', async () => {
+    const server = await build()
+    const { only } = await givenOne(server)
+
+    expect((await drop(server, undefined, only.id)).statusCode).toBe(401)
+  })
+
+  it('answers 404 for one that is already gone', async () => {
+    const server = await build()
+    const { ada, only } = await givenOne(server)
+
+    await drop(server, ada.cookie, only.id)
+
+    expect((await drop(server, ada.cookie, only.id)).statusCode).toBe(404)
+  })
+})
+
 describe('what somebody has switched on', () => {
   /**
    * The ones that are on unless somebody says otherwise.

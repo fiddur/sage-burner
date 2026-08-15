@@ -34,6 +34,7 @@ const clientWith = (
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
   readAt: () => undefined,
   markTargetShown: () => Promise.reject(new Error('markTargetShown is not stubbed in this file')),
+  deleteMyNotification: () => Promise.reject(new Error('deleteMyNotification is not stubbed in this file')),
   getMapLink: () => Promise.reject(new Error('getMapLink is not stubbed in this file')),
   signUp: () => Promise.reject(new Error('signUp is not stubbed in this file')),
   sendMyApplicationMessage: () =>

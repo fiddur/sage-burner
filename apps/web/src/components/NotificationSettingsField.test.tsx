@@ -1,6 +1,6 @@
 import type { NotificationSettings } from '@sage-burner/shared'
 
-import { categoriesAbout, notificationCategories } from '@sage-burner/shared'
+import { categoriesAbout, notificationCategories, notificationCategoryInfo } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -55,42 +55,63 @@ const checked = (label: string) => {
   return box instanceof HTMLInputElement && box.checked
 }
 
+const mixed = (label: string) => {
+  const box = screen.getByLabelText(label)
+  return box instanceof HTMLInputElement && box.indeterminate
+}
+
+/** Sections start collapsed (#682), so a per-category row needs its section opened first. */
+const open = async (heading: string) => {
+  fireEvent.click(await screen.findByRole('button', { name: heading }))
+}
+
 describe('what to be told about', () => {
-  it('shows a row for every category a member is ever told about, in two sections', async () => {
+  it('starts collapsed, with one switch per section rather than one per category', async () => {
     render(<NotificationSettingsField api={stub()} />)
 
-    const boxes = await screen.findAllByRole('checkbox')
-    expect(boxes).toHaveLength(notificationCategories.length - categoriesAbout('admin').length)
+    expect(await screen.findAllByRole('checkbox')).toHaveLength(3)
     expect(screen.getByText('What happens to you')).toBeTruthy()
-    expect(screen.getByText('What else is going on')).toBeTruthy()
+    expect(screen.getByText('What others are doing')).toBeTruthy()
+    expect(screen.getByText('A new version of the app is out')).toBeTruthy()
     // Nobody but an admin is ever told an application arrived, and a switch that
     // cannot do anything reads as a promise (#326).
     expect(screen.queryByText('What you look after')).toBeNull()
+  })
+
+  it('has a switch for every category a member is ever told about, once the sections are open', async () => {
+    render(<NotificationSettingsField api={stub()} />)
+
+    await open('What happens to you')
+    await open('What others are doing')
+
+    for (const category of notificationCategories.filter((one) => !categoriesAbout('admin').includes(one))) {
+      expect(screen.getByLabelText(`${notificationCategoryInfo[category].label} — Here`)).toBeTruthy()
+    }
     expect(screen.queryByLabelText('Somebody applies to join — Here')).toBeNull()
   })
 
-  it('names each section in a caption rather than a column header', async () => {
-    // The defect (#341): as a `<th>` under `.table thead th { white-space: nowrap }`
-    // the sentence could not wrap, so at a larger text size "What happens to you"
-    // ran straight over the Here column beside it. The rows carry their own
-    // `<th scope="row">`, so it never was a column header.
+  it('gives the one-category section no expander, its header row being the row', async () => {
     render(<NotificationSettingsField api={stub()} />)
 
-    const heading = await screen.findByText('What happens to you')
-    expect(heading.tagName).toBe('CAPTION')
-    // The corner beside the switch columns — Here alone here, since this render has
-    // no mail server — is empty rather than missing: a header row one cell short
-    // would put every switch column under the wrong heading.
-    expect(screen.queryByRole('columnheader', { name: 'What happens to you' })).toBeNull()
-    expect(heading.closest('table')?.querySelectorAll('thead th')).toHaveLength(2)
+    await screen.findByText('A new version of the app is out')
+    expect(screen.queryByRole('button', { name: 'A new version of the app is out' })).toBeNull()
+    expect(checked('A new version of the app is out — Here')).toBe(false)
+  })
+
+  it('says which section a switch belongs to, the visible word being the same in each', async () => {
+    // Four sections all showing "Here" is four boxes with one name between them
+    // without this — the heading is what tells them apart.
+    render(<NotificationSettingsField api={stub()} />)
+
+    expect(await screen.findByLabelText('What happens to you — Here')).toBeTruthy()
+    expect(screen.getByLabelText('What others are doing — Here')).toBeTruthy()
   })
 
   it('adds the admin section for an admin', async () => {
     render(asAdmin(stub()))
 
     expect(await screen.findByText('What you look after')).toBeTruthy()
-    expect(screen.getAllByRole('checkbox')).toHaveLength(notificationCategories.length)
-    expect(checked('Somebody applies to join — Here')).toBe(true)
+    expect(checked('What you look after — Here')).toBe(true)
   })
 
   it('ticks what happens to you and leaves the rest alone', async () => {
@@ -98,7 +119,8 @@ describe('what to be told about', () => {
     // what is on rather than what is off (#259).
     render(<NotificationSettingsField api={stub()} />)
 
-    await screen.findByLabelText(MEAL)
+    await open('What happens to you')
+    await open('What others are doing')
     expect(checked(MEAL)).toBe(true)
     expect(checked(DREAM_OFFERED)).toBe(false)
   })
@@ -146,7 +168,8 @@ describe('what to be told about', () => {
     const update = vi.fn(() => Promise.resolve<NotificationSettings>({ on: [], email: [], digest: 'daily' }))
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
 
-    fireEvent.click(await screen.findByLabelText(MEAL))
+    await open('What happens to you')
+    fireEvent.click(screen.getByLabelText(MEAL))
 
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({
@@ -165,18 +188,116 @@ describe('what to be told about', () => {
     const update = vi.fn(() => Promise.resolve<NotificationSettings>({ on: [], email: [], digest: 'daily' }))
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
 
-    fireEvent.click(await screen.findByLabelText(DREAM_OFFERED))
+    await open('What others are doing')
+    fireEvent.click(screen.getByLabelText(DREAM_OFFERED))
 
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'], email: [], digest: 'daily' })
     })
   })
 
+  it('switches a whole section on in one save, the chatty ones with it', async () => {
+    const update = vi.fn(() => Promise.resolve<NotificationSettings>({ on: [], email: [], digest: 'daily' }))
+    render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
+
+    fireEvent.click(await screen.findByLabelText('What others are doing — Here'))
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({
+        on: [...DEFAULTS, ...categoriesAbout('else')],
+        email: [],
+        digest: 'daily',
+      })
+    })
+  })
+
+  it('switches a whole section off in one save, leaving the other sections alone', async () => {
+    const update = vi.fn(() => Promise.resolve<NotificationSettings>({ on: [], email: [], digest: 'daily' }))
+    render(
+      <NotificationSettingsField
+        api={stub({
+          getMyNotificationSettings: () =>
+            Promise.resolve({ on: [...categoriesAbout('you'), 'application'], email: [], digest: 'daily' }),
+          updateMyNotificationSettings: update,
+        })}
+      />,
+    )
+
+    fireEvent.click(await screen.findByLabelText('What happens to you — Here'))
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({ on: ['application'], email: [], digest: 'daily' })
+    })
+  })
+
+  it('turns a mixed section fully on, which is what a click on it asks for', async () => {
+    const update = vi.fn(() => Promise.resolve<NotificationSettings>({ on: [], email: [], digest: 'daily' }))
+    render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
+
+    fireEvent.click(await screen.findByLabelText('What happens to you — Here'))
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({
+        on: ['application', ...categoriesAbout('you')],
+        email: [],
+        digest: 'daily',
+      })
+    })
+  })
+
+  it('shows the section switch as mixed where its categories differ', async () => {
+    render(<NotificationSettingsField api={stub()} />)
+
+    await screen.findByLabelText('What happens to you — Here')
+    expect(mixed('What happens to you — Here')).toBe(true)
+    expect(checked('What happens to you — Here')).toBe(false)
+  })
+
+  it('shows it plainly off where none of them is on', async () => {
+    render(<NotificationSettingsField api={stub()} />)
+
+    await screen.findByLabelText('What others are doing — Here')
+    expect(mixed('What others are doing — Here')).toBe(false)
+    expect(checked('What others are doing — Here')).toBe(false)
+  })
+
+  it('shows it plainly on where every one of them is', async () => {
+    render(
+      <NotificationSettingsField
+        api={stub({
+          getMyNotificationSettings: () =>
+            Promise.resolve({ on: [...categoriesAbout('else')], email: [], digest: 'daily' }),
+        })}
+      />,
+    )
+
+    await screen.findByLabelText('What others are doing — Here')
+    expect(checked('What others are doing — Here')).toBe(true)
+    expect(mixed('What others are doing — Here')).toBe(false)
+  })
+
+  it('reflects a single tick back in the section switch above it', async () => {
+    render(
+      <NotificationSettingsField
+        api={stub({
+          getMyNotificationSettings: () => Promise.resolve({ on: [], email: [], digest: 'daily' }),
+          updateMyNotificationSettings: () =>
+            Promise.resolve({ on: ['dream_offered'], email: [], digest: 'daily' }),
+        })}
+      />,
+    )
+
+    await open('What others are doing')
+    fireEvent.click(screen.getByLabelText(DREAM_OFFERED))
+
+    await waitFor(() => expect(mixed('What others are doing — Here')).toBe(true))
+  })
+
   it('offers no email column where the installation has no mail server', async () => {
     // A switch that cannot do anything reads as a promise (#30).
     render(<NotificationSettingsField api={stub()} />)
 
-    await screen.findByLabelText(MEAL)
+    await open('What happens to you')
     expect(screen.queryByLabelText(MEAL_EMAIL)).toBeNull()
     expect(screen.queryByText('Email')).toBeNull()
   })
@@ -184,7 +305,7 @@ describe('what to be told about', () => {
   it('offers one where it has, off for every category', async () => {
     render(<NotificationSettingsField api={stub()} sendsEmail />)
 
-    await screen.findByLabelText(MEAL_EMAIL)
+    await open('What happens to you')
     // Off even for the ones the bell has on: email is a channel of its own and is
     // never switched on by anything but asking.
     expect(checked(MEAL)).toBe(true)
@@ -197,7 +318,8 @@ describe('what to be told about', () => {
     )
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} sendsEmail />)
 
-    fireEvent.click(await screen.findByLabelText(MEAL_EMAIL))
+    await open('What happens to you')
+    fireEvent.click(screen.getByLabelText(MEAL_EMAIL))
 
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS], email: ['meal_role'], digest: 'daily' })
@@ -214,7 +336,8 @@ describe('what to be told about', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByLabelText(MEAL))
+    await open('What happens to you')
+    fireEvent.click(screen.getByLabelText(MEAL))
 
     await screen.findByRole('alert')
     expect(checked(MEAL)).toBe(true)
@@ -228,7 +351,7 @@ describe('the digest of what you have missed', () => {
     // The email column's rule: a switch that cannot do anything reads as a promise.
     render(<NotificationSettingsField api={stub()} />)
 
-    await screen.findByLabelText(MEAL)
+    await screen.findByText('What happens to you')
 
     expect(screen.queryByLabelText(DIGEST)).toBeNull()
   })
