@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { PushBrowser } from '../push.ts'
 
+import { BellNudge } from '../components/BellNudge.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NotificationList } from '../components/NotificationList.tsx'
@@ -17,9 +19,18 @@ export type NotificationsApi = Pick<
   | 'getMyNotificationSettings'
   | 'markNotificationsSeen'
   | 'updateMyNotificationSettings'
+  | 'getPushKey'
+  | 'subscribeToPush'
+  | 'unsubscribeFromPush'
 >
 
-export const Notifications = ({ api }: { api: NotificationsApi }) => {
+export const Notifications = ({
+  api,
+  browser,
+}: {
+  api: NotificationsApi
+  browser?: PushBrowser | undefined
+}) => {
   const viewer = useViewer()
   const signedIn = viewer.account !== undefined
   const { loaded, refreshing, reload } = useLoad(async (signal) => await api.getMyNotifications(signal), {
@@ -69,6 +80,8 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
       {loaded.status === 'ready' && (
         <NotificationList items={asRead} busy={rows.busy} onStop={rows.stop} onRemove={rows.remove} />
       )}
+
+      {signedIn && <BellNudge api={api} browser={browser} />}
     </GuardedPage>
   )
 }

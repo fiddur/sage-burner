@@ -1448,6 +1448,39 @@ a.person-badge:focus-visible span:last-child {
   margin-inline-start: 0.15rem;
 }
 
+/* The heart and the faces beside it are two targets in one line, and the list they unfold
+   into wraps onto its own (#693). `flex-wrap` plus the list's full basis is what puts it
+   there — an inline box would sit beside the count and push the card wide. */
+.heart-wrap {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Deliberately wider and taller than `.dream-heart` beside it: two small adjacent targets
+   would take each other's taps, and the difference in size is what says they are two. */
+.heart-who-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.4rem;
+  margin-inline-start: 0.2rem;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.heart-who {
+  flex-basis: 100%;
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 /* The bottom edge, pulled to make a dream longer or shorter. Only in the grid. */
 .dream-resize {
   position: absolute;
@@ -1913,9 +1946,12 @@ a.person-badge:focus-visible span:last-child {
   font-weight: normal;
 }
 
-.thread-mine {
+/* The heart is everybody's and the pen is the author's, so this is no longer only theirs.
+   `flex-start` keeps the buttons their own height when the heart unfolds its list. */
+.thread-foot {
   margin: 0;
   display: flex;
+  align-items: flex-start;
   gap: 0.4rem;
 }
 
@@ -2605,6 +2641,28 @@ img.avatar {
 
 .push-nudge > p:last-child {
   margin-bottom: 0;
+}
+
+/* In the flow at the foot of the bell rather than fixed over it, unlike `.push-nudge` above:
+   this one is persistent, and a floating bar that keeps coming back is the nagging #695 set out
+   to avoid. */
+.bell-nudge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.bell-nudge > p {
+  flex: 1 1 12rem;
+  margin: 0;
+}
+
+.bell-nudge-on {
+  font-size: 0.9rem;
 }
 
 /* What is on screen has not refreshed in five minutes. Muted rather than alarming:

@@ -75,13 +75,22 @@ export const dreamActions = ({
   },
 })
 
-export type DreamTalkApi = Pick<ApiClient, 'getThread' | 'postComment' | 'updateComment' | 'deleteComment'>
+export type DreamTalkApi = Pick<
+  ApiClient,
+  | 'getThread'
+  | 'postComment'
+  | 'updateComment'
+  | 'deleteComment'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
+>
 
 export interface DreamTalk {
   thread: Thread | undefined
   say: (body: string, done: () => void) => void
   rewrite: (id: string, body: string) => void
   remove: (id: string) => void
+  heart: (id: string, hearting: boolean) => void
 }
 
 export const threadOf = (
@@ -132,6 +141,11 @@ export const useDreamThread = ({
     },
     rewrite: (id, body) => after(() => api.updateComment(id, { body }), 'Could not save that.'),
     remove: (id) => after(() => api.deleteComment(id), 'Could not take that back.'),
+    heart: (id, hearting) =>
+      after(
+        () => (hearting ? api.supportComment(id) : api.withdrawSupportForComment(id)),
+        'Could not do that just now.',
+      ),
   }
 }
 

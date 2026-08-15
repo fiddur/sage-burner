@@ -740,8 +740,10 @@ deletes their own, and an admin may delete any.
 hand up or down, renamed, moved, edited, withdrawn. A heart does not — the faces are on
 the dream already, and twenty hearts is twenty lines nobody reads.
 
-**A heart on every card** (#479), and it stays that quiet everywhere: no notification, no entry,
-no bump up the feed. A heart is for the next reader to see, not a bell for the author.
+**A heart on every card** (#479) **and on every comment** (#693), and it stays that quiet
+everywhere: no notification, no entry, no bump up the feed. A heart is for the next reader to see,
+not a bell for the author. Only comments — the lines the app wrote are done things, and hearting
+"withdrew this dream" means nothing.
 
 **Two tables behind one button.** A dream's heart is `session_support`, unchanged — the heart on
 its card and the heart on its schedule chip are one heart, and two like-buttons meaning different
@@ -761,8 +763,22 @@ thing somebody presses on the way home.
 key so the conversation outlives the dream — but `session_support.session_id` does carry one, so
 the insert would dangle and answer 500 rather than refusing. The route looks the dream up and
 answers 404; the card hides the button, which is the nicer half but not the sufficient one, since
-the route is reachable directly. The song page shows the faces as well as the count, through the same overlapped
-row the dream panel uses — now `Faces`, since it has a second caller.
+the route is reachable directly.
+
+**A comment's heart is `entry_support (entry_id, account_id)`** (#693), cascading on both, so
+taking a comment back takes its hearts with it and an edit keeps them. `POST`/`DELETE
+/api/comments/:id/support/me`, which is the vocabulary the comment's own routes already use rather
+than the issue's `/api/thread-entries/`; both answer the whole thread, as every other write on one
+does. The route refuses an entry whose `kind` is not `comment` with a 404 rather than writing a
+heart nobody can see.
+
+**One control carries both** (#693), and the count is not in the heart. `Heart` is two targets: the
+♡ / ❤️‍🔥 toggles your own and does nothing else, and the overlapping faces with the total beside
+them are a second, deliberately wider one that unfolds the whole list of who gave one, each row a
+link to their page. Two small adjacent targets would take each other's taps, so the difference in
+size is what says they are two. The list unfolds **inline** rather than as a floating popover — the
+box it belongs to is the comment — and it is what a keyboard and a screen reader reach, which a
+hover popover or a long-press is not. Nothing shows at all where nobody has hearted yet.
 
 **Coalescing happens on the write.** Laying out the grid is a drag every few seconds, so
 a second line of the same kind by the same person with nothing in between rewrites the
@@ -886,10 +902,13 @@ three readers order by — it was `(thread_id, created_at)`, which served none o
 which is right for saying, rewording and deleting a comment — you have just written in it — and
 surprising for the heart and for the bell's follow switch, where pressing one on a card with ten comments
 unfolded all ten and made "show the whole thread" vanish. The fold is the client's, not the
-server's, so the fix is there: those two paths keep the `entries` and `entry_count` the card was
-already showing and take everything else from the answer. Keeping the fold rather than folding to
-three is what makes it right in both directions — a card somebody had expanded stays expanded. The
-song page's own conversation is unaffected, because it never folds.
+server's, so the fix is there: those paths keep the `entry_count` and the _set_ of entries the card
+was already showing, and take everything else from the answer. The entries themselves come from the
+answer where the answer has them, which is what makes a heart on a comment show up without
+unfolding the nine above it (#693) — keeping the shown rows verbatim would have left the heart
+looking as though it had not been pressed. Keeping the fold rather than folding to three is what
+makes it right in both directions — a card somebody had expanded stays expanded. The song page's
+own conversation is unaffected, because it never folds.
 
 **Retention is the burn, for everything that has one.** A `thread` that names an `event`
 cascades with it, and the route reads the newest fifty. An audit log

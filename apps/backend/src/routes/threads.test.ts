@@ -877,53 +877,53 @@ describe('the heart on a comment', () => {
     const [said] = (await entriesOf(server, ada.cookie, id)).filter((entry) => entry.kind === 'comment')
     if (said === undefined) throw new Error('no comment')
 
-    return { server, ada, thread: id, comment: said }
+    return { server, ada, card: id, comment: said }
   }
 
   it('gives one, and says whose it is', async () => {
-    const { server, ada, thread, comment } = await setUp()
+    const { server, ada, card, comment } = await setUp()
 
     const given = await love(server, ada.cookie, comment.id)
 
     expect(given.statusCode).toBe(200)
-    const [after] = (await entriesOf(server, ada.cookie, thread)).filter((one) => one.kind === 'comment')
+    const [after] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind === 'comment')
     expect(after?.support_count).toBe(1)
     expect(after?.supported_by_me).toBe(true)
     expect(after?.supporters.map((person) => person.name)).toEqual(['Ada'])
   })
 
   it('takes it back', async () => {
-    const { server, ada, thread, comment } = await setUp()
+    const { server, ada, card, comment } = await setUp()
     await love(server, ada.cookie, comment.id)
 
     await unlove(server, ada.cookie, comment.id)
 
-    const [after] = (await entriesOf(server, ada.cookie, thread)).filter((one) => one.kind === 'comment')
+    const [after] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind === 'comment')
     expect(after?.support_count).toBe(0)
     expect(after?.supported_by_me).toBe(false)
   })
 
   it('counts one heart per person however many times it is given', async () => {
-    const { server, ada, thread, comment } = await setUp()
+    const { server, ada, card, comment } = await setUp()
 
     await love(server, ada.cookie, comment.id)
     await love(server, ada.cookie, comment.id)
 
-    const [after] = (await entriesOf(server, ada.cookie, thread)).filter((one) => one.kind === 'comment')
+    const [after] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind === 'comment')
     expect(after?.support_count).toBe(1)
   })
 
   it('is somebody else’s to give as well, and each is their own', async () => {
-    const { server, ada, thread, comment } = await setUp()
+    const { server, ada, card, comment } = await setUp()
     const bea = await givenAccount('Bea')
     await givenComing(bea.id)
 
     await love(server, bea.cookie, comment.id)
 
-    const [mine] = (await entriesOf(server, ada.cookie, thread)).filter((one) => one.kind === 'comment')
+    const [mine] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind === 'comment')
     expect(mine?.support_count).toBe(1)
     expect(mine?.supported_by_me).toBe(false)
-    const [theirs] = (await entriesOf(server, bea.cookie, thread)).filter((one) => one.kind === 'comment')
+    const [theirs] = (await entriesOf(server, bea.cookie, card)).filter((one) => one.kind === 'comment')
     expect(theirs?.supported_by_me).toBe(true)
   })
 
@@ -950,8 +950,8 @@ describe('the heart on a comment', () => {
   })
 
   it('answers 404 for an entry that is not a comment, a done thing being nobody’s to love', async () => {
-    const { server, ada, thread } = await setUp()
-    const [done] = (await entriesOf(server, ada.cookie, thread)).filter((one) => one.kind !== 'comment')
+    const { server, ada, card } = await setUp()
+    const [done] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind !== 'comment')
 
     expect((await love(server, ada.cookie, done?.id ?? '')).statusCode).toBe(404)
   })

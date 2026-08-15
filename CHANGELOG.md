@@ -9,6 +9,25 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **A comment can be given a ❤️‍🔥 now, the way a card already could.** The heart itself only
+  gives yours and takes it back — the count has moved out of it and sits beside it, behind a
+  little stack of the faces of whoever gave one. Press that stack and the whole list unfolds
+  under the comment, each name linking to their page. Cards work the same way now, so there is
+  one heart to learn wherever you meet one. Nothing is notified and nothing moves up the feed:
+  a heart is still for the next reader to see. The lines the app writes for itself — "offered
+  this dream", "is cooking it" — carry no heart.
+
+- **The bell offers to turn notifications on, for whoever it cannot reach.** If you are reading
+  your notifications in a browser that has push switched off, there is now a quiet line at the
+  foot of the list with a **Turn on** button. The ✕ puts it away for this sitting; it comes back
+  next time you open the app, unless you have already said "Do not ask me here" somewhere else.
+  It never appears where the button could not work.
+
+- **Meal cards say which day they are for.** A burn with three Dinners had three cards on the
+  feed all headed "Dinner", and each digest line said the same word — with nothing to tell one
+  sitting from another until somebody wrote a food idea. They now read "Dinner · Sat 1", and so
+  does the notification when somebody comments on one.
+
 - **On a laptop, everything is in one menu down the left.** Half the pages were words along
   the top and the other half were behind ☰, and which half a page was in came down to what
   fitted. Every page is in the column now — Feed, Members, Schedule, Leads, Meals, FAQ,

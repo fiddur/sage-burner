@@ -170,8 +170,10 @@ phone" means 360px.
 - [ ] A lead role has a card: adding one opens it, taking the lead and handing it
       over add a line each, and saying something on it reaches whoever is on it.
 - [ ] A generated meal plan puts **nothing** on the feed. Take a sitting's cooking on and
-      its card appears, headed by the sitting and carrying the food idea; the **Meals** chip
-      shows it. A comment on it reaches whoever is cooking.
+      its card appears, headed by the sitting's slot **and its day** — "Dinner · Sat 1" —
+      and carrying the food idea; the **Meals** chip shows it. Do the same for the next
+      day's Dinner: two cards, headed differently. A comment on it reaches whoever is
+      cooking, and names the sitting the same way.
 - [ ] Comment on a dream's card; the same conversation shows in the dream's
       panel. Edit your own comment; delete it; an admin can delete anyone's.
 - [ ] Mention the member by name from the picker — they are notified once, not
@@ -190,6 +192,12 @@ phone" means 360px.
       something went wrong, the card stays, and what was typed is still in the box to
       send again.
 - [ ] Heart a card: the count moves, nothing is notified, nothing bumps.
+- [ ] Heart a comment under any card: the ♡ fills, the count appears beside it rather
+      than inside it, and nothing is notified. From a second account, heart the same
+      comment: the count is 2 and both faces are stacked.
+- [ ] Press the faces-and-count: the list of who gave one unfolds under the comment,
+      each row linking to that person's page. Press again and it folds away.
+- [ ] The lines the app wrote — "offered this dream", "is cooking it" — carry no heart.
 
 ## The songbook
 
@@ -252,7 +260,8 @@ phone" means 360px.
 - [ ] Turn on "any dream" comments, then mute one card from its bell: a reply there
       rings nothing, while a reply on another dream still does.
 - [ ] Heart a card with more comments than it shows: the count fills and the card
-      stays folded, "show the whole thread" still offered.
+      stays folded, "show the whole thread" still offered. The same for a heart on one
+      of the comments it does show.
 - [ ] Subscribe to push in one browser; a notification tapped lands on the
       right page in the open app rather than a new window.
 - [ ] Any of the emails — the test message, an invite, a notification — arrives wearing
@@ -291,6 +300,12 @@ phone" means 360px.
 - [ ] Press "Do not ask me here". Tick another category, on either the feed or the details
       page: no strip, this time or after a reload. In a different browser, ticking one raises
       it again.
+- [ ] In a browser with push off, open `/notifications`: a slim strip at the foot of the
+      list offers **Turn on**, and pressing it subscribes from there. With push already on
+      here, or with the browser blocking notifications, there is no strip.
+- [ ] Press the strip's ✕: it goes. Reload — still gone. Close the browser, open it
+      again and return: the strip is back. After "Do not ask me here" on the other strip,
+      it stays away.
 - [ ] Take up an invite in a browser with push off: the welcome offers "Notify me here",
       and accepting it subscribes without a trip to another page.
 - [ ] With SMTP configured, Your details → Notifications carries **A summary by email when

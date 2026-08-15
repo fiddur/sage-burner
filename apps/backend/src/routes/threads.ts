@@ -14,6 +14,7 @@ import {
   bringPage,
   coalesces,
   commentSchema,
+  dayName,
   dreamPage,
   feedPage,
   followSchema,
@@ -498,6 +499,7 @@ export const readThreads = async (
       role_title: leadRole.title,
       role_purpose: leadRole.purpose,
       meal_label: meal.label,
+      meal_date: meal.date,
       meal_idea: meal.food_idea,
     })
     .from(thread)
@@ -666,6 +668,7 @@ interface CardRow {
   role_title: string | null
   role_purpose: string | null
   meal_label: string | null
+  meal_date: string | null
   meal_idea: string | null
 }
 
@@ -729,8 +732,11 @@ const roleFacts = (row: CardRow): CardFacts => ({
   gone: row.role_title === null,
 })
 
+export const sittingName = (label: string, date: string | null): string =>
+  date === null ? label : `${label} · ${dayName(date, 'short')}`
+
 const mealFacts = (row: CardRow): CardFacts => ({
-  title: row.meal_label ?? row.title,
+  title: row.meal_label === null ? row.title : sittingName(row.meal_label, row.meal_date),
   link: row.meal_label === null || row.event_id === null ? null : mealsPage(row.event_id),
   body: written(row.meal_idea),
   gone: row.meal_label === null,
@@ -1242,14 +1248,14 @@ export const registerThreadRoutes = (
     }),
     meal: async (found: Subject) => {
       const [row] = await db
-        .select({ label: meal.label })
+        .select({ label: meal.label, date: meal.date })
         .from(meal)
         .where(eq(meal.id, found.entity_id))
         .limit(1)
 
       return {
         link: found.event_id === null ? null : mealsPage(found.event_id),
-        what: row?.label ?? found.title,
+        what: row === undefined ? found.title : sittingName(row.label, row.date),
       }
     },
   } as const satisfies Record<

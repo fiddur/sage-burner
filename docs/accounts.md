@@ -1100,6 +1100,18 @@ did nothing at all, with no way out but pressing somewhere unrelated first. `use
 strip rather than beside it, so a page nobody has ticked anything on registers no service worker and
 re-posts no subscription.
 
+**The bell asks too, more quietly** (#695). Somebody reading their notifications on a device push
+cannot reach is exactly the person push is for — they care what happened and nothing reached them
+until they opened the app — so the foot of the list carries a strip of its own: one line, **Turn
+on**, and an ✕. In the flow rather than fixed over the window, unlike the strip above: this one is
+persistent, and a floating bar that keeps coming back is the nagging it set out to avoid. Its ✕ is
+`sessionStorage`, and that is the whole of what "for now" means — gone until the browser is closed,
+back the next sitting. The lasting "Do not ask me here" silences it as well, the heavier refusal
+covering the lighter occasion but not the other way round. It is never drawn where the button could
+not work: no push in this browser, permission already refused, or a subscription already live.
+`usePushHere` sits inside the strip rather than beside it for the reason the one above gives, so a
+reader who has waved it off registers no service worker.
+
 **On iOS it leads with installing**, because push does not exist in Safari until the app is on the
 home screen: `PushAsk` renders the install line rather than a button that cannot deliver, splitting
 on whether this is already the installed copy exactly as the toggle did.

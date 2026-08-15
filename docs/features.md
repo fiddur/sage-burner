@@ -104,7 +104,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   nothing. The plan is one table — food idea, lead, help, cleanup — and any
   member takes a role, moves a sitting or writes the food idea. The kitchen
   draws its own schedule lane from the meals. Each sitting has a card on the feed
-  once somebody does something with it, so "is it vegan?" has somewhere to go.
+  once somebody does something with it, headed by its slot and its day, so "is it
+  vegan?" has somewhere to go for a particular Dinner rather than all three.
 - The lead-roles register: the burn's jobs, any member takes one, hands one
   over or appoints somebody — and whoever it happens to is told. Each role has a
   card on the feed, so "who can take this?" has somewhere to be asked.
@@ -130,7 +131,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Anything taken back leaves the feed: a withdrawn announcement, dream, song or
   bring item, and a stay somebody left. The conversation is kept, its place on
   the page is not.
-- A heart on every card, quietly — no notification, no bump.
+- A heart on every card and on every comment, quietly — no notification, no bump.
+  One control throughout: the heart toggles your own, and the overlapping faces
+  beside it unfold into who gave one.
 
 ## The songbook — [the-app.md](./the-app.md)
 
@@ -171,6 +174,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   somebody has just joined on an invite, and again wherever a switch is turned on in a
   browser that would hear nothing — the settings table or a card's own bell — until you
   say not to ask there, which answers for all of them at once.
+- The bell itself carries a quieter offer at the foot of the list, for whoever is
+  reading their notifications on a device push cannot reach. Its ✕ lasts the sitting
+  rather than for good, and the heavier refusal above silences it too.
 - Email as a channel of its own, per category, off until asked for — the column
   appears only once an admin has configured SMTP.
 - A digest of the feed, by email, **on by default** — daily, weekly or never. It carries

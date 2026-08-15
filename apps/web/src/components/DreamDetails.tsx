@@ -156,6 +156,7 @@ export const DreamDetails = ({
             onSay={talk.say}
             onRewrite={talk.rewrite}
             onRemove={talk.remove}
+            onHeart={talk.heart}
           />
         </>
       )}

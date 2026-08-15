@@ -3,10 +3,12 @@ import type { Notification } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { PushBrowser } from '../push.ts'
 import type { Viewer } from '../viewer.tsx'
 import type { NotificationsApi } from './Notifications.tsx'
 
 import { apiError } from '../api/client.ts'
+import { NUDGE_DISMISSED_KEY, NUDGE_LATER_KEY } from '../push.ts'
 import { ViewerProvider } from '../viewer.tsx'
 import { Notifications } from './Notifications.tsx'
 
@@ -46,13 +48,32 @@ const stub = (over: Partial<NotificationsApi> = {}, held = TWO, unseen = held.le
     Promise.resolve({ on: ['meal_role'], email: ['meal_role'], digest: 'daily' }),
   updateMyNotificationSettings: () =>
     Promise.resolve({ on: ['meal_role'], email: ['meal_role'], digest: 'daily' }),
+  getPushKey: () => Promise.resolve({ public_key: 'BFakeKey_with-url-safe' }),
+  subscribeToPush: () => Promise.resolve(undefined),
+  unsubscribeFromPush: () => Promise.resolve(undefined),
   ...over,
 })
 
-const renderPage = (api: NotificationsApi, viewer: Viewer = ADA) =>
+const aSubscription = (endpoint = 'https://push.example/one') => ({
+  endpoint,
+  unsubscribe: () => Promise.resolve(true),
+  toJSON: () => ({ endpoint, keys: { p256dh: 'a-public-key', auth: 'a-secret' } }),
+})
+
+const aBrowser = (subscribed: boolean, permission: NotificationPermission = 'default'): PushBrowser => ({
+  permission: () => permission,
+  requestPermission: () => Promise.resolve('granted'),
+  register: () =>
+    Promise.resolve({
+      getSubscription: () => Promise.resolve(subscribed ? aSubscription() : null),
+      subscribe: () => Promise.resolve(aSubscription()),
+    }),
+})
+
+const renderPage = (api: NotificationsApi, viewer: Viewer = ADA, browser?: PushBrowser) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Notifications api={api} />
+      <Notifications api={api} browser={browser} />
     </ViewerProvider>,
   )
 
@@ -295,5 +316,83 @@ describe('what has happened to you', () => {
 
     expect(await screen.findByRole('link', { name: 'Log in' })).toBeTruthy()
     expect(getMyNotifications).not.toHaveBeenCalled()
+  })
+})
+
+describe('the offer to turn push on, at the foot of the bell', () => {
+  const OFFER = /Push notifications are off on this device/
+
+  afterEach(() => {
+    globalThis.localStorage.clear()
+    globalThis.sessionStorage.clear()
+  })
+
+  it('asks whoever is reading this with push off here', async () => {
+    renderPage(stub(), ADA, aBrowser(false))
+
+    expect(await screen.findByText(OFFER)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Turn on' })).toBeTruthy()
+  })
+
+  it('stays away where this browser already hears them', async () => {
+    renderPage(stub(), ADA, aBrowser(true))
+
+    await waitFor(() => expect(screen.getByText('You are on helper for Dinner')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText(OFFER)).toBeNull())
+  })
+
+  it('stays away where the browser has already refused, the button having nothing to promise', async () => {
+    renderPage(stub(), ADA, aBrowser(false, 'denied'))
+
+    await screen.findByText('You are on helper for Dinner')
+    expect(screen.queryByText(OFFER)).toBeNull()
+  })
+
+  it('stays away where the browser cannot do push at all', async () => {
+    renderPage(stub(), ADA, undefined)
+
+    await screen.findByText('You are on helper for Dinner')
+    expect(screen.queryByText(OFFER)).toBeNull()
+  })
+
+  it('subscribes from the strip itself', async () => {
+    const subscribeToPush = vi.fn<NotificationsApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    renderPage(stub({ subscribeToPush }), ADA, aBrowser(false))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn on' }))
+
+    await waitFor(() => expect(subscribeToPush).toHaveBeenCalledTimes(1))
+  })
+
+  it('goes for this sitting when waved off, and is back the next one', async () => {
+    renderPage(stub(), ADA, aBrowser(false))
+    await screen.findByText(OFFER)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+
+    await waitFor(() => expect(screen.queryByText(OFFER)).toBeNull())
+    expect(globalThis.sessionStorage.getItem(NUDGE_LATER_KEY)).toBe('yes')
+
+    cleanup()
+    globalThis.sessionStorage.clear()
+    renderPage(stub(), ADA, aBrowser(false))
+
+    expect(await screen.findByText(OFFER)).toBeTruthy()
+  })
+
+  it('stays away for the same sitting once waved off', async () => {
+    globalThis.sessionStorage.setItem(NUDGE_LATER_KEY, 'yes')
+    renderPage(stub(), ADA, aBrowser(false))
+
+    await screen.findByText('You are on helper for Dinner')
+    expect(screen.queryByText(OFFER)).toBeNull()
+  })
+
+  it('is silenced for good by the heavier refusal the other strip carries', async () => {
+    globalThis.localStorage.setItem(NUDGE_DISMISSED_KEY, 'yes')
+    renderPage(stub(), ADA, aBrowser(false))
+
+    await screen.findByText('You are on helper for Dinner')
+    expect(screen.queryByText(OFFER)).toBeNull()
   })
 })

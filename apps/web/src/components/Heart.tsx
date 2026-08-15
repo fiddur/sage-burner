@@ -1,13 +1,26 @@
 import type { Supporter } from '@sage-burner/shared'
 
-import { useId, useRef, useState } from 'preact/hooks'
+import { useId, useState } from 'preact/hooks'
 
-import { useAway } from '../dropdown.ts'
-import { Faces } from './Faces.tsx'
+import { Avatar } from './Avatar.tsx'
+import { PersonBadge } from './PersonBadge.tsx'
 
-const HOVER_MS = 700
+const STACKED = 3
 
-const PRESS_MS = 500
+const Stack = ({ people }: { people: readonly Supporter[] }) => (
+  <span class="faces">
+    {people.slice(0, STACKED).map((person) => (
+      <span key={person.account_id} class="face">
+        <Avatar
+          accountId={person.account_id}
+          name={person.name}
+          avatar={person.avatar}
+          size="dream-facilitator"
+        />
+      </span>
+    ))}
+  </span>
+)
 
 export const Heart = ({
   what,
@@ -26,75 +39,48 @@ export const Heart = ({
 }) => {
   const [showing, setShowing] = useState(false)
   const listId = useId()
-  const timer = useRef(0)
-  const held = useRef(false)
-  const wrap = useAway<HTMLSpanElement>(showing, () => setShowing(false))
-
-  const stopWaiting = () => {
-    if (timer.current !== 0) clearTimeout(timer.current)
-    timer.current = 0
-  }
-
-  const waitThenShow = (delay: number, longPress: boolean) => {
-    if (people.length === 0) return
-
-    stopWaiting()
-    timer.current = window.setTimeout(() => {
-      timer.current = 0
-      held.current = longPress
-      setShowing(true)
-    }, delay)
-  }
 
   return (
-    <span ref={wrap} class="heart-wrap">
+    <span class="heart-wrap">
       <button
         type="button"
         class="dream-heart"
         disabled={busy}
         aria-pressed={hearted}
         aria-label={`${hearted ? 'Take back your heart for' : 'Give a heart to'} ${what}`}
-        aria-describedby={showing ? listId : undefined}
-        onPointerEnter={(pointer) => {
-          if (pointer.pointerType === 'touch') return
-
-          waitThenShow(HOVER_MS, false)
-        }}
-        onPointerLeave={(pointer) => {
-          stopWaiting()
-          if (pointer.pointerType !== 'touch') setShowing(false)
-        }}
-        onPointerDown={(pointer) => {
-          if (pointer.pointerType !== 'touch') return
-
-          waitThenShow(PRESS_MS, true)
-        }}
-        onPointerUp={stopWaiting}
-        onPointerCancel={stopWaiting}
-        onFocus={() => waitThenShow(0, false)}
-        onBlur={() => {
-          stopWaiting()
-          setShowing(false)
-        }}
         onClick={(clickEvent) => {
           clickEvent.stopPropagation()
-          // A long press asked who else gave one; it is not also a press of the heart.
-          if (held.current) {
-            held.current = false
-            return
-          }
-
           onHeart(!hearted)
         }}
       >
         <span aria-hidden="true">{hearted ? '❤️‍🔥' : '♡'}</span>
-        {count > 0 && <span class="dream-heart-count">{count}</span>}
       </button>
 
-      {showing && people.length > 0 && (
-        <span id={listId} class="heart-who" role="group" aria-label={`Who gave a heart to ${what}`}>
-          <Faces people={people} />
-        </span>
+      {count > 0 && (
+        <button
+          type="button"
+          class="heart-who-toggle"
+          aria-expanded={showing}
+          aria-controls={listId}
+          onClick={(clickEvent) => {
+            clickEvent.stopPropagation()
+            setShowing(!showing)
+          }}
+        >
+          <Stack people={people} />
+          <span class="dream-heart-count">{count}</span>
+          <span class="visually-hidden"> gave a heart to {what}</span>
+        </button>
+      )}
+
+      {showing && (
+        <ul id={listId} class="heart-who">
+          {people.map((person) => (
+            <li key={person.account_id}>
+              <PersonBadge accountId={person.account_id} name={person.name} avatar={person.avatar} />
+            </li>
+          ))}
+        </ul>
       )}
     </span>
   )

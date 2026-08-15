@@ -593,6 +593,16 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.withdrawSupportForThread.method,
       }),
 
+    supportComment: (id: string) =>
+      request<ThreadResponse>(apiRoutes.supportComment.path(id), {
+        method: apiRoutes.supportComment.method,
+      }),
+
+    withdrawSupportForComment: (id: string) =>
+      request<ThreadResponse>(apiRoutes.withdrawSupportForComment.path(id), {
+        method: apiRoutes.withdrawSupportForComment.method,
+      }),
+
     getApplicationMessages: (id: string, signal?: AbortSignal) =>
       request<ApplicationMessagesResponse>(apiRoutes.getApplicationMessages.path(id), { signal }),
 

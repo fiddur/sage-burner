@@ -1,6 +1,7 @@
 import type { EventAttendeesResponse, Meal, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
+import { dayName } from '@sage-burner/shared'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -19,7 +20,7 @@ import { NoBurn } from '../components/NoBurn.tsx'
 import { NotForYou } from '../components/NotForYou.tsx'
 import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
-import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
+import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { pinchedZoom, touchGap } from '../pinch.ts'
@@ -57,6 +58,8 @@ export type ScheduleApi = Pick<
   | 'postComment'
   | 'updateComment'
   | 'deleteComment'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
   | 'uploadImage'
 > &
   CalendarFeedApi

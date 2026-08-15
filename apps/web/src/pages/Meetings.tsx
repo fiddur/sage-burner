@@ -51,6 +51,8 @@ export type MeetingsApi = Pick<
   | 'postComment'
   | 'updateComment'
   | 'deleteComment'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
   | 'uploadImage'
 >
 
@@ -656,6 +658,7 @@ const Point = ({
           onSay={talk.say}
           onRewrite={talk.rewrite}
           onRemove={talk.remove}
+          onHeart={talk.heart}
         />
       )}
     </li>

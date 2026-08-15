@@ -72,6 +72,8 @@ const stub = (over: Partial<FeedApi> = {}, threads: Thread[] = []): FeedApi => (
   setThreadFollow: () => Promise.reject(new Error('setThreadFollow is not stubbed here')),
   supportThread: () => Promise.reject(new Error('supportThread is not stubbed here')),
   withdrawSupportForThread: () => Promise.reject(new Error('withdrawSupportForThread is not stubbed here')),
+  supportComment: () => Promise.reject(new Error('supportComment is not stubbed here')),
+  withdrawSupportForComment: () => Promise.reject(new Error('withdrawSupportForComment is not stubbed here')),
   addPost: () => Promise.reject(new Error('addPost is not stubbed here')),
   getEventAttendees: () =>
     Promise.resolve({
@@ -388,14 +390,62 @@ describe('the heart on a card', () => {
     ).toBeTruthy()
   })
 
-  it('shows the count and that it is yours', async () => {
+  it('shows that it is yours, and puts the count beside it rather than in it', async () => {
     renderPage(
-      stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 3, supported_by_me: true })]),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Sauna at dawn',
+          support_count: 3,
+          supported_by_me: true,
+          supporters: [
+            { account_id: 'a-1', name: 'Ada', avatar: null },
+            { account_id: 'a-2', name: 'Bea', avatar: null },
+            { account_id: 'a-3', name: 'Cai', avatar: null },
+          ],
+        }),
+      ]),
     )
 
     const heart = await screen.findByRole('button', { name: 'Take back your heart for Sauna at dawn' })
     expect(heart.getAttribute('aria-pressed')).toBe('true')
-    expect(heart.textContent).toContain('3')
+    expect(heart.textContent).not.toContain('3')
+    expect(screen.getByRole('button', { name: '3 gave a heart to Sauna at dawn' })).toBeTruthy()
+  })
+
+  it('unfolds who gave one, as rows that link to them, and folds them away again', async () => {
+    renderPage(
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Sauna at dawn',
+          support_count: 2,
+          supporters: [
+            { account_id: 'a-1', name: 'Ada', avatar: null },
+            { account_id: 'a-2', name: 'Bea', avatar: null },
+          ],
+        }),
+      ]),
+    )
+
+    const who = await screen.findByRole('button', { name: '2 gave a heart to Sauna at dawn' })
+    expect(who.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('link', { name: 'Bea' })).toBeNull()
+
+    fireEvent.click(who)
+
+    expect(screen.getByRole('link', { name: 'Bea' }).getAttribute('href')).toBe('/members/a-2')
+
+    fireEvent.click(who)
+
+    expect(screen.queryByRole('link', { name: 'Bea' })).toBeNull()
+  })
+
+  it('offers nothing to unfold where nobody has given one', async () => {
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' })
+    expect(screen.queryByRole('button', { name: /gave a heart to/ })).toBeNull()
   })
 
   it('gives one', async () => {
@@ -421,8 +471,8 @@ describe('the heart on a card', () => {
           supported_by_me: true,
           entry_count: 4,
           entries: [
-            anEntry({ id: 't-0', body: 'offered this dream', kind: 'offered' }),
-            anEntry({ id: 't-1', body: 'the earliest thing said' }),
+            anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' }),
+            anEntry({ id: 't-2', body: 'the earliest thing said' }),
           ],
         }),
       }),
@@ -466,6 +516,87 @@ describe('the heart on a card', () => {
     const heart = await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' })
 
     expect(heart.textContent).toBe('♡')
+  })
+})
+
+describe('the heart on a comment', () => {
+  const said = (over: Partial<Thread> = {}) =>
+    aCard({
+      id: 'c-1',
+      title: 'Sauna at dawn',
+      entries: [anEntry({ id: 't-1', body: 'bring a towel' })],
+      ...over,
+    })
+
+  it('gives one to the comment rather than to the card it is under', async () => {
+    const supportComment = vi.fn<FeedApi['supportComment']>(() =>
+      Promise.resolve({
+        thread: said({
+          entries: [
+            anEntry({
+              id: 't-1',
+              body: 'bring a towel',
+              support_count: 1,
+              supported_by_me: true,
+              supporters: [{ account_id: 'a-1', name: 'Ada', avatar: null }],
+            }),
+          ],
+        }),
+      }),
+    )
+    renderPage(stub({ supportComment }, [said()]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to what Ada said' }))
+
+    await waitFor(() => expect(supportComment).toHaveBeenCalledWith('t-1'))
+    expect(await screen.findByRole('button', { name: 'Take back your heart for what Ada said' })).toBeTruthy()
+  })
+
+  it('takes one back', async () => {
+    const withdrawSupportForComment = vi.fn<FeedApi['withdrawSupportForComment']>(() =>
+      Promise.resolve({ thread: said() }),
+    )
+    renderPage(
+      stub({ withdrawSupportForComment }, [
+        said({
+          entries: [
+            anEntry({
+              id: 't-1',
+              body: 'bring a towel',
+              support_count: 1,
+              supported_by_me: true,
+              supporters: [{ account_id: 'a-1', name: 'Ada', avatar: null }],
+            }),
+          ],
+        }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take back your heart for what Ada said' }))
+
+    await waitFor(() => expect(withdrawSupportForComment).toHaveBeenCalledWith('t-1'))
+  })
+
+  it('leaves the card folded, a heart on a comment being no reason to unfold the rest', async () => {
+    const supportComment = vi.fn<FeedApi['supportComment']>(() =>
+      Promise.resolve({
+        thread: said({
+          entry_count: 4,
+          entries: [
+            anEntry({ id: 't-0', body: 'the earliest thing said' }),
+            anEntry({ id: 't-1', body: 'bring a towel', support_count: 1, supported_by_me: true }),
+          ],
+        }),
+      }),
+    )
+    renderPage(stub({ supportComment }, [said({ entry_count: 4 })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to what Ada said' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Take back your heart for what Ada said' })).toBeTruthy(),
+    )
+    expect(screen.queryByText('the earliest thing said')).toBeNull()
   })
 })
 
