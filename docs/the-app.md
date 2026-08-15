@@ -340,9 +340,9 @@ sets `sideEffects: false` is that this app has already lost that argument once.
 **`currentColor` and `em` are what kept it to one new rule.** `.icon` is `1.1em` square and
 the drawing is `fill: none; stroke: currentColor`, so every rule that already set a control's
 colour and its `:hover` reaches the icon untouched, in both themes, and each place decides
-the size from its own `font-size`. The bell gained something in the move: it was greyed with
-`filter: grayscale(1)`, which does nothing to a drawing that is one colour already, so
-unseen notifications turn it `--ember` instead.
+the size from its own `font-size`. That is what the bell then lost by going back (#672): an
+emoji takes neither `currentColor` nor the `filter: grayscale(1)` it wore before #621, so the
+quiet-until-something-happens signal is opacity and the count badge.
 
 **The drawing is `aria-hidden` and the name stays on the button**, which was already true of
 the emoji and is why six assertions in eighteen hundred had to change — a control is found by

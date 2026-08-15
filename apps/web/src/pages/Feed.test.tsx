@@ -185,8 +185,6 @@ describe('the bell in a card’s corner', () => {
   }
 
   it('is a lit bell where something is on and a struck one where nothing is', async () => {
-    // #672: both states were grey line art differing by one diagonal stroke, so at the size
-    // the corner gives it a card with both switches on looked like a card with neither.
     renderPage(
       stub({}, [
         aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true }),
@@ -202,7 +200,6 @@ describe('the bell in a card’s corner', () => {
   })
 
   it('lights up for the kind as well as for the card', async () => {
-    // The passing sibling: either switch alone is enough to make it ring.
     renderPage(
       stub(
         {

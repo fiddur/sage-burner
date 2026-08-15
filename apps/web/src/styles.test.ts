@@ -125,9 +125,6 @@ describe('the stylesheet', () => {
   })
 
   it('keeps the nudge above the popdown that raises it, and under the drawer', () => {
-    // #589: at 25 the strip sat under `.card-bell-menu`, so ticking a category on a card low
-    // in the feed put the offer behind the menu it had been ticked in and the tap did nothing.
-    // The scale is bar 20, popdown 30, nudge 32, backdrop 34, drawer 35, modal 40.
     const layer = (selector: string) =>
       Number(/z-index:\s*(\d+)/.exec(rules.find((rule) => rule.selector === selector)?.body ?? '')?.[1])
 
