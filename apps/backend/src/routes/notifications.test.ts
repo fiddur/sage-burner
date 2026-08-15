@@ -1295,12 +1295,6 @@ describe('what one line in the log covers', () => {
   })
 })
 
-/**
- * The vocabulary lives in `enums.ts` and the CHECK enforcing it lives in migration SQL, which
- * the schema is never read for at runtime — so adding a category without a migration passes
- * every type check and then silently kills each write that mentions it. It cost a debugging
- * round to find that out through six unrelated tests going red, hence a test that says it.
- */
 describe('the vocabulary the database will accept', () => {
   const insertable = (table: 'notification' | 'notification_setting', category: string): boolean => {
     try {

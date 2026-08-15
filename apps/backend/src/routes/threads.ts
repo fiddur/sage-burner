@@ -823,12 +823,6 @@ const authorRow = async (
   return row?.author == null ? [] : [row.author]
 }
 
-/**
- * Whoever wrote the thing a card is for, which is who a heart on it is news to (#706). A dream
- * is the odd one: it has a facilitator rather than an author, and the facilitator can be handed
- * on, so the person who offered it is the thread's own `offered` line. A generated sitting and a
- * lead role are nobody's, and a heart on one tells nobody rather than picking whoever acted first.
- */
 const cardAuthor = {
   attendance: (_db: Database, found: Whose) => Promise.resolve(found.subject_account_id),
   post: async (db: Database, found: Whose) => (await authorRow(db, post, found.entity_id))[0] ?? null,
@@ -851,8 +845,45 @@ const cardAuthor = {
   meal: () => Promise.resolve(null),
 } as const satisfies Record<ThreadEntityType, (db: Database, found: Whose) => Promise<string | null>>
 
-export const wroteIt = async (db: Database, found: Whose): Promise<string | null> =>
+const wroteIt = async (db: Database, found: Whose): Promise<string | null> =>
   await cardAuthor[found.entity_type](db, found)
+
+/**
+ * A dream's heart has two doors — the card on the feed and the panel on Dreams and Schedule —
+ * and they write the same `session_support` row, so they have to say the same thing (#706).
+ */
+export const tellHeartedDream = async (
+  db: Database,
+  notify: Notifier,
+  dream: { id: string; event_id: string | null; title: string },
+  by: string,
+): Promise<void> => {
+  const [card] = await db
+    .select({ id: thread.id })
+    .from(thread)
+    .where(and(eq(thread.entity_type, 'session'), eq(thread.entity_id, dream.id)))
+    .limit(1)
+
+  if (card === undefined) return
+
+  const author = await wroteIt(db, {
+    id: card.id,
+    entity_type: 'session',
+    entity_id: dream.id,
+    subject_account_id: null,
+  })
+
+  if (author === null || author === by) return
+
+  await notify(
+    author,
+    oneBatch({
+      category: 'hearted',
+      body: `${await displayName(db, by)} hearts ${dream.title}`,
+      link: dream.event_id === null ? null : dreamPage(dream.event_id, dream.id),
+    }),
+  )
+}
 
 const alsoInIt = {
   attendance: (_db: Database, found: Whose) =>
@@ -1134,7 +1165,11 @@ export const registerThreadRoutes = (
         .where(and(eq(threadSupport.thread_id, found.id), eq(threadSupport.account_id, viewer.account_id)))
     }
 
-    if (given) await tellHearted(found, viewer.account_id, await wroteIt(db, found))
+    if (given) {
+      await (found.entity_type === 'session'
+        ? tellHeartedDream(db, notify, { ...found, id: found.entity_id }, viewer.account_id)
+        : tellHearted(found, viewer.account_id, await wroteIt(db, found)))
+    }
 
     return await whole(reply, found.id, viewer)
   }
@@ -1352,12 +1387,6 @@ export const registerThreadRoutes = (
             .where(and(eq(attendance.event_id, eventId), ne(attendance.account_id, author)))
         ).map((row) => row.account_id)
 
-  /**
-   * Never for your own click (#706), which is the rule every role control already keeps: hearting
-   * your own comment is the common case and a notification for it teaches people to ignore the
-   * channel. `author` is null wherever the thing is nobody's — a generated sitting, a lead role,
-   * a line the app wrote — and then nobody is told.
-   */
   const tellHearted = async (found: Subject & { id: string }, by: string, author: string | null) => {
     if (author === null || author === by) return
 

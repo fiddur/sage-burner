@@ -11,9 +11,10 @@ under today's heading, and make a new heading when there is none.
 
 - **You are told when somebody hearts what you wrote.** A heart used to reach nobody — it was
   news only if you went back and looked — so now whoever wrote the comment, the announcement,
-  the song or the dream gets a line in the bell. Once, however many times the button is pressed,
-  and never for your own. It is on to begin with and switches off under **Somebody hearts
-  something you wrote** on your details page.
+  the song or the dream gets a line in the bell. Never for your own, and pressing the heart again
+  changes nothing — though taking one back and giving it afresh does say so again, that being a
+  second heart. It is on to begin with and switches off under **Somebody hearts something you
+  wrote** on your details page.
 
 - **The ⋯ on the last notification opens upward instead of off the edge.** On the bell panel it
   used to hang past the bottom, so **Remove this notification** was drawn where nothing could

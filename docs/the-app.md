@@ -751,10 +751,21 @@ back and looked. One category, `hearted`, `about: 'you'` and on by default — t
 wherever it lands, so one switch covers what the comment categories need nine pairs for.
 
 **Never for your own click**, the rule the role controls already keep: hearting your own comment is
-the common case and a notification for it teaches people to ignore the channel. **Once**, however
-often the button is pressed — the routes are `onConflictDoNothing`, so the notification hangs off
-`.returning()` being non-empty rather than off the request arriving. Taking a heart back says
-nothing, and re-giving it says nothing either, the row having never gone from anybody's bell.
+the common case and a notification for it teaches people to ignore the channel. **Once per heart**,
+however often the request arrives — the routes are `onConflictDoNothing`, so the notification hangs
+off `.returning()` being non-empty rather than off the request landing. Taking a heart back says
+nothing.
+
+**Taking one back and giving it again does say so again**, and that is where this stops: the second
+heart is a second heart, and the only thing that could remember otherwise is a row saying who has
+already been told, which is a table to keep for a case worth one line in somebody's bell. Forty-two
+members and a toggle nobody has reason to work at.
+
+**A dream's heart has two doors** and they have to agree: `POST /api/threads/:id/support/me` from
+the feed card and `POST /api/sessions/:id/support/me` from the panel on Dreams and Schedule write
+the same `session_support` row. Both go through `tellHeartedDream`, which is exported for exactly
+that reason — the first cut notified from one of them, and the same heart on the same dream rang
+from the card and was silent from the panel.
 
 **Who wrote it** is `cardAuthor`, per entity type, because there is no one column for it. `post`,
 `song`, `bring`, `point` and `meeting` carry `author_account_id`; an `attendance` card is its

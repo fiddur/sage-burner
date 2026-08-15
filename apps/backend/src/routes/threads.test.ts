@@ -1,7 +1,13 @@
 import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { everybodyToken, MAX_COMMENT, mentionsIn, mentionToken } from '@sage-burner/shared'
+import {
+  everybodyToken,
+  MAX_COMMENT,
+  mentionsIn,
+  mentionToken,
+  notificationCategories,
+} from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -981,11 +987,27 @@ describe('the heart on a comment', () => {
     expect(await bell(server, ada.cookie)).toHaveLength(1)
   })
 
-  it('says nothing to somebody who has switched hearts off', async () => {
+  it('says it again for a heart taken back and given afresh, which is a second heart', async () => {
     const { server, ada, comment } = await setUp()
     const bea = await givenAccount('Bea')
     await givenComing(bea.id)
-    await setOn(server, ada.cookie, [])
+    await love(server, bea.cookie, comment.id)
+
+    await unlove(server, bea.cookie, comment.id)
+    await love(server, bea.cookie, comment.id)
+
+    expect(await bell(server, ada.cookie)).toHaveLength(2)
+  })
+
+  it('says nothing to somebody who has switched hearts off, and only that switch', async () => {
+    const { server, ada, comment } = await setUp()
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await setOn(
+      server,
+      ada.cookie,
+      notificationCategories.filter((category) => category !== 'hearted'),
+    )
 
     await love(server, bea.cookie, comment.id)
 

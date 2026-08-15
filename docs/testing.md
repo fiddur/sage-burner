@@ -193,8 +193,10 @@ phone" means 360px.
       something went wrong, the card stays, and what was typed is still in the box to
       send again.
 - [ ] Heart a card somebody else announced: the count moves, nothing bumps, and **they**
-      get a bell line saying you hearted it. Press it again — no second line. Take it back —
-      still one line. Heart your own: nothing at all.
+      get a bell line saying you hearted it. Take it back — still one line. Heart your own:
+      nothing at all.
+- [ ] Heart somebody's dream from the **panel** on Dreams or Schedule, not from its feed card:
+      the same line reaches them. The two buttons are one heart and say the same thing.
 - [ ] The ♡ on a comment sits on the same line as the pen and the bin beside it, hearted or not.
 - [ ] Heart a comment under any card: the ♡ fills, the count appears beside it rather
       than inside it, and whoever wrote it is told. From a second account, heart the same
