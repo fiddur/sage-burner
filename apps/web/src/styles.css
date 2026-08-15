@@ -2060,6 +2060,90 @@ a.person-badge:focus-visible span:last-child {
   table-layout: fixed;
 }
 
+/* The header row of a collapsed section (#682). */
+.notification-section {
+  margin-block: 0.75rem;
+}
+
+.notification-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.notification-switches {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Fixed width so Here sits under Here down the page: the headings above them differ in
+   length, and a switch that moves per section reads as a different control. */
+.notification-master {
+  width: 4.5rem;
+}
+
+.notification-section-name {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: start;
+}
+
+.notification-master {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* The rows under an open header, tucked in so they read as belonging to it. */
+.notification-section .notification-settings {
+  margin-block-start: 0.25rem;
+}
+
+.notification-list li {
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.notification-said {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The ⋯ is the anchor `.card-bell-menu` positions against, exactly as `.card-bell` is. */
+.notification-menu {
+  position: relative;
+}
+
+.notification-menu-button {
+  padding: 0.1rem 0.2rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.notification-menu-button:hover,
+.notification-menu-button:focus-visible {
+  color: var(--ink);
+}
+
+.notification-menu .card-bell-menu {
+  text-align: start;
+}
+
 /* Under the tables rather than a column in them (#620): one choice for the whole account,
    where a column would have asked the same question once per category. Bounded, because a
    three-way choice stretched across the page reads as a text field. */

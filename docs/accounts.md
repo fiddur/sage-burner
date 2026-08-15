@@ -985,13 +985,14 @@ visit, where there is nobody to mark anything for. What the answer carries is th
 own payload, handed to whoever subscribed, so the badge clears without waiting for the
 next ask.
 
-One row per category under **Your details → Notifications**, in three sections that
-default differently — a count here would go stale on the next feature, and
-`notificationCategoryInfo` is the list:
+Four sections under **Your details → Notifications**, each collapsed to one row with a
+switch per channel, opening to a row per category (#682) — a count here would go stale
+on the next feature, and `notificationCategoryInfo` is the list. The sections default
+differently:
 
 - **What happens to you** — on unless you refuse them: being put on a meal is not
   noise, and somebody who never opens the settings should still hear it.
-- **What else is going on** — the section #259 added. **Off unless you ask.** A burn
+- **What others are doing** — the section #259 added. **Off unless you ask.** A burn
   where every dream and every arrival pings forty-two people is a channel people learn
   to ignore, which costs the notifications that are actually about them.
 
@@ -1003,6 +1004,12 @@ default differently — a count here would go stale on the next feature, and
   default while sitting here rather than under _what happens to you_, which is about your
   own record changing. The section still says where a category belongs; `on` says whether
   it can wait.
+
+- **A new version of the app is out** — its own `about: 'app'` rather than a special
+  case in the page (#682). It is neither something that happened to you nor something
+  somebody at the burn did, and the section it used to sit in described it as one. With
+  one category in it the header row _is_ the row: no expander, and the switch on it is
+  that category's own.
 
 - **What you look after** — an application arriving, and **only an admin is shown it**
   (#326). Nobody else is ever told, and a switch that cannot do anything reads as a
@@ -1024,6 +1031,34 @@ Switching one off silences the bell and the push together — those are one swit
 a bell filling with things somebody asked not to hear about is the same noise in a
 quieter place. The same holds in the other direction: nothing is recorded at all for a
 category somebody never turned on.
+
+**A section's switch is a literal bulk write** (#682), not a mode: on puts every category
+in that section on for that channel — the chatty `*_comment_any` ones with the rest — and
+off takes them all off. It is drawn mixed where the categories under it differ, and a
+click from mixed asks for all of them, which is what a checkbox does. Nothing is stored
+per section: the wire carries the complete `{ on, email, digest }` it always did, so the
+switch is a shape the page puts on the same write, and the row under it is what a later
+read shows.
+
+**Most people are expected never to open a section.** The switches that get used are the
+🔔 in a card's corner and the ⋯ on a notification (#680) — both are about the thing in
+front of you, which is when somebody actually knows whether they want to hear about it
+again. Every category in one flat list was a page nobody could answer.
+
+### Switching one off from the notification itself (#680)
+
+Every row on the bell panel and on `/notifications` carries a ⋯ with two entries.
+**Stop telling me about this** takes the row's own category off **both** channels at once
+— the row is a complaint about the kind, not about one channel of it — by reading the
+settings and writing the whole set back, the same read-then-write any other save does.
+**Remove this notification** is `DELETE /api/me/notifications/:id`, which answers the
+account's fresh list so the unseen count settles with it, and 404s for a row belonging to
+anybody else. Neither asks for confirmation: the first is undone from the settings above,
+and the second removes one line of history.
+
+The dropdown is the `card-bell-menu` pattern, and opening it in a second place is what
+moved the click-away-and-Escape half into `useAway` — the same behaviour written twice is
+the kind of thing that goes one fix stale.
 
 ### Asked for at the moment somebody joins (#574)
 

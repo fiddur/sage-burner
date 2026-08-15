@@ -11,12 +11,12 @@ import {
   notificationSettingsSchema,
   targetShownSchema,
 } from '@sage-burner/shared'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { account, notificationSetting } from '../db/schema.ts'
+import { account, notification, notificationSetting } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { markSeen, markShownSeen, notificationBatches, notificationsFor, switchedOn } from '../push/notify.ts'
 
@@ -66,6 +66,22 @@ export const registerNotificationRoutes = (app: FastifyInstance, { db, sessions,
     if (body === undefined) return sendError(reply, 400)
 
     await markShownSeen(db, accountId, { link: body.link, asOf: body.as_of }, now())
+
+    return (await notificationsFor(db, accountId)) satisfies NotificationsResponse
+  })
+
+  app.delete<{ Params: { id: string } }>(apiRoutes.deleteMyNotification.fastify, async (request, reply) => {
+    void noStore(reply)
+
+    const accountId = await mine(request)
+    if (accountId === undefined) return sendError(reply, 401)
+
+    const gone = await db
+      .delete(notification)
+      .where(and(eq(notification.id, request.params.id), eq(notification.account_id, accountId)))
+      .returning({ id: notification.id })
+
+    if (gone.length === 0) return sendError(reply, 404)
 
     return (await notificationsFor(db, accountId)) satisfies NotificationsResponse
   })

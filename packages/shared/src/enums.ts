@@ -135,7 +135,7 @@ export const notificationCategories = [
 export type NotificationCategory = (typeof notificationCategories)[number]
 
 export interface NotificationCategoryInfo {
-  about: 'admin' | 'else' | 'you'
+  about: 'admin' | 'app' | 'else' | 'you'
   label: string
   on: boolean
 }
@@ -192,7 +192,7 @@ export const notificationCategoryInfo = {
   meal_taken: { label: 'Somebody takes on a meal or a chore', on: false, about: 'else' },
   meal_comment: { label: 'Somebody comments on a meal you are on', on: true, about: 'you' },
   meal_comment_any: { label: 'Somebody comments on any meal', on: false, about: 'else' },
-  new_version: { label: 'A new version of the app is out', on: false, about: 'else' },
+  new_version: { label: 'A new version of the app is out', on: false, about: 'app' },
   application: { label: 'Somebody applies to join', on: true, about: 'admin' },
   application_news: { label: 'News about your application', on: true, about: 'you' },
 } as const satisfies Record<NotificationCategory, NotificationCategoryInfo>
@@ -202,7 +202,8 @@ export const notifiesByDefault = (category: NotificationCategory): boolean =>
 
 export const notificationSections = [
   { about: 'you', heading: 'What happens to you' },
-  { about: 'else', heading: 'What else is going on' },
+  { about: 'else', heading: 'What others are doing' },
+  { about: 'app', heading: 'A new version of the app is out' },
   { about: 'admin', heading: 'What you look after' },
 ] as const satisfies readonly { about: NotificationCategoryInfo['about']; heading: string }[]
 
