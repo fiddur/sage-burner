@@ -9,6 +9,16 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **Every meeting in the diary can be edited, not only the next one.** Mistype the time or the
+  joining link on a meeting further out and the only way back was to take it out and put it in
+  again — which told everybody a second time and dropped it out of every subscribed calendar in
+  between. There is a ✏️ on every line now.
+
+- **A reply to something somebody has just taken away is not lost.** If a meeting is taken out of
+  the diary while you are typing on its card, your reply now stays in the box, the message says
+  what happened rather than "Not found.", and the card leaves the page instead of sitting there
+  taking replies nobody will read.
+
 - **A lead role is something you can talk about now.** The feed had two shapes on it: cards you
   could reply to, and one-line news you could not — which by the end was only the lead roles.
   Adding a role, taking the lead, handing it over and joining or leaving a team all show as one

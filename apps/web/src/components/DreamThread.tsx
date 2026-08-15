@@ -67,7 +67,7 @@ export const DreamThread = ({
   more: boolean
   upload: UploadImage
   people?: readonly Mentionable[]
-  onSay: (body: string) => void
+  onSay: (body: string, done: () => void) => void
   onRewrite: (id: string, body: string) => void
   onRemove: (id: string) => void
   onShowAll?: () => void
@@ -108,11 +108,12 @@ export const DreamThread = ({
 
   if (thread === undefined) return null
 
+  // Emptied by the caller's `done` rather than on the way out: a reply to a thread somebody has
+  // just deleted answers 404, and what was typed used to go with it (#614).
   const say = () => {
     if (saying.trim() === '') return
 
-    onSay(saying.trim())
-    setSaying('')
+    onSay(saying.trim(), () => setSaying(''))
   }
 
   return (

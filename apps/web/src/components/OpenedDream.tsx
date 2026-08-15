@@ -79,7 +79,7 @@ export type DreamTalkApi = Pick<ApiClient, 'getThread' | 'postComment' | 'update
 
 export interface DreamTalk {
   thread: Thread | undefined
-  say: (body: string) => void
+  say: (body: string, done: () => void) => void
   rewrite: (id: string, body: string) => void
   remove: (id: string) => void
 }
@@ -116,16 +116,19 @@ export const useDreamThread = ({
   const fetched = answered?.id === threadId ? answered : undefined
   const thread = held?.id === fetched?.id && held !== undefined ? held : fetched
 
-  const after = (work: () => Promise<{ thread: Thread }>, fallback: string) => {
-    run(async () => setHeld((await work()).thread), fallback)
+  const after = (work: () => Promise<{ thread: Thread }>, fallback: string, done?: () => void) => {
+    run(async () => {
+      setHeld((await work()).thread)
+      done?.()
+    }, fallback)
   }
 
   return {
     thread,
-    say: (body) => {
+    say: (body, done) => {
       if (threadId == null) return
 
-      after(() => api.postComment(threadId, { body }), 'Could not say that.')
+      after(() => api.postComment(threadId, { body }), 'Could not say that.', done)
     },
     rewrite: (id, body) => after(() => api.updateComment(id, { body }), 'Could not save that.'),
     remove: (id) => after(() => api.deleteComment(id), 'Could not take that back.'),

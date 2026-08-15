@@ -968,6 +968,50 @@ describe('what everyone has been doing', () => {
     expect(await screen.findByText('is one person enough?')).toBeTruthy()
   })
 
+  it('takes a card away when its thing has gone, and says which thing it was', async () => {
+    // #614: a meeting taken out of the diary deletes its thread, so a reply from a page that
+    // was already showing the card answers 404. The card used to stay, composer and all, under
+    // a banner reading "Not found." — and what had been typed was gone with it.
+    const posted = vi.fn<FeedApi['postComment']>(() =>
+      Promise.reject(apiError(404, 'not_found', 'Not found.')),
+    )
+    const getFeed = vi
+      .fn<FeedApi['getFeed']>()
+      .mockResolvedValueOnce({
+        threads: [aCard({ id: 'c-1', title: 'Planning call', entity_type: 'meeting' })],
+      })
+      .mockResolvedValue({ threads: [] })
+    renderPage(stub({ getFeed, postComment: posted }))
+
+    const box = await screen.findByLabelText('Say something about Planning call')
+    fireEvent.input(box, { target: { value: 'that time does not work' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    expect(
+      await screen.findByText('Somebody took that out of the diary. It is off the page now.'),
+    ).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Planning call')).toBeNull())
+  })
+
+  it('keeps the card and the ordinary wording where the failure is not a disappearance', async () => {
+    // The passing sibling: a 500 is something to try again, not something that has gone.
+    const posted = vi.fn<FeedApi['postComment']>(() =>
+      Promise.reject(apiError(500, 'internal_error', 'Something went wrong at our end.')),
+    )
+    renderPage(stub({ postComment: posted }, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    const box = await screen.findByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: 'is one mat enough?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    expect(await screen.findByText('Something went wrong at our end.')).toBeTruthy()
+    expect(screen.getByText('Sauna at dawn')).toBeTruthy()
+    expect(screen.getByLabelText('Say something about Sauna at dawn')).toHaveProperty(
+      'value',
+      'is one mat enough?',
+    )
+  })
+
   it('asks for the rest of a conversation only when there is more of it', async () => {
     // The card carries the end of it, which is what bounds the page and what the
     // installed app keeps on disk. The whole thread is a read of its own.
