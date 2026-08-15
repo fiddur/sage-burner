@@ -268,6 +268,18 @@ phone" means 360px.
       admin's own address, and the Email column appears on the notification
       settings — unticked for every kind until asked. The digest below the tables
       is the one thing there that starts on.
+- [ ] Your details → Notifications shows four collapsed sections rather than a row per
+      category. **A new version of the app is out** has no expander — with one category in
+      it, its header row is the row.
+- [ ] On an account that has never saved: **What happens to you** is plainly ticked, every
+      one of its kinds being on by default, and **What others are doing** is **mixed**,
+      `meeting_scheduled` being the one of its kinds that is on. Press the mixed one: every
+      row under it comes back ticked, and one save went out. Press it again: all off.
+- [ ] Open a section and untick one row: the switch above it goes mixed without a reload.
+- [ ] On the bell panel and on `/notifications`, a row's ⋯ offers two things. **Stop telling
+      me about this** names the kind; press it, and that kind is off in both columns on the
+      details page. **Remove this notification** takes the row off, and a reload does not
+      bring it back — with an unseen row, the count above drops with it.
 - [ ] In a browser with push off, tick a category on the details page: a strip appears at the
       bottom of the window offering to turn notifications on here.
 - [ ] Without dismissing it, go to the feed and tick "Notify me on similar" in a card's 🔔:

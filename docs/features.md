@@ -178,6 +178,11 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   happens _around you_ is off unless asked for — except a meeting being scheduled,
   which is on, because it is the only one with a time you have to be at. Attendance
   is the audience for burn-wide news, and nobody is told about their own click.
+- The settings are four collapsed sections with a switch each for Here and Email;
+  open one for the categories under it. A section's switch writes every category in
+  it and reads as mixed where they differ.
+- Every notification carries a ⋯: stop being told this kind of thing at all, on both
+  channels at once, or take that one line off your list.
 - Admins are told when somebody applies; everybody who asked is told when a new
   version deploys, with a link to the changelog.
 

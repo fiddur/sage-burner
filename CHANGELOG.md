@@ -16,6 +16,19 @@ under today's heading, and make a new heading when there is none.
   « at the top of it puts it away if you would rather have the room, ☰ brings it back, and it
   stays however you left it. On a phone nothing changes.
 
+- **The notification settings are four switches, not a row per kind.** Your details →
+  Notifications was one long list of every kind of thing the app can tell you about, which is a
+  page nobody could answer. It is four sections now — what happens to you, what others are
+  doing, a new version of the app, and what you look after — each with a switch for Here and one
+  for Email. A switch shows half-filled where the kinds under it disagree, and opening a section
+  still gives you every row it always had.
+
+- **You can switch a kind off from the notification itself.** Every line on the bell and on the
+  notifications page has a ⋯ with "Stop telling me about this", which says which kind it means
+  and switches it off for both the bell and email, and "Remove this notification", which takes
+  that one line off your list. That is where switching things off is meant to happen — you know
+  whether you wanted to hear it while you are looking at it.
+
 - **Meals are on the feed now.** Taking a sitting's cooking on, handing it over, putting a hand up
   for the crew or writing what it will be all show as one card per sitting, with the food idea on
   it and a box to ask "is it vegan?". Generating the plan itself puts nothing on the feed — a card

@@ -73,6 +73,10 @@ const expectLinks = (present: string[], absent: string[]) => {
 const noBell: LayoutApi = {
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
   markNotificationsSeen: () => Promise.reject(new Error('markNotificationsSeen is not stubbed here')),
+  deleteMyNotification: () => Promise.reject(new Error('deleteMyNotification is not stubbed here')),
+  getMyNotificationSettings: () => Promise.reject(new Error('getMyNotificationSettings is not stubbed here')),
+  updateMyNotificationSettings: () =>
+    Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   getMapLink: () => Promise.resolve({ map: { url: null } }),
 }
 
