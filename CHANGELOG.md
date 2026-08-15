@@ -9,6 +9,27 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **On a laptop, everything is in one menu down the left.** Half the pages were words along
+  the top and the other half were behind ☰, and which half a page was in came down to what
+  fitted. Every page is in the column now — Feed, Members, Schedule, Leads, Meals, FAQ,
+  Songbook, Rideshares, Bring list, Meetings and the map — with the one you are on marked. The
+  « at the top of it puts it away if you would rather have the room, ☰ brings it back, and it
+  stays however you left it. On a phone nothing changes.
+
+- **Every longer box is now the same editor, and it tells you what it can do.** Write and Preview
+  tabs over it, the toolbar under them, and a line beneath saying markdown is supported and that a
+  picture can be pasted, dropped or picked. The comment boxes, the meeting notes, the bring list's
+  "anything else" and the applicant's box had all been simpler boxes with less on them — the
+  meeting notes were rendered as markdown while offering nothing to write it with.
+
+- **A new page explains the formatting**, at `/formatting`, linked from under every box. It shows
+  what you type beside what it turns into, and it is readable without signing in — an applicant
+  writing to the organisers has the same box as everybody else.
+
+- **Taking back a comment somebody else already took back no longer claims the whole thing is
+  gone.** The banner said "Somebody took that out of the diary" while the meeting sat on the screen
+  right below it. It says the comment is no longer there, and the card stays.
+
 - **The notification settings are four switches, not a row per kind.** Your details →
   Notifications was one long list of every kind of thing the app can tell you about, which is a
   page nobody could answer. It is four sections now — what happens to you, what others are

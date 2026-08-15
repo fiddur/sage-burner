@@ -182,6 +182,10 @@ phone" means 360px.
 - [ ] With the feed open in a second browser, take a meeting out of the diary in the
       first, then reply to its card in the second: the reply is refused with "Somebody
       took that out of the diary" and the card leaves the page, composer and all.
+- [ ] With the same two browsers, take a comment back in the first and then, in the second,
+      press ✏️ on that same comment and save: the message is "That comment is no longer
+      there.", the card stays with everything else on it, and the comment goes from it.
+      🗑️ **Take back** on an already-taken-back comment says the same.
 - [ ] Stop the backend, type a reply on any card and press **Say it**: the message says
       something went wrong, the card stays, and what was typed is still in the box to
       send again.
@@ -389,7 +393,29 @@ phone" means 360px.
       the body; pasting one and dropping one on the box still do the same.
 - [ ] While it is going up, the note below the box says a picture is on its way and the
       picture button is dimmed. Choosing an SVG says so below the box, not in the toolbar.
-- [ ] A field the public reads — the welcome text — has four buttons and no picture one.
+- [ ] Every longer box wears the same editor — a card's comment box, the rewrite box under
+      ✏️, a meeting's notes, a bring item's "anything else", the welcome text, and the
+      applicant's box on `/apply` — each with **Write | Preview** over it and a footer under
+      it. The song sheet and the application answers are plain boxes, and say nothing about
+      markdown.
+- [ ] **Preview** renders what **Write** holds, and an empty box previews as _Nothing
+      written yet._ rather than blank. Switching back keeps what was typed.
+- [ ] The footer's _Markdown is supported_ opens `/formatting`, which reads the same signed
+      out. Every example's right-hand column is what its left-hand column renders to.
+- [ ] The picture half of that footer is there only where pictures are — present on a
+      comment and on **How to pay**, absent on the applicant's box and on the **welcome
+      text**, which the public reads and cannot fetch an uploaded picture from.
+
+## The nav on a wide screen
+
+- [ ] A member sees a column of pages down the left on load, with every page in it —
+      Feed, Members, Schedule, Leads, Meals, FAQ, Songbook, Rideshares, Bring list,
+      Meetings, and the map where one is set, which still opens away. The top bar carries
+      the brand, the burn selector and the corner, and no page links at all.
+- [ ] The page you are on is marked in that column.
+- [ ] Press « at the top of it: the column goes and ☰ appears at the leading edge of the
+      bar. Reload: still gone. Press ☰: it is back, and a reload keeps it back.
+- [ ] Signed out, there is no column and no ☰.
 
 ## On a phone
 

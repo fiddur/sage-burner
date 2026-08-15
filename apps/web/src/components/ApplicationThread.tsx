@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { localDay } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
-import { rowsFor } from '../textarea.ts'
 import { ErrorText } from './ErrorText.tsx'
+import { MarkdownField } from './MarkdownField.tsx'
 import { PendingButton } from './PendingButton.tsx'
 
 export const ApplicationThread = ({
@@ -54,15 +54,16 @@ export const ApplicationThread = ({
 
       <ErrorText message={error} />
 
-      <p class="thread-say">
-        <textarea
-          class="thread-box"
-          aria-label={`Say something to ${subject}`}
+      <div class="thread-say">
+        <MarkdownField
+          label={`what you say to ${subject}`}
+          labelHidden
+          accessibleName={`Say something to ${subject}`}
           placeholder="Say something…"
-          maxLength={MAX_COMMENT}
-          rows={rowsFor(saying, 2)}
           value={saying}
-          onInput={(typed) => setSaying(typed.currentTarget.value)}
+          maxLength={MAX_COMMENT}
+          rows={2}
+          onInput={setSaying}
         />
         <PendingButton
           busy={busy}
@@ -72,7 +73,7 @@ export const ApplicationThread = ({
           disabled={saying.trim() === ''}
           onClick={() => onSay(saying.trim())}
         />
-      </p>
+      </div>
     </section>
   )
 }

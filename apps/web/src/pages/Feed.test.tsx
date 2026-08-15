@@ -1029,6 +1029,83 @@ describe('what everyone has been doing', () => {
     await waitFor(() => expect(screen.queryByText('Planning call')).toBeNull())
   })
 
+  it('says a comment has gone without claiming the card’s thing has, and leaves the card', async () => {
+    const raised = anEntry({ id: 't-1', body: 'raised this', kind: 'raised' })
+    const withComment = aCard({
+      id: 'c-1',
+      title: 'Planning call',
+      entity_type: 'meeting',
+      entry_count: 2,
+      entries: [raised, anEntry({ id: 't-2', body: 'that time does not work' })],
+    })
+    const getFeed = vi.fn<FeedApi['getFeed']>().mockResolvedValue({ threads: [withComment] })
+    const getThread = vi
+      .fn<FeedApi['getThread']>()
+      .mockResolvedValue({ thread: { ...withComment, entries: [raised], entry_count: 1 } })
+    const deleteComment = vi.fn<FeedApi['deleteComment']>(() =>
+      Promise.reject(apiError(404, 'not_found', 'Not found.')),
+    )
+    renderPage(stub({ getFeed, getThread, deleteComment }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take back this comment' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take back this comment' }))
+
+    expect(await screen.findByText('That comment is no longer there.')).toBeTruthy()
+    expect(screen.getByText('Planning call')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('that time does not work')).toBeNull())
+    expect(getFeed).toHaveBeenCalledTimes(1)
+  })
+
+  it('says the same when the comment goes while it is being rewritten', async () => {
+    const raised = anEntry({ id: 't-1', body: 'raised this', kind: 'raised' })
+    const withComment = aCard({
+      id: 'c-1',
+      title: 'Planning call',
+      entity_type: 'meeting',
+      entry_count: 2,
+      entries: [raised, anEntry({ id: 't-2', body: 'that time does not work' })],
+    })
+    const getThread = vi
+      .fn<FeedApi['getThread']>()
+      .mockResolvedValue({ thread: { ...withComment, entries: [raised], entry_count: 1 } })
+    const updateComment = vi.fn<FeedApi['updateComment']>(() =>
+      Promise.reject(apiError(404, 'not_found', 'Not found.')),
+    )
+    renderPage(stub({ getFeed: () => Promise.resolve({ threads: [withComment] }), getThread, updateComment }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Rewrite what you said' }))
+    fireEvent.input(screen.getByLabelText('Rewrite what you said'), { target: { value: 'nor does Sunday' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('That comment is no longer there.')).toBeTruthy()
+    expect(screen.getByText('Planning call')).toBeTruthy()
+  })
+
+  it('falls back to the card’s own wording where the thread has gone with the comment', async () => {
+    const raised = anEntry({ id: 't-1', body: 'raised this', kind: 'raised' })
+    const withComment = aCard({
+      id: 'c-1',
+      title: 'Planning call',
+      entity_type: 'meeting',
+      entry_count: 2,
+      entries: [raised, anEntry({ id: 't-2', body: 'that time does not work' })],
+    })
+    const getFeed = vi
+      .fn<FeedApi['getFeed']>()
+      .mockResolvedValueOnce({ threads: [withComment] })
+      .mockResolvedValue({ threads: [] })
+    const gone = () => Promise.reject(apiError(404, 'not_found', 'Not found.'))
+    renderPage(stub({ getFeed, getThread: gone, deleteComment: gone }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take back this comment' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take back this comment' }))
+
+    expect(
+      await screen.findByText('Somebody took that out of the diary. It is off the page now.'),
+    ).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Planning call')).toBeNull())
+  })
+
   it('keeps the card and the ordinary wording where the failure is not a disappearance', async () => {
     // The passing sibling: a 500 is something to try again, not something that has gone.
     const posted = vi.fn<FeedApi['postComment']>(() =>

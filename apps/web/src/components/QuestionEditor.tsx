@@ -284,12 +284,7 @@ const QuestionFields = ({
         </select>
       </label>
 
-      <MarkdownField
-        label="Help text (markdown)"
-        value={helpText}
-        maxLength={MAX_NOTES}
-        onInput={setHelpText}
-      />
+      <MarkdownField label="Help text" value={helpText} maxLength={MAX_NOTES} onInput={setHelpText} />
 
       <label class="field-inline">
         <input

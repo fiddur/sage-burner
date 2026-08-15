@@ -7,6 +7,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { DreamTalk } from '../components/OpenedDream.tsx'
 import type { UploadImage } from '../image-upload.ts'
+import type { Mentionable } from '../mentioning.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { Destroy } from '../components/Destroy.tsx'
@@ -15,14 +16,15 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
 import { IconButton } from '../components/IconButton.tsx'
+import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { useDreamThread } from '../components/OpenedDream.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
-import { rowsFor } from '../textarea.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type BringApi = Pick<
@@ -210,18 +212,14 @@ export const Bring = ({ api }: { api: BringApi }) => {
               />
             </label>
 
-            <label class="field">
-              <span>Anything else about it?</span>
-              <textarea
-                name="comment"
-                maxLength={MAX_NOTES}
-                rows={rowsFor(draft.comment)}
-                value={draft.comment}
-                onInput={(typed) =>
-                  setDraft((current) => ({ ...current, comment: typed.currentTarget.value }))
-                }
-              />
-            </label>
+            <MarkdownField
+              label="Anything else about it?"
+              value={draft.comment}
+              maxLength={MAX_NOTES}
+              upload={api.uploadImage}
+              people={attendees}
+              onInput={(comment) => setDraft((current) => ({ ...current, comment }))}
+            />
 
             {attending && (
               <label class="field-inline">
@@ -237,7 +235,13 @@ export const Bring = ({ api }: { api: BringApi }) => {
               </label>
             )}
 
-            <PendingButton busy={busy} label="Add it" busyLabel="Adding…" type="submit" />
+            <PendingButton
+              busy={busy}
+              disabled={stillUploading(draft.comment)}
+              label="Add it"
+              busyLabel="Adding…"
+              type="submit"
+            />
           </form>
         </>
       )}
@@ -281,7 +285,14 @@ const Row = ({
   if (editing) {
     return (
       <li class="bring-row">
-        <ItemFields item={item} busy={busy} onCancel={() => onEdit(false)} onSave={onSave} />
+        <ItemFields
+          item={item}
+          busy={busy}
+          upload={upload}
+          people={attendees}
+          onCancel={() => onEdit(false)}
+          onSave={onSave}
+        />
       </li>
     )
   }
@@ -353,11 +364,15 @@ const Row = ({
 const ItemFields = ({
   item,
   busy,
+  upload,
+  people,
   onCancel,
   onSave,
 }: {
   item: BringEntry
   busy: boolean
+  upload: UploadImage
+  people: readonly Mentionable[]
   onCancel: () => void
   onSave: (changes: { title: string; comment: string }) => void
 }) => {
@@ -377,20 +392,20 @@ const ItemFields = ({
         />
       </label>
 
-      <label class="field">
-        <span>Anything else about it?</span>
-        <textarea
-          maxLength={MAX_NOTES}
-          rows={rowsFor(comment)}
-          aria-label={`Comment, for ${item.title}`}
-          value={comment}
-          onInput={(typed) => setComment(typed.currentTarget.value)}
-        />
-      </label>
+      <MarkdownField
+        label="Anything else about it?"
+        accessibleName={`Comment, for ${item.title}`}
+        value={comment}
+        maxLength={MAX_NOTES}
+        upload={upload}
+        people={people}
+        onInput={setComment}
+      />
 
       <p class="row">
         <PendingButton
           busy={busy}
+          disabled={stillUploading(comment)}
           label="Save"
           busyLabel="Saving…"
           type="button"

@@ -136,6 +136,39 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     )
   }
 
+  const onComment = (card: Thread, work: () => Promise<unknown>, fallback: string) => {
+    let entityGone = false
+
+    const settle = async () => {
+      try {
+        held((await api.getThread(card.id)).thread)
+      } catch (second) {
+        if (!isGone(second)) return
+
+        entityGone = true
+        forget(card.id)
+        await reload()
+      }
+    }
+
+    run(
+      async () => {
+        try {
+          await work()
+        } catch (failure) {
+          if (isGone(failure)) await settle()
+
+          throw failure
+        }
+      },
+      (failure) => {
+        if (!isGone(failure)) return errorMessage(failure, fallback)
+
+        return entityGone ? wentAway[card.entity_type] : GONE_COMMENT
+      },
+    )
+  }
+
   const talk = {
     say: (card: Thread, body: string, done: () => void) => {
       onCard(
@@ -148,10 +181,14 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       )
     },
     rewrite: (card: Thread, id: string, body: string) => {
-      onCard(card, async () => held((await api.updateComment(id, { body })).thread), 'Could not save that.')
+      onComment(
+        card,
+        async () => held((await api.updateComment(id, { body })).thread),
+        'Could not save that.',
+      )
     },
     remove: (card: Thread, id: string) => {
-      onCard(card, async () => held((await api.deleteComment(id)).thread), 'Could not take that back.')
+      onComment(card, async () => held((await api.deleteComment(id)).thread), 'Could not take that back.')
     },
     showAll: (card: Thread) => {
       onCard(card, async () => held((await api.getThread(card.id)).thread), 'Could not load the rest of it.')
@@ -557,6 +594,8 @@ const wentAway = {
   role: 'Somebody took that role off. It is off the page now.',
   meal: 'Somebody took that sitting off the plan. It is off the page now.',
 } as const satisfies Record<Thread['entity_type'], string>
+
+const GONE_COMMENT = 'That comment is no longer there.'
 
 const goneLabel = {
   session: ' · withdrawn',

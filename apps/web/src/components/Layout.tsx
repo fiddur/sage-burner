@@ -9,11 +9,12 @@ import type { BellApi } from './NotificationBell.tsx'
 import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { useLoad } from '../load.ts'
+import { useSidebar } from '../sidebar.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 import { useHidingBar, usePhone } from '../viewport.ts'
 import { Avatar } from './Avatar.tsx'
 import { Icon } from './Icon.tsx'
-import { Menu } from './Menu.tsx'
+import { Menu, Sidebar } from './Menu.tsx'
 import { NotificationBell } from './NotificationBell.tsx'
 
 export interface NavPage {
@@ -56,11 +57,24 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
   const mapUrl = map.status === 'ready' ? map.data : null
   const bottomBar = phone && pages.length > 0
   const hidden = useHidingBar(bottomBar)
+  const sidebar = useSidebar()
+
+  const everyPage = approved ? [...memberPages, ...withMap(menuPages, mapUrl)] : []
+  const aside = !phone && everyPage.length > 0 && !sidebar.hidden
 
   return (
-    <div class={bottomBar ? 'layout has-bottom-bar' : 'layout'}>
+    <div class={classesFor({ bottomBar, aside })}>
       <header class="site-header">
-        <Menu pages={approved ? withMap(menuPages, mapUrl) : []} />
+        {phone ? (
+          <Menu pages={approved ? withMap(menuPages, mapUrl) : []} />
+        ) : (
+          everyPage.length > 0 &&
+          sidebar.hidden && (
+            <button type="button" class="menu-button" aria-label="Menu" onClick={sidebar.show}>
+              <Icon name="menu" />
+            </button>
+          )
+        )}
 
         <a class="brand" href="/">
           <img class="brand-mark" src={apiRoutes.getInstallationIcon.path()} alt="" />
@@ -82,8 +96,10 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
           </select>
         )}
 
-        <TopNav api={api} pages={bottomBar ? [] : pages} />
+        <TopNav api={api} />
       </header>
+
+      {aside && <Sidebar pages={everyPage} onHide={sidebar.hide} />}
 
       <main class="site-main">{children}</main>
 
@@ -102,7 +118,10 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
 const withMap = (pages: readonly NavPage[], url: string | null): readonly NavPage[] =>
   url === null ? pages : [...pages, { href: url, label: 'Map of area', icon: '🗺️', away: true }]
 
-const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => {
+const classesFor = ({ bottomBar, aside }: { bottomBar: boolean; aside: boolean }): string =>
+  ['layout', bottomBar && 'has-bottom-bar', aside && 'has-sidebar'].filter(Boolean).join(' ')
+
+const TopNav = ({ api }: { api: BellApi }) => {
   const viewer = useViewer()
 
   return (
@@ -113,12 +132,6 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
           <a href="/login">Log in</a>
         </>
       )}
-
-      {pages.map((page) => (
-        <a key={page.href} href={page.href}>
-          {page.label}
-        </a>
-      ))}
 
       {viewer.account !== undefined && (
         <span class="nav-session">
