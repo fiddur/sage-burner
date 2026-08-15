@@ -217,6 +217,17 @@ describe('the meetings page', () => {
     expect(field.getByRole('listitem').textContent).toBe('the door code is 1234')
   })
 
+  it('refuses to save while a picture in the notes is still going up', async () => {
+    renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }) }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))
+    fireEvent.input(screen.getByLabelText('Anything else about the meeting'), {
+      target: { value: '![Uploading room.jpg…]()' },
+    })
+
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+  })
+
   it('changes one further down the diary too, not only the next one', async () => {
     // #587: `MeetingFields` rendered from `NextMeeting` alone, so mistyping the time on
     // anything but the imminent meeting left 🗑️ and scheduling it again as the way back —

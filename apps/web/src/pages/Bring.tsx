@@ -21,6 +21,7 @@ import { NoBurn } from '../components/NoBurn.tsx'
 import { useDreamThread } from '../components/OpenedDream.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
@@ -234,7 +235,13 @@ export const Bring = ({ api }: { api: BringApi }) => {
               </label>
             )}
 
-            <PendingButton busy={busy} label="Add it" busyLabel="Adding…" type="submit" />
+            <PendingButton
+              busy={busy}
+              disabled={stillUploading(draft.comment)}
+              label="Add it"
+              busyLabel="Adding…"
+              type="submit"
+            />
           </form>
         </>
       )}
@@ -398,6 +405,7 @@ const ItemFields = ({
       <p class="row">
         <PendingButton
           busy={busy}
+          disabled={stillUploading(comment)}
           label="Save"
           busyLabel="Saving…"
           type="button"

@@ -131,8 +131,6 @@ export const MarkdownField = ({
       <PictureTrouble pictures={pictures} />
 
       <p class="form-note md-field-help">
-        {/* Away, so `preact-iso` leaves the click to the browser: routing here unmounts the
-            composer, and every draft in this app is component state. */}
         <a href={formattingPage()} target="_blank" rel="noreferrer">
           Markdown is supported
         </a>

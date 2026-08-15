@@ -30,6 +30,7 @@ import { useDreamThread } from '../components/OpenedDream.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { fromLocalInput, localMoment, shortDayOf, toLocalInput } from '../datetime.ts'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
@@ -851,7 +852,7 @@ const MeetingFields = ({
           label={meeting === undefined ? 'Put it in' : 'Save'}
           busyLabel="Saving…"
           type="button"
-          disabled={title.trim() === '' || startsAt === null}
+          disabled={title.trim() === '' || startsAt === null || stillUploading(notes)}
           onClick={() => {
             if (startsAt === null) return
 
