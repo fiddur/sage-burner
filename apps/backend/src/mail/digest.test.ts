@@ -1,4 +1,4 @@
-import type { DigestChoice, NotificationCategory, ThreadEntryKind } from '@sage-burner/shared'
+import type { DigestChoice, ThreadEntryKind } from '@sage-burner/shared'
 
 import { notifiesByDefault } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
@@ -12,10 +12,10 @@ import { createDb, runMigrations } from '../db/index.ts'
 import {
   account,
   accountRole,
-  activity,
   event,
   installation,
   INSTALLATION_ID,
+  leadRole,
   mailSetting,
   meetingPoint,
   song,
@@ -119,18 +119,44 @@ const givenBurn = async () => {
   return id
 }
 
-const givenActivity = async (
+const givenRoleCard = async (
   eventId: string,
-  {
-    category = 'lead_role_filled',
-    body = 'Bo takes the lead of Kitchen',
-    link = '/roles',
-    at = ago(2 * HOUR),
-  }: { category?: NotificationCategory; body?: string; link?: string; at?: string } = {},
+  { title = 'Kitchen', at = ago(2 * HOUR) }: { title?: string; at?: string } = {},
 ) => {
+  const roleId = randomUUID()
+  const threadId = randomUUID()
+
   await db()
-    .insert(activity)
-    .values({ id: randomUUID(), event_id: eventId, category, body, link, created_at: at })
+    .insert(leadRole)
+    .values({
+      id: roleId,
+      event_id: eventId,
+      title,
+      purpose: '',
+      tasks: '',
+      effort_before: 'none',
+      effort_during: 'none',
+      effort_after: 'none',
+      team_size_wanted: 0,
+      lead_attendance_id: null,
+      created_at: ago(10 * DAY),
+    })
+  await db()
+    .insert(thread)
+    .values({ id: threadId, event_id: eventId, entity_type: 'role', entity_id: roleId, title })
+  await db()
+    .insert(threadEntry)
+    .values({
+      id: randomUUID(),
+      thread_id: threadId,
+      kind: 'facilitator',
+      seq: Date.parse(at),
+      author_account_id: null,
+      body: 'is leading it',
+      created_at: at,
+    })
+
+  return threadId
 }
 
 const givenSongCard = async ({
@@ -348,18 +374,18 @@ describe('a card in one line', () => {
 })
 
 describe('what a digest holds', () => {
-  it('gathers the burn lines and the cards under the feed’s own headings, in its own order', async () => {
+  it('gathers the cards under the feed’s own headings, in its own order', async () => {
     build()
     const burn = await givenBurn()
-    await givenActivity(burn)
+    await givenRoleCard(burn)
     const card = await givenPointCard(burn)
     await givenEntry(card, { kind: 'raised', body: 'raised this' })
 
     const sections = await feedSince(db(), { after: null, origin: 'https://burn.example' })
 
-    expect(sections.map((section) => section.label)).toEqual(['Burns', 'Points'])
-    expect(sections[0]?.entries).toEqual([
-      { body: 'Bo takes the lead of Kitchen', link: 'https://burn.example/roles' },
+    expect(sections.map((section) => section.label)).toEqual(['Points', 'Leads'])
+    expect(sections[1]?.entries).toEqual([
+      { body: 'Kitchen — Somebody is leading it', link: `https://burn.example/roles?burn=${burn}` },
     ])
   })
 
@@ -419,7 +445,7 @@ describe('what a digest holds', () => {
   it('leaves the link out where the installation does not know its own address', async () => {
     build()
     const burn = await givenBurn()
-    await givenActivity(burn)
+    await givenRoleCard(burn)
 
     const sections = await feedSince(db(), { after: null, origin: undefined })
 
@@ -435,7 +461,7 @@ describe('what a digest holds', () => {
   it('is empty where everything is older than the cut', async () => {
     build()
     const burn = await givenBurn()
-    await givenActivity(burn, { at: ago(5 * DAY) })
+    await givenRoleCard(burn, { at: ago(5 * DAY) })
 
     expect(await feedSince(db(), { after: ago(2 * DAY), origin: undefined })).toEqual([])
   })
@@ -443,19 +469,22 @@ describe('what a digest holds', () => {
   it('carries the whole backlog where nothing has been mailed yet', async () => {
     build()
     const burn = await givenBurn()
-    await givenActivity(burn, { body: 'ancient', at: ago(60 * DAY) })
-    await givenActivity(burn, { body: 'recent', at: ago(HOUR) })
+    await givenRoleCard(burn, { title: 'ancient', at: ago(60 * DAY) })
+    await givenRoleCard(burn, { title: 'recent', at: ago(HOUR) })
 
     const sections = await feedSince(db(), { after: null, origin: undefined })
 
-    expect(sections[0]?.entries.map((one) => one.body)).toEqual(['recent', 'ancient'])
+    expect(sections[0]?.entries.map((one) => one.body)).toEqual([
+      'recent — Somebody is leading it',
+      'ancient — Somebody is leading it',
+    ])
   })
 
   it('caps what one section carries, and says how much it left out', async () => {
     build()
     const burn = await givenBurn()
     for (let at = 0; at < MOST_PER_SECTION + 3; at += 1) {
-      await givenActivity(burn, { body: `line ${at}`, at: ago(at * HOUR) })
+      await givenRoleCard(burn, { title: `line ${at}`, at: ago(at * HOUR) })
     }
 
     const [section] = await feedSince(db(), { after: null, origin: undefined })
@@ -513,7 +542,7 @@ describe('the nightly sweep', () => {
     build()
     await givenMailServer()
     await givenAccount({ lastActive: ago(3 * DAY) })
-    await givenActivity(await givenBurn())
+    await givenRoleCard(await givenBurn())
     const send = vi.fn(() => Promise.resolve())
 
     expect(await sweepDigests(deps(send), NOW)).toBe(1)
@@ -528,8 +557,8 @@ describe('the nightly sweep', () => {
     await givenMailServer()
     await givenAccount({ lastActive: ago(10 * DAY), digestSent: ago(2 * DAY) })
     const burn = await givenBurn()
-    await givenActivity(burn, { body: 'already sent to them', at: ago(5 * DAY) })
-    await givenActivity(burn, { body: 'since that digest', at: ago(HOUR) })
+    await givenRoleCard(burn, { title: 'already sent to them', at: ago(5 * DAY) })
+    await givenRoleCard(burn, { title: 'since that digest', at: ago(HOUR) })
     const sent: Message[] = []
 
     await sweepDigests(deps(collecting(sent)), NOW)
@@ -543,8 +572,8 @@ describe('the nightly sweep', () => {
     await givenMailServer()
     await givenAccount({ lastActive: ago(5 * DAY), digestSent: ago(10 * DAY) })
     const burn = await givenBurn()
-    await givenActivity(burn, { body: 'before they came back', at: ago(7 * DAY) })
-    await givenActivity(burn, { body: 'after they left again', at: ago(HOUR) })
+    await givenRoleCard(burn, { title: 'before they came back', at: ago(7 * DAY) })
+    await givenRoleCard(burn, { title: 'after they left again', at: ago(HOUR) })
     const sent: Message[] = []
 
     await sweepDigests(deps(collecting(sent)), NOW)
@@ -557,7 +586,7 @@ describe('the nightly sweep', () => {
     build()
     await givenMailServer()
     await givenAccount({ lastActive: ago(10 * DAY) })
-    await givenActivity(await givenBurn(), { body: 'while they were gone', at: ago(5 * DAY) })
+    await givenRoleCard(await givenBurn(), { title: 'while they were gone', at: ago(5 * DAY) })
     const sent: Message[] = []
 
     await sweepDigests(deps(collecting(sent)), NOW)
@@ -568,7 +597,7 @@ describe('the nightly sweep', () => {
   it('sends nothing where no mail server has been set up', async () => {
     build()
     await givenAccount({ lastActive: ago(3 * DAY) })
-    await givenActivity(await givenBurn())
+    await givenRoleCard(await givenBurn())
     const send = vi.fn(() => Promise.resolve())
 
     expect(await sweepDigests(deps(send), NOW)).toBe(0)
@@ -589,7 +618,7 @@ describe('the nightly sweep', () => {
     build()
     await givenMailServer()
     const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
-    await givenActivity(await givenBurn())
+    await givenRoleCard(await givenBurn())
     const failing = deps(() => Promise.reject(new Error('550 nope')))
 
     expect(await sweepDigests(failing, NOW)).toBe(0)
@@ -604,8 +633,8 @@ describe('the nightly sweep', () => {
     await givenMailServer()
     await givenAccount({ lastActive: ago(3 * DAY) })
     const burn = await givenBurn()
-    await givenActivity(burn, { body: 'one' })
-    await givenActivity(burn, { body: 'two', at: ago(3 * HOUR) })
+    await givenRoleCard(burn, { title: 'one' })
+    await givenRoleCard(burn, { title: 'two', at: ago(3 * HOUR) })
     const sent: Message[] = []
 
     await sweepDigests(deps(collecting(sent)), NOW)
@@ -620,7 +649,7 @@ describe('the nightly sweep', () => {
     await givenAccount({ lastActive: ago(3 * DAY) })
     const burn = await givenBurn()
     for (let at = 0; at < MOST_PER_SECTION + 3; at += 1) {
-      await givenActivity(burn, { body: `line ${at}`, at: ago(at * HOUR) })
+      await givenRoleCard(burn, { title: `line ${at}`, at: ago(at * HOUR) })
     }
     const sent: Message[] = []
 
@@ -634,7 +663,7 @@ describe('the nightly sweep', () => {
     build()
     await givenMailServer()
     await givenAccount({ lastActive: ago(3 * DAY), approved: false })
-    await givenActivity(await givenBurn())
+    await givenRoleCard(await givenBurn())
     const send = vi.fn(() => Promise.resolve())
 
     expect(await sweepDigests(deps(send), NOW)).toBe(0)

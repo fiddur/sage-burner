@@ -68,9 +68,8 @@ describe('enum type guards', () => {
 })
 
 describe('the feed filter carried in a URL', () => {
-  it('has a chip for every kind of card, and one for the burn news', () => {
-    expect(feedKinds).toContain('activity')
-    for (const type of threadEntityTypes) expect(feedKinds).toContain(type)
+  it('has a chip for every kind of card, and nothing else', () => {
+    expect([...feedKinds]).toEqual([...threadEntityTypes])
   })
 
   it('reads the kinds a URL asks for', () => {

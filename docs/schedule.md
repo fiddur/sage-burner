@@ -516,6 +516,36 @@ account exists, it is the pairing that is wrong.
 Names are resolved at read time from `account`, never copied into the register: a
 name corrected on the profile page is corrected here too.
 
+### A role is a card on the feed (#610)
+
+**The eighth `ThreadEntityType`, and the one that took the last line off the feed.** Adding
+a role, taking the lead, handing it over, joining a team and leaving one all wrote a
+notification and a one-line `activity` row; the row is now an entry on the role's own card,
+so the register's news arrives where it can be answered. "Who can take this?" is the
+question the register could not hold, and it is a conversation. `docs/the-app.md` has the
+feed's side of it, and what went with the `activity` table.
+
+The card's title and body are the role's live `title` and `purpose`, read through the same
+join every other card kind uses, so renaming a role cannot leave the old name on the feed.
+The link is the register at that burn — `/roles?burn=…` rather than `/roles`, which is the
+same rule every burn-scoped link follows, and it is now what the personal notifications use
+too. There is no per-role anchor: the register is one table, and a card that lands you on it
+lands you next to the thing.
+
+**Deleting a role deletes its card**, in the transaction that deletes the row — the shape a
+meeting and a talking point already use (#608). A role that no longer exists has no purpose
+left to show and nobody left on it, so a tombstone would say less than nothing.
+
+**Seeding a register from a previous burn opens a card per role**, dated from each copied
+role's own stamp rather than from one `now()`, so the cards come out in the register's order.
+The vacant roles a burn starts with are exactly the ones somebody needs to ask about, and a
+role with no card has nowhere for the asking to go.
+
+**A team change writes an entry, which is new**: it used to tell the person and nobody
+else. It bumps the role up the feed, which is what "somebody is on it now" deserves, and
+`entryCategory` maps `helper` to no category, so it is one more thing on the card rather
+than one more thing that can be switched on.
+
 ### One table, at every width
 
 The register used to become a card per role below 60rem, which turned six short

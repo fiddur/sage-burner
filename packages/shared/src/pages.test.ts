@@ -8,6 +8,7 @@ import {
   loginPage,
   meetingsPage,
   oauthOutcomes,
+  rolesPage,
   signingInOutcomes,
 } from './pages.ts'
 
@@ -67,5 +68,15 @@ describe('the meetings page', () => {
 
   it('encodes both, so an id cannot invent a parameter', () => {
     expect(meetingsPage('a&b', 'c=d')).toBe('/meetings?burn=a%26b&point=c%3Dd')
+  })
+})
+
+describe('the lead-roles register', () => {
+  it('names the burn it belongs to, a role card linking to the register at its own burn', () => {
+    expect(rolesPage('burn-1')).toBe('/roles?burn=burn-1')
+  })
+
+  it('encodes it, so an id cannot invent a parameter', () => {
+    expect(rolesPage('a&b')).toBe('/roles?burn=a%26b')
   })
 })

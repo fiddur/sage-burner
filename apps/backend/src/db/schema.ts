@@ -772,26 +772,6 @@ export const notificationBatch = sqliteTable(
   (table) => [primaryKey({ columns: [table.id] }), index('notification_batch_idx').on(table.created_at)],
 )
 
-export const activity = sqliteTable(
-  'activity',
-  {
-    id: text('id').notNull(),
-    event_id: text('event_id')
-      .notNull()
-      .references(() => event.id, { onDelete: 'cascade' }),
-    category: text('category', { enum: notificationCategories }).notNull(),
-    body: text('body').notNull(),
-    link: text('link'),
-    created_at: text('created_at').notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.id] }),
-    index('activity_recent_idx').on(table.created_at),
-    index('activity_event_idx').on(table.event_id),
-    check('activity_category_check', oneOf(table.category, notificationCategories)),
-  ],
-)
-
 // `event_id` is nullable for the songbook, whose threads belong to no burn and so outlive
 // every one of them — `docs/the-app.md` has why the book is global.
 export const thread = sqliteTable(

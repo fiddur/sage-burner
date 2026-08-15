@@ -4,6 +4,8 @@ import type { FastifyInstance } from 'fastify'
 import { feedPath, mentionToken } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
@@ -12,14 +14,15 @@ import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
-import { createDb, runMigrations } from '../db/index.ts'
+import { createDb, migrationsFolder, runMigrations } from '../db/index.ts'
 import {
   account,
   accountRole,
-  activity,
   attendance,
   event,
+  leadRole,
   place,
+  session,
   thread,
   threadEntry,
 } from '../db/schema.ts'
@@ -33,9 +36,8 @@ import { CARD_ENTRIES, FEED_LIMIT } from './feed.ts'
  * matching notification on — so no test here turns one on, and the burn-wide writes
  * still fill the feed.
  *
- * **A lead role is what stages a line**, since anything with a thread is a card instead:
- * offering a dream, and — since #426 — saying you are coming. The two halves are asserted
- * separately, which is what the response's two arrays are.
+ * **Everything on it is a card** (#610): one shape, carrying its whole history and the
+ * talk under it, whether it is a dream, a person at a burn, an announcement or a lead role.
  */
 
 const SECRET = 'v'.repeat(40)
@@ -115,19 +117,40 @@ const feed = (server: FastifyInstance, cookie?: string, kinds: readonly FeedKind
     ...(cookie === undefined ? {} : { headers: { cookie } }),
   })
 
-const lines = async (
+/** A card written straight in, for the cases a frozen clock cannot stage. */
+const givenDreamCard = async (
+  title: string,
+  created_at: string,
+  { eventId = BURN, id = randomUUID() }: { eventId?: string; id?: string } = {},
+) => {
+  const dream = randomUUID()
+
+  await db().insert(session).values({ id: dream, event_id: eventId, title })
+  await db().insert(thread).values({
+    id,
+    event_id: eventId,
+    entity_type: 'session',
+    entity_id: dream,
+    subject_account_id: null,
+    title,
+  })
+  await db().insert(threadEntry).values({
+    id: randomUUID(),
+    thread_id: id,
+    kind: 'offered',
+    seq: 1,
+    author_account_id: null,
+    body: 'offered this dream',
+    created_at,
+    edited_at: null,
+  })
+}
+
+const titles = async (
   server: FastifyInstance,
   cookie: string,
   kinds: readonly FeedKind[] = [],
-): Promise<string[]> =>
-  (await feed(server, cookie, kinds)).json().activity.map((one: { body: string }) => one.body)
-
-/** A line written straight into the table, for the cases a frozen clock cannot stage. */
-const givenLine = async (body: string, created_at: string, eventId = BURN, id = randomUUID()) => {
-  await db()
-    .insert(activity)
-    .values({ id, event_id: eventId, category: 'dream_offered', body, link: null, created_at })
-}
+): Promise<string[]> => (await cards(server, cookie, kinds)).map((card) => card.title)
 
 const offerDream = async (server: FastifyInstance, cookie: string, title: string, eventId = BURN) => {
   const response = await server.inject({
@@ -202,8 +225,8 @@ describe('the feed', () => {
     expect(card?.entries.map((entry) => [entry.author?.name, entry.kind, entry.body])).toEqual([
       ['Ada', 'offered', 'offered this dream'],
     ])
-    // And no line beside it: one offer is one thing on the page, not two.
-    expect(await lines(server, ada.cookie)).toEqual([])
+    // And nothing beside it: one offer is one thing on the page, not two.
+    expect(await cards(server, ada.cookie)).toHaveLength(1)
   })
 
   it('shows it to the person who did it, unlike the notification', async () => {
@@ -221,9 +244,9 @@ describe('the feed', () => {
   })
 
   it('heads a card with what the dream is called now, not what it was called then', async () => {
-    // The bug this fixes. An `activity` line freezes the title into a sentence, so the
-    // feed went on offering "Sauna at dawn" after it had been renamed; a card carries the
-    // thread's own title and the rename keeps it in step.
+    // The bug this fixes. A line freezing the title into a sentence went on offering
+    // "Sauna at dawn" after it had been renamed; a card carries the thread's own title
+    // and the rename keeps it in step.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -290,14 +313,14 @@ describe('the feed', () => {
     await givenBurn()
     await givenBurn(OTHER_BURN, 'Autumn burn', 'autumn')
     const ada = await givenAccount('Ada')
-    await givenLine('Something here', NOW)
-    await givenLine('Something there', NOW, OTHER_BURN)
+    await givenDreamCard('Something here', NOW)
+    await givenDreamCard('Something there', NOW, { eventId: OTHER_BURN })
 
-    const rows = (await feed(server, ada.cookie)).json().activity
-    expect(rows.map((one: { burn: string }) => one.burn).toSorted()).toEqual(['Autumn burn', 'Summer burn'])
+    const rows = await cards(server, ada.cookie)
+    expect(rows.map((one) => one.burn).toSorted()).toEqual(['Autumn burn', 'Summer burn'])
   })
 
-  it('carries the category, so the chip can offer to switch it on', async () => {
+  it('gives a lead role a card of its own, linked to the register at its burn', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -305,12 +328,16 @@ describe('the feed', () => {
 
     await addLeadRole(server, ada.cookie, 'Firewood')
 
-    const [row] = (await feed(server, ada.cookie)).json().activity
-    expect(row.category).toBe('lead_role_added')
-    expect(row.link).toBe('/roles')
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.entity_type).toBe('role')
+    expect(card?.title).toBe('Firewood')
+    expect(card?.link).toBe(`/roles?burn=${BURN}`)
+    expect(card?.entries.map((entry) => [entry.author?.name, entry.kind, entry.body])).toEqual([
+      ['Ada', 'added', 'added this lead role'],
+    ])
   })
 
-  it('has a line for a lead role, and a card for somebody saying they are coming', async () => {
+  it('has a card for a lead role, and one for somebody saying they are coming', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -320,10 +347,14 @@ describe('the feed', () => {
     await joinBurn(server, bea.cookie)
     await addLeadRole(server, ada.cookie, 'Firewood')
 
-    expect(await lines(server, ada.cookie)).toEqual(['A new lead role: Firewood'])
-    const [card] = await cards(server, ada.cookie)
-    expect(card?.title).toBe('Bea')
-    expect(card?.entries.map((entry) => [entry.kind, entry.body])).toEqual([['joined', 'is coming']])
+    expect(
+      (await cards(server, ada.cookie)).map((card) => [card.entity_type, card.title]).toSorted(),
+    ).toEqual(
+      [
+        ['attendance', 'Bea'],
+        ['role', 'Firewood'],
+      ].toSorted(),
+    )
   })
 
   it('is newest first', async () => {
@@ -334,32 +365,27 @@ describe('the feed', () => {
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
-    await givenLine('Earlier', '2026-07-01T10:00:00.000Z')
-    await givenLine('Later', '2026-07-01T11:00:00.000Z')
+    await givenDreamCard('Earlier', '2026-07-01T10:00:00.000Z')
+    await givenDreamCard('Later', '2026-07-01T11:00:00.000Z')
 
-    expect(await lines(server, ada.cookie)).toEqual(['Later', 'Earlier'])
+    expect(await titles(server, ada.cookie)).toEqual(['Later', 'Earlier'])
   })
 
-  it('breaks a shared stamp by id, so two reads cannot disagree', async () => {
+  it('puts the higher id first where two cards share a stamp, so two reads cannot disagree', async () => {
     // A copied register writes several rows a millisecond apart, and nothing promises
     // that — an order that changed between two reads of the same rows would read as
-    // though something had happened again. Asserted as the expected order rather than as
-    // two equal reads: SQLite answers one query the same way twice with or without the
-    // tie-break, so comparing two runs proves nothing.
+    // though something had happened again. This pins the order `recentThreads` asks for;
+    // it does not prove the tie-break, since SQLite answers this group-by the same way
+    // with and without it, which was measured rather than reasoned out.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
-    // Written in the opposite order to their ids, which is what makes this reject the
-    // tie-break's removal. What answers without it is a reverse scan of
-    // `activity_recent_idx`, where equal `created_at` keys come back rowid-descending —
-    // so the two orders differ only when the ids run against the writing order. Measured
-    // by removing `desc(activity.id)` and watching this fail, not reasoned out.
-    await givenLine('One', NOW, BURN, 'a0000000-0000-4000-8000-000000000003')
-    await givenLine('Two', NOW, BURN, 'a0000000-0000-4000-8000-000000000002')
-    await givenLine('Three', NOW, BURN, 'a0000000-0000-4000-8000-000000000001')
+    await givenDreamCard('One', NOW, { id: 'a0000000-0000-4000-8000-000000000001' })
+    await givenDreamCard('Two', NOW, { id: 'a0000000-0000-4000-8000-000000000002' })
+    await givenDreamCard('Three', NOW, { id: 'a0000000-0000-4000-8000-000000000003' })
 
-    expect(await lines(server, ada.cookie)).toEqual(['One', 'Two', 'Three'])
+    expect(await titles(server, ada.cookie)).toEqual(['Three', 'Two', 'One'])
   })
 
   it('stops at the limit rather than answering the whole table', async () => {
@@ -370,13 +396,13 @@ describe('the feed', () => {
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     for (let index = 0; index <= FEED_LIMIT; index += 1) {
-      await givenLine(`Line ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
+      await givenDreamCard(`Card ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
     }
 
-    const rows = (await feed(server, ada.cookie)).json().activity
+    const rows = await titles(server, ada.cookie)
     expect(rows).toHaveLength(FEED_LIMIT)
     // And it is the newest that survive the cut, not the first written.
-    expect(rows[0].body).toBe(`Line ${FEED_LIMIT}`)
+    expect(rows[0]).toBe(`Card ${FEED_LIMIT}`)
   })
 
   it('refuses anybody without a role, and anybody not signed in', async () => {
@@ -406,52 +432,45 @@ describe('the feed', () => {
     await givenComing(ada.id)
     await addLeadRole(server, ada.cookie, 'Firewood')
     await offerDream(server, ada.cookie, 'Sauna at dawn')
-    expect(await db().select().from(activity)).toHaveLength(1)
-    expect(await db().select().from(thread)).toHaveLength(1)
+    expect(await db().select().from(thread)).toHaveLength(2)
 
     await db().delete(event).where(eq(event.id, BURN))
 
-    expect(await db().select().from(activity)).toEqual([])
-    // The thread goes with it too, and the entries with the thread — a conversation
+    // The thread goes with the burn, and the entries with the thread — a conversation
     // outlives its dream, not the burn it was at.
     expect(await db().select().from(thread)).toEqual([])
     expect(await db().select().from(threadEntry)).toEqual([])
-    expect(await lines(server, ada.cookie)).toEqual([])
     expect(await cards(server, ada.cookie)).toEqual([])
   })
 
-  it('refuses a category the vocabulary has never heard of', async () => {
-    // The CHECK, proved by a write that skips the API — the migration's, not the
-    // schema's, since the test database is built from the SQL.
-    await build()
-    await givenBurn()
-
-    expect(() =>
-      client()
-        .prepare('insert into activity (id, event_id, category, body, created_at) values (?, ?, ?, ?, ?)')
-        .run(randomUUID(), BURN, 'gossip', 'something happened', NOW),
-    ).toThrow()
-  })
-
-  it('holds nothing but what a burn-wide notification says', async () => {
-    // The disclosure argument, as an assertion: every column the route selects comes
-    // from `activity` or the burn's name, so a payment date or an address cannot reach
-    // the page through it.
+  it('holds nothing but what a card is made of', async () => {
+    // The disclosure argument, as an assertion: `readThreads` names every column it
+    // answers with, so a payment date or an address cannot reach the page through it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     await addLeadRole(server, ada.cookie, 'Firewood')
 
-    const [row] = (await feed(server, ada.cookie)).json().activity
+    const [row] = (await feed(server, ada.cookie)).json().threads
     expect(Object.keys(row).toSorted()).toEqual([
       'body',
       'burn',
-      'category',
-      'created_at',
+      'entity_id',
+      'entity_type',
+      'entries',
+      'entry_count',
       'event_id',
+      'followed_by_me',
+      'gone',
       'id',
+      'last_at',
       'link',
+      'own',
+      'support_count',
+      'supported_by_me',
+      'supporters',
+      'title',
     ])
   })
 
@@ -646,24 +665,25 @@ describe('the feed', () => {
     expect(await cards(server, ada.cookie)).toEqual([])
   })
 
-  it('cuts the page against both halves, not each on its own', async () => {
-    // Fifty things, not fifty of each: a burn full of talk must not push the news off
+  it('cuts the page against everything on it, whatever kind each one is', async () => {
+    // Fifty things, not fifty of each: a burn full of talk must not push the rest off
     // the page, and a quiet one must not leave it half empty.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     for (let index = 0; index < FEED_LIMIT; index += 1) {
-      await givenLine(`Line ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
+      await givenDreamCard(`Card ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
     }
 
-    // Newer than every one of them, so it takes the last place and one line loses it.
+    // Newer than every one of them, so it takes the last place and one card loses it.
     stamp = '2026-07-03T00:00:00.000Z'
-    await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await addLeadRole(server, ada.cookie, 'Firewood')
 
-    const response = (await feed(server, ada.cookie)).json()
-    expect(response.threads).toHaveLength(1)
-    expect(response.activity).toHaveLength(FEED_LIMIT - 1)
+    const shown = await titles(server, ada.cookie)
+    expect(shown).toHaveLength(FEED_LIMIT)
+    expect(shown[0]).toBe('Firewood')
+    expect(shown).not.toContain('Card 0')
   })
 
   it('writes nothing when it is read', async () => {
@@ -677,8 +697,7 @@ describe('the feed', () => {
     await feed(server, ada.cookie)
     await feed(server, ada.cookie)
 
-    expect(await db().select().from(activity)).toHaveLength(1)
-    expect(await db().select().from(threadEntry)).toHaveLength(1)
+    expect(await db().select().from(threadEntry)).toHaveLength(2)
     // And no bell row for the reader: the two surfaces are separate, and reading one
     // must not fill the other.
     const bell = await server.inject({
@@ -849,29 +868,63 @@ describe('somebody’s own card', () => {
   })
 })
 
-describe('the kinds a viewer asks for', () => {
-  const givenDreamCard = async (title: string, created_at: string) => {
-    const id = randomUUID()
-    await db().insert(thread).values({
-      id,
+describe('a lead role added before roles had cards', () => {
+  it('gets one from the backfill, dated from when the role appeared', async () => {
+    // The other half of `20260815100100_role_cards` (#610): what it writes is what the feed
+    // reads. Staged by hand and swept by the shipped SQL, since the migration has long run by
+    // the time this suite can add a role.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const older = randomUUID()
+    await db().insert(leadRole).values({
+      id: older,
       event_id: BURN,
-      entity_type: 'session',
-      entity_id: randomUUID(),
-      subject_account_id: null,
-      title,
+      title: 'Firewood',
+      purpose: '',
+      tasks: '',
+      effort_before: 'none',
+      effort_during: 'none',
+      effort_after: 'none',
+      team_size_wanted: 0,
+      lead_attendance_id: null,
+      created_at: '2026-07-01T09:00:00.000Z',
     })
-    await db().insert(threadEntry).values({
-      id: randomUUID(),
-      thread_id: id,
-      kind: 'offered',
-      seq: 1,
-      author_account_id: null,
-      body: 'offered this dream',
-      created_at,
-      edited_at: null,
-    })
-  }
+    expect(await cards(server, ada.cookie)).toEqual([])
 
+    client().exec(
+      readFileSync(path.join(migrationsFolder, '20260815100100_role_cards', 'migration.sql'), 'utf8'),
+    )
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.title).toBe('Firewood')
+    expect(card?.entries.map((entry) => [entry.author, entry.kind, entry.body])).toEqual([
+      [null, 'added', 'added this lead role'],
+    ])
+    // Dated by the adding rather than by the deploy, so an old role does not arrive at the
+    // top of the feed as though it were news.
+    expect(card?.last_at).toBe('2026-07-01T09:00:00.000Z')
+  })
+
+  it('leaves the card a role already has alone, rather than beginning it twice', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const role = (await addLeadRole(server, ada.cookie, 'Firewood')).json().role.id
+
+    client().exec(
+      readFileSync(path.join(migrationsFolder, '20260815100100_role_cards', 'migration.sql'), 'utf8'),
+    )
+
+    const mine = (await cards(server, ada.cookie)).filter((card) => card.entity_id === role)
+    expect(mine).toHaveLength(1)
+    expect(mine[0]?.entries.map((entry) => entry.body)).toEqual(['added this lead role'])
+  })
+})
+
+describe('the kinds a viewer asks for', () => {
   const staged = async (server: FastifyInstance, cookie: string) => {
     await offerDream(server, cookie, 'Sauna at dawn')
     await joinBurn(server, cookie)
@@ -887,12 +940,12 @@ describe('the kinds a viewer asks for', () => {
 
     expect((await cards(server, ada.cookie)).map((card) => card.entity_type).toSorted()).toEqual([
       'attendance',
+      'role',
       'session',
     ])
-    expect(await lines(server, ada.cookie)).toEqual(['A new lead role: Fire lead'])
   })
 
-  it('answers with one kind of card and no burn news when one card kind is asked for', async () => {
+  it('answers with one kind and nothing else when one kind is asked for', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada', ['admin', 'member'])
@@ -902,18 +955,16 @@ describe('the kinds a viewer asks for', () => {
     expect((await cards(server, ada.cookie, ['session'])).map((card) => card.entity_type)).toEqual([
       'session',
     ])
-    expect(await lines(server, ada.cookie, ['session'])).toEqual([])
   })
 
-  it('answers with the burn news and no cards when only that is asked for', async () => {
+  it('answers with the lead roles and nothing else when only those are asked for', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada', ['admin', 'member'])
 
     await staged(server, ada.cookie)
 
-    expect(await lines(server, ada.cookie, ['activity'])).toEqual(['A new lead role: Fire lead'])
-    expect(await cards(server, ada.cookie, ['activity'])).toEqual([])
+    expect((await cards(server, ada.cookie, ['role'])).map((card) => card.title)).toEqual(['Fire lead'])
   })
 
   it('answers with two kinds at once, which is what taking one chip off leaves', async () => {
@@ -926,7 +977,6 @@ describe('the kinds a viewer asks for', () => {
     expect(
       (await cards(server, ada.cookie, ['session', 'attendance'])).map((card) => card.entity_type).toSorted(),
     ).toEqual(['attendance', 'session'])
-    expect(await lines(server, ada.cookie, ['session', 'attendance'])).toEqual([])
   })
 
   it('loses a person’s card behind a run of dreams when nothing is filtered', async () => {

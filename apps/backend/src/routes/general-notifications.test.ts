@@ -461,6 +461,9 @@ describe('the vocabulary the database will accept', () => {
       'new_version',
       // #326's, and the reason the tables were rebuilt a second time.
       'application',
+      // #610's, which rebuilt them again when a lead role became something to talk about.
+      'lead_role_comment',
+      'lead_role_comment_any',
     ]) {
       client()
         .prepare(
@@ -469,7 +472,7 @@ describe('the vocabulary the database will accept', () => {
         .run(randomUUID(), ada.id, category, 'something happened', NOW)
     }
 
-    expect(await bodiesFor(server, ada.cookie)).toHaveLength(6)
+    expect(await bodiesFor(server, ada.cookie)).toHaveLength(8)
   })
 
   it('refuses one it has never heard of', async () => {

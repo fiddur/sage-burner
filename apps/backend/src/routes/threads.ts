@@ -20,6 +20,7 @@ import {
   meetingsPage,
   mentionedAccounts,
   profilePage,
+  rolesPage,
   songPage,
   withMentionNames,
 } from '@sage-burner/shared'
@@ -41,6 +42,8 @@ import {
   bringHand,
   bringItem,
   event,
+  leadRole,
+  leadRoleMember,
   meeting,
   meetingPoint,
   post,
@@ -341,7 +344,31 @@ const participantThreads = async (
       ),
     )
 
-  return new Set([...spoke, ...facilitating, ...helping, ...bringing].map((row) => row.thread_id))
+  const looking = await db
+    .select({ thread_id: thread.id })
+    .from(thread)
+    .innerJoin(leadRole, and(eq(thread.entity_type, 'role'), eq(leadRole.id, thread.entity_id)))
+    .innerJoin(attendance, eq(attendance.id, leadRole.lead_attendance_id))
+    .where(and(inArray(thread.id, [...ids]), eq(attendance.account_id, viewer.account_id)))
+
+  const onTheTeam = await db
+    .select({ thread_id: thread.id })
+    .from(thread)
+    .innerJoin(leadRoleMember, eq(leadRoleMember.role_id, thread.entity_id))
+    .innerJoin(attendance, eq(attendance.id, leadRoleMember.attendance_id))
+    .where(
+      and(
+        inArray(thread.id, [...ids]),
+        eq(thread.entity_type, 'role'),
+        eq(attendance.account_id, viewer.account_id),
+      ),
+    )
+
+  return new Set(
+    [...spoke, ...facilitating, ...helping, ...bringing, ...looking, ...onTheTeam].map(
+      (row) => row.thread_id,
+    ),
+  )
 }
 
 const partOf = (row: CardRow, already: ReadonlySet<string>, viewer: Viewer): boolean =>
@@ -412,6 +439,8 @@ export const readThreads = async (
       meeting_notes: meeting.notes,
       meeting_starts_at: meeting.starts_at,
       meeting_author: meeting.author_account_id,
+      role_title: leadRole.title,
+      role_purpose: leadRole.purpose,
     })
     .from(thread)
     .leftJoin(event, eq(event.id, thread.event_id))
@@ -423,6 +452,7 @@ export const readThreads = async (
     .leftJoin(bringItem, and(eq(thread.entity_type, 'bring'), eq(bringItem.id, thread.entity_id)))
     .leftJoin(meetingPoint, and(eq(thread.entity_type, 'point'), eq(meetingPoint.id, thread.entity_id)))
     .leftJoin(meeting, and(eq(thread.entity_type, 'meeting'), eq(meeting.id, thread.entity_id)))
+    .leftJoin(leadRole, and(eq(thread.entity_type, 'role'), eq(leadRole.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const ranked = db
@@ -564,6 +594,8 @@ interface CardRow {
   meeting_notes: string | null
   meeting_starts_at: string | null
   meeting_author: string | null
+  role_title: string | null
+  role_purpose: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
@@ -619,6 +651,13 @@ const meetingFacts = (row: CardRow): CardFacts => ({
   gone: row.meeting_title === null,
 })
 
+const roleFacts = (row: CardRow): CardFacts => ({
+  title: row.role_title ?? row.title,
+  link: row.role_title === null || row.event_id === null ? null : rolesPage(row.event_id),
+  body: written(row.role_purpose),
+  gone: row.role_title === null,
+})
+
 const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
   facts.body === null ? facts : { ...facts, body: named(facts.body) }
 
@@ -646,6 +685,7 @@ const factsFor = (row: CardRow): CardFacts =>
     bring: bringFacts,
     point: pointFacts,
     meeting: meetingFacts,
+    role: roleFacts,
   })[row.entity_type](row)
 
 export const nameOf = async (db: Database, accountId: string): Promise<string | null> => {
@@ -719,6 +759,21 @@ const alsoInIt = {
       .where(eq(sessionHelper.session_id, found.entity_id))
 
     return [...facilitating, ...helping].map((row) => row.account_id)
+  },
+  role: async (db: Database, found: Whose) => {
+    const leading = await db
+      .select({ account_id: attendance.account_id })
+      .from(leadRole)
+      .innerJoin(attendance, eq(attendance.id, leadRole.lead_attendance_id))
+      .where(eq(leadRole.id, found.entity_id))
+
+    const team = await db
+      .select({ account_id: attendance.account_id })
+      .from(leadRoleMember)
+      .innerJoin(attendance, eq(attendance.id, leadRoleMember.attendance_id))
+      .where(eq(leadRoleMember.role_id, found.entity_id))
+
+    return [...leading, ...team].map((row) => row.account_id)
   },
 } as const satisfies Record<
   ThreadEntityType,
@@ -1003,7 +1058,13 @@ export const registerThreadRoutes = (
   }
 
   const titleOf = async (
-    table: typeof bringItem | typeof meeting | typeof meetingPoint | typeof post | typeof song,
+    table:
+      | typeof bringItem
+      | typeof leadRole
+      | typeof meeting
+      | typeof meetingPoint
+      | typeof post
+      | typeof song,
     found: Subject,
   ): Promise<string> => {
     const [row] = await db
@@ -1043,6 +1104,10 @@ export const registerThreadRoutes = (
 
       return { link: profilePage(subject), what: (await nameOf(db, subject)) ?? found.title }
     },
+    role: async (found: Subject) => ({
+      link: found.event_id === null ? null : rolesPage(found.event_id),
+      what: await titleOf(leadRole, found),
+    }),
   } as const satisfies Record<
     ThreadEntityType,
     (found: Subject) => Promise<{ link: string | null; what: string }>
@@ -1059,6 +1124,7 @@ export const registerThreadRoutes = (
     bring: { mine: 'bring_comment', anybody: 'bring_comment_any' },
     point: { mine: 'point_comment', anybody: 'point_comment_any' },
     meeting: { mine: 'meeting_comment', anybody: 'meeting_comment_any' },
+    role: { mine: 'lead_role_comment', anybody: 'lead_role_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {

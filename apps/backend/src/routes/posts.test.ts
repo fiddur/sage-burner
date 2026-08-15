@@ -130,7 +130,7 @@ describe('announcing something', () => {
     expect(card?.entries.map((entry) => [entry.kind, entry.author?.name])).toEqual([['posted', 'Ada']])
   })
 
-  it('writes no line beside the card, since one announcement is one thing', async () => {
+  it('is one thing on the feed rather than two, since one announcement is one thing', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -139,7 +139,7 @@ describe('announcing something', () => {
     await announce(server, ada.cookie, { title: 'The planning call is Sunday', body: '' })
 
     const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie: ada.cookie } })
-    expect(feed.json().activity).toEqual([])
+    expect(feed.json().threads).toHaveLength(1)
   })
 
   it('links nowhere, because the card is the announcement', async () => {

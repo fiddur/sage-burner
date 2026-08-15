@@ -1,4 +1,4 @@
-import type { Activity, NotificationCategory, NotificationSettings, Thread } from '@sage-burner/shared'
+import type { NotificationCategory, NotificationSettings, Thread } from '@sage-burner/shared'
 
 import {
   BURN_PARAM,
@@ -10,7 +10,6 @@ import {
   KINDS_PARAM,
   MAX_POST,
   MAX_TITLE,
-  notificationCategoryInfo,
 } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
 import { useState } from 'preact/hooks'
@@ -27,7 +26,6 @@ import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Heart } from '../components/Heart.tsx'
-import { Icon } from '../components/Icon.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localDay } from '../datetime.ts'
@@ -57,12 +55,9 @@ export type FeedApi = Pick<
 >
 
 interface Happening {
-  activity: readonly Activity[]
   threads: readonly Thread[]
   settings: NotificationSettings
 }
-
-type Item = { at: string; id: string } & ({ line: Activity } | { card: Thread })
 
 export const Feed = ({ api }: { api: FeedApi }) => {
   const viewer = useViewer()
@@ -77,7 +72,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         api.getMyNotificationSettings(signal),
       ])
 
-      return { activity: feed.activity, threads: feed.threads, settings }
+      return { threads: feed.threads, settings }
     },
     { enabled: approved, key: lit.join(','), fallback: 'Could not load what has been going on.' },
   )
@@ -162,7 +157,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     },
   }
 
-  const items = loaded.status === 'ready' ? feedItems(loaded.data) : []
+  const cards = loaded.status === 'ready' ? loaded.data.threads : []
   const selected = useSelectedBurn()
   const eventId = selected?.event.id
 
@@ -197,9 +192,10 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       </h1>
 
       <p class="form-note">
-        What people have been doing and saying, newest first. Say something on a dream and it comes back to
-        the top. Tap what a line is about to be told about the next one at a burn you are coming to — the same
-        switch as the one on <a href="/profile">your details</a>.
+        What people have been doing and saying, newest first. Say something on a card and it comes back to the
+        top. The 🔔 in its corner is where you say whether to be told about replies to it, and about the next
+        one like it at a burn you are coming to — the same switch as the one on{' '}
+        <a href="/profile">your details</a>.
       </p>
 
       <ChipRow
@@ -229,47 +225,26 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       {loaded.status === 'loading' && <p class="form-note">One moment…</p>}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {loaded.status === 'ready' && items.length === 0 && (
+      {loaded.status === 'ready' && cards.length === 0 && (
         <p class="form-note">Nothing has happened yet. It will show up here when it does.</p>
       )}
 
-      {items.length > 0 && (
+      {cards.length > 0 && (
         <ul class="feed">
-          {items.map((item) =>
-            'line' in item ? (
-              <li key={item.id} class="feed-line">
-                <p class="feed-what">
-                  {item.line.link === null ? (
-                    item.line.body
-                  ) : (
-                    <a href={atItsBurn(item.line.link, item.line.event_id)}>{item.line.body}</a>
-                  )}
-                </p>
-                <p class="feed-when">
-                  {item.line.burn} · {localDay(item.line.created_at)}
-                </p>
-                <Chip
-                  category={item.line.category}
-                  on={settings?.on.includes(item.line.category) ?? false}
-                  busy={busy}
-                  onToggle={() => toggle(item.line.category)}
-                />
-              </li>
-            ) : (
-              <Card
-                key={item.id}
-                card={whole[item.card.id] ?? item.card}
-                viewerId={viewer.account?.id}
-                admin={isAdmin(viewer)}
-                busy={busy}
-                on={settings?.on}
-                talk={talk}
-                upload={api.uploadImage}
-                people={mentionable(item.card)}
-                onToggle={toggle}
-              />
-            ),
-          )}
+          {cards.map((item) => (
+            <Card
+              key={item.id}
+              card={whole[item.id] ?? item}
+              viewerId={viewer.account?.id}
+              admin={isAdmin(viewer)}
+              busy={busy}
+              on={settings?.on}
+              talk={talk}
+              upload={api.uploadImage}
+              people={mentionable(item)}
+              onToggle={toggle}
+            />
+          ))}
         </ul>
       )}
     </GuardedPage>
@@ -435,14 +410,6 @@ const Announce = ({
   )
 }
 
-const feedItems = ({ activity, threads }: Happening): Item[] =>
-  [
-    ...activity.map((line) => ({ at: line.created_at, id: line.id, line })),
-    ...threads.map((card) => ({ at: card.last_at ?? '', id: card.id, card })),
-  ].sort((one, other) =>
-    one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
-  )
-
 const Card = ({
   card,
   viewerId,
@@ -553,6 +520,7 @@ const goneLabel = {
   bring: ' · off the list',
   point: ' · taken off',
   meeting: ' · out of the diary',
+  role: ' · no longer a role',
 } as const satisfies Record<Thread['entity_type'], string>
 
 const whereItBelongs = (card: Thread): string | undefined =>
@@ -563,36 +531,3 @@ const chipFor = (card: Thread): NotificationCategory | undefined =>
     (found, entry) => found ?? entryCategory(card.entity_type, entry.kind),
     undefined,
   )
-
-const atItsBurn = (link: string, eventId: string) => {
-  const hash = link.indexOf('#')
-  const path = hash === -1 ? link : link.slice(0, hash)
-  const fragment = hash === -1 ? undefined : link.slice(hash + 1)
-  const joined = `${path}${path.includes('?') ? '&' : '?'}${BURN_PARAM}=${encodeURIComponent(eventId)}`
-
-  return fragment === undefined ? joined : `${joined}#${fragment}`
-}
-
-const Chip = ({
-  category,
-  on,
-  busy,
-  onToggle,
-}: {
-  category: NotificationCategory
-  on: boolean
-  busy: boolean
-  onToggle: () => void
-}) => (
-  <button
-    type="button"
-    class={on ? 'chip is-on' : 'chip'}
-    aria-pressed={on}
-    disabled={busy}
-    title={on ? 'You are told about these. Tap to stop.' : 'Tell me about these'}
-    onClick={onToggle}
-  >
-    {notificationCategoryInfo[category].label}
-    {on && <Icon name="bell" />}
-  </button>
-)

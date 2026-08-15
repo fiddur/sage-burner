@@ -187,7 +187,7 @@ describe('asking for something and offering it', () => {
     ])
   })
 
-  it('writes no line beside the card, since one item is one thing', async () => {
+  it('is one thing on the feed rather than two, since one item is one thing', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -196,7 +196,7 @@ describe('asking for something and offering it', () => {
     await add(server, ada.cookie, { title: 'Drums' })
 
     const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie: ada.cookie } })
-    expect(feed.json().activity).toEqual([])
+    expect(feed.json().threads).toHaveLength(1)
   })
 
   it('links to the item on the bring list', async () => {

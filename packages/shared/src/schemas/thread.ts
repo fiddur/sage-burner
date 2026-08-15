@@ -45,6 +45,9 @@ export type Thread = z.infer<typeof threadSchema>
 export const threadResponseSchema = z.object({ thread: threadSchema })
 export type ThreadResponse = z.infer<typeof threadResponseSchema>
 
+export const feedResponseSchema = z.object({ threads: z.array(threadSchema) })
+export type FeedResponse = z.infer<typeof feedResponseSchema>
+
 export const commentSchema = z.object({ body: nonEmptyText(MAX_COMMENT) }).strict()
 export type CommentInput = z.infer<typeof commentSchema>
 

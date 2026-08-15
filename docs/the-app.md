@@ -313,8 +313,8 @@ Three rules the pages follow, all of them things a phone found first:
 ## The icons (#621)
 
 **Colour names what a thing is; grey line art is what you can press.** The pages keep their
-emoji — 🎵 Songbook, 🛻 Rideshares, 🍽️ Meals — and so do the marks on the feed's activity
-lines and the before/during/after phases on Leads. Those say _what this is_, and a grey
+emoji — 🎵 Songbook, 🛻 Rideshares, 🍽️ Meals — and so do the marks on a card's entries and
+the before/during/after phases on Leads. Those say _what this is_, and a grey
 outline pan is worse than 🍳. Every control went the other way: a pencil, a trashcan, a
 bell, a hand, one weight and one colour. A row may hold both — a page's own mark beside the
 arrow saying it opens elsewhere — but two _controls_ in one row are never one of each.
@@ -378,18 +378,20 @@ on nothing, and those controls are how somebody explores what a button does.
 A page of what everyone has been doing (#303) and what they are talking about (#375),
 because between burns the app was quiet and quiet reads as nothing-to-do.
 
-**Two things on one page, deliberately.** Anything you can talk about is one **card**
-carrying its whole history and the talk under it — a dream, a person at a burn (#426), an
-announcement (#438); the burn's own news that nobody talks to — a lead role added, a lead
-taken — stays a **line**. Collapsing everything by thread was the first design and it does not work: the
-lines that belong to no card would end up behind one card per burn, which is the page's
-list disappearing into an accordion. So `activity` keeps what has no conversation to hang
-on, and shrinks as each kind of thing gains one — saying you are coming was a line until
-#426 and is a card now.
+**One thing on the page, in the end.** Everything on it is a **card** carrying its whole
+history and the talk under it — a dream, a person at a burn (#426), an announcement (#438),
+a song, a bring item, a talking point, a meeting (#597) and, last of all, a lead role
+(#610). It took eight goes to get there: the page began as one card kind beside a table of
+one-line `activity` rows for the burn's news that nobody could talk to, and each release
+turned another line into something with a conversation under it until the table had two
+writers left and then none. The line's argument — that collapsing everything by thread
+would hide the news behind one card per burn — held only while "the news" was a category of
+its own rather than a thing. A lead role _is_ a thing: it has people on it, and "who can
+take this?" is a conversation.
 
-The server merges both halves by time and cuts them to fifty **against each other**, so a
-burn full of talk cannot push its news off the page and a quiet one does not leave the
-page half empty.
+The server sorts by when each card last moved and cuts to fifty, so a burn full of talk on
+one card cannot show up as fifty copies of it and a quiet one does not leave the page half
+empty.
 
 ### Something taken back is off the page (#617)
 
@@ -457,21 +459,23 @@ exactly one kind so it degenerates to the obvious thing, while a song carries se
 categories and stays visible while either is lit. The songbook keeps its lit-set in the page
 rather than in the address, because there is nothing there to link somebody to.
 
-### The lines
+### What the page is made of
 
-**The burn-wide notifications, shown to everybody.** Somebody saying they are coming, a
-lead role added, a lead taken. Those categories are **off by default** — a burn where
-every arrival pings forty-two people is a channel people learn to ignore (#259) — so
-until this page the ordinary way to learn anything had happened was to go looking.
+**The burn's news is on the cards, not beside them.** Somebody saying they are coming, a
+lead role added, a lead taken: each is an entry on the card of the thing it happened to.
+Those notification categories are **off by default** — a burn where every arrival pings
+forty-two people is a channel people learn to ignore (#259) — so without this page the
+ordinary way to learn anything had happened would be to go looking.
 
-**An `activity` row, written where `notifyAttendees` fans out.** The alternative was
-deriving the feed from the rows that already exist, and it does not work: those carry
-_current_ state, so a helper who signed up and stood down again leaves nothing to show,
-and several of the join tables have no `created_at` at all.
+**A `thread_entry`, written where the route writes the row.** The alternative was deriving
+the feed from the rows that already exist, and it does not work: those carry _current_
+state, so a helper who signed up and stood down again leaves nothing to show, and several
+of the join tables have no `created_at` at all. Every entry is written beside the write it
+describes, which is also what keeps the two in step.
 
-The wording is the notification's own, third person, and so is the link. Nothing about
-payment, contact details or allergies can reach the feed, because nothing but a
-burn-wide notification writes to it.
+Nothing about payment, contact details or allergies can reach the feed: `readThreads` names
+every column it answers with, and a card's body is the thing's own public text — a dream's
+title, an announcement's words, a role's purpose.
 
 ### The cards
 
@@ -485,9 +489,9 @@ component draws it inside the dream's own panel (#342), so the two cannot come t
 conversation differently. A withdrawn dream has neither: the panel goes with the dream and the
 card is off the feed (#617), leaving `GET /api/threads/:id` as the only thing that answers for it.
 
-**The title is never frozen into a sentence, and that is the bug this fixed.** An
-`activity` line freezes it — "Ada offered a dream: Sauna at dawn" — and goes on saying it
-after the dream has been renamed. A dream's card heads with `thread.title`, which the
+**The title is never frozen into a sentence, and that is the bug this fixed.** A line freezes
+it — "Ada offered a dream: Sauna at dawn" — and goes on saying it after the dream has been
+renamed. A dream's card heads with `thread.title`, which the
 rename keeps in step. A person's card cannot use the stored title at all: a name is the
 account's, and renaming yourself must not leave the old one on the feed, so `readThreads`
 resolves it from `account.name` and keeps `thread.title` only as the fallback for when the
@@ -673,9 +677,8 @@ deletes their own, and an admin may delete any.
 hand up or down, renamed, moved, edited, withdrawn. A heart does not — the faces are on
 the dream already, and twenty hearts is twenty lines nobody reads.
 
-**A heart on every card** (#479), and it stays that quiet everywhere: no notification, no
-`activity` row, no entry, no bump up the feed. A heart is for the next reader to see, not a bell
-for the author.
+**A heart on every card** (#479), and it stays that quiet everywhere: no notification, no entry,
+no bump up the feed. A heart is for the next reader to see, not a bell for the author.
 
 **Two tables behind one button.** A dream's heart is `session_support`, unchanged — the heart on
 its card and the heart on its schedule chip are one heart, and two like-buttons meaning different
@@ -733,8 +736,8 @@ was lovely" is a thing somebody posts on the way home. Every other dream write s
 it reads as a label. The menu is titled _Notification settings_ and holds the two switches that
 exist for one card: this kind of thing, and this card. It is the app's first dropdown, so it sets
 the pattern — a real button with `aria-expanded` and `aria-controls`, and closing on outside-press
-and Escape. The activity **lines** keep their inline chip: a bell-menu per one-liner is more chrome
-than line.
+and Escape. It is now the only shape there is: the one-line news that kept an inline chip
+went with #610, which turned the last of it into cards.
 
 **It is not a menu, and it stopped saying it was** (#487). `role="menu"` puts a screen reader into
 menu mode, where it expects `menuitem` children and arrow-key navigation; what is inside is a title
@@ -756,9 +759,8 @@ person, the person it is about. Appointing somebody writes a line authored by wh
 appointed, so a facilitator handed the dream has said nothing and would otherwise never
 hear a question about it.
 
-Neither writes an `activity` row: the entry is the record, and a line beside it would put
-one comment on the page twice. That is what `tellAttendees` is for beside
-`notifyAttendees`.
+Neither writes anything beside the entry: the entry is the record, and a second row for the
+same comment would put it on the page twice.
 
 **And one card can be followed or muted** (#480). `thread_follow (thread_id, account_id,
 enabled)` is the absence-means-default pattern `notification_setting` already uses: no row and
@@ -826,8 +828,8 @@ already showing and take everything else from the answer. Keeping the fold rathe
 three is what makes it right in both directions — a card somebody had expanded stays expanded. The
 song page's own conversation is unaffected, because it never folds.
 
-**Retention is the burn, for everything that has one.** `activity` cascades with `event`
-and so does a `thread` that names one, and the route reads the newest fifty. An audit log
+**Retention is the burn, for everything that has one.** A `thread` that names an `event`
+cascades with it, and the route reads the newest fifty. An audit log
 grows without bound; this is bounded by something that already ends. The songbook is the
 exception and says so below: `thread.event_id` is nullable for it, so a song's
 conversation is kept as long as the song is.

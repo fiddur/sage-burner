@@ -151,7 +151,6 @@ describe('migrations', () => {
     const vocabularies: [string, string, readonly string[]][] = [
       ['notification', 'notification_category_check', notificationCategories],
       ['notification_setting', 'notification_setting_category_check', notificationCategories],
-      ['activity', 'activity_category_check', notificationCategories],
       ['thread', 'thread_entity_type_check', threadEntityTypes],
       ['thread_entry', 'thread_entry_kind_check', threadEntryKinds],
       ['account_connection', 'account_connection_kind_check', connectionKinds],
@@ -176,11 +175,15 @@ describe('migrations', () => {
     expect(indexes('thread_entry')).toEqual(['thread_entry_seq_idx'])
     expect(indexes('thread')).toEqual(['thread_entity_idx', 'thread_event_idx', 'thread_subject_idx'])
     expect(indexes('notification')).toEqual(['notification_account_idx'])
-    expect(indexes('activity')).toEqual(['activity_event_idx', 'activity_recent_idx'])
   })
 
+  // Only the orphan half of #608's sweep: the other half deleted `activity` rows, and #610
+  // dropped that table, so replaying the whole file against today's schema cannot run.
   const leftovers = () =>
     readFileSync(path.join(migrationsFolder, '20260813160000_meeting_leftovers', 'migration.sql'), 'utf8')
+      .split('--> statement-breakpoint')
+      .filter((statement) => !statement.includes('`activity`'))
+      .join('')
 
   const givenMeeting = (id: string, author: string | null = null) => {
     handle.client
@@ -202,24 +205,6 @@ describe('migrations', () => {
       )
       .run(`${id}-e`, id, 'scheduled', 1, ids.account, 'put it in the diary', '2026-08-13T09:00:00.000Z')
   }
-
-  it('sweeps out the feed lines meetings had for half a day, and leaves every other line', () => {
-    const seeded: readonly [string, string][] = [
-      ['a-1', 'meeting_scheduled'],
-      ['a-2', 'meeting_scheduled'],
-      ['a-3', 'dream_offered'],
-    ]
-
-    for (const [id, category] of seeded) {
-      handle.client
-        .prepare('insert into activity (id, event_id, category, body, link, created_at) values (?,?,?,?,?,?)')
-        .run(id, ids.event, category, 'something happened', null, '2026-08-13T09:00:00.000Z')
-    }
-
-    handle.client.exec(leftovers())
-
-    expect(handle.client.prepare('select id from activity order by id').all()).toEqual([{ id: 'a-3' }])
-  })
 
   it('sweeps out a card whose meeting is gone, and the conversation stranded under it', () => {
     givenMeeting('m-live')
@@ -1572,9 +1557,9 @@ describe('the threads migration', () => {
         { entity_type: 'session', entity_id: 's-1', title: 'Sauna at dawn', event_id: 'e-1' },
         { entity_type: 'session', entity_id: 's-2', title: 'Cacao ceremony', event_id: 'e-1' },
       ])
-      // No entries are invented: an `activity` row carries a sentence and a `/dreams`
-      // link rather than a session id, so nothing here can say who offered which dream
-      // or when. A thread with no entries draws no card until something happens.
+      // No entries are invented: the feed line a dream had then carried a sentence and a
+      // `/dreams` link rather than a session id, so nothing here can say who offered which
+      // dream or when. A thread with no entries draws no card until something happens.
       expect(fresh.client.prepare('select count(*) as n from thread_entry').get()?.n).toBe(0)
     } finally {
       fresh.close()
@@ -1611,8 +1596,8 @@ describe('the threads migration', () => {
   })
 
   it('keeps every notification already written while widening what one may be about', () => {
-    // Three tables carry a CHECK listing the categories and SQLite cannot alter one in
-    // place, so all three are rebuilt — and a rebuild that dropped the rows would be a
+    // Both tables that carry a CHECK listing the categories are rebuilt, SQLite being
+    // unable to alter one in place — and a rebuild that dropped the rows would be a
     // silent emptying of somebody's bell.
     const fresh = beforeTheThreads()
 
@@ -1629,15 +1614,11 @@ describe('the threads migration', () => {
       fresh.client
         .prepare('insert into notification_setting (account_id, category, enabled) values (?, ?, ?)')
         .run('a-1', 'dream_offered', 1)
-      fresh.client
-        .prepare('insert into activity (id, event_id, category, body, created_at) values (?, ?, ?, ?, ?)')
-        .run('act-1', 'e-1', 'member_joined', 'Bea is coming.', NOW)
 
       runMigrations(fresh, migrationsFolder)
 
       expect(fresh.client.prepare('select count(*) as n from notification').get()?.n).toBe(1)
       expect(fresh.client.prepare('select count(*) as n from notification_setting').get()?.n).toBe(1)
-      expect(fresh.client.prepare('select count(*) as n from activity').get()?.n).toBe(1)
 
       // And the new categories are storable, which is what the rebuild was for.
       expect(() =>

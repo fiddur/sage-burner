@@ -161,10 +161,14 @@ phone" means 360px.
 
 ## The feed, and talking
 
-- [ ] The feed holds the protocol's history so far: joins as cards, lead news
-      as lines, newest first.
+- [ ] The feed holds the protocol's history so far, every item a card with a 🔔 in
+      its corner and a comment box under it, newest first. Nothing on the page is a
+      one-liner with a chip at its tail.
 - [ ] The chip row: first tap solos a kind, the URL carries the filter, back
-      undoes it, clearing the last chip lands on everything.
+      undoes it, clearing the last chip lands on everything. **Leads** is one of the
+      chips and shows the roles.
+- [ ] A lead role has a card: adding one opens it, taking the lead and handing it
+      over add a line each, and saying something on it reaches whoever is on it.
 - [ ] Comment on a dream's card; the same conversation shows in the dream's
       panel. Edit your own comment; delete it; an admin can delete anyone's.
 - [ ] Mention the member by name from the picker — they are notified once, not
@@ -338,7 +342,7 @@ phone" means 360px.
       the trashcan, the bell, the hand, the menu, the toolbar's link, list and picture.
       Nothing coloured is a button except the heart.
 - [ ] The pages keep their emoji: the phone's bottom bar, the drawer's entries, the
-      feed's activity marks and the before/during/after phases on Leads.
+      marks on a feed card's entries and the before/during/after phases on Leads.
 - [ ] The bell is quiet with nothing unseen and turns ember when something is.
 - [ ] Hearting something fills ♡ to ❤️‍🔥 — the heart is the one control that is not a line
       drawing — and taking the heart back empties it.
