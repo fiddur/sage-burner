@@ -81,7 +81,7 @@ export const Notifications = ({
         <NotificationList items={asRead} busy={rows.busy} onStop={rows.stop} onRemove={rows.remove} />
       )}
 
-      {signedIn && <BellNudge api={api} browser={browser} />}
+      <BellNudge api={api} browser={browser} />
     </GuardedPage>
   )
 }

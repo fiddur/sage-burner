@@ -43,13 +43,7 @@ const Strip = ({
   )
 }
 
-/**
- * The foot of the bell, for the person reading their notifications on a device push cannot reach
- * — which is exactly the person it is for (#695). The ✕ is a lighter dismissal than the strip
- * that follows switching a category on, and that heavier one silences this too.
- *
- * `usePushHere` lives in `Strip` so a reader who has already said no registers no service worker.
- */
+/** `usePushHere` lives in `Strip` so a reader who has already said no registers no service worker. */
 export const BellNudge = ({
   api,
   browser,

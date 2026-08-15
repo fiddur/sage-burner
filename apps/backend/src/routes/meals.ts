@@ -36,7 +36,7 @@ import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow } from './events.ts'
-import { addEntry, forgetThread, threadFor } from './threads.ts'
+import { addEntry, forgetThread, sittingName, threadFor } from './threads.ts'
 
 export interface MealDeps extends GuardDeps {
   now: () => Date
@@ -178,10 +178,15 @@ export const registerMealRoutes = (
 
   const cookMoved = async (sitting: MealRow, by: string, was: string | undefined, after: string | null) => {
     if (was !== undefined && was !== after) {
-      await tell(by, was, sitting.event_id, `You are no longer leading ${sitting.label}`)
+      await tell(
+        by,
+        was,
+        sitting.event_id,
+        `You are no longer leading ${sittingName(sitting.label, sitting.date)}`,
+      )
     }
     if (after !== null && after !== was) {
-      await tell(by, after, sitting.event_id, `You are leading ${sitting.label}`)
+      await tell(by, after, sitting.event_id, `You are leading ${sittingName(sitting.label, sitting.date)}`)
     }
 
     const said = await cookLine(by, was, after)
@@ -189,7 +194,12 @@ export const registerMealRoutes = (
 
     if (after === null || after === was) return
 
-    await tellTheBurn(sitting, by, after, `${await displayName(db, after)} is cooking ${sitting.label}`)
+    await tellTheBurn(
+      sitting,
+      by,
+      after,
+      `${await displayName(db, after)} is cooking ${sittingName(sitting.label, sitting.date)}`,
+    )
   }
 
   const cookLine = async (by: string, was: string | undefined, after: string | null) => {
@@ -356,7 +366,7 @@ export const registerMealRoutes = (
             viewer.account_id,
             accountId,
             existing.event_id,
-            `You are on ${role} for ${existing.label}`,
+            `You are on ${role} for ${sittingName(existing.label, existing.date)}`,
           )
           await noteOnMeal(
             existing,
@@ -370,7 +380,7 @@ export const registerMealRoutes = (
             existing,
             viewer.account_id,
             accountId,
-            `${await displayName(db, accountId)} is on ${role} for ${existing.label}`,
+            `${await displayName(db, accountId)} is on ${role} for ${sittingName(existing.label, existing.date)}`,
           )
         }
       } else {
@@ -390,7 +400,7 @@ export const registerMealRoutes = (
             viewer.account_id,
             accountId,
             existing.event_id,
-            `You are off ${role} for ${existing.label}`,
+            `You are off ${role} for ${sittingName(existing.label, existing.date)}`,
           )
           await noteOnMeal(
             existing,

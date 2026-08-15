@@ -41,7 +41,7 @@ export const Heart = ({
   const listId = useId()
 
   return (
-    <span class="heart-wrap">
+    <div class="heart-wrap">
       <button
         type="button"
         class="dream-heart"
@@ -61,7 +61,7 @@ export const Heart = ({
           type="button"
           class="heart-who-toggle"
           aria-expanded={showing}
-          aria-controls={listId}
+          aria-controls={showing ? listId : undefined}
           onClick={(clickEvent) => {
             clickEvent.stopPropagation()
             setShowing(!showing)
@@ -82,6 +82,6 @@ export const Heart = ({
           ))}
         </ul>
       )}
-    </span>
+    </div>
   )
 }

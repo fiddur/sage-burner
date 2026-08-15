@@ -106,6 +106,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   draws its own schedule lane from the meals. Each sitting has a card on the feed
   once somebody does something with it, headed by its slot and its day, so "is it
   vegan?" has somewhere to go for a particular Dinner rather than all three.
+- Every notification about a sitting names its day too, so two jobs on two Dinners never
+  read the same.
 - The lead-roles register: the burn's jobs, any member takes one, hands one
   over or appoints somebody — and whoever it happens to is told. Each role has a
   card on the feed, so "who can take this?" has somewhere to be asked.

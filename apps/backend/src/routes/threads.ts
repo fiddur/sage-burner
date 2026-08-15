@@ -264,26 +264,18 @@ export const recentThreads = async (
 
 type Hearts = ReadonlyMap<string, Supporter[]>
 
-const heartsOnEntries = async (db: Database, ids: readonly string[]): Promise<Hearts> => {
-  if (ids.length === 0) return new Map()
+interface HeartRow {
+  key: string
+  account_id: string
+  name: string | null
+  avatar: string | null
+}
 
-  const rows = await db
-    .select({
-      entry_id: entrySupport.entry_id,
-      account_id: account.id,
-      name: account.name,
-      avatar: accountAvatar.updated_at,
-    })
-    .from(entrySupport)
-    .innerJoin(account, eq(account.id, entrySupport.account_id))
-    .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
-    .where(inArray(entrySupport.entry_id, [...ids]))
-    .orderBy(asc(account.name), asc(account.id))
-
+const heartsBy = (rows: readonly HeartRow[]): Hearts => {
   const held = new Map<string, Supporter[]>()
   for (const row of rows) {
-    held.set(row.entry_id, [
-      ...(held.get(row.entry_id) ?? []),
+    held.set(row.key, [
+      ...(held.get(row.key) ?? []),
       { account_id: row.account_id, name: row.name, avatar: row.avatar },
     ])
   }
@@ -291,19 +283,39 @@ const heartsOnEntries = async (db: Database, ids: readonly string[]): Promise<He
   return held
 }
 
-const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> => {
-  const rows = await db
+/**
+ * The face of everybody behind one heart, keyed by whatever the support table hangs off.
+ * `thread_support` and `entry_support` are the same table twice over, and the order is the
+ * order the faces come out in on both pages — so it is written once.
+ */
+const heartRows = async (
+  db: Database,
+  support:
+    | { of: typeof entrySupport; key: typeof entrySupport.entry_id }
+    | { of: typeof threadSupport; key: typeof threadSupport.thread_id },
+  ids: readonly string[],
+): Promise<HeartRow[]> => {
+  if (ids.length === 0) return []
+
+  return await db
     .select({
-      thread_id: threadSupport.thread_id,
+      key: support.key,
       account_id: account.id,
       name: account.name,
       avatar: accountAvatar.updated_at,
     })
-    .from(threadSupport)
-    .innerJoin(account, eq(account.id, threadSupport.account_id))
+    .from(support.of)
+    .innerJoin(account, eq(account.id, support.of.account_id))
     .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
-    .where(inArray(threadSupport.thread_id, [...ids]))
+    .where(inArray(support.key, [...ids]))
     .orderBy(asc(account.name), asc(account.id))
+}
+
+const heartsOnEntries = async (db: Database, ids: readonly string[]): Promise<Hearts> =>
+  heartsBy(await heartRows(db, { of: entrySupport, key: entrySupport.entry_id }, ids))
+
+const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> => {
+  const rows = await heartRows(db, { of: threadSupport, key: threadSupport.thread_id }, ids)
 
   const dreams = await db
     .select({
@@ -320,15 +332,7 @@ const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> 
     .where(and(inArray(thread.id, [...ids]), eq(thread.entity_type, 'session')))
     .orderBy(asc(account.name), asc(account.id))
 
-  const held = new Map<string, Supporter[]>()
-  for (const row of [...rows, ...dreams]) {
-    held.set(row.thread_id, [
-      ...(held.get(row.thread_id) ?? []),
-      { account_id: row.account_id, name: row.name, avatar: row.avatar },
-    ])
-  }
-
-  return held
+  return heartsBy([...rows, ...dreams.map(({ thread_id, ...person }) => ({ key: thread_id, ...person }))])
 }
 
 const participantThreads = async (

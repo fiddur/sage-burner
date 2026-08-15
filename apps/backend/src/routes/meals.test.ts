@@ -989,8 +989,28 @@ describe('telling somebody a meal role moved', () => {
 
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
     expect(messagesFrom(deliver).toSorted()).toEqual([
-      'You are leading Dinner',
-      'You are no longer leading Dinner',
+      'You are leading Dinner · Sat 1',
+      'You are no longer leading Dinner · Sat 1',
+    ])
+  })
+
+  it('names the sitting by its day, so two jobs on two Dinners do not read the same', async () => {
+    // The bell links to the whole plan rather than a sitting, so the words are all
+    // there is to tell one Dinner's job from another's.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, admin, ada } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(bea.id)
+    const { meals } = await listMeals(server, ada.cookie)
+    const [first, , third] = meals
+
+    await send(server, 'PUT', `/api/meals/${third.id}/lead`, admin.cookie, { account_id: bea.id })
+    await send(server, 'PUT', `/api/meals/${first.id}/crew/helper`, admin.cookie, { account_id: bea.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
+    expect(messagesFrom(deliver)).toEqual([
+      'You are leading Dinner · Mon 3',
+      'You are on helper for Dinner · Sat 1',
     ])
   })
 
@@ -1015,7 +1035,7 @@ describe('telling somebody a meal role moved', () => {
     await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: bea.id })
 
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
-    expect(messagesFrom(deliver)).toEqual(['You are on helper for Dinner'])
+    expect(messagesFrom(deliver)).toEqual(['You are on helper for Dinner · Sat 1'])
   })
 
   it('says nothing the second time somebody is put on a crew', async () => {
@@ -1056,7 +1076,7 @@ describe('telling somebody a meal role moved', () => {
     await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${bea.id}`, ada.cookie)
 
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
-    expect(messagesFrom(deliver)).toEqual(['You are off helper for Dinner'])
+    expect(messagesFrom(deliver)).toEqual(['You are off helper for Dinner · Sat 1'])
   })
 })
 
@@ -1266,7 +1286,7 @@ describe('the card a sitting carries', () => {
         body: string
       }[]
 
-    expect((await bell(watching.cookie)).map((one) => one.body)).toEqual(['Bea is cooking Dinner'])
+    expect((await bell(watching.cookie)).map((one) => one.body)).toEqual(['Bea is cooking Dinner · Sat 1'])
     expect((await bell(admin.cookie)).map((one) => one.category)).toEqual([])
     expect((await bell(bea.cookie)).map((one) => one.category)).toEqual(['meal_role'])
     expect((await bell(ada.cookie)).map((one) => one.category)).toEqual([])
@@ -1285,7 +1305,7 @@ describe('the card a sitting carries', () => {
 
     const bell = (await send(server, 'GET', '/api/me/notifications', watching.cookie)).json()
       .notifications as { body: string }[]
-    expect(bell.map((one) => one.body)).toEqual(['Ada is on cleanup for Dinner'])
+    expect(bell.map((one) => one.body)).toEqual(['Ada is on cleanup for Dinner · Sat 1'])
   })
 
   it('tells whoever is cooking when somebody says something about it', async () => {

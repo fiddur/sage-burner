@@ -584,7 +584,13 @@ describe('the heart on a comment', () => {
           entry_count: 4,
           entries: [
             anEntry({ id: 't-0', body: 'the earliest thing said' }),
-            anEntry({ id: 't-1', body: 'bring a towel', support_count: 1, supported_by_me: true }),
+            anEntry({
+              id: 't-1',
+              body: 'bring a towel',
+              support_count: 1,
+              supported_by_me: true,
+              supporters: [{ account_id: 'a-1', name: 'Ada', avatar: null }],
+            }),
           ],
         }),
       }),

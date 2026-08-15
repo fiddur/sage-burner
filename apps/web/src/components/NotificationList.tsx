@@ -4,7 +4,7 @@ import { notificationCategoryInfo } from '@sage-burner/shared'
 import { useId, useState } from 'preact/hooks'
 
 import { localDay } from '../datetime.ts'
-import { useAway } from '../dropdown.ts'
+import { useAway, useFlipUp } from '../dropdown.ts'
 import { Icon } from './Icon.tsx'
 
 const RowMenu = ({
@@ -21,6 +21,7 @@ const RowMenu = ({
   const [open, setOpen] = useState(false)
   const panelId = useId()
   const wrap = useAway<HTMLDivElement>(open, () => setOpen(false))
+  const { menu, up } = useFlipUp<HTMLDivElement>(open)
   const said = item.body
 
   return (
@@ -37,7 +38,13 @@ const RowMenu = ({
       </button>
 
       {open && (
-        <div id={panelId} class="card-bell-menu" role="group" aria-label={`What to do with “${said}”`}>
+        <div
+          ref={menu}
+          id={panelId}
+          class={up ? 'card-bell-menu is-above' : 'card-bell-menu'}
+          role="group"
+          aria-label={`What to do with “${said}”`}
+        >
           <button
             type="button"
             class="link-button"
