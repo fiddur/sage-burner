@@ -17,6 +17,7 @@ import {
   dreamPage,
   feedPage,
   followSchema,
+  mealsPage,
   meetingsPage,
   mentionedAccounts,
   profilePage,
@@ -44,6 +45,8 @@ import {
   event,
   leadRole,
   leadRoleMember,
+  meal,
+  mealRole,
   meeting,
   meetingPoint,
   post,
@@ -135,26 +138,12 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise
     }
   }
 
-  await db.insert(threadEntry).values({
-    id: randomUUID(),
-    thread_id: entry.thread_id,
-    kind: entry.kind,
-    seq: sql`(select coalesce(max(${threadEntry.seq}), 0) + 1 from ${threadEntry} where ${threadEntry.thread_id} = ${entry.thread_id})`,
-    author_account_id: entry.author_account_id,
-    body: entry.body,
-    created_at: at.toISOString(),
-    edited_at: null,
-  })
+  openWith(db, entry, at)
 
   return 'inserted'
 }
 
-/**
- * `addEntry` for a thread being made in the same transaction, where the write it describes and
- * the entry saying so must land together or not at all. Sync, so it can run inside `db.transaction`;
- * nothing coalesces on a thread that did not exist a line ago.
- */
-export const openWith = (tx: Transaction, entry: NewEntry, at: Date) => {
+export const openWith = (tx: Database | Transaction, entry: NewEntry, at: Date) => {
   tx.insert(threadEntry)
     .values({
       id: randomUUID(),
@@ -390,8 +379,21 @@ const participantThreads = async (
       ),
     )
 
+  const cooking = await db
+    .select({ thread_id: thread.id })
+    .from(thread)
+    .innerJoin(mealRole, eq(mealRole.meal_id, thread.entity_id))
+    .innerJoin(attendance, eq(attendance.id, mealRole.attendance_id))
+    .where(
+      and(
+        inArray(thread.id, [...ids]),
+        eq(thread.entity_type, 'meal'),
+        eq(attendance.account_id, viewer.account_id),
+      ),
+    )
+
   return new Set(
-    [...spoke, ...facilitating, ...helping, ...bringing, ...looking, ...onTheTeam].map(
+    [...spoke, ...facilitating, ...helping, ...bringing, ...looking, ...onTheTeam, ...cooking].map(
       (row) => row.thread_id,
     ),
   )
@@ -467,6 +469,8 @@ export const readThreads = async (
       meeting_author: meeting.author_account_id,
       role_title: leadRole.title,
       role_purpose: leadRole.purpose,
+      meal_label: meal.label,
+      meal_idea: meal.food_idea,
     })
     .from(thread)
     .leftJoin(event, eq(event.id, thread.event_id))
@@ -479,6 +483,7 @@ export const readThreads = async (
     .leftJoin(meetingPoint, and(eq(thread.entity_type, 'point'), eq(meetingPoint.id, thread.entity_id)))
     .leftJoin(meeting, and(eq(thread.entity_type, 'meeting'), eq(meeting.id, thread.entity_id)))
     .leftJoin(leadRole, and(eq(thread.entity_type, 'role'), eq(leadRole.id, thread.entity_id)))
+    .leftJoin(meal, and(eq(thread.entity_type, 'meal'), eq(meal.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const ranked = db
@@ -622,6 +627,8 @@ interface CardRow {
   meeting_author: string | null
   role_title: string | null
   role_purpose: string | null
+  meal_label: string | null
+  meal_idea: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
@@ -684,6 +691,13 @@ const roleFacts = (row: CardRow): CardFacts => ({
   gone: row.role_title === null,
 })
 
+const mealFacts = (row: CardRow): CardFacts => ({
+  title: row.meal_label ?? row.title,
+  link: row.meal_label === null || row.event_id === null ? null : mealsPage(row.event_id),
+  body: written(row.meal_idea),
+  gone: row.meal_label === null,
+})
+
 const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
   facts.body === null ? facts : { ...facts, body: named(facts.body) }
 
@@ -712,6 +726,7 @@ const factsFor = (row: CardRow): CardFacts =>
     point: pointFacts,
     meeting: meetingFacts,
     role: roleFacts,
+    meal: mealFacts,
   })[row.entity_type](row)
 
 export const nameOf = async (db: Database, accountId: string): Promise<string | null> => {
@@ -785,6 +800,15 @@ const alsoInIt = {
       .where(eq(sessionHelper.session_id, found.entity_id))
 
     return [...facilitating, ...helping].map((row) => row.account_id)
+  },
+  meal: async (db: Database, found: Whose) => {
+    const cooking = await db
+      .select({ account_id: attendance.account_id })
+      .from(mealRole)
+      .innerJoin(attendance, eq(attendance.id, mealRole.attendance_id))
+      .where(eq(mealRole.meal_id, found.entity_id))
+
+    return cooking.map((row) => row.account_id)
   },
   role: async (db: Database, found: Whose) => {
     const leading = await db
@@ -1134,6 +1158,18 @@ export const registerThreadRoutes = (
       link: found.event_id === null ? null : rolesPage(found.event_id),
       what: await titleOf(leadRole, found),
     }),
+    meal: async (found: Subject) => {
+      const [row] = await db
+        .select({ label: meal.label })
+        .from(meal)
+        .where(eq(meal.id, found.entity_id))
+        .limit(1)
+
+      return {
+        link: found.event_id === null ? null : mealsPage(found.event_id),
+        what: row?.label ?? found.title,
+      }
+    },
   } as const satisfies Record<
     ThreadEntityType,
     (found: Subject) => Promise<{ link: string | null; what: string }>
@@ -1151,6 +1187,7 @@ export const registerThreadRoutes = (
     point: { mine: 'point_comment', anybody: 'point_comment_any' },
     meeting: { mine: 'meeting_comment', anybody: 'meeting_comment_any' },
     role: { mine: 'lead_role_comment', anybody: 'lead_role_comment_any' },
+    meal: { mine: 'meal_comment', anybody: 'meal_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {

@@ -81,6 +81,24 @@ Roles reference an `attendance`, so only somebody coming can be on one and withd
 takes them off everything. One lead per sitting, which a partial unique index enforces;
 the other two are unbounded, because nothing runs out of people willing to wash up.
 
+### A sitting is a card on the feed (#667)
+
+**The ninth `ThreadEntityType`, and the last shared list with no presence on the feed.** `meals.ts`
+told the cook and nobody else, so a sitting filling up — or nobody taking it — was invisible to
+anyone not looking at the plan, and invisible to the digest with it, which is built from the feed.
+Taking the cooking on, handing it over, standing for a crew and writing the food idea are entries
+now, and anyone can ask "is it vegan?" where the answer is useful.
+
+**No card until something happens to it.** Generating a plan writes forty sittings in one press, and
+opening a card each would put forty things on the feed that nobody has done. `threadFor` makes the
+card on the first entry, which is the first time there is anything to read.
+
+The card's title is the sitting's label and its body is the food idea, both read live through the
+join, so renaming a sitting cannot leave the old name on the feed. `meal_taken` is the burn-wide
+category — off by default, like every "what somebody else did" — and `meal_role` stays what it was:
+the personal one, for being put on or taken off. **Deleting a sitting deletes its card**, in the
+transaction that deletes the row.
+
 ### The kitchen is not a place
 
 It is a lane the schedule draws itself, from the meals. So **nothing but cooking,
@@ -532,11 +550,11 @@ same rule every burn-scoped link follows, and it is now what the personal notifi
 too. There is no per-role anchor: the register is one table, and a card that lands you on it
 lands you next to the thing.
 
-**The role, its card and the line saying it was added are one transaction** (#671). They were two
-writes for a while, so a crash between them would have left a role whose card has no entries —
-which `recentThreads` never returns, putting the role on the feed nowhere with no way back short of
-the backfill migration. `openWith` is `addEntry`'s synchronous half for exactly this: a thread made
-and opened in the same breath.
+**A role, its card and the line saying it was added are one transaction** (#671) — on both doors,
+adding one and seeding a register from a previous burn. They were two writes for a while, so a
+crash between them would have left a role whose card has no entries, which `recentThreads` never
+returns: the role on the feed nowhere, with no way back short of the backfill migration.
+`openWith` is the insert `addEntry` ends in, called directly so it can run inside a transaction.
 
 **Deleting a role deletes its card**, in the transaction that deletes the row — the shape a
 meeting and a talking point already use (#608). A role that no longer exists has no purpose

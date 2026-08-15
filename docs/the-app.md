@@ -390,8 +390,8 @@ because between burns the app was quiet and quiet reads as nothing-to-do.
 
 **One thing on the page, in the end.** Everything on it is a **card** carrying its whole
 history and the talk under it — a dream, a person at a burn (#426), an announcement (#438),
-a song, a bring item, a talking point, a meeting (#597) and, last of all, a lead role
-(#610). It took eight goes to get there: the page began as one card kind beside a table of
+a song, a bring item, a talking point, a meeting (#597), a lead role (#610) and a meal
+(#667). It took eight goes to get there: the page began as one card kind beside a table of
 one-line `activity` rows for the burn's news that nobody could talk to, and each release
 turned another line into something with a conversation under it until the table had two
 writers left and then none. The line's argument — that collapsing everything by thread
