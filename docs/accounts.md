@@ -1078,7 +1078,7 @@ category switched off left no trace at all, which for an audit is the interestin
 
 **One row per notification, not per recipient.** `notification_batch` is what ⚙️ → Notifications
 sent lists: when, the category, the first line of the body, how many were told, how many had it
-switched off, how many devices took it, how many emails were queued. A fan-out to thirty attendees
+switched off, how many devices took it, how many emails a mail server took. A fan-out to thirty attendees
 is one line here and thirty in `notification`.
 
 **`oneBatch` is what makes that true, and every shared-audience loop calls it** — not only the
@@ -1094,7 +1094,7 @@ page holds. One category per row, so a comment is two rows — the participants'
 notifications with separate bodies — and the body is one string, `${who} named you in ${what}`,
 handed to everybody named. `@everybody` then turned a single mention into one row per attendee,
 which is the flood this exists to stop; the log read as several identical lines nobody could tell
-apart. All four sites mint one batch and share it: `tellNamed` in `threads.ts`, `bring.ts` and
+apart. All five sites mint one batch and share it: `tellNamed` in `threads.ts`, `bring.ts` and
 `meetings.ts`, and the announcement's two in `posts.ts`. Every one of them goes through `namedBy`,
 which is what expands `@everybody`, so one left out leaves the flood open.
 

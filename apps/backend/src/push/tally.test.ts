@@ -87,13 +87,8 @@ const givenBurn = async () => {
 
 const TOLD: Told = { category: 'dream_offered', body: 'Ada offered a dream', link: '/dreams' }
 
-const quietly = createEmailQueue(() => undefined)
-
-const telling = (
-  deps: PushDeps,
-  post?: EmailChannel,
-  log: (trouble: PushTrouble) => void = () => undefined,
-) => recordAndPush(deps, () => clock, log, post === undefined ? undefined : { post, defer: quietly.defer })
+const telling = (deps: PushDeps, log: (trouble: PushTrouble) => void = () => undefined) =>
+  recordAndPush(deps, () => clock, log)
 
 /** The email leg runs off the queue, so a test asserting on it waits for this one's `drain`. */
 const emailing = (deps: PushDeps, post: EmailChannel) => {
@@ -292,7 +287,7 @@ describe('the line written when a push goes wrong', () => {
     await givenDevice(accountId, 'https://push.example/sulking')
     const trouble: PushTrouble[] = []
 
-    await telling(deps, undefined, (one) => trouble.push(one))(accountId, TOLD)
+    await telling(deps, (one) => trouble.push(one))(accountId, TOLD)
 
     expect(trouble).toEqual([
       { account_id: accountId, category: 'dream_offered', sent: 0, failed: 1, gone: 0 },
@@ -305,7 +300,7 @@ describe('the line written when a push goes wrong', () => {
     await givenDevice(accountId, 'https://push.example/live')
     const trouble: PushTrouble[] = []
 
-    await telling(deps, undefined, (one) => trouble.push(one))(accountId, TOLD)
+    await telling(deps, (one) => trouble.push(one))(accountId, TOLD)
 
     expect(trouble).toEqual([])
   })
