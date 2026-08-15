@@ -305,10 +305,11 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                   </label>
 
                   <MarkdownField
-                    label="Welcome text (markdown)"
+                    label="Welcome text"
                     value={welcome}
                     maxLength={MAX_WELCOME_LENGTH}
                     rows={12}
+                    upload={api.uploadImage}
                     onInput={(next) => {
                       setWelcome(next)
                       setSaved(false)
@@ -316,7 +317,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                   />
 
                   <MarkdownField
-                    label="How to pay (markdown)"
+                    label="How to pay"
                     value={payment}
                     maxLength={MAX_WELCOME_LENGTH}
                     rows={6}
@@ -328,7 +329,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                   />
 
                   <MarkdownField
-                    label="When the burn is full (markdown)"
+                    label="When the burn is full"
                     value={transfer}
                     maxLength={MAX_WELCOME_LENGTH}
                     rows={6}

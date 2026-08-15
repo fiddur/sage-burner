@@ -141,6 +141,26 @@ describe('a conversation about a dream', () => {
     expect((box as HTMLTextAreaElement).value).toBe('is one mat enough?')
   })
 
+  it('is the app’s one editor, so a comment can be previewed like everything else', () => {
+    // #638: the two boxes here were hand-rolled — toolbar, no preview at all — while every
+    // other longer field had one.
+    show(aThread([]))
+
+    const box = screen.getByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: '- a towel\n- a mug' } })
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['a towel', 'a mug'])
+  })
+
+  it('says where to read about the marks it takes', () => {
+    show(aThread([]))
+
+    expect(screen.getByRole('link', { name: 'Markdown is supported' }).getAttribute('href')).toBe(
+      '/formatting',
+    )
+  })
+
   it('will not send an empty comment', () => {
     const { say } = show(aThread([]))
 

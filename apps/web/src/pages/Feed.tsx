@@ -136,6 +136,22 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     )
   }
 
+  // A comment's 404 is a different loss from the card's: no `forget`, no `reload` (#683).
+  const onComment = (card: Thread, work: () => Promise<unknown>, fallback: string) => {
+    run(
+      async () => {
+        try {
+          await work()
+        } catch (failure) {
+          if (isGone(failure)) held((await api.getThread(card.id)).thread)
+
+          throw failure
+        }
+      },
+      (failure) => (isGone(failure) ? GONE_COMMENT : errorMessage(failure, fallback)),
+    )
+  }
+
   const talk = {
     say: (card: Thread, body: string, done: () => void) => {
       onCard(
@@ -148,10 +164,14 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       )
     },
     rewrite: (card: Thread, id: string, body: string) => {
-      onCard(card, async () => held((await api.updateComment(id, { body })).thread), 'Could not save that.')
+      onComment(
+        card,
+        async () => held((await api.updateComment(id, { body })).thread),
+        'Could not save that.',
+      )
     },
     remove: (card: Thread, id: string) => {
-      onCard(card, async () => held((await api.deleteComment(id)).thread), 'Could not take that back.')
+      onComment(card, async () => held((await api.deleteComment(id)).thread), 'Could not take that back.')
     },
     showAll: (card: Thread) => {
       onCard(card, async () => held((await api.getThread(card.id)).thread), 'Could not load the rest of it.')
@@ -556,6 +576,8 @@ const wentAway = {
   meeting: 'Somebody took that out of the diary. It is off the page now.',
   role: 'Somebody took that role off. It is off the page now.',
 } as const satisfies Record<Thread['entity_type'], string>
+
+const GONE_COMMENT = 'That comment is no longer there.'
 
 const goneLabel = {
   session: ' · withdrawn',

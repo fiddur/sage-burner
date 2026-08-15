@@ -410,7 +410,9 @@ describe('a song’s page', () => {
 
     expect(await screen.findByText(/put it in the book/)).toBeTruthy()
 
-    fireEvent.input(screen.getByLabelText(/Say something/), { target: { value: 'we sang this at dawn' } })
+    fireEvent.input(screen.getByLabelText('Say something about Fire in the sky'), {
+      target: { value: 'we sang this at dawn' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
 
     await waitFor(() => expect(postComment).toHaveBeenCalledWith('t-1', { body: 'we sang this at dawn' }))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { hasMarkdown, LINK_PLACEHOLDER, written } from './syntax.ts'
+import { LINK_PLACEHOLDER, written } from './syntax.ts'
 
 const at = (value: string, start: number, end = start) => ({ start, end })
 
@@ -97,31 +97,4 @@ describe('writing a list', () => {
 
     expect(written('list', value, at('', 0, value.length), value.length + 3).value).toBe(value)
   })
-})
-
-describe('whether there is any markdown in what somebody wrote', () => {
-  it('says no to plain words, which is most of what members write', () => {
-    expect(hasMarkdown('Bringing a big pot and two ladles. See you Friday!')).toBe(false)
-  })
-
-  it('says no to an asterisk or an underscore that marks nothing', () => {
-    expect(hasMarkdown('2 * 3 is 6')).toBe(false)
-    expect(hasMarkdown('the file is called sauna_at_dawn')).toBe(false)
-  })
-
-  for (const [what, value] of [
-    ['bold', 'a **warm** sauna'],
-    ['italic', 'a _warm_ sauna'],
-    ['a link', 'see [the map](https://example.org)'],
-    ['a picture', 'look ![](/api/images/x)'],
-    ['a heading', '# Sauna'],
-    ['a bulleted list', '- a cup\n- a plate'],
-    ['a numbered list', '1. a cup'],
-    ['a quote', '> as Ada said'],
-    ['code', 'run `pnpm check`'],
-  ] as const) {
-    it(`says yes to ${what}`, () => {
-      expect(hasMarkdown(value)).toBe(true)
-    })
-  }
 })

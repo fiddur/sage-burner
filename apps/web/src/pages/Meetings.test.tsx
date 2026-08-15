@@ -1,6 +1,6 @@
 import type { Meeting, MeetingPointEntry } from '@sage-burner/shared'
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -202,6 +202,21 @@ describe('the meetings page', () => {
       'value',
       'https://meet.example/abc',
     )
+  })
+
+  it('takes the notes in the same editor as everything else, with a preview', async () => {
+    // #638: it was a bare textarea whose value is rendered as markdown on the page, so what
+    // somebody typed came out differently from what they had been looking at.
+    renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }) }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))
+    const box = screen.getByLabelText('Anything else about the meeting')
+    fireEvent.input(box, { target: { value: '- the door code is 1234' } })
+
+    const field = within(box.closest('.field') as HTMLElement)
+    fireEvent.click(field.getByRole('tab', { name: 'Preview' }))
+
+    expect(field.getByRole('listitem').textContent).toBe('the door code is 1234')
   })
 
   it('changes one further down the diary too, not only the next one', async () => {

@@ -216,9 +216,10 @@ describe('AdminEvents', () => {
     // is to publish it to the public homepage.
     renderPage(stub())
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
-    await screen.findByLabelText('Welcome text (markdown)')
+    await screen.findByLabelText('Welcome text')
 
-    fill('Welcome text (markdown)', '# Bring water')
+    fill('Welcome text', '# Bring water')
+    fireEvent.click(screen.getAllByRole('tab', { name: 'Preview' })[0] as HTMLElement)
 
     await waitFor(() => {
       // Level 2, matching what the public page renders — the preview is only
@@ -227,12 +228,22 @@ describe('AdminEvents', () => {
     })
   })
 
+  it('takes a picture in the welcome text, as its two siblings already did', async () => {
+    // #638: the field simply did not pass `upload`, so the burn's own front page was the one
+    // longer text nobody could put a picture in.
+    renderPage(stub())
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+
+    expect(await screen.findByLabelText('Add a picture to Welcome text')).toBeTruthy()
+  })
+
   it('escapes raw HTML in the preview, so it shows what a visitor gets', async () => {
     renderPage(stub())
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
-    await screen.findByLabelText('Welcome text (markdown)')
+    await screen.findByLabelText('Welcome text')
 
-    fill('Welcome text (markdown)', '# Bring water\n<script>alert(1)</script>')
+    fill('Welcome text', '# Bring water\n<script>alert(1)</script>')
+    fireEvent.click(screen.getAllByRole('tab', { name: 'Preview' })[0] as HTMLElement)
 
     await waitFor(() => {
       expect(screen.getByText(/<script>alert\(1\)<\/script>/)).toBeTruthy()
@@ -349,23 +360,23 @@ describe('AdminEvents', () => {
     await screen.findByLabelText('Name of summer-2026')
 
     fill('Name of summer-2026', '  Something Else  ')
-    fill('Welcome text (markdown)', '# Typed but not stored')
+    fill('Welcome text', '# Typed but not stored')
     screen.getByRole('button', { name: 'Save event' }).click()
 
     await waitFor(() =>
       expect(screen.getByLabelText('Name of summer-2026')).toHaveProperty('value', 'Trimmed By Server'),
     )
     // Bound separately from the rest, so it needs resyncing on its own.
-    expect(screen.getByLabelText('Welcome text (markdown)')).toHaveProperty('value', '# Hello')
+    expect(screen.getByLabelText('Welcome text')).toHaveProperty('value', '# Hello')
   })
 
   it('sends only what the form changed, so a cap fix cannot clobber the welcome text', async () => {
     const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
     renderPage(stub({ updateEvent }))
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
-    await screen.findByLabelText('Welcome text (markdown)')
+    await screen.findByLabelText('Welcome text')
 
-    fill('Welcome text (markdown)', '# New words')
+    fill('Welcome text', '# New words')
     screen.getByRole('button', { name: 'Save event' }).click()
 
     await waitFor(() => {
@@ -396,7 +407,7 @@ describe('AdminEvents', () => {
       }),
     )
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
-    await screen.findByLabelText('Welcome text (markdown)')
+    await screen.findByLabelText('Welcome text')
 
     screen.getByRole('button', { name: 'Save event' }).click()
 

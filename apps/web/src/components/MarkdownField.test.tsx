@@ -26,21 +26,62 @@ describe('MarkdownField', () => {
     expect(onInput).toHaveBeenCalledWith(PRINCIPLES)
   })
 
-  it('renders the markdown quietly below the field, with no mode to switch into', async () => {
+  it('writes until Preview is asked for, and reads it back under the same tabs', async () => {
     render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
+
+    expect(screen.getByLabelText('Help text')).toHaveProperty('value', PRINCIPLES)
+    expect(screen.queryByRole('listitem')).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
 
     expect((await screen.findAllByRole('listitem')).map((item) => item.textContent)).toEqual([
       'Radical inclusion',
       'Leave no trace',
     ])
-    expect(screen.getByLabelText('Help text')).toHaveProperty('value', PRINCIPLES)
-    expect(screen.queryByRole('button', { name: /Preview/ })).toBeNull()
+    expect(screen.queryByLabelText('Help text')).toBeNull()
   })
 
-  it('shows no preview of plain words, which is what most people write', () => {
-    render(<MarkdownField label="Help text" value="Bringing a pot." maxLength={2000} onInput={vi.fn()} />)
+  it('goes back to what was typed, which is the whole of a mode being a mode', () => {
+    render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
 
-    expect(screen.queryByText('How it will read')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Write' }))
+
+    expect(screen.getByLabelText('Help text')).toHaveProperty('value', PRINCIPLES)
+  })
+
+  it('says there is nothing to read rather than showing an empty panel', () => {
+    render(<MarkdownField label="Help text" value="   " maxLength={2000} onInput={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    expect(screen.getByText('Nothing written yet.')).toBeTruthy()
+  })
+
+  it('says markdown is supported, and where to read about it', () => {
+    render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
+
+    expect(screen.getByRole('link', { name: 'Markdown is supported' }).getAttribute('href')).toBe(
+      '/formatting',
+    )
+  })
+
+  it('offers the picture line only where pictures can be sent', () => {
+    render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
+    expect(screen.queryByText(/add a picture/)).toBeNull()
+
+    cleanup()
+    render(
+      <MarkdownField
+        label="Help text"
+        value=""
+        maxLength={2000}
+        upload={() => Promise.reject(new Error('not used'))}
+        onInput={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/paste, drop or click/)).toBeTruthy()
   })
 
   it('escapes raw HTML in the preview, so it shows what an applicant gets', async () => {
@@ -52,6 +93,8 @@ describe('MarkdownField', () => {
         onInput={vi.fn()}
       />,
     )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
 
     expect(await screen.findByText(/alert\(1\)/)).toBeTruthy()
     expect(document.querySelector('script')).toBeNull()

@@ -32,7 +32,6 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { fromLocalInput, localMoment, shortDayOf, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
-import { rowsFor } from '../textarea.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type MeetingsApi = Pick<
@@ -158,6 +157,7 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
       meetings={shown}
       busy={busy}
       editing={amending}
+      upload={api.uploadImage}
       onEditing={setAmending}
       onSave={amend}
       onDelete={remove}
@@ -215,6 +215,7 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
             next={next}
             busy={busy}
             editing={amending}
+            upload={api.uploadImage}
             onEditing={setAmending}
             onSave={amend}
             onDelete={remove}
@@ -241,6 +242,7 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
           <ScheduleOne
             busy={busy}
             scheduling={scheduling}
+            upload={api.uploadImage}
             onScheduling={setScheduling}
             onSchedule={(fields) =>
               run(async () => {
@@ -263,6 +265,7 @@ const TheDiary = ({
   meetings,
   busy,
   editing,
+  upload,
   onEditing,
   onSave,
   onDelete,
@@ -271,6 +274,7 @@ const TheDiary = ({
   meetings: readonly Meeting[]
   busy: boolean
   editing: string | undefined
+  upload: UploadImage
   onEditing: (id: string | undefined) => void
   onSave: (id: string, fields: MeetingDraft) => void
   onDelete: (id: string) => void
@@ -298,6 +302,7 @@ const TheDiary = ({
               <MeetingFields
                 meeting={one}
                 busy={busy}
+                upload={upload}
                 onCancel={() => onEditing(undefined)}
                 onSave={(fields) => onSave(one.id, fields)}
               />
@@ -416,11 +421,13 @@ const RaiseAPoint = ({
 const ScheduleOne = ({
   busy,
   scheduling,
+  upload,
   onScheduling,
   onSchedule,
 }: {
   busy: boolean
   scheduling: boolean
+  upload: UploadImage
   onScheduling: (wanted: boolean) => void
   onSchedule: (fields: MeetingDraft) => void
 }) => (
@@ -428,7 +435,7 @@ const ScheduleOne = ({
     <h2>Put a meeting in the diary</h2>
 
     {scheduling ? (
-      <MeetingFields busy={busy} onCancel={() => onScheduling(false)} onSave={onSchedule} />
+      <MeetingFields busy={busy} upload={upload} onCancel={() => onScheduling(false)} onSave={onSchedule} />
     ) : (
       <p class="row">
         <button type="button" disabled={busy} onClick={() => onScheduling(true)}>
@@ -443,6 +450,7 @@ const NextMeeting = ({
   next,
   busy,
   editing,
+  upload,
   onEditing,
   onSave,
   onDelete,
@@ -450,6 +458,7 @@ const NextMeeting = ({
   next: Meeting | undefined
   busy: boolean
   editing: string | undefined
+  upload: UploadImage
   onEditing: (id: string | undefined) => void
   onSave: (id: string, fields: MeetingDraft) => void
   onDelete: (id: string) => void
@@ -498,6 +507,7 @@ const NextMeeting = ({
       <MeetingFields
         meeting={next}
         busy={busy}
+        upload={upload}
         onCancel={() => onEditing(undefined)}
         onSave={(fields) => onSave(next.id, fields)}
       />
@@ -762,11 +772,13 @@ const DecisionFields = ({
 const MeetingFields = ({
   meeting,
   busy,
+  upload,
   onCancel,
   onSave,
 }: {
   meeting?: Meeting | undefined
   busy: boolean
+  upload: UploadImage
   onCancel: () => void
   onSave: (fields: MeetingDraft) => void
 }) => {
@@ -823,16 +835,15 @@ const MeetingFields = ({
         />
       </label>
 
-      <label class="field">
-        <span>Anything else about it?</span>
-        <textarea
-          maxLength={MAX_NOTES}
-          rows={rowsFor(notes, 2)}
-          aria-label="Anything else about the meeting"
-          value={notes}
-          onInput={(typed) => setNotes(typed.currentTarget.value)}
-        />
-      </label>
+      <MarkdownField
+        label="Anything else about it?"
+        accessibleName="Anything else about the meeting"
+        value={notes}
+        maxLength={MAX_NOTES}
+        rows={2}
+        upload={upload}
+        onInput={setNotes}
+      />
 
       <p class="row">
         <PendingButton

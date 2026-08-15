@@ -39,6 +39,8 @@ export const feedPage = (kinds: readonly FeedKind[] = [], burn?: string): string
 
 export const changelogPage = (): string => '/changelog'
 
+export const formattingPage = (): string => '/formatting'
+
 export const songbookPage = (): string => '/songs'
 
 export const songPage = (songId: string): string => `/songs/${encodeURIComponent(songId)}`
