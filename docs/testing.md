@@ -339,11 +339,16 @@ phone" means 360px.
 ## The icons
 
 - [ ] Every control is a line drawing in the colour of the text beside it — the pencil,
-      the trashcan, the bell, the hand, the menu, the toolbar's link, list and picture.
-      Nothing coloured is a button except the heart.
+      the trashcan, the hand, the menu, the toolbar's link, list and picture. Nothing
+      coloured is a button except the heart and the bell.
 - [ ] The pages keep their emoji: the phone's bottom bar, the drawer's entries, the
       marks on a feed card's entries and the before/during/after phases on Leads.
-- [ ] The bell is quiet with nothing unseen and turns ember when something is.
+- [ ] The top bell is 🔔, dim with nothing unseen and full-strength with a count on it when
+      something is.
+- [ ] A card's bell is 🔔 where either of its switches is on and 🔕 where neither is — tick one
+      and it lights without a reload.
+- [ ] Ticking a category on a card near the bottom of a phone screen raises the push strip
+      **over** the still-open menu, and its offer can be pressed without dismissing anything.
 - [ ] Hearting something fills ♡ to ❤️‍🔥 — the heart is the one control that is not a line
       drawing — and taking the heart back empties it.
 - [ ] In dark mode every icon is still legible, and hovering a control still lightens it.

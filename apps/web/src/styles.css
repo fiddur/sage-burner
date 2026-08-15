@@ -2400,10 +2400,15 @@ img.avatar {
   the settings table is three screens long and the feed is longer — so a strip at the top of the
   page would appear off-screen exactly when it is raised. Sage of `.install-app` rather than the
   ember of a warning: it is an offer, not something going wrong.
+
+  **Above the popdown, which is what raises it** (#589). At 25 it sat under `.card-bell-menu`, so
+  ticking a category on a card low in the feed put the offer *behind* the menu that had just been
+  ticked in — `elementFromPoint` on the button answered the menu, and the tap did nothing. Under
+  the drawer's backdrop still, that being a whole-viewport overlay rather than a floating strip.
 */
 .push-nudge {
   position: fixed;
-  z-index: 25;
+  z-index: 32;
   inset-inline: 0.5rem;
   bottom: calc(0.5rem + env(safe-area-inset-bottom));
   max-width: 40rem;
@@ -2534,14 +2539,16 @@ img.avatar {
 }
 
 /* A link to `/notifications` rather than a button (#336), so it wears none of a
-   link's clothes: an underline under an icon reads as a mistake. */
+   link's clothes: an underline under an icon reads as a mistake.
+
+   No `color`: the mark is an emoji again (#672) and carries its own, so the quiet-until-something-
+   happens signal is the opacity below and the count badge, not the ember a line drawing took. */
 .bell {
   position: relative;
   display: inline-flex;
   padding: 0.2rem 0.3rem;
   border: 0;
   background: none;
-  color: var(--muted);
   font-size: 1.1rem;
   line-height: 1;
   text-decoration: none;
@@ -2551,7 +2558,6 @@ img.avatar {
 }
 
 .bell.has-unseen {
-  color: var(--ember);
   opacity: 1;
 }
 

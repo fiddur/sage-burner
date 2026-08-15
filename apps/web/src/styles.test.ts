@@ -124,6 +124,16 @@ describe('the stylesheet', () => {
     expect(rules.find((rule) => rule.selector === '.song-body')?.body).toMatch(/font-family:[^;]*monospace/)
   })
 
+  it('keeps the nudge above the popdown that raises it, and under the drawer', () => {
+    const layer = (selector: string) =>
+      Number(/z-index:\s*(\d+)/.exec(rules.find((rule) => rule.selector === selector)?.body ?? '')?.[1])
+
+    expect(layer('.push-nudge')).toBeGreaterThan(layer('.card-bell-menu'))
+    expect(layer('.push-nudge')).toBeGreaterThan(layer('.bell-panel'))
+    expect(layer('.push-nudge')).toBeLessThan(layer('.menu-backdrop'))
+    expect(layer('.push-nudge')).toBeGreaterThan(layer('.bottom-bar'))
+  })
+
   it('positions every box that scrolls sideways', () => {
     // Anything establishing a horizontal scroll container has to be a containing
     // block, so an absolutely positioned descendant cannot escape to the document and
