@@ -37,7 +37,8 @@ export const MarkdownField = ({
 }) => {
   const mentioning = useMentioning({ value, people, maxLength, onInput })
   const fieldId = useId()
-  const panelId = useId()
+  const writeId = useId()
+  const readId = useId()
   const pictures = useImageUpload({ value, maxLength, onInput, upload })
   const syntax = useSyntax({ value, maxLength, onInput })
   const [previewing, setPreviewing] = useState(false)
@@ -51,7 +52,17 @@ export const MarkdownField = ({
       </label>
 
       <div class="md-field">
-        <div class="md-tabs" role="tablist" aria-label="Write or preview">
+        <div
+          class="md-tabs"
+          role="tablist"
+          aria-label="Write or preview"
+          onKeyDown={(keyEvent) => {
+            if (keyEvent.key !== 'ArrowLeft' && keyEvent.key !== 'ArrowRight') return
+
+            keyEvent.preventDefault()
+            setPreviewing(keyEvent.key === 'ArrowRight')
+          }}
+        >
           {[false, true].map((wanted) => (
             <button
               key={wanted ? 'preview' : 'write'}
@@ -59,7 +70,8 @@ export const MarkdownField = ({
               role="tab"
               class={previewing === wanted ? 'md-tab is-on' : 'md-tab'}
               aria-selected={previewing === wanted}
-              aria-controls={wanted ? panelId : fieldId}
+              aria-controls={wanted ? readId : writeId}
+              tabIndex={previewing === wanted ? undefined : -1}
               onClick={() => setPreviewing(wanted)}
             >
               {wanted ? 'Preview' : 'Write'}
@@ -68,7 +80,7 @@ export const MarkdownField = ({
         </div>
 
         {previewing ? (
-          <div id={panelId} class="md-field-preview" role="tabpanel" aria-label={`${subject}, as it reads`}>
+          <div id={readId} class="md-field-preview" role="tabpanel" aria-label={`${subject}, as it reads`}>
             {value.trim() === '' ? (
               <p class="form-note">Nothing written yet.</p>
             ) : (
@@ -77,7 +89,7 @@ export const MarkdownField = ({
             )}
           </div>
         ) : (
-          <>
+          <div id={writeId} role="tabpanel" aria-label={`${subject}, to write in`}>
             <SyntaxToolbar syntax={syntax} subject={subject}>
               <AddPicture pictures={pictures} label={label} />
             </SyntaxToolbar>
@@ -96,7 +108,7 @@ export const MarkdownField = ({
               {...pictures.handlers}
               {...mentioning.noticing}
             />
-          </>
+          </div>
         )}
       </div>
 

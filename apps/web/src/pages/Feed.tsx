@@ -138,17 +138,35 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 
   // A comment's 404 is a different loss from the card's: no `forget`, no `reload` (#683).
   const onComment = (card: Thread, work: () => Promise<unknown>, fallback: string) => {
+    let entityGone = false
+
+    const settle = async () => {
+      try {
+        held((await api.getThread(card.id)).thread)
+      } catch (second) {
+        if (!isGone(second)) return
+
+        entityGone = true
+        forget(card.id)
+        await reload()
+      }
+    }
+
     run(
       async () => {
         try {
           await work()
         } catch (failure) {
-          if (isGone(failure)) held((await api.getThread(card.id)).thread)
+          if (isGone(failure)) await settle()
 
           throw failure
         }
       },
-      (failure) => (isGone(failure) ? GONE_COMMENT : errorMessage(failure, fallback)),
+      (failure) => {
+        if (!isGone(failure)) return errorMessage(failure, fallback)
+
+        return entityGone ? wentAway[card.entity_type] : GONE_COMMENT
+      },
     )
   }
 

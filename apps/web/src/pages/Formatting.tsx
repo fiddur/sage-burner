@@ -1,10 +1,5 @@
 import { renderMarkdown } from '../markdown.ts'
 
-/**
- * Rendered through `renderMarkdown` rather than written out as HTML, so the right-hand column is
- * the app answering for itself: a change to what the renderer allows shows up here without anybody
- * remembering to edit the page.
- */
 const EXAMPLES: readonly { what: string; source: string }[] = [
   { what: 'Emphasis', source: '**bold**, *italic*' },
   { what: 'A heading', source: '## Saturday' },

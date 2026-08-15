@@ -142,8 +142,6 @@ describe('a conversation about a dream', () => {
   })
 
   it('is the app’s one editor, so a comment can be previewed like everything else', () => {
-    // #638: the two boxes here were hand-rolled — toolbar, no preview at all — while every
-    // other longer field had one.
     show(aThread([]))
 
     const box = screen.getByLabelText('Say something about Sauna at dawn')

@@ -229,8 +229,6 @@ describe('AdminEvents', () => {
   })
 
   it('takes a picture in the welcome text, as its two siblings already did', async () => {
-    // #638: the field simply did not pass `upload`, so the burn's own front page was the one
-    // longer text nobody could put a picture in.
     renderPage(stub())
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
 

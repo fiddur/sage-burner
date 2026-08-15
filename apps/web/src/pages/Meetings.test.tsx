@@ -205,8 +205,6 @@ describe('the meetings page', () => {
   })
 
   it('takes the notes in the same editor as everything else, with a preview', async () => {
-    // #638: it was a bare textarea whose value is rendered as markdown on the page, so what
-    // somebody typed came out differently from what they had been looking at.
     renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }) }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))

@@ -658,8 +658,6 @@ a:hover {
   display: flex;
 }
 
-/* The strip only reads as one inside the bordered box; over a comment box it is a bare row of
-   controls. */
 .md-field > .syntax-row {
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--ink) 4%, transparent);

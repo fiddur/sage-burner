@@ -1078,6 +1078,31 @@ describe('what everyone has been doing', () => {
     expect(screen.getByText('Planning call')).toBeTruthy()
   })
 
+  it('falls back to the card’s own wording where the thread has gone with the comment', async () => {
+    const raised = anEntry({ id: 't-1', body: 'raised this', kind: 'raised' })
+    const withComment = aCard({
+      id: 'c-1',
+      title: 'Planning call',
+      entity_type: 'meeting',
+      entry_count: 2,
+      entries: [raised, anEntry({ id: 't-2', body: 'that time does not work' })],
+    })
+    const getFeed = vi
+      .fn<FeedApi['getFeed']>()
+      .mockResolvedValueOnce({ threads: [withComment] })
+      .mockResolvedValue({ threads: [] })
+    const gone = () => Promise.reject(apiError(404, 'not_found', 'Not found.'))
+    renderPage(stub({ getFeed, getThread: gone, deleteComment: gone }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take back this comment' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take back this comment' }))
+
+    expect(
+      await screen.findByText('Somebody took that out of the diary. It is off the page now.'),
+    ).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Planning call')).toBeNull())
+  })
+
   it('keeps the card and the ordinary wording where the failure is not a disappearance', async () => {
     // The passing sibling: a 500 is something to try again, not something that has gone.
     const posted = vi.fn<FeedApi['postComment']>(() =>

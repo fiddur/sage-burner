@@ -431,6 +431,12 @@ thread to drop the stale line, and leaves the card where it is. Sent through `on
 claimed the meeting was out of the diary while the meeting's own card sat under the banner saying
 otherwise: a message the same screen disproved.
 
+**The refetch is also how it tells the two apart.** A deleted meeting takes its thread and every
+entry with it, so a comment write against one 404s for the entity's reason rather than the
+comment's — and `GET /api/threads/:id` then 404s too. That second answer is what decides: it puts
+`onCard`'s handling back, wording and `forget` and `reload` alike. Neither loss can be read off the
+first 404, which carries the same status either way.
+
 **What was typed survives a failed reply.** `DreamThread` emptied its box on the way out rather
 than on the answer, so a reply to a thread somebody had just deleted was lost to a banner. The box
 is cleared by a `done` the caller passes, which is the shape the rewording form already used.
