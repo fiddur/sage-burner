@@ -169,6 +169,9 @@ phone" means 360px.
       chips and shows the roles.
 - [ ] A lead role has a card: adding one opens it, taking the lead and handing it
       over add a line each, and saying something on it reaches whoever is on it.
+- [ ] A generated meal plan puts **nothing** on the feed. Take a sitting's cooking on and
+      its card appears, headed by the sitting and carrying the food idea; the **Meals** chip
+      shows it. A comment on it reaches whoever is cooking.
 - [ ] Comment on a dream's card; the same conversation shows in the dream's
       panel. Edit your own comment; delete it; an admin can delete anyone's.
 - [ ] Mention the member by name from the picker — they are notified once, not

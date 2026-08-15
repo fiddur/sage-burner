@@ -103,7 +103,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   generates the sittings; regenerating adds what is missing and removes
   nothing. The plan is one table — food idea, lead, help, cleanup — and any
   member takes a role, moves a sitting or writes the food idea. The kitchen
-  draws its own schedule lane from the meals.
+  draws its own schedule lane from the meals. Each sitting has a card on the feed
+  once somebody does something with it, so "is it vegan?" has somewhere to go.
 - The lead-roles register: the burn's jobs, any member takes one, hands one
   over or appoints somebody — and whoever it happens to is told. Each role has a
   card on the feed, so "who can take this?" has somewhere to be asked.
@@ -113,8 +114,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 
 - The feed: what everyone has been doing and saying, as one kind of thing — a
   card carrying its whole history and the talk under it, for a dream, a person at
-  a burn, an announcement, a song, a bring item, a talking point, a meeting or a
-  lead role.
+  a burn, an announcement, a song, a bring item, a talking point, a meeting, a
+  lead role or a meal.
 - A chip row filters the feed by kind, carried in the URL, defaulting to
   everything.
 - Comments on any card: markdown, edit your own, delete your own (an admin may

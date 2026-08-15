@@ -1,3 +1,4 @@
+import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { eq } from 'drizzle-orm'
@@ -1113,5 +1114,177 @@ describe('changing a plan somebody else has just changed', () => {
     )
 
     expect((await setIdea(server, admin.cookie, first, current)).statusCode).toBe(200)
+  })
+})
+
+describe('the card a sitting carries', () => {
+  const setUp = async () => {
+    const server = await build()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
+    const ada = await givenAttending('Ada')
+    const [meal] = (await listMeals(server, ada.cookie)).meals
+
+    return { server, admin, ada, meal }
+  }
+
+  const cardFor = async (server: FastifyInstance, cookie: string, mealId: string) => {
+    const feed = await send(server, 'GET', '/api/feed', cookie)
+    const found = (feed.json().threads as Thread[]).find((card) => card.entity_id === mealId)
+    if (found === undefined) throw new Error(`no card for ${mealId}`)
+
+    return found
+  }
+
+  const entriesOn = async (server: FastifyInstance, cookie: string, mealId: string) => {
+    const card = await cardFor(server, cookie, mealId)
+    const whole = await send(server, 'GET', `/api/threads/${card.id}`, cookie)
+
+    return (whole.json().thread.entries as Thread['entries']).map((entry) => [
+      entry.author?.name ?? null,
+      entry.kind,
+      entry.body,
+    ])
+  }
+
+  it('has none until somebody does something with it, a generated plan being nobody’s news', async () => {
+    const { server, ada } = await setUp()
+
+    const feed = await send(server, 'GET', '/api/feed', ada.cookie)
+    expect(feed.json().threads).toEqual([])
+  })
+
+  it('opens when somebody takes the cooking on, headed by the sitting', async () => {
+    const { server, ada, meal } = await setUp()
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+
+    const card = await cardFor(server, ada.cookie, meal.id)
+    expect(card.entity_type).toBe('meal')
+    expect(card.title).toBe('Dinner')
+    expect(card.link).toBe(`/meals?burn=${BURN}`)
+    expect(card.entries.map((entry) => [entry.author?.name, entry.kind, entry.body])).toEqual([
+      ['Ada', 'facilitator', 'is cooking it'],
+    ])
+  })
+
+  it('says which way the cooking went, in the words of whoever did it', async () => {
+    const { server, admin, ada, meal } = await setUp()
+    const bea = await givenAttending('Bea')
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: bea.id })
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, admin.cookie, { account_id: null })
+
+    expect(await entriesOn(server, ada.cookie, meal.id)).toEqual([
+      ['Ada', 'facilitator', 'is cooking it'],
+      ['Ada', 'facilitator', 'asked Bea to cook it'],
+      [null, 'facilitator', 'took Bea off cooking it'],
+    ])
+  })
+
+  it('says who put a hand up for the crew and who stood down', async () => {
+    const { server, ada, meal } = await setUp()
+    const bea = await givenAttending('Bea')
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/cleanup`, ada.cookie, { account_id: bea.id })
+    await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${ada.id}`, ada.cookie)
+
+    expect(await entriesOn(server, ada.cookie, meal.id)).toEqual([
+      ['Ada', 'helper', 'put a hand up for helper'],
+      ['Ada', 'helper', 'asked Bea onto cleanup'],
+      ['Ada', 'helper', 'cannot do helper after all'],
+    ])
+  })
+
+  it('carries the food idea as the card’s body, and says when it is written', async () => {
+    const { server, ada, meal } = await setUp()
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/idea`, ada.cookie, { food_idea: 'Dahl and rice' })
+
+    const card = await cardFor(server, ada.cookie, meal.id)
+    expect(card.body).toBe('Dahl and rice')
+    expect(card.entries.map((entry) => entry.body)).toEqual(['said what it will be: Dahl and rice'])
+  })
+
+  it('says nothing when the idea is saved unchanged, whoever saves it', async () => {
+    const { server, ada, meal } = await setUp()
+    const bea = await givenAttending('Bea')
+    await send(server, 'PUT', `/api/meals/${meal.id}/idea`, ada.cookie, { food_idea: 'Dahl and rice' })
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/idea`, bea.cookie, { food_idea: 'Dahl and rice' })
+
+    expect(await entriesOn(server, ada.cookie, meal.id)).toEqual([
+      ['Ada', 'edited', 'said what it will be: Dahl and rice'],
+    ])
+  })
+
+  it('takes the card off the feed with the sitting', async () => {
+    const { server, admin, ada, meal } = await setUp()
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+    const card = await cardFor(server, ada.cookie, meal.id)
+
+    await send(server, 'DELETE', `/api/admin/meals/${meal.id}`, admin.cookie)
+
+    const feed = await send(server, 'GET', '/api/feed', ada.cookie)
+    expect(feed.json().threads).toEqual([])
+    expect((await send(server, 'GET', `/api/threads/${card.id}`, ada.cookie)).statusCode).toBe(404)
+  })
+
+  it('tells the burn who took it on, and never the two who did it', async () => {
+    const { server, admin, ada, meal } = await setUp()
+    const bea = await givenAttending('Bea')
+    const watching = await givenAttending('Cai')
+    await send(server, 'PUT', '/api/me/notification-settings', watching.cookie, {
+      on: ['meal_taken'],
+      email: [],
+      digest: 'off',
+    })
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, admin.cookie, { account_id: bea.id })
+
+    const bell = async (cookie: string) =>
+      (await send(server, 'GET', '/api/me/notifications', cookie)).json().notifications as {
+        category: string
+        body: string
+      }[]
+
+    expect((await bell(watching.cookie)).map((one) => one.body)).toEqual(['Bea is cooking Dinner'])
+    expect((await bell(admin.cookie)).map((one) => one.category)).toEqual([])
+    expect((await bell(bea.cookie)).map((one) => one.category)).toEqual(['meal_role'])
+    expect((await bell(ada.cookie)).map((one) => one.category)).toEqual([])
+  })
+
+  it('tells the burn about a hand going up for a crew as well', async () => {
+    const { server, ada, meal } = await setUp()
+    const watching = await givenAttending('Cai')
+    await send(server, 'PUT', '/api/me/notification-settings', watching.cookie, {
+      on: ['meal_taken'],
+      email: [],
+      digest: 'off',
+    })
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/cleanup`, ada.cookie, { account_id: ada.id })
+
+    const bell = (await send(server, 'GET', '/api/me/notifications', watching.cookie)).json()
+      .notifications as { body: string }[]
+    expect(bell.map((one) => one.body)).toEqual(['Ada is on cleanup for Dinner'])
+  })
+
+  it('tells whoever is cooking when somebody says something about it', async () => {
+    const { server, ada, meal } = await setUp()
+    const bea = await givenAttending('Bea')
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+    const card = await cardFor(server, ada.cookie, meal.id)
+
+    await send(server, 'POST', `/api/threads/${card.id}/comments`, bea.cookie, { body: 'is it vegan?' })
+
+    const bell = await send(server, 'GET', '/api/me/notifications', ada.cookie)
+    expect(bell.json().notifications.map((one: { category: string }) => one.category)).toEqual([
+      'meal_comment',
+    ])
   })
 })

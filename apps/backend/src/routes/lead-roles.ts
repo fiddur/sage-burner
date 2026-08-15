@@ -478,6 +478,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       }
 
       const stamp = now().toISOString()
+      const by = await callerId(request)
       const seeded = db.transaction((tx) => {
         const [burn] = tx
           .select({ id: event.id })
@@ -516,9 +517,12 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         const startedAt = Date.parse(stamp)
 
         source.forEach((row, index) => {
+          const id = randomUUID()
+          const at = new Date(startedAt + index)
+
           tx.insert(leadRole)
             .values({
-              id: randomUUID(),
+              id,
               event_id: request.params.eventId,
               title: row.title,
               purpose: row.purpose,
@@ -528,9 +532,22 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
               effort_after: row.effort_after,
               team_size_wanted: row.team_size_wanted,
               lead_attendance_id: null,
-              created_at: new Date(startedAt + index).toISOString(),
+              created_at: at.toISOString(),
             })
             .run()
+
+          const card = threadIdFor(tx, {
+            type: 'role',
+            id,
+            event_id: request.params.eventId,
+            title: row.title,
+          })
+
+          openWith(
+            tx,
+            { thread_id: card, kind: 'added', author_account_id: by ?? null, body: 'added this lead role' },
+            at,
+          )
         })
 
         return 'copied' as const
@@ -539,23 +556,9 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       if (seeded === 'not_found') return sendError(reply, 404)
       if (seeded === 'conflict') return sendError(reply, 409)
 
-      const roles = await rolesFor(db, request.params.eventId)
-      const by = await callerId(request)
-
-      for (const role of roles) {
-        await addEntry(
-          db,
-          {
-            thread_id: await threadFor(db, 'role', role),
-            kind: 'added',
-            author_account_id: by ?? null,
-            body: 'added this lead role',
-          },
-          new Date(role.created_at),
-        )
-      }
-
-      return reply.code(201).send({ roles } satisfies LeadRolesResponse)
+      return reply
+        .code(201)
+        .send({ roles: await rolesFor(db, request.params.eventId) } satisfies LeadRolesResponse)
     },
   )
 }

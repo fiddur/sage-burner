@@ -25,6 +25,8 @@ export const meetingsPage = (eventId: string, pointId?: string): string =>
 
 export const rolesPage = (eventId: string): string => `/roles?${BURN_PARAM}=${encodeURIComponent(eventId)}`
 
+export const mealsPage = (eventId: string): string => `/meals?${BURN_PARAM}=${encodeURIComponent(eventId)}`
+
 export const membersPage = (eventId?: string): string =>
   eventId === undefined ? '/members' : `/members?${BURN_PARAM}=${encodeURIComponent(eventId)}`
 

@@ -257,6 +257,7 @@ describe('what somebody has switched on', () => {
     'meeting_comment',
     'mentioned',
     'lead_role_comment',
+    'meal_comment',
     'application',
     'application_news',
   ]
@@ -705,8 +706,7 @@ describe('the waiting list', () => {
   })
 
   it('says nothing to whoever is left when somebody leaves, an unpaid place never having been one', async () => {
-    // `staying` rather than the leaver: with only the leaver unpaid, a recompute wired into
-    // the leave route would notify nobody and this would pass against it.
+    // No fixture can reject a recompute here: leaving only removes an unpaid row (docs/burns.md).
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])
