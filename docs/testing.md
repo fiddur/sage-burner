@@ -283,6 +283,10 @@ phone" means 360px.
       the number who had the category off, and the devices that took it. Cause a burn-wide
       notification: it is **one** line whose "Told" is the number attending, not one line
       per person.
+- [ ] Write `@everybody` in an announcement, a bring item's comment and a talking point: each
+      is **one** line under "Somebody names you", not one per person named.
+- [ ] With no mail server set up, tick an Email box and cause that notification: the line's
+      **Emails** column stays at 0, nothing having been posted.
 
 ## Meetings
 

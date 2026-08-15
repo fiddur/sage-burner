@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **Naming everybody in one message is one line in the log again, not one per person.** ⚙️ →
+  Notifications sent filled up with identical rows whenever somebody wrote `@everybody`, pushing
+  everything else off the page.
+
+- **The log's Emails column counts emails a mail server actually took.** It counted the ticked
+  box instead, so an installation with no mail server at all reported emails going out.
+
+- **"1 place left, and they go to whoever pays" now says "it goes".**
+
 - **Every meeting in the diary can be edited, not only the next one.** Mistype the time or the
   joining link on a meeting further out and the only way back was to take it out and put it in
   again — which told everybody a second time and dropped it out of every subscribed calendar in

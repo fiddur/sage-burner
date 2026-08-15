@@ -30,7 +30,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { account, event, meeting, meetingPoint, thread } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, namedBy, reachedByMention, tellAttendees } from '../push/notify.ts'
+import { displayName, namedBy, oneBatch, reachedByMention, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { addEntry, forgetThread, renameThread, threadFor, threadIdFor } from './threads.ts'
 
@@ -145,16 +145,13 @@ export const registerMeetingRoutes = (
   }
 
   const tellNamed = async (named: readonly string[], who: string, point: MeetingPoint) => {
-    await Promise.all(
-      named.map(
-        async (accountId) =>
-          await notify(accountId, {
-            category: 'mentioned',
-            body: `${who} named you about: ${point.title}`,
-            link: meetingsPage(point.event_id, point.id),
-          }),
-      ),
-    )
+    const said = oneBatch({
+      category: 'mentioned',
+      body: `${who} named you about: ${point.title}`,
+      link: meetingsPage(point.event_id, point.id),
+    })
+
+    await Promise.all(named.map(async (accountId) => await notify(accountId, said)))
   }
 
   app.get<{ Params: { eventId: string } }>(

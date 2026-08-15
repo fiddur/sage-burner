@@ -35,7 +35,9 @@ export const AdminNotificationLog = ({ api }: { api: NotificationLogApi }) => {
       <p class="form-note">
         One line per notification the app generated, newest first. <strong>Taken</strong> counts the browsers
         whose push service accepted it — not the people who saw it, which nothing here can know. Somebody who
-        has the category switched off is counted under <strong>Off</strong> and told nothing.
+        has the category switched off is counted under <strong>Off</strong> and told nothing.{' '}
+        <strong>Emails</strong> counts the messages a mail server took, so it stays at nought until one is set
+        up.
       </p>
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}

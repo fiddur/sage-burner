@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { everybodyToken } from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -12,7 +13,16 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, migrationsFolder, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, meeting, thread, threadEntry } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  attendance,
+  event,
+  meeting,
+  notificationBatch,
+  thread,
+  threadEntry,
+} from '../db/schema.ts'
 
 const SECRET = 'm'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -243,6 +253,19 @@ describe('deciding a point', () => {
       ['raised', 'raised this'],
       ['decided', 'By the barn'],
     ])
+  })
+
+  it('writes one line in the log for a naming, however many it names', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    for (const name of ['Bea', 'Cai', 'Dee']) await givenComing((await givenAccount(name)).id)
+    await givenComing(ada.id)
+
+    await raise(server, ada.cookie, { title: 'Where do we park?', body: `${everybodyToken()} thoughts?` })
+
+    const log = await db().select().from(notificationBatch)
+    expect(log.filter((row) => row.category === 'mentioned')).toMatchObject([{ told: 3 }])
   })
 
   it('tells the burn about a decision, and never the person who recorded it', async () => {
