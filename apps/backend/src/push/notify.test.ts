@@ -9,7 +9,7 @@ import type { PushDeps } from './push.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, attendance, event, notification, notificationSetting } from '../db/schema.ts'
 import { createEmailQueue } from '../mail/queue.ts'
-import { notifyAttendees, recordAndPush } from './notify.ts'
+import { recordAndPush, tellAttendees } from './notify.ts'
 
 /**
  * The two halves of a notification that are about *timing* rather than about wording:
@@ -103,12 +103,11 @@ describe('telling everybody coming to a burn', () => {
       posted.push(accountId)
     }
 
-    const told = await notifyAttendees(
+    const told = await tellAttendees(
       deps.db,
       recordAndPush(deps, NOW_AT, () => undefined, { post: byEmail, defer: queue.defer }),
       BURN,
       TOLD,
-      { at: new Date(NOW) },
     )
 
     expect(told).toBe(3)
@@ -137,12 +136,11 @@ describe('telling everybody coming to a burn', () => {
       open -= 1
     }
 
-    await notifyAttendees(
+    await tellAttendees(
       deps.db,
       recordAndPush(deps, NOW_AT, () => undefined, { post: byEmail, defer: queue.defer }),
       BURN,
       TOLD,
-      { at: new Date(NOW) },
     )
     await queue.drain()
 

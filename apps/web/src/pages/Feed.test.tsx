@@ -1,4 +1,4 @@
-import type { Activity, MyBurn, Thread, ThreadEntry } from '@sage-burner/shared'
+import type { MyBurn, Thread, ThreadEntry } from '@sage-burner/shared'
 
 import { mentionsIn, mentionToken, notificationCategoryInfo } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
@@ -21,26 +21,6 @@ const ADA: Viewer = {
   status: 'signed-in',
   account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] },
 }
-
-const aLine = (over: Partial<Activity> & Pick<Activity, 'id' | 'body'>): Activity => ({
-  event_id: 'e-1',
-  burn: 'Summer burn',
-  category: 'dream_offered',
-  link: '/dreams',
-  created_at: '2026-08-07T18:00:00.000Z',
-  ...over,
-})
-
-const TWO: Activity[] = [
-  aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna at dawn' }),
-  aLine({
-    id: 'x-2',
-    body: 'Bea is coming.',
-    category: 'member_joined',
-    link: '/members',
-    created_at: '2026-08-07T17:00:00.000Z',
-  }),
-]
 
 const anEntry = (over: Partial<ThreadEntry> & Pick<ThreadEntry, 'id' | 'body'>): ThreadEntry => ({
   kind: 'comment',
@@ -81,8 +61,8 @@ const DEFAULTS = [
   'application',
 ] as const
 
-const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: Thread[] = []): FeedApi => ({
-  getFeed: () => Promise.resolve({ activity, threads }),
+const stub = (over: Partial<FeedApi> = {}, threads: Thread[] = []): FeedApi => ({
+  getFeed: () => Promise.resolve({ threads }),
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [], digest: 'daily' }),
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [], digest: 'daily' }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
@@ -159,7 +139,7 @@ const renderPageAt = (at: string, api: FeedApi) => {
 
 describe('the chip row over the feed', () => {
   it('asks the server for nothing in particular until somebody taps a chip', async () => {
-    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ activity: TWO, threads: [] }))
+    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ threads: [] }))
     renderPageAt('/feed', stub({ getFeed }))
 
     await screen.findByRole('button', { name: 'Everything' })
@@ -175,7 +155,7 @@ describe('the chip row over the feed', () => {
   })
 
   it('asks the server for what the address says, since the page reads only the newest fifty', async () => {
-    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ activity: [], threads: [] }))
+    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ threads: [] }))
     renderPageAt('/feed?kinds=song', stub({ getFeed }))
 
     await screen.findByRole('button', { name: 'Songs' })
@@ -190,10 +170,10 @@ describe('the chip row over the feed', () => {
     expect(screen.getByRole('button', { name: 'Everything' }).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('has a chip for the burn news beside the ones for cards', async () => {
+  it('has a chip for every kind of card', async () => {
     renderPageAt('/feed', stub())
 
-    for (const name of ['Burns', 'Dreams', 'People', 'Posts', 'Songs']) {
+    for (const name of ['Dreams', 'People', 'Posts', 'Songs', 'Bring', 'Points', 'Meetings', 'Leads']) {
       expect(await screen.findByRole('button', { name })).toBeTruthy()
     }
   })
@@ -205,7 +185,7 @@ describe('the bell in a card’s corner', () => {
   }
 
   it('opens on a press and closes on Escape', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     await bellOn('Sauna at dawn')
     expect(screen.getByText('Notification settings')).toBeTruthy()
@@ -216,7 +196,7 @@ describe('the bell in a card’s corner', () => {
   })
 
   it('closes when something outside it is pressed', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     await bellOn('Sauna at dawn')
     fireEvent.pointerDown(document.body)
@@ -225,7 +205,7 @@ describe('the bell in a card’s corner', () => {
   })
 
   it('says whether it is open, and names the switches it opens rather than a menu', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     const bell = await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' })
     expect(bell.getAttribute('aria-expanded')).toBe('false')
@@ -243,7 +223,7 @@ describe('the bell in a card’s corner', () => {
     const setThreadFollow = vi.fn<FeedApi['setThreadFollow']>(() =>
       Promise.resolve({ thread: aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true }) }),
     )
-    renderPage(stub({ setThreadFollow }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    renderPage(stub({ setThreadFollow }, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     await bellOn('Sauna at dawn')
     fireEvent.click(screen.getByLabelText('Notify on replies'))
@@ -252,7 +232,7 @@ describe('the bell in a card’s corner', () => {
   })
 
   it('shows the effective state, so what it says is what will happen', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true })]))
 
     await bellOn('Sauna at dawn')
 
@@ -261,17 +241,13 @@ describe('the bell in a card’s corner', () => {
 
   it('offers following on a card whose news maps to no category at all', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Sauna at dawn',
-            entries: [anEntry({ id: 't-1', body: 'moved it in the schedule', kind: 'scheduled' })],
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Sauna at dawn',
+          entries: [anEntry({ id: 't-1', body: 'moved it in the schedule', kind: 'scheduled' })],
+        }),
+      ]),
     )
 
     await bellOn('Sauna at dawn')
@@ -313,7 +289,7 @@ describe('switching a kind on from a card', () => {
   const NUDGE = 'Nothing will reach you on this device yet.'
 
   it('offers push here, which is the moment somebody asked to be told about something', async () => {
-    withNudge(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    withNudge(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
     fireEvent.change(screen.getByLabelText(/Notify me on similar/), { target: { checked: true } })
@@ -346,7 +322,6 @@ describe('switching a kind on from a card', () => {
           getMyNotificationSettings: () =>
             Promise.resolve({ on: ['dream_offered'], email: [], digest: 'daily' }),
         },
-        [],
         [aCard({ id: 'c-1', title: 'Sauna at dawn' })],
       ),
     )
@@ -359,7 +334,7 @@ describe('switching a kind on from a card', () => {
   })
 
   it('offers it on the way on, which is the passing sibling of that', async () => {
-    withProbe(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    withProbe(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
     fireEvent.change(screen.getByLabelText(/Notify me on similar/), { target: { checked: true } })
@@ -370,9 +345,7 @@ describe('switching a kind on from a card', () => {
 
 describe('the heart on a card', () => {
   it('is offered on every kind of card, not only on a dream', async () => {
-    renderPage(
-      stub({}, [], [aCard({ id: 'c-1', title: 'The planning call is Sunday', entity_type: 'post' })]),
-    )
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'The planning call is Sunday', entity_type: 'post' })]))
 
     expect(
       await screen.findByRole('button', { name: 'Give a heart to The planning call is Sunday' }),
@@ -381,7 +354,7 @@ describe('the heart on a card', () => {
 
   it('shows the count and that it is yours', async () => {
     renderPage(
-      stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 3, supported_by_me: true })]),
+      stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 3, supported_by_me: true })]),
     )
 
     const heart = await screen.findByRole('button', { name: 'Take back your heart for Sauna at dawn' })
@@ -395,7 +368,7 @@ describe('the heart on a card', () => {
         thread: aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 1, supported_by_me: true }),
       }),
     )
-    renderPage(stub({ supportThread }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    renderPage(stub({ supportThread }, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' }))
 
@@ -418,7 +391,7 @@ describe('the heart on a card', () => {
         }),
       }),
     )
-    renderPage(stub({ supportThread }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 4 })]))
+    renderPage(stub({ supportThread }, [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 4 })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' }))
 
@@ -434,11 +407,9 @@ describe('the heart on a card', () => {
       Promise.resolve({ thread: aCard({ id: 'c-1', title: 'Sauna at dawn' }) }),
     )
     renderPage(
-      stub(
-        { withdrawSupportForThread },
-        [],
-        [aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 1, supported_by_me: true })],
-      ),
+      stub({ withdrawSupportForThread }, [
+        aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 1, supported_by_me: true }),
+      ]),
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Take back your heart for Sauna at dawn' }))
@@ -447,14 +418,14 @@ describe('the heart on a card', () => {
   })
 
   it('offers none on a card whose thing is gone, which the route refuses anyway', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', gone: true })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', gone: true })]))
 
     await screen.findByText(/withdrawn/)
     expect(screen.queryByRole('button', { name: /heart/ })).toBeNull()
   })
 
   it('says no number where nobody has given one', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     const heart = await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' })
 
@@ -503,9 +474,9 @@ describe('announcing something on the feed', () => {
   })
 
   it('offers nothing to announce to before a burn is chosen', async () => {
-    renderPage(stub(), ADA, null)
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]), ADA, null)
 
-    await waitFor(() => expect(screen.getByText('Ada offered a dream: Sauna at dawn')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Sauna at dawn')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Announce something' })).toBeNull()
   })
 
@@ -573,9 +544,7 @@ describe('announcing something on the feed', () => {
     // The feed spans burns; the attendee list is the one in the bar. `namedBy` would drop a name
     // from the wrong burn silently, so the menu must not offer it — `@everybody` still works,
     // because the server resolves that from the card's own event.
-    renderPage(
-      stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dusk', event_id: 'e-2', burn: 'Autumn burn' })]),
-    )
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dusk', event_id: 'e-2', burn: 'Autumn burn' })]))
 
     const box = await screen.findByLabelText('Say something about Sauna at dusk')
     fireEvent.input(box, { target: { value: 'ask @Be' } })
@@ -585,7 +554,7 @@ describe('announcing something on the feed', () => {
   })
 
   it('offers them on a card from the burn in the bar', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', event_id: 'e-1' })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', event_id: 'e-1' })]))
 
     const box = await screen.findByLabelText('Say something about Sauna at dawn')
     fireEvent.input(box, { target: { value: 'ask @Be' } })
@@ -619,19 +588,15 @@ describe('announcing something on the feed', () => {
 
   it('draws a mention as a link to the person it names', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Sunday',
-            entity_type: 'post',
-            link: null,
-            body: `ask ${mentionToken('Bea', 'a-2')}`,
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Sunday',
+          entity_type: 'post',
+          link: null,
+          body: `ask ${mentionToken('Bea', 'a-2')}`,
+        }),
+      ]),
     )
 
     const link = await screen.findByRole('link', { name: '@Bea' })
@@ -648,43 +613,30 @@ describe('announcing something on the feed', () => {
 })
 
 describe('what everyone has been doing', () => {
-  it('shows a line per thing, newest first', async () => {
-    renderPage(stub())
-
-    expect(await screen.findByText('Ada offered a dream: Sauna at dawn')).toBeTruthy()
-    const lines = [...document.querySelectorAll('.feed-what')].map((one) => one.textContent)
-    expect(lines).toEqual(['Ada offered a dream: Sauna at dawn', 'Bea is coming.'])
-  })
-
-  it('interleaves the conversations with the news, by when each last moved', async () => {
-    // Two things on one page: a dream is a card carrying its own history and talk, and
-    // the burn's news stays a line. The order is one order, not two lists.
+  it('shows a card per thing, in the order the server sends them', async () => {
+    // One list, whatever each card is about: the order is the server's, by when each
+    // last moved, and the page does not sort it again.
     renderPage(
-      stub(
-        {},
-        [aLine({ id: 'x-1', body: 'Bea is coming.', created_at: '2026-08-07T19:00:00.000Z' })],
-        [
-          aCard({ id: 'c-1', title: 'Sauna at dawn', last_at: '2026-08-07T20:00:00.000Z' }),
-          aCard({ id: 'c-2', title: 'Cacao ceremony', last_at: '2026-08-07T18:00:00.000Z' }),
-        ],
-      ),
+      stub({}, [
+        aCard({ id: 'c-1', title: 'Sauna at dawn' }),
+        aCard({ id: 'c-2', title: 'Bea', entity_type: 'attendance' }),
+        aCard({ id: 'c-3', title: 'Cacao ceremony' }),
+      ]),
     )
 
     await screen.findByText('Sauna at dawn')
-    expect(
-      [...document.querySelectorAll('.feed-card-head, .feed-what')].map((one) => one.textContent),
-    ).toEqual(['Sauna at dawn', 'Bea is coming.', 'Cacao ceremony'])
+    expect([...document.querySelectorAll('.feed-card-head')].map((one) => one.textContent)).toEqual([
+      'Sauna at dawn',
+      'Bea',
+      'Cacao ceremony',
+    ])
   })
 
   it('says nothing about when, on a card nothing has happened on', async () => {
     // `new Date('')` is an Invalid Date, and the card drew it. Reachable by taking back
     // the last comment on a thread from before #375, which has no other entry.
     renderPage(
-      stub(
-        {},
-        [],
-        [aCard({ id: 'c-1', title: 'Sauna at dawn', last_at: null, entry_count: 0, entries: [] })],
-      ),
+      stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', last_at: null, entry_count: 0, entries: [] })]),
     )
 
     await screen.findByText('Sauna at dawn')
@@ -692,16 +644,14 @@ describe('what everyone has been doing', () => {
   })
 
   it('heads a card with what it is called, and links where the card says', async () => {
-    renderPage(
-      stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', link: '/dreams?burn=e-2&dream=s-9' })]),
-    )
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', link: '/dreams?burn=e-2&dream=s-9' })]))
 
     const link = await screen.findByRole('link', { name: 'Sauna at dawn' })
     expect(link.getAttribute('href')).toBe('/dreams?burn=e-2&dream=s-9')
   })
 
   it('keeps a withdrawn dream readable, and links nowhere', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', gone: true, link: null })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', gone: true, link: null })]))
 
     expect(await screen.findByText(/withdrawn/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Sauna at dawn' })).toBeNull()
@@ -709,7 +659,7 @@ describe('what everyone has been doing', () => {
 
   it('says somebody is no longer coming rather than withdrawn, on their own card', async () => {
     renderPage(
-      stub({}, [], [aCard({ id: 'c-1', title: 'Ada', entity_type: 'attendance', gone: true, link: null })]),
+      stub({}, [aCard({ id: 'c-1', title: 'Ada', entity_type: 'attendance', gone: true, link: null })]),
     )
 
     expect(await screen.findByText(/no longer coming/)).toBeTruthy()
@@ -718,20 +668,16 @@ describe('what everyone has been doing', () => {
 
   it('carries somebody’s introduction in the top of their card', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Ada',
-            entity_type: 'attendance',
-            link: '/members/a-1',
-            body: 'I build **saunas**.',
-            entries: [anEntry({ id: 't-1', body: 'says who they are', kind: 'introduced' })],
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Ada',
+          entity_type: 'attendance',
+          link: '/members/a-1',
+          body: 'I build **saunas**.',
+          entries: [anEntry({ id: 't-1', body: 'says who they are', kind: 'introduced' })],
+        }),
+      ]),
     )
 
     expect(await screen.findByText('saunas')).toBeTruthy()
@@ -740,19 +686,15 @@ describe('what everyone has been doing', () => {
 
   it('says an announcement was taken back, not that somebody is no longer coming', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'The planning call is Sunday',
-            entity_type: 'post',
-            link: null,
-            gone: true,
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'The planning call is Sunday',
+          entity_type: 'post',
+          link: null,
+          gone: true,
+        }),
+      ]),
     )
 
     expect(await screen.findByText(/taken back/)).toBeTruthy()
@@ -774,21 +716,17 @@ describe('what everyone has been doing', () => {
       }),
     )
     renderPage(
-      stub(
-        { updatePost },
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Sunday',
-            entity_type: 'post',
-            entity_id: 's-1',
-            link: null,
-            body: 'Come.',
-            own: true,
-          }),
-        ],
-      ),
+      stub({ updatePost }, [
+        aCard({
+          id: 'c-1',
+          title: 'Sunday',
+          entity_type: 'post',
+          entity_id: 's-1',
+          link: null,
+          body: 'Come.',
+          own: true,
+        }),
+      ]),
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Reword it' }))
@@ -803,11 +741,9 @@ describe('what everyone has been doing', () => {
   it('takes one back by the entity it is about, not by the thread', async () => {
     const deletePost = vi.fn<FeedApi['deletePost']>(() => Promise.resolve(undefined))
     renderPage(
-      stub(
-        { deletePost },
-        [],
-        [aCard({ id: 'c-1', title: 'Sunday', entity_type: 'post', entity_id: 's-1', link: null, own: true })],
-      ),
+      stub({ deletePost }, [
+        aCard({ id: 'c-1', title: 'Sunday', entity_type: 'post', entity_id: 's-1', link: null, own: true }),
+      ]),
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Take back Sunday' }))
@@ -839,11 +775,9 @@ describe('what everyone has been doing', () => {
       }),
     )
     renderPage(
-      stub(
-        { updatePost, postComment: () => Promise.resolve({ thread: stale }) },
-        [],
-        [{ ...stale, title: 'Sunday' }],
-      ),
+      stub({ updatePost, postComment: () => Promise.resolve({ thread: stale }) }, [
+        { ...stale, title: 'Sunday' },
+      ]),
     )
 
     fireEvent.input(await screen.findByLabelText('Say something about Sunday'), {
@@ -866,11 +800,9 @@ describe('what everyone has been doing', () => {
 
   it('keeps what was typed when a rewording is refused', async () => {
     renderPage(
-      stub(
-        { updatePost: () => Promise.reject(apiError(500, 'internal', 'Nope.')) },
-        [],
-        [aCard({ id: 'c-1', title: 'Sunday', entity_type: 'post', entity_id: 's-1', link: null, own: true })],
-      ),
+      stub({ updatePost: () => Promise.reject(apiError(500, 'internal', 'Nope.')) }, [
+        aCard({ id: 'c-1', title: 'Sunday', entity_type: 'post', entity_id: 's-1', link: null, own: true }),
+      ]),
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Reword it' }))
@@ -887,20 +819,16 @@ describe('what everyone has been doing', () => {
       account: { id: 'a-9', name: 'Cai', avatar: null, roles: ['admin', 'member'] },
     }
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Sunday',
-            entity_type: 'post',
-            entity_id: 's-1',
-            link: null,
-            own: false,
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Sunday',
+          entity_type: 'post',
+          entity_id: 's-1',
+          link: null,
+          own: false,
+        }),
+      ]),
       BOSS,
     )
 
@@ -915,7 +843,7 @@ describe('what everyone has been doing', () => {
       status: 'signed-in',
       account: { id: 'a-9', name: 'Cai', avatar: null, roles: ['admin', 'member'] },
     }
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', own: false })]), BOSS)
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', own: false })]), BOSS)
 
     await waitFor(() => expect(screen.getByText('Sauna at dawn')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Take back Sauna at dawn' })).toBeNull()
@@ -923,20 +851,16 @@ describe('what everyone has been doing', () => {
 
   it('offers neither to somebody it is not theirs', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Sunday',
-            entity_type: 'post',
-            entity_id: 's-1',
-            link: null,
-            own: false,
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Sunday',
+          entity_type: 'post',
+          entity_id: 's-1',
+          link: null,
+          own: false,
+        }),
+      ]),
     )
 
     await waitFor(() => expect(screen.getByText('Sunday')).toBeTruthy())
@@ -957,20 +881,16 @@ describe('what everyone has been doing', () => {
 
   it('offers an announcement’s own switch, not a dream’s', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'The planning call is Sunday',
-            entity_type: 'post',
-            link: null,
-            body: 'Come.',
-            entries: [anEntry({ id: 't-1', body: 'noted', kind: 'comment' })],
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'The planning call is Sunday',
+          entity_type: 'post',
+          link: null,
+          body: 'Come.',
+          entries: [anEntry({ id: 't-1', body: 'noted', kind: 'comment' })],
+        }),
+      ]),
     )
 
     fireEvent.click(
@@ -984,19 +904,15 @@ describe('what everyone has been doing', () => {
 
   it('offers the switch that belongs to the card, not the dream one of the same name', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Ada',
-            entity_type: 'attendance',
-            link: '/members/a-1',
-            entries: [anEntry({ id: 't-1', body: 'nice one', kind: 'comment' })],
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Ada',
+          entity_type: 'attendance',
+          link: '/members/a-1',
+          entries: [anEntry({ id: 't-1', body: 'nice one', kind: 'comment' })],
+        }),
+      ]),
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Ada' }))
@@ -1010,21 +926,17 @@ describe('what everyone has been doing', () => {
 
   it('draws what somebody said differently from what the app did', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Sauna at dawn',
-            entry_count: 2,
-            entries: [
-              anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' }),
-              anEntry({ id: 't-2', body: 'bring a towel', author: { account_id: 'a-2', name: 'Bea' } }),
-            ],
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Sauna at dawn',
+          entry_count: 2,
+          entries: [
+            anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' }),
+            anEntry({ id: 't-2', body: 'bring a towel', author: { account_id: 'a-2', name: 'Bea' } }),
+          ],
+        }),
+      ]),
     )
 
     await screen.findByText('Ada offered this dream')
@@ -1046,7 +958,7 @@ describe('what everyone has been doing', () => {
         }),
       }),
     )
-    renderPage(stub({ postComment: posted }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+    renderPage(stub({ postComment: posted }, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     const box = await screen.findByLabelText('Say something about Sauna at dawn')
     fireEvent.input(box, { target: { value: 'is one person enough?' } })
@@ -1072,7 +984,7 @@ describe('what everyone has been doing', () => {
         }),
       }),
     )
-    renderPage(stub({ getThread: whole }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 4 })]))
+    renderPage(stub({ getThread: whole }, [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 4 })]))
 
     fireEvent.click(await screen.findByRole('button', { name: /Show the whole thread \(4\)/ }))
 
@@ -1081,7 +993,7 @@ describe('what everyone has been doing', () => {
   })
 
   it('offers no way to ask for more when the card already has all of it', async () => {
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 1 })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 1 })]))
 
     await screen.findByText('Sauna at dawn')
     expect(screen.queryByRole('button', { name: /Show the whole thread/ })).toBeNull()
@@ -1092,24 +1004,20 @@ describe('what everyone has been doing', () => {
     // dream being moved sends nothing, so a card whose latest news is a move offers
     // following alone rather than a switch that would change nothing.
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Sauna at dawn',
-            entries: [anEntry({ id: 't-1', body: 'moved it in the schedule', kind: 'scheduled' })],
-          }),
-          aCard({
-            id: 'c-2',
-            title: 'Cacao ceremony',
-            entity_id: 's-2',
-            last_at: '2026-08-07T17:00:00.000Z',
-            entries: [anEntry({ id: 't-2', body: 'bring a cup' })],
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Sauna at dawn',
+          entries: [anEntry({ id: 't-1', body: 'moved it in the schedule', kind: 'scheduled' })],
+        }),
+        aCard({
+          id: 'c-2',
+          title: 'Cacao ceremony',
+          entity_id: 's-2',
+          last_at: '2026-08-07T17:00:00.000Z',
+          entries: [anEntry({ id: 't-2', body: 'bring a cup' })],
+        }),
+      ]),
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Cacao ceremony' }))
@@ -1120,53 +1028,17 @@ describe('what everyone has been doing', () => {
     expect(screen.getAllByLabelText('Notify on replies')).toHaveLength(2)
   })
 
-  it('names the burn each line belongs to, because the page spans them', async () => {
-    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Cai is coming.', burn: 'Autumn burn' })]))
+  it('names the burn each card belongs to, because the page spans them', async () => {
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dusk', burn: 'Autumn burn' })]))
 
     expect(await screen.findByText(/Autumn burn/)).toBeTruthy()
   })
 
-  it('links a line to the page it is about, at the burn it is about', async () => {
-    // The page alone was the defect (#333): the links are the notification's, and
-    // those are burn-agnostic — so a line about the autumn burn followed while the
-    // selector sat on the summer one opened the summer page.
-    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna', event_id: 'e-2' })]))
+  it('leaves a card with no page of its own as plain text', async () => {
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'The planning call is Sunday', link: null })]))
 
-    const link = await screen.findByRole('link', { name: 'Ada offered a dream: Sauna' })
-    expect(link.getAttribute('href')).toBe('/dreams?burn=e-2')
-  })
-
-  it('puts the burn before a fragment rather than inside it', async () => {
-    // None carries one today. Appended after a `#` the query is not a query at all,
-    // which is the sort of thing that is cheap now and archaeology later.
-    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna', link: '/schedule#s-1' })]))
-
-    const link = await screen.findByRole('link', { name: 'Ada offered a dream: Sauna' })
-    expect(link.getAttribute('href')).toBe('/schedule?burn=e-1#s-1')
-  })
-
-  it('keeps everything past a second # rather than dropping it', async () => {
-    // Also none today. `split('#')` kept the first two pieces and threw the rest away.
-    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna', link: '/schedule#s-1#b' })]))
-
-    const link = await screen.findByRole('link', { name: 'Ada offered a dream: Sauna' })
-    expect(link.getAttribute('href')).toBe('/schedule?burn=e-1#s-1#b')
-  })
-
-  it('keeps a query the link already had', async () => {
-    // None carries one today. The joiner is a `&` rather than a second `?` so that
-    // stays true of a link somebody adds rather than of this one.
-    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna', link: '/dreams?open=s-1' })]))
-
-    const link = await screen.findByRole('link', { name: 'Ada offered a dream: Sauna' })
-    expect(link.getAttribute('href')).toBe('/dreams?open=s-1&burn=e-1')
-  })
-
-  it('leaves a line with no page of its own as plain text', async () => {
-    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Something happened.', link: null })]))
-
-    await screen.findByText('Something happened.')
-    expect(screen.queryByRole('link', { name: 'Something happened.' })).toBeNull()
+    await screen.findByText('The planning call is Sunday')
+    expect(screen.queryByRole('link', { name: 'The planning call is Sunday' })).toBeNull()
   })
 
   it('offers to switch the category on, and says it is off', async () => {
@@ -1175,12 +1047,13 @@ describe('what everyone has been doing', () => {
     const update = vi.fn<FeedApi['updateMyNotificationSettings']>(() =>
       Promise.resolve({ on: [...DEFAULTS, 'dream_offered'], email: [], digest: 'daily' }),
     )
-    renderPage(stub({ updateMyNotificationSettings: update }, [aLine({ id: 'x-1', body: 'A dream.' })]))
+    renderPage(stub({ updateMyNotificationSettings: update }, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
-    const chip = await screen.findByRole('button', { name: /Somebody offers a dream/ })
-    expect(chip.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    const tick = screen.getByLabelText(/Notify me on similar \(Somebody offers a dream/)
+    expect(tick).toHaveProperty('checked', false)
 
-    fireEvent.click(chip)
+    fireEvent.click(tick)
 
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'], email: [], digest: 'daily' })
@@ -1200,14 +1073,15 @@ describe('what everyone has been doing', () => {
             Promise.resolve({ on: ['dream_offered'], email: ['meal_role'], digest: 'daily' }),
           updateMyNotificationSettings: update,
         },
-        [aLine({ id: 'x-1', body: 'A dream.' })],
+        [aCard({ id: 'c-1', title: 'Sauna at dawn' })],
       ),
     )
 
-    const chip = await screen.findByRole('button', { name: /Somebody offers a dream/ })
-    expect(chip.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    const tick = screen.getByLabelText(/Notify me on similar \(Somebody offers a dream/)
+    expect(tick).toHaveProperty('checked', true)
 
-    fireEvent.click(chip)
+    fireEvent.click(tick)
 
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith({ on: [], email: ['meal_role'], digest: 'daily' }),
@@ -1216,11 +1090,9 @@ describe('what everyone has been doing', () => {
 
   it('says the songbook where a card belongs to no burn', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [aCard({ id: 'c-1', title: 'Fire in the sky', entity_type: 'song', event_id: null, burn: null })],
-      ),
+      stub({}, [
+        aCard({ id: 'c-1', title: 'Fire in the sky', entity_type: 'song', event_id: null, burn: null }),
+      ]),
     )
 
     await screen.findByText('Fire in the sky')
@@ -1229,20 +1101,16 @@ describe('what everyone has been doing', () => {
 
   it('offers no rewording on a song card, which is edited on its own page', async () => {
     renderPage(
-      stub(
-        {},
-        [],
-        [
-          aCard({
-            id: 'c-1',
-            title: 'Fire in the sky',
-            entity_type: 'song',
-            event_id: null,
-            burn: null,
-            own: true,
-          }),
-        ],
-      ),
+      stub({}, [
+        aCard({
+          id: 'c-1',
+          title: 'Fire in the sky',
+          entity_type: 'song',
+          event_id: null,
+          burn: null,
+          own: true,
+        }),
+      ]),
     )
 
     await screen.findByText('Fire in the sky')

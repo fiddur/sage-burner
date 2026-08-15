@@ -256,6 +256,7 @@ describe('what somebody has switched on', () => {
     'meeting_scheduled',
     'meeting_comment',
     'mentioned',
+    'lead_role_comment',
     'application',
     'application_news',
   ]

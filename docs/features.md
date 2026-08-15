@@ -105,14 +105,16 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   member takes a role, moves a sitting or writes the food idea. The kitchen
   draws its own schedule lane from the meals.
 - The lead-roles register: the burn's jobs, any member takes one, hands one
-  over or appoints somebody — and whoever it happens to is told.
+  over or appoints somebody — and whoever it happens to is told. Each role has a
+  card on the feed, so "who can take this?" has somewhere to be asked.
 - Editing is scoped to burns that have not ended; a finished burn is a record.
 
 ## Talking — [the-app.md](./the-app.md)
 
-- The feed: what everyone has been doing and saying. Quiet one-line news
-  (someone joined, a lead taken) beside cards that carry a conversation — a
-  dream, a person at a burn, an announcement, a song.
+- The feed: what everyone has been doing and saying, as one kind of thing — a
+  card carrying its whole history and the talk under it, for a dream, a person at
+  a burn, an announcement, a song, a bring item, a talking point, a meeting or a
+  lead role.
 - A chip row filters the feed by kind, carried in the URL, defaulting to
   everything.
 - Comments on any card: markdown, edit your own, delete your own (an admin may

@@ -31,8 +31,8 @@ that led to it, without anybody having to open the page.
 decision edited twice leaves two entries and one truth, which is the right way round: the
 timeline is history and the column is now.
 
-**No activity line.** The card is the feed presence when a point is raised and the `decided`
-entry bumps it when it is addressed; a one-liner beside it would put one thing on the feed twice.
+**Nothing beside the card.** The card is the feed presence when a point is raised and the
+`decided` entry bumps it when it is addressed; a second row would put one thing on the feed twice.
 
 ## Whose it is
 
@@ -69,8 +69,9 @@ same `isProfileUrl` refusal. A `javascript:` link in an `href` is stored script,
 **A card, like everything else on the feed** (#597). It was a line for a day: an `activity` row
 rendered with the pre-#480 chip, so a meeting was the one thing on the feed nobody could reply to —
 backwards for the thing most likely to need _I can't make that time_. `meeting` is the seventh
-`ThreadEntityType` now, so it gets comments, hearts, follow and the card bell for free, and there is
-no line beside it, which would put one thing on the feed twice.
+`ThreadEntityType`, so it gets comments, hearts, follow and the card bell for free, and there is
+nothing beside it, which would put one thing on the feed twice. The eighth was the lead role
+(#610), and with it the `activity` table went.
 
 The entry kind is `scheduled`, which already existed for a dream being put in the timetable and
 already coalesces — so a meeting moved three times is one line saying it moved, not four. Moving it
@@ -94,8 +95,8 @@ a rejoin re-points the person's card at the new stay. Neither is on the feed any
 these two.
 
 **And one for a meeting written before cards existed** (#616). Between #592 and #603 a scheduled
-meeting wrote an `activity` line and no thread; #603 gave new meetings a card and backfilled
-nothing, and #608 then swept those lines — so a meeting from that half-day was on the feed nowhere,
+meeting wrote an `activity` line — a row in the table #610 has since dropped — and no thread;
+#603 gave new meetings a card and backfilled nothing, and #608 then swept those lines — so a meeting from that half-day was on the feed nowhere,
 with no entry saying it had been planned and nowhere to reply that the time does not work.
 `20260813180000_meeting_cards` opens one card per meeting that has none, with the `scheduled` entry
 `noteOnMeeting` would have written, dated from `meeting.created_at` rather than from the deploy: a

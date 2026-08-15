@@ -123,6 +123,8 @@ export const notificationCategories = [
   'mentioned',
   'lead_role_added',
   'lead_role_filled',
+  'lead_role_comment',
+  'lead_role_comment_any',
   'new_version',
   'application',
   'application_news',
@@ -182,6 +184,8 @@ export const notificationCategoryInfo = {
   mentioned: { label: 'Somebody names you', on: true, about: 'you' },
   lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
+  lead_role_comment: { label: 'Somebody comments on a role you are on', on: true, about: 'you' },
+  lead_role_comment_any: { label: 'Somebody comments on any lead role', on: false, about: 'else' },
   new_version: { label: 'A new version of the app is out', on: false, about: 'else' },
   application: { label: 'Somebody applies to join', on: true, about: 'admin' },
   application_news: { label: 'News about your application', on: true, about: 'you' },
@@ -207,17 +211,17 @@ export const threadEntityTypes = [
   'bring',
   'point',
   'meeting',
+  'role',
 ] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
   isOneOf(threadEntityTypes, value)
 
-export const feedKinds = ['activity', ...threadEntityTypes] as const
+export const feedKinds = threadEntityTypes
 export type FeedKind = (typeof feedKinds)[number]
 export const isFeedKind = (value: unknown): value is FeedKind => isOneOf(feedKinds, value)
 
 export const feedKindLabel = {
-  activity: 'Burns',
   session: 'Dreams',
   attendance: 'People',
   post: 'Posts',
@@ -225,6 +229,7 @@ export const feedKindLabel = {
   bring: 'Bring',
   point: 'Points',
   meeting: 'Meetings',
+  role: 'Leads',
 } as const satisfies Record<FeedKind, string>
 
 export const KINDS_PARAM = 'kinds'
@@ -316,6 +321,14 @@ const meetingCategory = (kind: ThreadEntryKind): NotificationCategory | undefine
   return undefined
 }
 
+const roleCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'lead_role_comment_any'
+  if (kind === 'added') return 'lead_role_added'
+  if (kind === 'facilitator') return 'lead_role_filled'
+
+  return undefined
+}
+
 const categoriesFor = {
   session: sessionCategory,
   attendance: attendanceCategory,
@@ -324,6 +337,7 @@ const categoriesFor = {
   bring: bringCategory,
   point: pointCategory,
   meeting: meetingCategory,
+  role: roleCategory,
 } as const satisfies Record<ThreadEntityType, (kind: ThreadEntryKind) => NotificationCategory | undefined>
 
 export const entryCategory = (

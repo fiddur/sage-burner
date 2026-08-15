@@ -1092,9 +1092,9 @@ worker acknowledging a `push` — and only while online — which is not what th
 is unbounded growth, so a row older than `RETENTION_DAYS` goes when the next notification opens a
 batch. The `notification` rows are the record; this is the delivery note.
 
-**No CHECK on its category**, unlike `notification`, `notification_setting` and `activity`. Those
-three are rebuilt by every migration that widens the vocabulary and a fourth would tax that change
-again — for a table nothing but this process writes into, and where a write failing because the
+**No CHECK on its category**, unlike `notification` and `notification_setting`. Those two are
+rebuilt by every migration that widens the vocabulary and a third would tax that change again —
+for a table nothing but this process writes into, and where a write failing because the
 vocabulary moved on would mean losing the record of a notification that did go out.
 
 ### The email column
@@ -1132,9 +1132,9 @@ digest never needed one: its cut was always a time mark. That also makes everybo
 the **same message with a different cut** — there is nothing in it addressed to one person,
 which is why `digestPreviewFor` takes no account id.
 
-**What the feed cannot carry drops out of the digest with it.** Nothing writes an `activity`
-row or a thread entry for `payment`, `waiting_list_near`, `waiting_list_pushed`, `meal_role`,
-`new_version`, `application` or `application_news`, so none of them is in a digest. Those stay
+**What the feed cannot carry drops out of the digest with it.** Nothing writes a thread entry
+for `payment`, `waiting_list_near`, `waiting_list_pushed`, `meal_role`, `new_version`,
+`application` or `application_news`, so none of them is in a digest. Those stay
 the bell's and the per-category email column's. Meals are the one shared list with no feed
 presence at all, which is a gap in the feed rather than in the digest — #667 is where it is
 tracked, and giving a meal a card puts it in the digest with no change here.
@@ -1334,11 +1334,10 @@ rung.
 The burn-wide ones fan out over the attendance list, and **attendance is the whole
 audience**: somebody who has not said they are coming hears nothing about that burn,
 however their switches are set, and a member who leaves stops hearing about it the
-moment their row goes. `notifyAttendees` is the fan-out that also writes an `activity`
-line; `tellAttendees` is the same fan-out without one, which is what anything carrying a
-thread uses — a comment, and since #426 saying you are coming and saying who you are.
-A line beside a card would put one thing on the feed twice. They name people — "Ada offered a dream: Sauna at dawn" —
-unlike the applications notification, which hides an applicant. The difference is who
+moment their row goes. `tellAttendees` is that fan-out, and it is all there is since #610:
+what a burn is told about is written as an entry on the thing's own card, never as a second
+row beside it, which would put one thing on the feed twice. They name people — "Ada offered a
+dream: Sauna at dawn" — unlike the applications notification, which hides an applicant. The difference is who
 is reading: these go only to people attending the same burn, who already read each
 other's names on the Members page, and "somebody is coming" is not worth switching on.
 

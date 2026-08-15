@@ -17,7 +17,6 @@ import type { DeliveryCounts, PushDeps } from './push.ts'
 import {
   account,
   accountRole,
-  activity,
   attendance,
   notification,
   notificationBatch,
@@ -217,30 +216,6 @@ export const displayName = async (db: Database, accountId: string): Promise<stri
     .limit(1)
 
   return row?.name ?? 'Somebody'
-}
-
-export const recordActivity = async (db: Database, eventId: string, told: Told, at: Date) => {
-  await db.insert(activity).values({
-    id: randomUUID(),
-    event_id: eventId,
-    category: told.category,
-    body: told.body,
-    link: told.link,
-    created_at: at.toISOString(),
-  })
-}
-
-export const notifyAttendees = async (
-  db: Database,
-  notify: Notifier,
-  eventId: string,
-  told: Told,
-  { except = [], at }: { at: Date; except?: readonly (string | undefined)[] },
-): Promise<number> => {
-  const one = oneBatch(told)
-  await recordActivity(db, eventId, one, at)
-
-  return await tellAttendees(db, notify, eventId, one, { except })
 }
 
 export const tellAttendees = async (

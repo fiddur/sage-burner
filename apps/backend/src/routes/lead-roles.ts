@@ -1,4 +1,10 @@
-import type { CopySourcesResponse, LeadRole, LeadRoleResponse, LeadRolesResponse } from '@sage-burner/shared'
+import type {
+  CopySourcesResponse,
+  LeadRole,
+  LeadRoleResponse,
+  LeadRolesResponse,
+  ThreadEntryKind,
+} from '@sage-burner/shared'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
@@ -8,6 +14,7 @@ import {
   leadRoleLeadSchema,
   leadRoleTeamSchema,
   leadRoleUpdateSchema,
+  rolesPage,
 } from '@sage-burner/shared'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
@@ -23,9 +30,10 @@ import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
-import { displayName, notifyAttendees } from '../push/notify.ts'
+import { displayName, tellAttendees } from '../push/notify.ts'
 import { copySourcesFor } from './copy-sources.ts'
 import { openEventNow } from './events.ts'
+import { addEntry, forgetThread, threadFor, threadIdFor } from './threads.ts'
 
 export interface LeadRoleDeps extends GuardDeps {
   now: () => Date
@@ -108,14 +116,75 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     return (await openEventNow(db, now, row.event_id)) === undefined ? undefined : row
   }
 
-  const tell = async (by: string, accountId: string | undefined, message: string) => {
+  const tell = async (
+    by: string | undefined,
+    accountId: string | undefined,
+    eventId: string,
+    message: string,
+  ) => {
     if (accountId === undefined || accountId === by) return
 
-    await notify(accountId, { category: 'lead_role', body: message, link: '/roles' })
+    await notify(accountId, { category: 'lead_role', body: message, link: rolesPage(eventId) })
   }
 
-  const callerId = async (request: FastifyRequest) =>
-    (await viewerFor(request, { db, sessions }))?.account_id ?? ''
+  const noteOnRole = async (
+    role: { id: string; event_id: string; title: string },
+    kind: ThreadEntryKind,
+    by: string | undefined,
+    body: string,
+  ) => {
+    await addEntry(
+      db,
+      { thread_id: await threadFor(db, 'role', role), kind, author_account_id: by ?? null, body },
+      now(),
+    )
+  }
+
+  const leadLine = async (by: string | undefined, was: string | null, after: string | null) => {
+    if (after === null) {
+      if (was === null) return undefined
+
+      return was === by ? 'stepped back from leading it' : `took ${await displayName(db, was)} off leading it`
+    }
+
+    if (after === was) return undefined
+    if (after === by) return was === null ? 'is leading it' : 'took over as lead'
+
+    return `asked ${await displayName(db, after)} to lead it`
+  }
+
+  const leadMoved = async (
+    role: { id: string; event_id: string; title: string },
+    by: string | undefined,
+    was: string | undefined,
+    after: string | null,
+  ) => {
+    if (was !== undefined && was !== after) {
+      await tell(by, was, role.event_id, `You are no longer ${role.title} lead.`)
+    }
+    if (after !== null && after !== was) {
+      await tell(by, after, role.event_id, `You are now ${role.title} lead.`)
+    }
+
+    const said = await leadLine(by, was ?? null, after)
+    if (said !== undefined) await noteOnRole(role, 'facilitator', by, said)
+
+    if (after === null || after === was) return
+
+    await tellAttendees(
+      db,
+      notify,
+      role.event_id,
+      {
+        category: 'lead_role_filled',
+        body: `${await displayName(db, after)} is now ${role.title} lead.`,
+        link: rolesPage(role.event_id),
+      },
+      { except: [by, after] },
+    )
+  }
+
+  const callerId = async (request: FastifyRequest) => (await viewerFor(request, { db, sessions }))?.account_id
 
   app.get<{ Params: { eventId: string } }>(
     apiRoutes.getLeadRoles.fastify,
@@ -143,22 +212,43 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         created_at: now().toISOString(),
       }
 
+      let threadId: string
       try {
-        await db
-          .insert(leadRole)
-          .values({ ...fields, lead_attendance_id: null })
-          .run()
+        threadId = db.transaction((tx) => {
+          tx.insert(leadRole)
+            .values({ ...fields, lead_attendance_id: null })
+            .run()
+
+          return threadIdFor(tx, {
+            type: 'role',
+            id: fields.id,
+            event_id: fields.event_id,
+            title: fields.title,
+          })
+        })
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return sendError(reply, 404)
         throw failure
       }
 
-      await notifyAttendees(
+      const by = await callerId(request)
+
+      await addEntry(
+        db,
+        { thread_id: threadId, kind: 'added', author_account_id: by ?? null, body: 'added this lead role' },
+        now(),
+      )
+
+      await tellAttendees(
         db,
         notify,
         fields.event_id,
-        { category: 'lead_role_added', body: `A new lead role: ${fields.title}`, link: '/roles' },
-        { except: [await callerId(request)], at: now() },
+        {
+          category: 'lead_role_added',
+          body: `A new lead role: ${fields.title}`,
+          link: rolesPage(fields.event_id),
+        },
+        { except: [by] },
       )
 
       const role: LeadRole = { ...fields, lead: null, team: [] }
@@ -205,10 +295,17 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         return sendError(reply, 404)
       }
 
-      const deleted = await db
-        .delete(leadRole)
-        .where(eq(leadRole.id, request.params.id))
-        .returning({ id: leadRole.id })
+      const deleted = db.transaction((tx) => {
+        const gone = tx
+          .delete(leadRole)
+          .where(eq(leadRole.id, request.params.id))
+          .returning({ id: leadRole.id })
+          .all()
+
+        if (gone.length > 0) forgetThread(tx, 'role', request.params.id)
+
+        return gone
+      })
 
       return deleted.length === 0 ? sendError(reply, 404) : reply.code(204).send()
     },
@@ -238,32 +335,14 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         .set({ lead_attendance_id: leadAttendanceId })
         .where(eq(leadRole.id, request.params.id))
 
-      const by = await callerId(request)
-      const before =
+      await leadMoved(
+        existing,
+        await callerId(request),
         existing.lead_attendance_id === null
           ? undefined
-          : await accountForAttendance(db, existing.lead_attendance_id)
-
-      if (before !== undefined && before !== body.account_id) {
-        await tell(by, before, `You are no longer ${existing.title} lead.`)
-      }
-      if (body.account_id !== null && body.account_id !== before) {
-        await tell(by, body.account_id, `You are now ${existing.title} lead.`)
-      }
-
-      if (body.account_id !== null && body.account_id !== before) {
-        await notifyAttendees(
-          db,
-          notify,
-          existing.event_id,
-          {
-            category: 'lead_role_filled',
-            body: `${await displayName(db, body.account_id)} is now ${existing.title} lead.`,
-            link: '/roles',
-          },
-          { except: [by, body.account_id], at: now() },
-        )
-      }
+          : await accountForAttendance(db, existing.lead_attendance_id),
+        body.account_id,
+      )
 
       const roles = await rolesFor(db, existing.event_id)
       const role = roles.find((candidate) => candidate.id === request.params.id)
@@ -288,16 +367,30 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       const attendanceId = await attendanceFor(db, existing.event_id, body.account_id)
       if (attendanceId === undefined) return sendError(reply, 400, 'not_attending')
 
-      await db
+      const added = await db
         .insert(leadRoleMember)
         .values({ role_id: request.params.id, attendance_id: attendanceId })
         .onConflictDoNothing()
+        .returning({ role_id: leadRoleMember.role_id })
 
-      await tell(
-        await callerId(request),
-        body.account_id,
-        `You have been added to the ${existing.title} team.`,
-      )
+      if (added.length > 0) {
+        const by = await callerId(request)
+
+        await tell(
+          by,
+          body.account_id,
+          existing.event_id,
+          `You have been added to the ${existing.title} team.`,
+        )
+        await noteOnRole(
+          existing,
+          'helper',
+          by,
+          body.account_id === by
+            ? 'joined the team'
+            : `asked ${await displayName(db, body.account_id)} onto the team`,
+        )
+      }
 
       const roles = await rolesFor(db, existing.event_id)
       const role = roles.find((candidate) => candidate.id === request.params.id)
@@ -329,10 +422,21 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
           .returning({ role_id: leadRoleMember.role_id })
 
         if (removed.length > 0) {
+          const by = await callerId(request)
+
           await tell(
-            await callerId(request),
+            by,
             request.params.accountId,
+            existing.event_id,
             `You have been taken off the ${existing.title} team.`,
+          )
+          await noteOnRole(
+            existing,
+            'helper',
+            by,
+            request.params.accountId === by
+              ? 'left the team'
+              : `took ${await displayName(db, request.params.accountId)} off the team`,
           )
         }
       }
@@ -408,20 +512,21 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         const startedAt = Date.parse(stamp)
 
         source.forEach((row, index) => {
+          const copied = {
+            id: randomUUID(),
+            event_id: request.params.eventId,
+            title: row.title,
+            purpose: row.purpose,
+            tasks: row.tasks,
+            effort_before: row.effort_before,
+            effort_during: row.effort_during,
+            effort_after: row.effort_after,
+            team_size_wanted: row.team_size_wanted,
+            created_at: new Date(startedAt + index).toISOString(),
+          }
+
           tx.insert(leadRole)
-            .values({
-              id: randomUUID(),
-              event_id: request.params.eventId,
-              title: row.title,
-              purpose: row.purpose,
-              tasks: row.tasks,
-              effort_before: row.effort_before,
-              effort_during: row.effort_during,
-              effort_after: row.effort_after,
-              team_size_wanted: row.team_size_wanted,
-              lead_attendance_id: null,
-              created_at: new Date(startedAt + index).toISOString(),
-            })
+            .values({ ...copied, lead_attendance_id: null })
             .run()
         })
 
@@ -431,9 +536,25 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       if (seeded === 'not_found') return sendError(reply, 404)
       if (seeded === 'conflict') return sendError(reply, 409)
 
-      return reply
-        .code(201)
-        .send({ roles: await rolesFor(db, request.params.eventId) } satisfies LeadRolesResponse)
+      const roles = await rolesFor(db, request.params.eventId)
+      const by = await callerId(request)
+
+      // Dated from each role's own stamp rather than from one `now()`, so the cards come out
+      // in the register's order rather than in whatever order a shared millisecond breaks to.
+      for (const role of roles) {
+        await addEntry(
+          db,
+          {
+            thread_id: await threadFor(db, 'role', role),
+            kind: 'added',
+            author_account_id: by ?? null,
+            body: 'added this lead role',
+          },
+          new Date(role.created_at),
+        )
+      }
+
+      return reply.code(201).send({ roles } satisfies LeadRolesResponse)
     },
   )
 }

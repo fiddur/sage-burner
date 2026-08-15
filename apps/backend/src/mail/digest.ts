@@ -1,12 +1,12 @@
 import type { DigestChoice, FeedKind, Thread, ThreadEntry } from '@sage-burner/shared'
 
 import { DEFAULT_DIGEST, detailsPage, feedKindLabel, feedKinds, threadEntityTypes } from '@sage-burner/shared'
-import { desc, eq, gt } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { MailDeps, Posted } from './mail.ts'
 
-import { account, activity } from '../db/schema.ts'
+import { account } from '../db/schema.ts'
 import { approvedAccounts } from '../push/notify.ts'
 import { FEED_LIMIT } from '../routes/feed.ts'
 import { readThreads, recentThreads } from '../routes/threads.ts'
@@ -129,18 +129,6 @@ export const feedSince = async (
   db: Database,
   { after, origin }: { after: string | null; origin: string | undefined },
 ): Promise<DigestSection[]> => {
-  const lines = await db
-    .select({
-      id: activity.id,
-      body: activity.body,
-      link: activity.link,
-      created_at: activity.created_at,
-    })
-    .from(activity)
-    .where(after === null ? undefined : gt(activity.created_at, after))
-    .orderBy(desc(activity.created_at), desc(activity.id))
-    .limit(FEED_LIMIT)
-
   const recent = await recentThreads(db, FEED_LIMIT, threadEntityTypes)
 
   const cards = await readThreads(
@@ -151,22 +139,13 @@ export const feedSince = async (
 
   const byId = new Map(recent.map((one) => [one.id, one.last_at]))
 
-  const said: FeedLine[] = [
-    ...lines.map((line) => ({
-      id: line.id,
-      at: line.created_at,
-      kind: 'activity' as const,
-      body: line.body,
-      link: line.link,
-    })),
-    ...cards.flatMap((card) => {
-      const body = card.gone ? undefined : lineFor(card)
-      const at = byId.get(card.id)
-      if (body === undefined || at === undefined) return []
+  const said: FeedLine[] = cards.flatMap((card) => {
+    const body = card.gone ? undefined : lineFor(card)
+    const at = byId.get(card.id)
+    if (body === undefined || at === undefined) return []
 
-      return [{ id: card.id, at, kind: card.entity_type, body, link: card.link }]
-    }),
-  ]
+    return [{ id: card.id, at, kind: card.entity_type, body, link: card.link }]
+  })
 
   const kept = said
     .sort((one, other) =>

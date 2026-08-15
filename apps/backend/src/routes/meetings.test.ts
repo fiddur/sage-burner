@@ -12,16 +12,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, migrationsFolder, runMigrations } from '../db/index.ts'
-import {
-  account,
-  accountRole,
-  activity,
-  attendance,
-  event,
-  meeting,
-  thread,
-  threadEntry,
-} from '../db/schema.ts'
+import { account, accountRole, attendance, event, meeting, thread, threadEntry } from '../db/schema.ts'
 
 const SECRET = 'm'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -454,7 +445,7 @@ describe('the meetings themselves', () => {
     expect(card.last_at).toBe('2026-07-01T09:00:00.000Z')
   })
 
-  it('writes no line beside that card, which would put one thing on the feed twice', async () => {
+  it('is one thing on the feed rather than two, the card being all of it', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -462,7 +453,8 @@ describe('the meetings themselves', () => {
 
     await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
 
-    expect(await db().select().from(activity)).toEqual([])
+    const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie: ada.cookie } })
+    expect(feed.json().threads).toHaveLength(1)
   })
 
   it('bumps the card when it moves, which is the half worth hearing', async () => {

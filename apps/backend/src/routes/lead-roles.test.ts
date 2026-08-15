@@ -1,3 +1,4 @@
+import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
 import { eq } from 'drizzle-orm'
@@ -770,7 +771,7 @@ describe('telling somebody a role moved', () => {
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
     expect(JSON.parse(String(deliver.mock.calls[0]?.[1]))).toEqual({
       body: 'You are now Sauna lead.',
-      link: '/roles',
+      link: `/roles?burn=${eventId}`,
       category: 'lead_role',
     })
   })
@@ -966,5 +967,230 @@ describe('rewriting a role somebody else has just rewritten', () => {
     const current = String((await list(server, ada.cookie, eventId)).headers.etag)
 
     expect((await rename(server, ada.cookie, mine, current)).statusCode).toBe(200)
+  })
+})
+
+describe('the card a role carries', () => {
+  const cardFor = async (server: FastifyInstance, cookie: string, roleId: string) => {
+    const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })
+    const found = (feed.json().threads as Thread[]).find((card) => card.entity_id === roleId)
+    if (found === undefined) throw new Error(`no card for ${roleId}`)
+
+    return found
+  }
+
+  /** Whole, not the newest three the feed folds a card to. */
+  const entriesOn = async (server: FastifyInstance, cookie: string, roleId: string) => {
+    const card = await cardFor(server, cookie, roleId)
+    const answered = await server.inject({
+      method: 'GET',
+      url: `/api/threads/${card.id}`,
+      headers: { cookie },
+    })
+
+    return (answered.json().thread.entries as Thread['entries']).map((entry) => [
+      entry.author?.name ?? null,
+      entry.kind,
+      entry.body,
+    ])
+  }
+
+  const say = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/threads/${threadId}/comments`,
+      headers: { cookie },
+      payload: { body },
+    })
+
+  const bellFor = async (server: FastifyInstance, cookie: string) =>
+    (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
+      .notifications as { body: string; category: string; link: string }[]
+
+  it('opens with who added it, and carries the purpose as the card’s body', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    await givenComing(eventId, ada.id)
+    const role = (await add(server, ada.cookie, eventId, { title: 'Sauna', purpose: 'Keep it hot' })).json()
+      .role
+
+    const card = await cardFor(server, ada.cookie, role.id)
+    expect(card.title).toBe('Sauna')
+    expect(card.body).toBe('Keep it hot')
+    expect(card.entries.map((entry) => [entry.author?.name, entry.kind, entry.body])).toEqual([
+      ['Ada', 'added', 'added this lead role'],
+    ])
+  })
+
+  it('says which way the leading went, in the words of whoever did it', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const bea = await givenAccount(['member'], 'Bea')
+    await givenComing(eventId, ada.id)
+    await givenComing(eventId, bea.id)
+    const role = (await add(server, ada.cookie, eventId)).json().role
+
+    await setLead(server, ada.cookie, role.id, { account_id: ada.id })
+    await setLead(server, ada.cookie, role.id, { account_id: bea.id })
+    await setLead(server, bea.cookie, role.id, { account_id: null })
+
+    expect(await entriesOn(server, ada.cookie, role.id)).toEqual([
+      ['Ada', 'added', 'added this lead role'],
+      ['Ada', 'facilitator', 'is leading it'],
+      ['Ada', 'facilitator', 'asked Bea to lead it'],
+      ['Bea', 'facilitator', 'stepped back from leading it'],
+    ])
+  })
+
+  it('says who took it over, and who was taken off it', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const bea = await givenAccount(['member'], 'Bea')
+    await givenComing(eventId, ada.id)
+    await givenComing(eventId, bea.id)
+    const role = (await add(server, ada.cookie, eventId)).json().role
+    await setLead(server, ada.cookie, role.id, { account_id: ada.id })
+
+    await setLead(server, bea.cookie, role.id, { account_id: bea.id })
+    await setLead(server, ada.cookie, role.id, { account_id: null })
+
+    expect((await entriesOn(server, ada.cookie, role.id)).slice(2)).toEqual([
+      ['Bea', 'facilitator', 'took over as lead'],
+      ['Ada', 'facilitator', 'took Bea off leading it'],
+    ])
+  })
+
+  it('says nothing when the lead is set to whoever already holds it', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    await givenComing(eventId, ada.id)
+    const role = (await add(server, ada.cookie, eventId)).json().role
+    await setLead(server, ada.cookie, role.id, { account_id: ada.id })
+
+    await setLead(server, ada.cookie, role.id, { account_id: ada.id })
+
+    expect(await entriesOn(server, ada.cookie, role.id)).toHaveLength(2)
+  })
+
+  it('says who joined the team and who left it, and nothing for a hand already up', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const bea = await givenAccount(['member'], 'Bea')
+    await givenComing(eventId, ada.id)
+    await givenComing(eventId, bea.id)
+    const role = (await add(server, ada.cookie, eventId)).json().role
+
+    await joinTeam(server, ada.cookie, role.id, ada.id)
+    await joinTeam(server, ada.cookie, role.id, ada.id)
+    await joinTeam(server, ada.cookie, role.id, bea.id)
+    await leaveTeam(server, bea.cookie, role.id, bea.id)
+
+    expect((await entriesOn(server, ada.cookie, role.id)).slice(1)).toEqual([
+      ['Ada', 'helper', 'joined the team'],
+      ['Ada', 'helper', 'asked Bea onto the team'],
+      ['Bea', 'helper', 'left the team'],
+    ])
+  })
+
+  it('opens one for every role seeded from a previous burn, in the register’s order', async () => {
+    // Otherwise the roles a burn starts with — the vacant ones, the ones most in need of
+    // "what does this involve?" — are the ones with nowhere to ask it.
+    const server = await build()
+    const before = await givenEvent('Spring burn', '2026-07-04')
+    const eventId = await givenEvent('Summer burn', '2026-07-05')
+    const ada = await givenAccount(['member'])
+    await givenComing(eventId, ada.id)
+    await add(server, ada.cookie, before, { title: 'Firewood' })
+    await add(server, ada.cookie, before, { title: 'Kitchen' })
+
+    expect((await copyFrom(server, ada.cookie, eventId, before)).statusCode).toBe(201)
+
+    const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie: ada.cookie } })
+    const here = (feed.json().threads as Thread[]).filter((card) => card.event_id === eventId)
+    // Newest first against the register's own order, rather than against the titles: the
+    // two source roles share the frozen clock's stamp, so which is copied first is the id
+    // tie-break's business and naming either here would be a coin flip.
+    const register = (await list(server, ada.cookie, eventId)).json().roles as { title: string }[]
+    expect(here.map((card) => card.title)).toEqual(register.map((role) => role.title).toReversed())
+    expect(here.flatMap((card) => card.entries.map((entry) => entry.body))).toEqual([
+      'added this lead role',
+      'added this lead role',
+    ])
+  })
+
+  it('takes the card off the feed with the role, there being nothing left to talk about', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    await givenComing(eventId, ada.id)
+    const role = (await add(server, ada.cookie, eventId)).json().role
+
+    const card = await cardFor(server, ada.cookie, role.id)
+
+    await remove(server, ada.cookie, role.id)
+
+    const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie: ada.cookie } })
+    expect(feed.json().threads).toEqual([])
+    // Deleted rather than left `gone`: the feed drops a tombstone either way, so this is
+    // what says the thread itself went, as a meeting's and a point's do.
+    const answered = await server.inject({
+      method: 'GET',
+      url: `/api/threads/${card.id}`,
+      headers: { cookie: ada.cookie },
+    })
+    expect(answered.statusCode).toBe(404)
+  })
+
+  it('tells the lead and the team when somebody says something about it', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const bea = await givenAccount(['member'], 'Bea')
+    const cai = await givenAccount(['member'], 'Cai')
+    await givenComing(eventId, ada.id)
+    await givenComing(eventId, bea.id)
+    await givenComing(eventId, cai.id)
+    const role = (await add(server, cai.cookie, eventId)).json().role
+    await setLead(server, cai.cookie, role.id, { account_id: ada.id })
+    await joinTeam(server, cai.cookie, role.id, bea.id)
+    const card = await cardFor(server, ada.cookie, role.id)
+
+    expect((await say(server, cai.cookie, card.id, 'when does it need lighting?')).statusCode).toBe(200)
+
+    for (const listener of [ada, bea]) {
+      expect(await bellFor(server, listener.cookie)).toContainEqual(
+        expect.objectContaining({
+          category: 'lead_role_comment',
+          body: 'Cai said something about Sauna',
+          link: `/roles?burn=${eventId}`,
+        }),
+      )
+    }
+  })
+
+  it('reaches whoever asked about any role, on its own switch', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const bea = await givenAccount(['member'], 'Bea')
+    await givenComing(eventId, ada.id)
+    await givenComing(eventId, bea.id)
+    const role = (await add(server, ada.cookie, eventId)).json().role
+    const card = await cardFor(server, ada.cookie, role.id)
+    await server.inject({
+      method: 'PUT',
+      url: '/api/me/notification-settings',
+      headers: { cookie: bea.cookie },
+      payload: { on: ['lead_role_comment_any'], email: [], digest: 'off' },
+    })
+
+    await say(server, ada.cookie, card.id, 'when does it need lighting?')
+
+    expect((await bellFor(server, bea.cookie)).map((one) => one.category)).toEqual(['lead_role_comment_any'])
   })
 })

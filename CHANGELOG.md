@@ -7,6 +7,20 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-15
+
+- **A lead role is something you can talk about now.** The feed had two shapes on it: cards you
+  could reply to, and one-line news you could not — which by the end was only the lead roles.
+  Adding a role, taking the lead, handing it over and joining or leaving a team all show as one
+  card per role now, with the 🔔 in its corner, a heart, and a box to say "what does this
+  actually involve?" or "I can take it from July". The card shows the role's purpose and links to
+  the register at that burn. Roles that were there before this get a card too, dated from when
+  they were added.
+
+- **The chip row over the feed has a Leads chip**, and no longer has Burns — there is no
+  separate stream of burn news left to filter, since every bit of it is on the card of the thing
+  it happened to.
+
 # 2026-08-14
 
 - **The email summary is the feed now, not your notifications.** It used to carry only the kinds

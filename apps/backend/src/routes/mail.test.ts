@@ -12,7 +12,16 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, activity, event, INSTALLATION_ID, mailSetting } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  event,
+  INSTALLATION_ID,
+  mailSetting,
+  post,
+  thread,
+  threadEntry,
+} from '../db/schema.ts'
 
 const SECRET = 'm'.repeat(40)
 const NOW = '2026-08-07T10:00:00.000Z'
@@ -302,13 +311,34 @@ describe('the digest preview', () => {
     return id
   }
 
-  const givenActivity = async (eventId: string, at: string, body = 'Ada offered a dream') => {
-    await db().insert(activity).values({
-      id: randomUUID(),
+  const givenAnnouncement = async (eventId: string, at: string, title = 'The planning call is Sunday') => {
+    const announced = randomUUID()
+    const card = randomUUID()
+
+    await db().insert(post).values({
+      id: announced,
       event_id: eventId,
-      category: 'dream_offered',
-      body,
-      link: '/dreams',
+      author_account_id: null,
+      title,
+      body: '',
+      withdrawn_at: null,
+      created_at: at,
+    })
+    await db().insert(thread).values({
+      id: card,
+      event_id: eventId,
+      entity_type: 'post',
+      entity_id: announced,
+      subject_account_id: null,
+      title,
+    })
+    await db().insert(threadEntry).values({
+      id: randomUUID(),
+      thread_id: card,
+      kind: 'posted',
+      seq: 1,
+      author_account_id: null,
+      body: 'announced it',
       created_at: at,
     })
   }
@@ -323,12 +353,12 @@ describe('the digest preview', () => {
     const server = await build()
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)
-    await givenActivity(await givenBurn(), '2026-08-07T02:00:00.000Z')
+    await givenAnnouncement(await givenBurn(), '2026-08-07T02:00:00.000Z')
 
     const answer = await preview(server, cookie, 24)
 
     expect(answer.json()).toEqual({ sent: true, to: 'admin@example.org', reason: null })
-    expect(posted[0]?.message.text).toContain('Ada offered a dream')
+    expect(posted[0]?.message.text).toContain('The planning call is Sunday')
   })
 
   it('takes the stretch it is given, and nothing older', async () => {
@@ -336,8 +366,8 @@ describe('the digest preview', () => {
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)
     const burn = await givenBurn()
-    await givenActivity(burn, '2026-08-05T10:00:00.000Z', 'a day and a half back')
-    await givenActivity(burn, '2026-08-07T02:00:00.000Z', 'this morning')
+    await givenAnnouncement(burn, '2026-08-05T10:00:00.000Z', 'a day and a half back')
+    await givenAnnouncement(burn, '2026-08-07T02:00:00.000Z', 'this morning')
 
     await preview(server, cookie, 24)
 
@@ -362,7 +392,7 @@ describe('the digest preview', () => {
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)
     const me = await idFor('admin@example.org')
-    await givenActivity(await givenBurn(), '2026-08-07T02:00:00.000Z')
+    await givenAnnouncement(await givenBurn(), '2026-08-07T02:00:00.000Z')
 
     await preview(server, cookie, 24)
 
