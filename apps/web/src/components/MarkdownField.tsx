@@ -1,5 +1,5 @@
 import { formattingPage } from '@sage-burner/shared'
-import { useId, useState } from 'preact/hooks'
+import { useId, useRef, useState } from 'preact/hooks'
 
 import type { UploadImage } from '../image-upload.ts'
 import type { Mentionable } from '../mentioning.ts'
@@ -37,19 +37,24 @@ export const MarkdownField = ({
 }) => {
   const mentioning = useMentioning({ value, people, maxLength, onInput })
   const fieldId = useId()
-  const writeId = useId()
-  const readId = useId()
+  const panelId = useId()
   const pictures = useImageUpload({ value, maxLength, onInput, upload })
   const syntax = useSyntax({ value, maxLength, onInput })
   const [previewing, setPreviewing] = useState(false)
+  const tabs = useRef<(HTMLButtonElement | null)[]>([null, null])
 
   const subject = accessibleName ?? label
 
+  // The arrow keys carry focus with the selection, which is what makes the roving
+  // `tabIndex` navigable rather than a way of losing the keyboard on a dead button.
+  const goTo = (wanted: boolean) => {
+    setPreviewing(wanted)
+    tabs.current[wanted ? 1 : 0]?.focus()
+  }
+
   return (
     <div class="field">
-      <label for={fieldId} class={labelHidden ? 'visually-hidden' : undefined}>
-        {label}
-      </label>
+      {!labelHidden && <label {...(previewing ? {} : { for: fieldId })}>{label}</label>}
 
       <div class="md-field">
         <div
@@ -60,17 +65,20 @@ export const MarkdownField = ({
             if (keyEvent.key !== 'ArrowLeft' && keyEvent.key !== 'ArrowRight') return
 
             keyEvent.preventDefault()
-            setPreviewing(keyEvent.key === 'ArrowRight')
+            goTo(keyEvent.key === 'ArrowRight')
           }}
         >
-          {[false, true].map((wanted) => (
+          {[false, true].map((wanted, at) => (
             <button
               key={wanted ? 'preview' : 'write'}
+              ref={(node) => {
+                tabs.current[at] = node
+              }}
               type="button"
               role="tab"
               class={previewing === wanted ? 'md-tab is-on' : 'md-tab'}
               aria-selected={previewing === wanted}
-              aria-controls={wanted ? readId : writeId}
+              aria-controls={previewing === wanted ? panelId : undefined}
               tabIndex={previewing === wanted ? undefined : -1}
               onClick={() => setPreviewing(wanted)}
             >
@@ -80,7 +88,7 @@ export const MarkdownField = ({
         </div>
 
         {previewing ? (
-          <div id={readId} class="md-field-preview" role="tabpanel" aria-label={`${subject}, as it reads`}>
+          <div id={panelId} class="md-field-preview" role="tabpanel" aria-label={`${subject}, as it reads`}>
             {value.trim() === '' ? (
               <p class="form-note">Nothing written yet.</p>
             ) : (
@@ -89,7 +97,7 @@ export const MarkdownField = ({
             )}
           </div>
         ) : (
-          <div id={writeId} role="tabpanel" aria-label={`${subject}, to write in`}>
+          <div id={panelId} role="tabpanel">
             <SyntaxToolbar syntax={syntax} subject={subject}>
               <AddPicture pictures={pictures} label={label} />
             </SyntaxToolbar>
@@ -100,7 +108,7 @@ export const MarkdownField = ({
               ref={syntax.ref}
               maxLength={maxLength}
               rows={rowsFor(value, rows)}
-              aria-label={accessibleName}
+              aria-label={labelHidden ? subject : accessibleName}
               placeholder={placeholder}
               value={value}
               onInput={(inputEvent) => onInput(inputEvent.currentTarget.value)}

@@ -136,7 +136,6 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     )
   }
 
-  // A comment's 404 is a different loss from the card's: no `forget`, no `reload` (#683).
   const onComment = (card: Thread, work: () => Promise<unknown>, fallback: string) => {
     let entityGone = false
 

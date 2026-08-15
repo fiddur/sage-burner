@@ -17,6 +17,29 @@ describe('MarkdownField', () => {
     expect(screen.getByLabelText('Help text').tagName).toBe('TEXTAREA')
   })
 
+  it('carries focus with the selection when an arrow key moves it', () => {
+    // The roving `tabIndex` makes the unselected tab untabbable, so a selection that
+    // moves without focus leaves the keyboard on a button nothing can reach again.
+    render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
+
+    const write = screen.getByRole('tab', { name: 'Write' })
+    write.focus()
+    fireEvent.keyDown(write, { key: 'ArrowRight' })
+
+    const preview = screen.getByRole('tab', { name: 'Preview' })
+    expect(preview.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(preview)
+  })
+
+  it('points a tab at a panel that is there, only one being rendered at a time', () => {
+    render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
+
+    const named = screen.getByRole('tab', { name: 'Write' }).getAttribute('aria-controls')
+    expect(named).not.toBeNull()
+    expect(document.getElementById(named ?? '')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: 'Preview' }).getAttribute('aria-controls')).toBeNull()
+  })
+
   it('reports what was typed', () => {
     const onInput = vi.fn()
     render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={onInput} />)

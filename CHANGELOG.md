@@ -19,9 +19,6 @@ under today's heading, and make a new heading when there is none.
   what you type beside what it turns into, and it is readable without signing in — an applicant
   writing to the organisers has the same box as everybody else.
 
-- **A picture can go in the welcome text.** It was the one field of the three on a burn's page
-  without the button.
-
 - **Taking back a comment somebody else already took back no longer claims the whole thing is
   gone.** The banner said "Somebody took that out of the diary" while the meeting sat on the screen
   right below it. It says the comment is no longer there, and the card stays.

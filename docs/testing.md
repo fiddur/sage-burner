@@ -390,8 +390,9 @@ phone" means 360px.
       written yet._ rather than blank. Switching back keeps what was typed.
 - [ ] The footer's _Markdown is supported_ opens `/formatting`, which reads the same signed
       out. Every example's right-hand column is what its left-hand column renders to.
-- [ ] The picture half of that footer is there only where pictures are — present on the
-      welcome text and a comment, absent on the applicant's box.
+- [ ] The picture half of that footer is there only where pictures are — present on a
+      comment and on **How to pay**, absent on the applicant's box and on the **welcome
+      text**, which the public reads and cannot fetch an uploaded picture from.
 
 ## On a phone
 

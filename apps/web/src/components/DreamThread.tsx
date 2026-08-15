@@ -73,6 +73,8 @@ export const DreamThread = ({
 
   if (thread === undefined) return null
 
+  // Emptied by the caller's `done` rather than on the way out: a reply to a thread somebody has
+  // just deleted answers 404, and what was typed used to go with it (#614).
   const say = () => {
     if (saying.trim() === '') return
 

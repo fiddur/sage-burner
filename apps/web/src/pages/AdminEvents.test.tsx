@@ -228,11 +228,13 @@ describe('AdminEvents', () => {
     })
   })
 
-  it('takes a picture in the welcome text, as its two siblings already did', async () => {
+  it('offers no picture in the welcome text, which the public reads and cannot fetch one from', async () => {
     renderPage(stub())
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Welcome text')
 
-    expect(await screen.findByLabelText('Add a picture to Welcome text')).toBeTruthy()
+    expect(screen.queryByLabelText('Add a picture to Welcome text')).toBeNull()
+    expect(screen.getByLabelText('Add a picture to How to pay')).toBeTruthy()
   })
 
   it('escapes raw HTML in the preview, so it shows what a visitor gets', async () => {

@@ -309,7 +309,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     value={welcome}
                     maxLength={MAX_WELCOME_LENGTH}
                     rows={12}
-                    upload={api.uploadImage}
                     onInput={(next) => {
                       setWelcome(next)
                       setSaved(false)
