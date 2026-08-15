@@ -144,17 +144,15 @@ const givenRoleCard = async (
   await db()
     .insert(thread)
     .values({ id: threadId, event_id: eventId, entity_type: 'role', entity_id: roleId, title })
-  await db()
-    .insert(threadEntry)
-    .values({
-      id: randomUUID(),
-      thread_id: threadId,
-      kind: 'facilitator',
-      seq: Date.parse(at),
-      author_account_id: null,
-      body: 'is leading it',
-      created_at: at,
-    })
+  await db().insert(threadEntry).values({
+    id: randomUUID(),
+    thread_id: threadId,
+    kind: 'facilitator',
+    seq: 1,
+    author_account_id: null,
+    body: 'is leading it',
+    created_at: at,
+  })
 
   return threadId
 }

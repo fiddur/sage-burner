@@ -46,7 +46,7 @@ const isRepeating = (choice: DigestChoice): choice is Repeating => choice !== 'o
 
 const away = (stamp: string | null, edge: string): boolean => stamp === null || stamp < edge
 
-export const laterOf = (one: string | null, other: string | null): string | null => {
+const laterOf = (one: string | null, other: string | null): string | null => {
   if (one === null) return other
   if (other === null) return one
 

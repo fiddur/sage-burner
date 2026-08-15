@@ -33,7 +33,7 @@ import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.t
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { copySourcesFor } from './copy-sources.ts'
 import { openEventNow } from './events.ts'
-import { addEntry, forgetThread, threadFor, threadIdFor } from './threads.ts'
+import { addEntry, forgetThread, openWith, threadFor, threadIdFor } from './threads.ts'
 
 export interface LeadRoleDeps extends GuardDeps {
   now: () => Date
@@ -212,32 +212,36 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         created_at: now().toISOString(),
       }
 
-      let threadId: string
+      const by = await callerId(request)
+
       try {
-        threadId = db.transaction((tx) => {
+        db.transaction((tx) => {
           tx.insert(leadRole)
             .values({ ...fields, lead_attendance_id: null })
             .run()
 
-          return threadIdFor(tx, {
+          const threadId = threadIdFor(tx, {
             type: 'role',
             id: fields.id,
             event_id: fields.event_id,
             title: fields.title,
           })
+
+          openWith(
+            tx,
+            {
+              thread_id: threadId,
+              kind: 'added',
+              author_account_id: by ?? null,
+              body: 'added this lead role',
+            },
+            now(),
+          )
         })
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return sendError(reply, 404)
         throw failure
       }
-
-      const by = await callerId(request)
-
-      await addEntry(
-        db,
-        { thread_id: threadId, kind: 'added', author_account_id: by ?? null, body: 'added this lead role' },
-        now(),
-      )
 
       await tellAttendees(
         db,
@@ -512,21 +516,20 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         const startedAt = Date.parse(stamp)
 
         source.forEach((row, index) => {
-          const copied = {
-            id: randomUUID(),
-            event_id: request.params.eventId,
-            title: row.title,
-            purpose: row.purpose,
-            tasks: row.tasks,
-            effort_before: row.effort_before,
-            effort_during: row.effort_during,
-            effort_after: row.effort_after,
-            team_size_wanted: row.team_size_wanted,
-            created_at: new Date(startedAt + index).toISOString(),
-          }
-
           tx.insert(leadRole)
-            .values({ ...copied, lead_attendance_id: null })
+            .values({
+              id: randomUUID(),
+              event_id: request.params.eventId,
+              title: row.title,
+              purpose: row.purpose,
+              tasks: row.tasks,
+              effort_before: row.effort_before,
+              effort_during: row.effort_during,
+              effort_after: row.effort_after,
+              team_size_wanted: row.team_size_wanted,
+              lead_attendance_id: null,
+              created_at: new Date(startedAt + index).toISOString(),
+            })
             .run()
         })
 
@@ -539,8 +542,6 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       const roles = await rolesFor(db, request.params.eventId)
       const by = await callerId(request)
 
-      // Dated from each role's own stamp rather than from one `now()`, so the cards come out
-      // in the register's order rather than in whatever order a shared millisecond breaks to.
       for (const role of roles) {
         await addEntry(
           db,

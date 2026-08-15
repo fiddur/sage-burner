@@ -572,6 +572,7 @@ describe('taking up an invite as somebody the provider already knows', () => {
 
     const [waiting] = await db().select().from(application).where(eq(application.account_id, id))
     expect(waiting?.status).toBe('pending')
+    expect(await db().select().from(accountRole).where(eq(accountRole.account_id, id))).toEqual([])
   })
 
   it('leaves the date on a decision already made, for somebody whose roles were taken off', async () => {

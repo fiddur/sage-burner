@@ -532,6 +532,12 @@ same rule every burn-scoped link follows, and it is now what the personal notifi
 too. There is no per-role anchor: the register is one table, and a card that lands you on it
 lands you next to the thing.
 
+**The role, its card and the line saying it was added are one transaction** (#671). They were two
+writes for a while, so a crash between them would have left a role whose card has no entries —
+which `recentThreads` never returns, putting the role on the feed nowhere with no way back short of
+the backfill migration. `openWith` is `addEntry`'s synchronous half for exactly this: a thread made
+and opened in the same breath.
+
 **Deleting a role deletes its card**, in the transaction that deletes the row — the shape a
 meeting and a talking point already use (#608). A role that no longer exists has no purpose
 left to show and nobody left on it, so a tombstone would say less than nothing.
