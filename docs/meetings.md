@@ -104,10 +104,17 @@ meeting is _at_ Sunday 19:00 and was _planned_ last Tuesday, and the feed is a r
 The author is the meeting's own, which is null for every row written before #603 added the column —
 those read "Somebody put it in the diary", since nothing anywhere recorded who.
 
-**One at a time in the banner.** The next meeting is where it is edited and where it is taken out
-of the diary, because that is the one anybody is looking at; everything else is a line under it.
-Meetings that have already been sit in a list of their own rather than mixed into the ones still
-ahead — a diary reads forwards.
+**The banner is the next one; every other one is a line under it.** The next meeting gets the
+whole card — the link, the note, the time in words — because that is the one anybody is looking
+at. Meetings that have already been sit in a list of their own rather than mixed into the ones
+still ahead: a diary reads forwards.
+
+**✏️ is on every line, though** (#587). It was on the banner alone for a while, which made
+mistyping the time on anything else a 🗑️ and a fresh scheduling — and that re-tells every
+attendee and drops the old UID out of everybody's subscribed calendar in between, for a typo.
+`PATCH /api/meetings/:id` never had a "must be next" condition; only the page could not produce
+the call. One `amending` id for the whole page, so two rows cannot be open on the same meeting
+with different unsaved answers, and pressing the same ✏️ twice shuts it again.
 
 ## In the calendar feed
 

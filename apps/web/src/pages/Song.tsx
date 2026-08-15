@@ -615,8 +615,11 @@ const Talk = ({
         more={held.entry_count > held.entries.length}
         upload={api.uploadImage}
         people={people}
-        onSay={(body) =>
-          run(async () => setThread((await api.postComment(held.id, { body })).thread), 'Could not say that.')
+        onSay={(body, done) =>
+          run(async () => {
+            setThread((await api.postComment(held.id, { body })).thread)
+            done()
+          }, 'Could not say that.')
         }
         onRewrite={(id, body) =>
           run(async () => setThread((await api.updateComment(id, { body })).thread), 'Could not save that.')

@@ -416,6 +416,17 @@ spelling of "withdrawn" is a second thing to keep in step, and the entity that g
 withdrawal next would have to remember both. The cut to fifty happens after, so a run of tombstones
 takes the page's slots but never a live card's place in the order.
 
+**And a page already open finds out from a 404** (#614). Every other disappearance here is soft, so
+until #608 a thread could not vanish under a page that was showing it; a meeting or a point deleted
+outright can. Every write a card offers goes through one wrapper that reads a 404 as _this is not
+there any more_: the card is dropped from the page, the feed is re-read, and the message names what
+went in the words that kind is taken away in — "Somebody took that out of the diary." A generic
+"Not found." over a card still sitting there with its composer open is the thing this replaces.
+
+**What was typed survives a failed reply.** `DreamThread` emptied its box on the way out rather
+than on the answer, so a reply to a thread somebody had just deleted was lost to a banner. The box
+is cleared by a `done` the caller passes, which is the shape the rewording form already used.
+
 #611 was the first answer to this, and the wrong one: it made a `withdrawn` entry not count as
 liveliness, so the card stayed where it already was, marked "taken back", and a comment on it could
 still lift it. There is no card left to order, so that rule is gone and `recentThreads` is back to

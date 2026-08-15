@@ -176,6 +176,12 @@ phone" means 360px.
       checkbox states what will actually happen.
 - [ ] Post an announcement; reword it (one card, bumped); withdraw it — the card
       leaves the feed, and a reload does not bring it back.
+- [ ] With the feed open in a second browser, take a meeting out of the diary in the
+      first, then reply to its card in the second: the reply is refused with "Somebody
+      took that out of the diary" and the card leaves the page, composer and all.
+- [ ] Stop the backend, type a reply on any card and press **Say it**: the message says
+      something went wrong, the card stays, and what was typed is still in the box to
+      send again.
 - [ ] Heart a card: the count moves, nothing is notified, nothing bumps.
 
 ## The songbook
@@ -292,6 +298,9 @@ phone" means 360px.
       link opens it, and leaving the end blank means it runs an hour.
 - [ ] Press ✏️ on it: the form opens filled in with what it already says, and saving moves it.
       A link that is not `https://` is refused.
+- [ ] Put a second and a third meeting in, further out. Each line in **Also in the diary** has
+      its own ✏️, editing one leaves the others closed, and pressing the same ✏️ again shuts
+      the form. Editing one that has already been works the same way.
 - [ ] The feed carries a **card** for it, headed with the meeting's name and carrying
       "put it in the diary". Comment on it, heart it, and use its 🔔 — a meeting is not a
       second-class thing on the feed. There is no separate line beside the card.

@@ -18,6 +18,7 @@ import type { ApiClient } from '../api/client.ts'
 import type { UploadImage } from '../image-upload.ts'
 import type { Mentionable } from '../mentioning.ts'
 
+import { isApiError } from '../api/client.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { CardBell } from '../components/CardBell.tsx'
 import { ChipRow } from '../components/ChipRow.tsx'
@@ -29,7 +30,7 @@ import { Heart } from '../components/Heart.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localDay } from '../datetime.ts'
-import { useAction, useLoad } from '../load.ts'
+import { errorMessage, useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { usePushNudge } from '../push-nudge.tsx'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
@@ -112,27 +113,59 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     setWhole(({ [threadId]: _gone, ...rest }) => rest)
   }
 
+  /**
+   * Every write a card offers, with the one answer a soft delete never gave: a 404 means the
+   * thing itself has gone since the page was drawn (#614). The card goes with it and the page
+   * says which, rather than leaving a composer over something nobody has.
+   */
+  const onCard = (card: Thread, work: () => Promise<unknown>, fallback: string) => {
+    run(
+      async () => {
+        try {
+          await work()
+        } catch (failure) {
+          if (isGone(failure)) {
+            forget(card.id)
+            await reload()
+          }
+
+          throw failure
+        }
+      },
+      (failure) => (isGone(failure) ? wentAway[card.entity_type] : errorMessage(failure, fallback)),
+    )
+  }
+
   const talk = {
-    say: (id: string, body: string) => {
-      run(async () => held((await api.postComment(id, { body })).thread), 'Could not say that.')
+    say: (card: Thread, body: string, done: () => void) => {
+      onCard(
+        card,
+        async () => {
+          held((await api.postComment(card.id, { body })).thread)
+          done()
+        },
+        'Could not say that.',
+      )
     },
-    rewrite: (id: string, body: string) => {
-      run(async () => held((await api.updateComment(id, { body })).thread), 'Could not save that.')
+    rewrite: (card: Thread, id: string, body: string) => {
+      onCard(card, async () => held((await api.updateComment(id, { body })).thread), 'Could not save that.')
     },
-    remove: (id: string) => {
-      run(async () => held((await api.deleteComment(id)).thread), 'Could not take that back.')
+    remove: (card: Thread, id: string) => {
+      onCard(card, async () => held((await api.deleteComment(id)).thread), 'Could not take that back.')
     },
-    showAll: (id: string) => {
-      run(async () => held((await api.getThread(id)).thread), 'Could not load the rest of it.')
+    showAll: (card: Thread) => {
+      onCard(card, async () => held((await api.getThread(card.id)).thread), 'Could not load the rest of it.')
     },
     follow: (card: Thread, following: boolean) => {
-      run(
+      onCard(
+        card,
         async () => heldKeepingFold(card, (await api.setThreadFollow(card.id, { following })).thread),
         'Could not change that. Please try again.',
       )
     },
     heart: (card: Thread, hearting: boolean) => {
-      run(
+      onCard(
+        card,
         async () =>
           heldKeepingFold(
             card,
@@ -427,10 +460,10 @@ const Card = ({
   busy: boolean
   on: readonly NotificationCategory[] | undefined
   talk: {
-    say: (id: string, body: string) => void
-    rewrite: (id: string, body: string) => void
-    remove: (id: string) => void
-    showAll: (id: string) => void
+    say: (card: Thread, body: string, done: () => void) => void
+    rewrite: (card: Thread, id: string, body: string) => void
+    remove: (card: Thread, id: string) => void
+    showAll: (card: Thread) => void
     reword: (threadId: string, id: string, title: string, body: string, done: () => void) => void
     takeBack: (threadId: string, id: string) => void
     heart: (card: Thread, hearting: boolean) => void
@@ -491,10 +524,10 @@ const Card = ({
         more={card.entry_count > card.entries.length}
         upload={upload}
         people={people}
-        onSay={(body) => talk.say(card.id, body)}
-        onRewrite={(id, body) => talk.rewrite(id, body)}
-        onRemove={(id) => talk.remove(id)}
-        onShowAll={() => talk.showAll(card.id)}
+        onSay={(body, done) => talk.say(card, body, done)}
+        onRewrite={(id, body) => talk.rewrite(card, id, body)}
+        onRemove={(id) => talk.remove(card, id)}
+        onShowAll={() => talk.showAll(card)}
       />
 
       {!card.gone && (
@@ -512,6 +545,18 @@ const Card = ({
   )
 }
 
+/** What a 404 from a card's own routes means, in the words each kind is taken away in. */
+const wentAway = {
+  session: 'Somebody withdrew that dream. It is off the page now.',
+  attendance: 'They are no longer coming. Their card is off the page now.',
+  post: 'Somebody took that announcement back. It is off the page now.',
+  song: 'Somebody took that out of the songbook. It is off the page now.',
+  bring: 'Somebody took that off the bring list. It is off the page now.',
+  point: 'Somebody took that point off. It is off the page now.',
+  meeting: 'Somebody took that out of the diary. It is off the page now.',
+  role: 'Somebody took that role off. It is off the page now.',
+} as const satisfies Record<Thread['entity_type'], string>
+
 const goneLabel = {
   session: ' · withdrawn',
   attendance: ' · no longer coming',
@@ -522,6 +567,8 @@ const goneLabel = {
   meeting: ' · out of the diary',
   role: ' · no longer a role',
 } as const satisfies Record<Thread['entity_type'], string>
+
+const isGone = (failure: unknown): boolean => isApiError(failure) && failure.status === 404
 
 const whereItBelongs = (card: Thread): string | undefined =>
   card.burn ?? (card.entity_type === 'song' ? 'Songbook' : undefined)

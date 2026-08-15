@@ -9,6 +9,19 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **Every meeting in the diary can be edited, not only the next one.** Mistype the time or the
+  joining link on a meeting further out and the only way back was to take it out and put it in
+  again — which told everybody a second time and dropped it out of every subscribed calendar in
+  between. There is a ✏️ on every line now.
+
+- **A card whose thing has been taken away says so and goes.** Reply to a meeting somebody took
+  out of the diary a moment ago and the answer used to be a bare "Not found." over a card that
+  stayed there, composer and all. Now it says "Somebody took that out of the diary" and the card
+  leaves the page.
+
+- **A reply that fails for any other reason stays in the box.** It used to be cleared the moment
+  you pressed Say it, whatever came back — so a hiccup at our end lost what you had written.
+
 - **The bell tells you whether it is on again.** In a card's corner it had become a grey outline
   in both states — the same empty bell whether you were being told about that card or not. It is
   🔔 when either of its switches is on and 🔕 when neither is, the way the heart is ♡ until you

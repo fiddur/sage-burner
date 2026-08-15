@@ -204,6 +204,84 @@ describe('the meetings page', () => {
     )
   })
 
+  it('changes one further down the diary too, not only the next one', async () => {
+    // #587: `MeetingFields` rendered from `NextMeeting` alone, so mistyping the time on
+    // anything but the imminent meeting left 🗑️ and scheduling it again as the way back —
+    // which re-tells everybody and drops the old UID out of every subscribed calendar.
+    const updateMeeting = vi.fn<MeetingsApi['updateMeeting']>(() => Promise.resolve({ meeting: aMeeting() }))
+    renderPage(
+      stub({
+        getMeetings: () =>
+          Promise.resolve({
+            meetings: [
+              aMeeting(),
+              aMeeting({ id: 'm-2', title: 'Toves meeting', starts_at: '2099-08-25T17:00:00.000Z' }),
+            ],
+          }),
+        updateMeeting,
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Toves meeting' }))
+    fireEvent.input(screen.getByLabelText('What the meeting is'), {
+      target: { value: 'Toves meeting, moved' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updateMeeting).toHaveBeenCalledWith('m-2', {
+        title: 'Toves meeting, moved',
+        starts_at: '2099-08-25T17:00:00.000Z',
+        ends_at: null,
+        link: null,
+        notes: '',
+      }),
+    )
+  })
+
+  it('opens one form at a time, so two rows cannot disagree about what is being changed', async () => {
+    renderPage(
+      stub({
+        getMeetings: () =>
+          Promise.resolve({
+            meetings: [
+              aMeeting(),
+              aMeeting({ id: 'm-2', title: 'Toves meeting', starts_at: '2099-08-25T17:00:00.000Z' }),
+              aMeeting({ id: 'm-3', title: 'Long build sync', starts_at: '2099-08-26T17:00:00.000Z' }),
+            ],
+          }),
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Toves meeting' }))
+    expect(screen.getAllByLabelText('What the meeting is')).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Long build sync' }))
+
+    const open = screen.getAllByLabelText('What the meeting is')
+    expect(open).toHaveLength(1)
+    expect(open[0]).toHaveProperty('value', 'Long build sync')
+  })
+
+  it('shuts the form again when the same ✏️ is pressed twice', async () => {
+    renderPage(
+      stub({
+        getMeetings: () =>
+          Promise.resolve({
+            meetings: [
+              aMeeting(),
+              aMeeting({ id: 'm-2', title: 'Toves meeting', starts_at: '2099-08-25T17:00:00.000Z' }),
+            ],
+          }),
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Toves meeting' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Toves meeting' }))
+
+    expect(screen.queryByLabelText('What the meeting is')).toBeNull()
+  })
+
   it('keeps a meeting that has been out of the way of one still to come', async () => {
     renderPage(
       stub({
