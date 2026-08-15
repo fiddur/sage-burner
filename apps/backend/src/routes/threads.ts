@@ -1128,11 +1128,9 @@ export const registerThreadRoutes = (
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {
-    const said = `${who} named you in ${what}`
+    const said = oneBatch({ category: 'mentioned', body: `${who} named you in ${what}`, link })
 
-    await Promise.all(
-      named.map(async (accountId) => await notify(accountId, { category: 'mentioned', body: said, link })),
-    )
+    await Promise.all(named.map(async (accountId) => await notify(accountId, said)))
   }
 
   // Whom "anybody commented" reaches: the burn's attendance, and every approved account for a

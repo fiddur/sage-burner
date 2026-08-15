@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **Naming everybody in one message is one line in the log again, not one per person.** ⚙️ →
+  Notifications sent filled up with identical rows whenever somebody wrote `@everybody`, pushing
+  everything else off the page.
+
+- **The log's Emails column counts emails a mail server actually took.** It counted the ticked
+  box instead, so an installation with no mail server at all reported emails going out.
+
+- **"1 place left, and they go to whoever pays" now says "it goes".**
+
 - **A lead role is something you can talk about now.** The feed had two shapes on it: cards you
   could reply to, and one-line news you could not — which by the end was only the lead roles.
   Adding a role, taking the lead, handing it over and joining or leaving a team all show as one

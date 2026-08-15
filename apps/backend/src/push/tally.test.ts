@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
-import type { PushTrouble, Told } from './notify.ts'
+import type { EmailChannel, PushTrouble, Told } from './notify.ts'
 import type { Delivery, PushDeps } from './push.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
@@ -87,17 +87,18 @@ const givenBurn = async () => {
 
 const TOLD: Told = { category: 'dream_offered', body: 'Ada offered a dream', link: '/dreams' }
 
+/** The queue the last `telling` deferred onto, so a test can wait for the email leg to run. */
+let queue = createEmailQueue(() => undefined)
+
 const telling = (
   deps: PushDeps,
-  post?: () => Promise<unknown>,
+  post?: EmailChannel,
   log: (trouble: PushTrouble) => void = () => undefined,
-) =>
-  recordAndPush(
-    deps,
-    () => clock,
-    log,
-    post === undefined ? undefined : { post, defer: createEmailQueue(() => undefined).defer },
-  )
+) => {
+  queue = createEmailQueue(() => undefined)
+
+  return recordAndPush(deps, () => clock, log, post === undefined ? undefined : { post, defer: queue.defer })
+}
 
 const rows = async () => await db().select().from(notificationBatch)
 
@@ -169,20 +170,45 @@ describe('the record of a notification going out', () => {
     expect(await rows()).toMatchObject([{ accepted: 0, failed: 1, gone: 0 }])
   })
 
-  it('counts the email leg where the person asked for one', async () => {
+  it('counts the email leg where a mail server took it', async () => {
     const deps = build()
     const accountId = await givenAccount({ email: true })
 
-    await telling(deps, () => Promise.resolve())(accountId, TOLD)
+    await telling(deps, () => Promise.resolve({ sent: true, reason: null }))(accountId, TOLD)
+    await queue.drain()
 
     expect(await rows()).toMatchObject([{ emailed: 1 }])
   })
 
-  it('counts no email where the installation has no mail server', async () => {
+  it('counts none where the mail server refused it', async () => {
+    // #583: the count was decided from the ticked box, before the queue had run — so a
+    // relay that answered "550" was logged as an email that went.
     const deps = build()
     const accountId = await givenAccount({ email: true })
 
-    await telling(deps)(accountId, TOLD)
+    await telling(deps, () => Promise.resolve({ sent: false, reason: '550 nope' }))(accountId, TOLD)
+    await queue.drain()
+
+    expect(await rows()).toMatchObject([{ emailed: 0 }])
+  })
+
+  it('counts none where the installation has no mail server, nothing being attempted', async () => {
+    // What `emailChannel` answers with no `mail_setting` row: it returns before posting.
+    const deps = build()
+    const accountId = await givenAccount({ email: true })
+
+    await telling(deps, () => Promise.resolve(undefined))(accountId, TOLD)
+    await queue.drain()
+
+    expect(await rows()).toMatchObject([{ emailed: 0 }])
+  })
+
+  it('counts no email where nobody asked for one', async () => {
+    const deps = build()
+    const accountId = await givenAccount()
+
+    await telling(deps, () => Promise.resolve({ sent: true, reason: null }))(accountId, TOLD)
+    await queue.drain()
 
     expect(await rows()).toMatchObject([{ emailed: 0 }])
   })

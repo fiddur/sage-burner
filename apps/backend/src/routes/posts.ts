@@ -14,7 +14,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { event, post } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, namedBy, reachedByMention, tellAttendees } from '../push/notify.ts'
+import { displayName, namedBy, oneBatch, reachedByMention, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { addEntry, threadFor } from './threads.ts'
 
@@ -78,16 +78,13 @@ export const registerPostRoutes = (
     const who = await displayName(db, viewer.account_id)
     const named = await reachedByMention(db, await namedBy(db, row.body, event_id, viewer.account_id))
 
-    await Promise.all(
-      named.map(
-        async (accountId) =>
-          await notify(accountId, {
-            category: 'mentioned',
-            body: `${who} named you in: ${row.title}`,
-            link: feedPage(),
-          }),
-      ),
-    )
+    const said = oneBatch({
+      category: 'mentioned',
+      body: `${who} named you in: ${row.title}`,
+      link: feedPage(),
+    })
+
+    await Promise.all(named.map(async (accountId) => await notify(accountId, said)))
 
     await tellAttendees(
       db,
@@ -123,16 +120,13 @@ export const registerPostRoutes = (
     ).filter((accountId) => !already.has(accountId))
     const by = await displayName(db, viewer.account_id)
 
-    await Promise.all(
-      newly.map(
-        async (accountId) =>
-          await notify(accountId, {
-            category: 'mentioned',
-            body: `${by} named you in: ${patched.row.title}`,
-            link: feedPage(),
-          }),
-      ),
-    )
+    const said = oneBatch({
+      category: 'mentioned',
+      body: `${by} named you in: ${patched.row.title}`,
+      link: feedPage(),
+    })
+
+    await Promise.all(newly.map(async (accountId) => await notify(accountId, said)))
 
     const reworded = patched.row.title !== existing.title || patched.row.body !== existing.body
 

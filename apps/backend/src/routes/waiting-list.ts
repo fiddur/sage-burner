@@ -73,7 +73,10 @@ export const tellAboutTheWaitingList = async (
 
   await tellTheUnpaid(db, notify, unpaid, {
     category: 'waiting_list_near',
-    body: `${burn.name} has ${left} ${left === 1 ? 'place' : 'places'} left, and they go to whoever pays. Your payment is not recorded yet.`,
+    body:
+      left === 1
+        ? `${burn.name} has 1 place left, and it goes to whoever pays. Your payment is not recorded yet.`
+        : `${burn.name} has ${left} places left, and they go to whoever pays. Your payment is not recorded yet.`,
     link,
   })
 }
