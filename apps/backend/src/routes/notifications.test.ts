@@ -625,9 +625,6 @@ describe('the waiting list', () => {
   })
 
   it('tells somebody who joins a burn that is already full (#564)', async () => {
-    // The line, not the payment, is what has to trigger the telling: every place here is
-    // paid, so nothing this member does and nothing an admin does will move it — the hook
-    // would never have fired for them at all.
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])
@@ -676,9 +673,6 @@ describe('the waiting list', () => {
   })
 
   it('does not tell the others again when somebody else joins', async () => {
-    // A join cannot change how many places are left — the joiner is unpaid — so the
-    // sentence is the one they already have, and saying it twice is what teaches people
-    // to stop reading them.
     const server = await build()
     await givenBurn(2)
     const admin = await givenAccount(['admin'])
@@ -710,23 +704,24 @@ describe('the waiting list', () => {
     expect(told.body).toContain('1 place left')
   })
 
-  it('says nothing when somebody leaves, because an unpaid place was never one of the places', async () => {
-    // `left` is the cap less what has been paid for, and leaving only ever removes an
-    // unpaid row — so the line cannot move and there is nothing new to say. The decision
-    // is recorded here rather than in a route that does not call anything.
+  it('says nothing to whoever is left when somebody leaves, an unpaid place never having been one', async () => {
+    // `staying` rather than the leaver: with only the leaver unpaid, a recompute wired into
+    // the leave route would notify nobody and this would pass against it.
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])
     const paid = await givenAccount()
     await givenComing(paid.id)
     await setPaid(server, admin.cookie, paid.id)
+    const staying = await givenAccount()
+    await join(server, staying.cookie)
     const late = await givenAccount()
     await join(server, late.cookie)
-    const before = (await list(server, late.cookie)).json().notifications.length
+    const before = (await list(server, staying.cookie)).json().notifications.length
 
     expect((await leave(server, late.cookie)).statusCode).toBe(204)
 
-    expect((await list(server, late.cookie)).json().notifications).toHaveLength(before)
+    expect((await list(server, staying.cookie)).json().notifications).toHaveLength(before)
   })
 
   it('says nothing at all while the burn is nowhere near full', async () => {
@@ -745,8 +740,6 @@ describe('the waiting list', () => {
   })
 
   it('warns nobody again when a payment is re-saved over itself', async () => {
-    // The roster's checkbox does this on a double click. It changes no count, so it
-    // must say nothing — least of all to *everybody* who has not paid.
     const server = await build()
     await givenBurn(5)
     const admin = await givenAccount(['admin'])
@@ -777,8 +770,6 @@ describe('the waiting list', () => {
   })
 
   it('says it is full on the crossing, not again on every payment after it', async () => {
-    // Inside the nearly-full window the repetition is a countdown and the number of
-    // places left changes each time. Past the cap it carries nothing new.
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])

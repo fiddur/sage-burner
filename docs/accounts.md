@@ -126,6 +126,13 @@ beside the role, since a group link admitting a rejected applicant is deliberate
 to say which of the two is true. A decision already `approved` keeps its own date; nothing else
 here reads somebody else's row, so an applicant is the only one their arrival settles.
 
+**A link admits; saying you are coming stays the person's own click** (#577). Approval from the
+queue does two things past the role — `joinTheNextBurn` and the decision mail — and settling the
+application on the link makes both unreachable for whoever came in that way. That is the shape
+this keeps: a link vets somebody into membership, and a member says they are coming from their own
+details page, which is what every other member does. Nothing here writes an attendance somebody
+has not asked for, and no invite arrival ever did.
+
 **Somebody already counted against a group link is admitted by another** (#546).
 `invite_redemption.account_id` being unique across the table means a second link cannot write a
 second row, and until this the write simply failed — rolling back the role with it, so an account
@@ -1071,7 +1078,7 @@ category switched off left no trace at all, which for an audit is the interestin
 
 **One row per notification, not per recipient.** `notification_batch` is what ⚙️ → Notifications
 sent lists: when, the category, the first line of the body, how many were told, how many had it
-switched off, how many devices took it, how many emails were queued. A fan-out to thirty attendees
+switched off, how many devices took it, how many emails a mail server took. A fan-out to thirty attendees
 is one line here and thirty in `notification`.
 
 **`oneBatch` is what makes that true, and every shared-audience loop calls it** — not only the
@@ -1087,7 +1094,7 @@ page holds. One category per row, so a comment is two rows — the participants'
 notifications with separate bodies — and the body is one string, `${who} named you in ${what}`,
 handed to everybody named. `@everybody` then turned a single mention into one row per attendee,
 which is the flood this exists to stop; the log read as several identical lines nobody could tell
-apart. All four sites mint one batch and share it: `tellNamed` in `threads.ts`, `bring.ts` and
+apart. All five sites mint one batch and share it: `tellNamed` in `threads.ts`, `bring.ts` and
 `meetings.ts`, and the announcement's two in `posts.ts`. Every one of them goes through `namedBy`,
 which is what expands `@everybody`, so one left out leaves the flood open.
 
@@ -2136,6 +2143,13 @@ same moment leave one, and a test asserts it.
 
 Nothing stops an admin removing their _own_ `admin` while another exists —
 that is stepping down, not a lockout.
+
+**Taking somebody's membership off means revoking the link they came in on**, where that link is a
+live group one (#546). Possession is the vetting and the redemption is counted once forever, so a
+live link admits the same account again the moment it is opened — the roles come back and nobody is
+told. That follows from the model rather than working against it, and it is the one
+security-visible consequence of it: whoever takes a role off has to shut the door as well, from
+Organise → Invites.
 
 **The viewer is resolved once per request.** A guard answers 401/403 from it and
 then has no way to hand it on, so the handler behind it used to ask again — two

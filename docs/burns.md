@@ -561,6 +561,14 @@ were two, and it is what lets the line be recomputed as often as it likes withou
 same thing twice. The link carries the burn (`/members?burn=…`, per #333), which is what makes "have
 we said this already" a query rather than a column.
 
+**It asks the bell, so two things slip past it** (#646). `recordAndPush` writes no `notification`
+row where the category is switched off, so somebody with the bell off and email on is never in
+`toldAlready` and gets the deferred email again on every recompute — which #643 raised from once
+per payment to once per join. And the burn's name is in the body, so renaming a burn makes every
+sentence a new one and the next recompute tells everybody unpaid all over again. Both need a
+deliberate opt-out and are rare enough to be written down rather than closed; the dedupe would
+have to key on something narrower than the words to fix either.
+
 **The line is what triggers the telling, not the payment** (#564). It used to be called from the
 payment route alone, which left out the one person most likely to care: somebody arriving at a burn
 that is _already_ full changes nothing an admin will touch, so with every place paid for, nothing
@@ -568,13 +576,23 @@ would ever have fired for them — they were below the line on the roster and ha
 it. **Every way an unpaid row appears recomputes it**: joining, and an admin adding somebody. Those
 are the two doors onto the same bug.
 
-**Leaving does not**, and that is not an omission. `left` is the cap less what has been paid for, and
-leaving only ever removes an **unpaid** row — so the line cannot move, and there is nothing new to
-say to anybody. Handing a place over does not move it either: it marks the taker paid and deletes the
+**A member leaving does not**, and that is not an omission. `left` is the cap less what has been
+paid for, and `DELETE /api/events/:eventId/attendance/me` filters on `payment_status = 'unpaid'` —
+so that door only ever removes a row the line never counted, and there is nothing new to say to
+anybody. Handing a place over does not move it either: it marks the taker paid and deletes the
 giver, who was.
 
-**Editing `member_cap` does move it, and tells nobody.** Lowering a cap pushes people onto the
-waiting list with nothing said. That one is open rather than decided.
+**Three other doors do move it and tell nobody**, which is the same open question rather than three:
+
+- **Lowering `member_cap`** pushes people onto the waiting list with nothing said.
+- **An admin removing somebody** — `DELETE /api/admin/events/:eventId/attendance/:accountId` —
+  deletes whatever their payment status is, so removing a paid member opens a place.
+- **Un-recording a payment**, since the payment `PATCH` only recomputes on the transition _to_
+  paid.
+
+The last two open a place rather than take one, so nobody is pushed below the line by them — which
+is why they are not #564's bug. They still leave the person who would now get in unaware that they
+would.
 
 ## Handing a place over
 

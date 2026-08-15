@@ -149,6 +149,26 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise
   return 'inserted'
 }
 
+/**
+ * `addEntry` for a thread being made in the same transaction, where the write it describes and
+ * the entry saying so must land together or not at all. Sync, so it can run inside `db.transaction`;
+ * nothing coalesces on a thread that did not exist a line ago.
+ */
+export const openWith = (tx: Transaction, entry: NewEntry, at: Date) => {
+  tx.insert(threadEntry)
+    .values({
+      id: randomUUID(),
+      thread_id: entry.thread_id,
+      kind: entry.kind,
+      seq: sql`(select coalesce(max(${threadEntry.seq}), 0) + 1 from ${threadEntry} where ${threadEntry.thread_id} = ${entry.thread_id})`,
+      author_account_id: entry.author_account_id,
+      body: entry.body,
+      created_at: at.toISOString(),
+      edited_at: null,
+    })
+    .run()
+}
+
 export const forgetThread = (tx: Transaction, type: ThreadEntityType, entityId: string) => {
   tx.delete(thread)
     .where(and(eq(thread.entity_type, type), eq(thread.entity_id, entityId)))
@@ -347,9 +367,15 @@ const participantThreads = async (
   const looking = await db
     .select({ thread_id: thread.id })
     .from(thread)
-    .innerJoin(leadRole, and(eq(thread.entity_type, 'role'), eq(leadRole.id, thread.entity_id)))
+    .innerJoin(leadRole, eq(leadRole.id, thread.entity_id))
     .innerJoin(attendance, eq(attendance.id, leadRole.lead_attendance_id))
-    .where(and(inArray(thread.id, [...ids]), eq(attendance.account_id, viewer.account_id)))
+    .where(
+      and(
+        inArray(thread.id, [...ids]),
+        eq(thread.entity_type, 'role'),
+        eq(attendance.account_id, viewer.account_id),
+      ),
+    )
 
   const onTheTeam = await db
     .select({ thread_id: thread.id })
