@@ -92,16 +92,3 @@ export const written = (kind: SyntaxKind, value: string, selection: Span, maxLen
 
   return withListAt(value, selection, maxLength)
 }
-
-const SYNTAX: readonly RegExp[] = [
-  /\*\*[^*\n]+\*\*/u,
-  /(?:^|\s)_[^_\n]+_(?:\s|$)/u,
-  /!?\[[^\]\n]*\]\([^)\n]*\)/u,
-  /^#{1,6}\s/mu,
-  /^\s*[-*+]\s/mu,
-  /^\s*\d+\.\s/mu,
-  /^\s*>\s/mu,
-  /`[^`\n]+`/u,
-]
-
-export const hasMarkdown = (value: string): boolean => SYNTAX.some((one) => one.test(value))

@@ -120,6 +120,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   everything.
 - Comments on any card: markdown, edit your own, delete your own (an admin may
   delete any), open even after the burn has ended.
+- One editor for every longer box: Write and Preview tabs, a toolbar, pictures
+  by paste, drop or button, and a footer linking to a formatting help page at
+  `/formatting` that anybody can read, signed in or not.
 - Mentions — `@name` from a picker, `@everybody` — notify the people named.
   A card can be followed or muted.
 - Announcements: any approved member posts one; withdrawing keeps the

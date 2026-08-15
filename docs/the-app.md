@@ -446,10 +446,24 @@ takes the page's slots but never a live card's place in the order.
 
 **And a page already open finds out from a 404** (#614). Every other disappearance here is soft, so
 until #608 a thread could not vanish under a page that was showing it; a meeting or a point deleted
-outright can. Every write a card offers goes through one wrapper that reads a 404 as _this is not
-there any more_: the card is dropped from the page, the feed is re-read, and the message names what
-went in the words that kind is taken away in — "Somebody took that out of the diary." A generic
-"Not found." over a card still sitting there with its composer open is the thing this replaces.
+outright can. Every write addressed to the card's own thread goes through one wrapper that reads a
+404 as _this is not there any more_: the card is dropped from the page, the feed is re-read, and the
+message names what went in the words that kind is taken away in — "Somebody took that out of the
+diary." A generic "Not found." over a card still sitting there with its composer open is the thing
+this replaces.
+
+**A comment's 404 is a different loss** (#683). Rewriting or taking back a comment addresses
+`/api/comments/:id`, not the card's entity, and the ordinary race there is that somebody else took
+that comment back first — so `onComment` says "That comment is no longer there.", refetches the one
+thread to drop the stale line, and leaves the card where it is. Sent through `onCard`, that race
+claimed the meeting was out of the diary while the meeting's own card sat under the banner saying
+otherwise: a message the same screen disproved.
+
+**The refetch is also how it tells the two apart.** A deleted meeting takes its thread and every
+entry with it, so a comment write against one 404s for the entity's reason rather than the
+comment's — and `GET /api/threads/:id` then 404s too. That second answer is what decides: it puts
+`onCard`'s handling back, wording and `forget` and `reload` alike. Neither loss can be read off the
+first 404, which carries the same status either way.
 
 **What was typed survives a failed reply.** `DreamThread` emptied its box on the way out rather
 than on the answer, so a reply to a thread somebody had just deleted was lost to a banner. The box
@@ -1811,10 +1825,12 @@ whoever has a keyboard; on a phone, where most members are, the toolbar is the w
 **Italic is `_`, not `*`.** With asterisks, italic on a selection inside `**bold**` matches the
 unwrap check and turns bold into italic. The two render identically, so the ambiguity buys nothing.
 
-**The preview is not a tab.** It renders quietly below the field, and only once the text has any
-markdown syntax in it — a preview of plain words beside the plain words is noise, and the mode
-switch was the chrome that read as a tool. `hasMarkdown` is what decides, and it is a list of
-patterns rather than a render-and-compare, because rendering plain text also changes it.
+**The preview is a tab again** (#638), reversing #473. The quiet block below the field was the
+answer while the editor was several editors: it appeared only once `hasMarkdown` saw syntax, so a
+member who did not know there was anything to see never saw it. **Write | Preview** is the shape
+everyone has met on GitHub, it says a preview exists before there is anything to preview, and it
+costs the box no room. `hasMarkdown` went with it — nothing decides any more, because the tab is
+the decision.
 
 **A picture is appended at the end of the body**, wherever it was pasted, dropped or chosen. That
 is the Facebook and Discord feel — words then pictures — and it costs no data-model change, since
@@ -1834,11 +1850,26 @@ _Sending a picture…_ note and the `ErrorText` for no-room, SVG-refused and upl
 the other half of what `AddPicture` used to be, and splitting it is what removed the `<p>`-nesting
 hazard the old row wrapper was there to dodge.
 
-**Every composer gets it**: `MarkdownField` for introductions, posts, dream descriptions and
-welcome text, and the two comment boxes in `DreamThread`, which are plain textareas rather than
-a `MarkdownField`. `useSyntax` + `SyntaxToolbar` is the same hook-and-component pair as
-`useImageUpload` + `AddPicture`/`PictureTrouble` and `useMentioning` + `MentionMenu`, so a third
-composer wires it the way it wires those.
+**Every composer is now the same one** (#638). `MarkdownField` is what a longer box is: the
+introductions, posts, dream descriptions and welcome text it always was, plus the two comment boxes
+in `DreamThread`, the meeting form's notes, the bring list's "anything else", and the applicant's
+thread — each of which was a hand-rolled textarea wiring some of the same hooks and forgetting the
+rest. There were three tiers of editor and the differences were nobody's decision, only the order
+the fields were written in. `useSyntax` + `SyntaxToolbar` is the same hook-and-component pair as
+`useImageUpload` + `AddPicture`/`PictureTrouble` and `useMentioning` + `MentionMenu`, and a box
+that wants all three now asks for `MarkdownField` rather than wiring them again.
+
+**A footer says what the box can do**, because nothing else did: _Markdown is supported_, linking
+to `/formatting`, and — only where an `upload` is wired — _paste, drop or click 🖼 to add a
+picture_. The help page renders its own examples through `renderMarkdown` rather than writing the
+right-hand column out as HTML, so what it promises is what the app does; a change to what the
+renderer allows shows up there without anybody remembering to edit it. It sits with the public
+pages, since an applicant writing to the organisers has the same box.
+
+**What is not a `MarkdownField`**: the song sheet, where chords and verses are preformatted rather
+than markdown; allergies; a ride's note; a stay's helping note; and the answers on the application
+form. The rule the sweep used is the one to keep using — a box whose value reaches `renderMarkdown`
+somewhere is a `MarkdownField`, and a box whose value does not is a plain `<textarea>`.
 
 ## Markdown is escaped, not filtered
 

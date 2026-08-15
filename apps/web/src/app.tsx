@@ -1,4 +1,4 @@
-import { changelogPage } from '@sage-burner/shared'
+import { changelogPage, formattingPage } from '@sage-burner/shared'
 import { LocationProvider, Route, Router } from 'preact-iso'
 import { useMemo } from 'preact/hooks'
 
@@ -34,6 +34,7 @@ import { Changelog } from './pages/Changelog.tsx'
 import { Dreams } from './pages/Dreams.tsx'
 import { Faq } from './pages/Faq.tsx'
 import { Feed } from './pages/Feed.tsx'
+import { Formatting } from './pages/Formatting.tsx'
 import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
@@ -307,6 +308,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
       <Route path={changelogPage()} component={ChangelogRoute} />
+      <Route path={formattingPage()} component={Formatting} />
       <Route path="/privacy" component={PrivacyRoute} />
       <Route path="/terms" component={TermsRoute} />
       <Route path="/members" component={MembersRoute} />
