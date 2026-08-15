@@ -540,8 +540,23 @@ describe('the waiting list', () => {
     await setPaid(server, admin.cookie, paid.id)
 
     const [told] = (await list(server, unpaid.cookie)).json().notifications
-    expect(told.body).toContain('1 place left')
+    expect(told.body).toContain('1 place left, and it goes to whoever pays')
     expect(told.body).not.toContain('1 places')
+  })
+
+  it('says the rest of the sentence in the plural where there are several', async () => {
+    const server = await build()
+    await givenBurn(4)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const unpaid = await givenAccount()
+    await givenComing(paid.id)
+    await givenComing(unpaid.id)
+
+    await setPaid(server, admin.cookie, paid.id)
+
+    const [told] = (await list(server, unpaid.cookie)).json().notifications
+    expect(told.body).toContain('3 places left, and they go to whoever pays')
   })
 
   it('tells every unpaid member it is full once the places are gone, wherever they joined', async () => {

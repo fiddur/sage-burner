@@ -11,6 +11,7 @@ import { and, count, desc, eq, inArray, isNull, lt, lte, sql } from 'drizzle-orm
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
+import type { Posted } from '../mail/mail.ts'
 import type { EmailQueue } from '../mail/queue.ts'
 import type { DeliveryCounts, PushDeps } from './push.ts'
 
@@ -97,7 +98,11 @@ export const notificationBatches = async (db: Database, limit: number) =>
 
 export type Notifier = (accountId: string, told: Told) => Promise<unknown>
 
-export type EmailChannel = (accountId: string, told: Told) => Promise<unknown>
+/**
+ * Answers what the mail server did with it — `undefined` where the installation has no mail
+ * server or the account no address, so nothing was attempted at all.
+ */
+export type EmailChannel = (accountId: string, told: Told) => Promise<Posted | undefined>
 
 export interface Email {
   post: EmailChannel
@@ -143,12 +148,17 @@ export const recordAndPush =
   (deps: PushDeps, now: () => Date, log: (trouble: PushTrouble) => void, email?: Email): Notifier =>
   async (accountId, told) => {
     const channels = await wants(deps.db, accountId, told.category)
-    const emailed = channels.email && email !== undefined
+    const one = oneBatch(told)
 
-    if (emailed) email.defer(async () => await email.post(accountId, told))
+    if (channels.email && email !== undefined) {
+      email.defer(async () => {
+        const posted = await email.post(accountId, one)
+        if (posted?.sent === true) await countInto(deps.db, now(), one, { emailed: 1 })
+      })
+    }
 
     if (!channels.bell) {
-      await countInto(deps.db, now(), told, { suppressed: 1, emailed: emailed ? 1 : 0 })
+      await countInto(deps.db, now(), one, { suppressed: 1 })
 
       return undefined
     }
@@ -156,20 +166,19 @@ export const recordAndPush =
     await deps.db.insert(notification).values({
       id: randomUUID(),
       account_id: accountId,
-      category: told.category,
-      body: told.body,
-      link: told.link,
+      category: one.category,
+      body: one.body,
+      link: one.link,
       created_at: now().toISOString(),
     })
 
-    const counts = await notifyAccount(deps, accountId, pushPayload(told))
+    const counts = await notifyAccount(deps, accountId, pushPayload(one))
     if (counts.failed > 0 || counts.gone > 0) {
-      log({ ...counts, account_id: accountId, category: told.category })
+      log({ ...counts, account_id: accountId, category: one.category })
     }
 
-    await countInto(deps.db, now(), told, {
+    await countInto(deps.db, now(), one, {
       told: 1,
-      emailed: emailed ? 1 : 0,
       accepted: counts.sent,
       failed: counts.failed,
       gone: counts.gone,

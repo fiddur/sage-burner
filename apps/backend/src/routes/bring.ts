@@ -22,7 +22,7 @@ import { handsFor, handsOn } from '../bring-hands.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { account, bringHand, bringItem, event, thread } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, namedBy, reachedByMention, tellAttendees } from '../push/notify.ts'
+import { displayName, namedBy, oneBatch, reachedByMention, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { addEntry, threadFor, threadIdFor } from './threads.ts'
 
@@ -126,16 +126,13 @@ export const registerBringRoutes = (
   }
 
   const tellNamed = async (named: readonly string[], who: string, item: BringItem) => {
-    await Promise.all(
-      named.map(
-        async (accountId) =>
-          await notify(accountId, {
-            category: 'mentioned',
-            body: `${who} named you about: ${item.title}`,
-            link: bringPage(item.event_id, item.id),
-          }),
-      ),
-    )
+    const said = oneBatch({
+      category: 'mentioned',
+      body: `${who} named you about: ${item.title}`,
+      link: bringPage(item.event_id, item.id),
+    })
+
+    await Promise.all(named.map(async (accountId) => await notify(accountId, said)))
   }
 
   const found = async (

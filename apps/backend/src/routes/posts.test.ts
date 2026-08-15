@@ -13,7 +13,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, post } from '../db/schema.ts'
+import { account, accountRole, attendance, event, notificationBatch, post } from '../db/schema.ts'
 
 const SECRET = 'p'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -244,6 +244,21 @@ describe('naming somebody in an announcement', () => {
 
     // `post_written` is off and was never switched on; `mentioned` is on by default.
     expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+  })
+
+  it('writes one line in the log for the naming, however many people it names', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    for (const name of ['Bea', 'Cai', 'Dee']) await givenComing((await givenAccount(name)).id)
+
+    await announce(server, ada.cookie, {
+      title: 'The planning call is Sunday',
+      body: `${everybodyToken()} please come`,
+    })
+
+    const log = await db().select().from(notificationBatch)
+    expect(log.filter((row) => row.category === 'mentioned')).toMatchObject([{ told: 3 }])
   })
 
   it('still announces to somebody who has turned being named off', async () => {

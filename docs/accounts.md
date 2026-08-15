@@ -1083,13 +1083,26 @@ lines, nearly all `told: 0, suppressed: 1`, pushing everything real out of the t
 page holds. One category per row, so a comment is two rows — the participants' and the listeners'
 — because those are two categories and the log is read by what it was about.
 
-Mentions stay one row per person, deliberately: they are separate notifications with separate
-bodies, naming different people.
+**Mentions are one row too** (#582). They were left out on the grounds that they are separate
+notifications with separate bodies — and the body is one string, `${who} named you in ${what}`,
+handed to everybody named. `@everybody` then turned a single mention into one row per attendee,
+which is the flood this exists to stop; the log read as several identical lines nobody could tell
+apart. All four sites mint one batch and share it: `tellNamed` in `threads.ts`, `bring.ts` and
+`meetings.ts`, and the announcement's two in `posts.ts`. Every one of them goes through `namedBy`,
+which is what expands `@everybody`, so one left out leaves the flood open.
 
 **`accepted` is not `delivered`, and the column is named so it cannot be read as one.** It counts
 the subscriptions the push service took; `gone` is a 404 or 410, meaning the subscription is dead
 and `push.ts` has just deleted it. What a device actually showed is unknowable without the service
 worker acknowledging a `push` — and only while online — which is not what this is.
+
+**`emailed` counts what a mail server took, not what was asked for** (#583). It was decided in
+`recordAndPush` from the ticked box, before the queue had run — so an installation with no
+`mail_setting` row, where `emailChannel` returns before posting anything, still logged an email
+per mention, and a relay answering `550` logged one too. The count moved into the deferred work
+and happens on `posted.sent`. That is why `recordAndPush` pins a batch id with `oneBatch` rather
+than leaving `countInto` to mint one: the bell half and the email half run minutes apart and have
+to find the same row.
 
 **It prunes itself.** These are member records in aggregate, and the issue an audit log always has
 is unbounded growth, so a row older than `RETENTION_DAYS` goes when the next notification opens a

@@ -1,7 +1,7 @@
 import type { BringEntry, Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { MAX_NOTES, mentionToken } from '@sage-burner/shared'
+import { everybodyToken, MAX_NOTES, mentionToken } from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -12,7 +12,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event } from '../db/schema.ts'
+import { account, accountRole, attendance, event, notificationBatch } from '../db/schema.ts'
 
 const SECRET = 'p'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -257,6 +257,19 @@ describe('asking for something and offering it', () => {
     })
 
     expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+  })
+
+  it('writes one line in the log for the naming, however many it names', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    for (const name of ['Bea', 'Cai', 'Dee']) await givenComing((await givenAccount(name)).id)
+    await givenComing(ada.id)
+
+    await add(server, ada.cookie, { title: 'Drums', comment: `${everybodyToken()} anyone?` })
+
+    const log = await db().select().from(notificationBatch)
+    expect(log.filter((row) => row.category === 'mentioned')).toMatchObject([{ told: 3 }])
   })
 
   it('is refused for a burn that has already ended', async () => {

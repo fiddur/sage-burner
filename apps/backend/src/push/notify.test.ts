@@ -198,7 +198,7 @@ describe('the email leg beside a bell row', () => {
     await recordAndPush(deps, NOW_AT, () => undefined, { post: byEmail, defer: queue.defer })(accountId, TOLD)
     await queue.drain()
 
-    expect(byEmail).toHaveBeenCalledWith(accountId, TOLD)
+    expect(byEmail).toHaveBeenCalledWith(accountId, { ...TOLD, batch: expect.any(String) })
     const rows = await db().select().from(notification).where(eq(notification.account_id, accountId))
     expect(rows.map((row) => row.body)).toEqual([TOLD.body])
   })

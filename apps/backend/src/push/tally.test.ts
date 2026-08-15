@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
-import type { PushTrouble, Told } from './notify.ts'
+import type { EmailChannel, PushTrouble, Told } from './notify.ts'
 import type { Delivery, PushDeps } from './push.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
@@ -87,17 +87,28 @@ const givenBurn = async () => {
 
 const TOLD: Told = { category: 'dream_offered', body: 'Ada offered a dream', link: '/dreams' }
 
+const quietly = createEmailQueue(() => undefined)
+
 const telling = (
   deps: PushDeps,
-  post?: () => Promise<unknown>,
+  post?: EmailChannel,
   log: (trouble: PushTrouble) => void = () => undefined,
-) =>
-  recordAndPush(
-    deps,
-    () => clock,
-    log,
-    post === undefined ? undefined : { post, defer: createEmailQueue(() => undefined).defer },
-  )
+) => recordAndPush(deps, () => clock, log, post === undefined ? undefined : { post, defer: quietly.defer })
+
+/** The email leg runs off the queue, so a test asserting on it waits for this one's `drain`. */
+const emailing = (deps: PushDeps, post: EmailChannel) => {
+  const queue = createEmailQueue(() => undefined)
+
+  return {
+    notify: recordAndPush(
+      deps,
+      () => clock,
+      () => undefined,
+      { post, defer: queue.defer },
+    ),
+    queue,
+  }
+}
 
 const rows = async () => await db().select().from(notificationBatch)
 
@@ -169,20 +180,50 @@ describe('the record of a notification going out', () => {
     expect(await rows()).toMatchObject([{ accepted: 0, failed: 1, gone: 0 }])
   })
 
-  it('counts the email leg where the person asked for one', async () => {
+  it('counts the email leg where a mail server took it', async () => {
     const deps = build()
     const accountId = await givenAccount({ email: true })
 
-    await telling(deps, () => Promise.resolve())(accountId, TOLD)
+    const email = emailing(deps, () => Promise.resolve({ sent: true, reason: null }))
+
+    await email.notify(accountId, TOLD)
+    await email.queue.drain()
 
     expect(await rows()).toMatchObject([{ emailed: 1 }])
   })
 
-  it('counts no email where the installation has no mail server', async () => {
+  it('counts none where the mail server refused it', async () => {
     const deps = build()
     const accountId = await givenAccount({ email: true })
 
-    await telling(deps)(accountId, TOLD)
+    const email = emailing(deps, () => Promise.resolve({ sent: false, reason: '550 nope' }))
+
+    await email.notify(accountId, TOLD)
+    await email.queue.drain()
+
+    expect(await rows()).toMatchObject([{ emailed: 0 }])
+  })
+
+  it('counts none where the installation has no mail server, nothing being attempted', async () => {
+    const deps = build()
+    const accountId = await givenAccount({ email: true })
+
+    const email = emailing(deps, () => Promise.resolve(undefined))
+
+    await email.notify(accountId, TOLD)
+    await email.queue.drain()
+
+    expect(await rows()).toMatchObject([{ emailed: 0 }])
+  })
+
+  it('counts no email where nobody asked for one', async () => {
+    const deps = build()
+    const accountId = await givenAccount()
+
+    const email = emailing(deps, () => Promise.resolve({ sent: true, reason: null }))
+
+    await email.notify(accountId, TOLD)
+    await email.queue.drain()
 
     expect(await rows()).toMatchObject([{ emailed: 0 }])
   })
