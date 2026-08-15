@@ -1632,6 +1632,29 @@ describe('the threads migration', () => {
       fresh.close()
     }
   })
+
+  it('takes the feed’s one-line news away with its table, rows and all', () => {
+    // #610 drops `activity`, whose rows are on nobody's bell — every one of them was also a
+    // notification. The drop is the last statement of the rebuild, so this is what says
+    // `PRAGMA foreign_key_check` is happy with a child table going while `event` stays.
+    const fresh = beforeTheThreads()
+
+    try {
+      anEvent(fresh, 'e-1', 'a-burn', NOW)
+      fresh.client
+        .prepare('insert into activity (id, event_id, category, body, created_at) values (?, ?, ?, ?, ?)')
+        .run('act-1', 'e-1', 'member_joined', 'Bea is coming.', NOW)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(
+        fresh.client.prepare("select name from sqlite_master where name = 'activity'").get(),
+      ).toBeUndefined()
+      expect(fresh.client.prepare('select count(*) as n from event').get()?.n).toBe(1)
+    } finally {
+      fresh.close()
+    }
+  })
 })
 
 describe('the login-address backfill', () => {
