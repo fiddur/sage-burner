@@ -176,6 +176,12 @@ phone" means 360px.
       checkbox states what will actually happen.
 - [ ] Post an announcement; reword it (one card, bumped); withdraw it — the card
       leaves the feed, and a reload does not bring it back.
+- [ ] With the feed open in a second browser, take a meeting out of the diary in the
+      first, then reply to its card in the second: the reply is refused with "Somebody
+      took that out of the diary" and the card leaves the page, composer and all.
+- [ ] Stop the backend, type a reply on any card and press **Say it**: the message says
+      something went wrong, the card stays, and what was typed is still in the box to
+      send again.
 - [ ] Heart a card: the count moves, nothing is notified, nothing bumps.
 
 ## The songbook
@@ -296,6 +302,9 @@ phone" means 360px.
       link opens it, and leaving the end blank means it runs an hour.
 - [ ] Press ✏️ on it: the form opens filled in with what it already says, and saving moves it.
       A link that is not `https://` is refused.
+- [ ] Put a second and a third meeting in, further out. Each line in **Also in the diary** has
+      its own ✏️, editing one leaves the others closed, and pressing the same ✏️ again shuts
+      the form. Editing one that has already been works the same way.
 - [ ] The feed carries a **card** for it, headed with the meeting's name and carrying
       "put it in the diary". Comment on it, heart it, and use its 🔔 — a meeting is not a
       second-class thing on the feed. There is no separate line beside the card.
@@ -343,11 +352,16 @@ phone" means 360px.
 ## The icons
 
 - [ ] Every control is a line drawing in the colour of the text beside it — the pencil,
-      the trashcan, the bell, the hand, the menu, the toolbar's link, list and picture.
-      Nothing coloured is a button except the heart.
+      the trashcan, the hand, the menu, the toolbar's link, list and picture. Nothing
+      coloured is a button except the heart and the bell.
 - [ ] The pages keep their emoji: the phone's bottom bar, the drawer's entries, the
       marks on a feed card's entries and the before/during/after phases on Leads.
-- [ ] The bell is quiet with nothing unseen and turns ember when something is.
+- [ ] The top bell is 🔔, dim with nothing unseen and full-strength with a count on it when
+      something is.
+- [ ] A card's bell is 🔔 where either of its switches is on and 🔕 where neither is — tick one
+      and it lights without a reload.
+- [ ] Ticking a category on a card near the bottom of a phone screen raises the push strip
+      **over** the still-open menu, and its offer can be pressed without dismissing anything.
 - [ ] Hearting something fills ♡ to ❤️‍🔥 — the heart is the one control that is not a line
       drawing — and taking the heart back empties it.
 - [ ] In dark mode every icon is still legible, and hovering a control still lightens it.

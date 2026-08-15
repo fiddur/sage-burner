@@ -77,7 +77,7 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
   const [draft, setDraft] = useState(BLANK)
   const [opened, setOpened] = useState<string | undefined>(undefined)
   const [scheduling, setScheduling] = useState(false)
-  const [amending, setAmending] = useState(false)
+  const [amending, setAmending] = useState<string | undefined>(undefined)
   const [editing, setEditing] = useState<string | undefined>(undefined)
 
   const { loaded, refreshing, reload } = useLoad(
@@ -120,6 +120,17 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
     run,
   })
 
+  const remove = (id: string) => {
+    run(() => api.deleteMeeting(id), 'Could not take that out.')
+  }
+
+  const amend = (id: string, fields: MeetingDraft) => {
+    run(async () => {
+      await api.updateMeeting(id, fields)
+      setAmending(undefined)
+    }, 'Could not save that.')
+  }
+
   const raise = () => {
     if (burn === undefined) return
     if (draft.title.trim() === '') {
@@ -140,6 +151,18 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
   const rest = meetings.filter((one) => one.id !== next?.id)
   const ahead = rest.filter((one) => Date.parse(meetingEnds(one.starts_at, one.ends_at)) > now.getTime())
   const over = rest.filter((one) => Date.parse(meetingEnds(one.starts_at, one.ends_at)) <= now.getTime())
+
+  const diary = (heading: string, shown: readonly Meeting[]) => (
+    <TheDiary
+      heading={heading}
+      meetings={shown}
+      busy={busy}
+      editing={amending}
+      onEditing={setAmending}
+      onSave={amend}
+      onDelete={remove}
+    />
+  )
 
   const list = (shown: readonly MeetingPointEntry[], empty: string) => (
     <PointList
@@ -193,13 +216,8 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
             busy={busy}
             editing={amending}
             onEditing={setAmending}
-            onSave={(id, fields) =>
-              run(async () => {
-                await api.updateMeeting(id, fields)
-                setAmending(false)
-              }, 'Could not save that.')
-            }
-            onDelete={(id) => run(() => api.deleteMeeting(id), 'Could not take that out.')}
+            onSave={amend}
+            onDelete={remove}
           />
 
           <section>
@@ -232,19 +250,8 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
             }
           />
 
-          <TheDiary
-            heading="Also in the diary"
-            meetings={ahead}
-            busy={busy}
-            onDelete={(id) => run(() => api.deleteMeeting(id), 'Could not take that out.')}
-          />
-
-          <TheDiary
-            heading="Meetings that have been"
-            meetings={over}
-            busy={busy}
-            onDelete={(id) => run(() => api.deleteMeeting(id), 'Could not take that out.')}
-          />
+          {diary('Also in the diary', ahead)}
+          {diary('Meetings that have been', over)}
         </>
       )}
     </GuardedPage>
@@ -255,11 +262,17 @@ const TheDiary = ({
   heading,
   meetings,
   busy,
+  editing,
+  onEditing,
+  onSave,
   onDelete,
 }: {
   heading: string
   meetings: readonly Meeting[]
   busy: boolean
+  editing: string | undefined
+  onEditing: (id: string | undefined) => void
+  onSave: (id: string, fields: MeetingDraft) => void
   onDelete: (id: string) => void
 }) =>
   meetings.length === 0 ? null : (
@@ -269,12 +282,26 @@ const TheDiary = ({
         {meetings.map((one) => (
           <li key={one.id}>
             <strong>{one.title}</strong> — {whenItIs(one)}
+            <IconButton
+              icon="edit"
+              label={`Edit ${one.title}`}
+              disabled={busy}
+              onClick={() => onEditing(editing === one.id ? undefined : one.id)}
+            />
             <Destroy
               what={one.title}
               verb="Take out of the diary"
               busy={busy}
               onDestroy={() => onDelete(one.id)}
             />
+            {editing === one.id && (
+              <MeetingFields
+                meeting={one}
+                busy={busy}
+                onCancel={() => onEditing(undefined)}
+                onSave={(fields) => onSave(one.id, fields)}
+              />
+            )}
           </li>
         ))}
       </ul>
@@ -422,8 +449,8 @@ const NextMeeting = ({
 }: {
   next: Meeting | undefined
   busy: boolean
-  editing: boolean
-  onEditing: (wanted: boolean) => void
+  editing: string | undefined
+  onEditing: (id: string | undefined) => void
   onSave: (id: string, fields: MeetingDraft) => void
   onDelete: (id: string) => void
 }) => (
@@ -456,7 +483,7 @@ const NextMeeting = ({
           icon="edit"
           label={`Edit ${next.title}`}
           disabled={busy}
-          onClick={() => onEditing(!editing)}
+          onClick={() => onEditing(editing === next.id ? undefined : next.id)}
         />
         <Destroy
           what={next.title}
@@ -467,11 +494,11 @@ const NextMeeting = ({
       </p>
     )}
 
-    {editing && next !== undefined && (
+    {next !== undefined && editing === next.id && (
       <MeetingFields
         meeting={next}
         busy={busy}
-        onCancel={() => onEditing(false)}
+        onCancel={() => onEditing(undefined)}
         onSave={(fields) => onSave(next.id, fields)}
       />
     )}

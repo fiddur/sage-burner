@@ -18,6 +18,29 @@ under today's heading, and make a new heading when there is none.
 
 - **"1 place left, and they go to whoever pays" now says "it goes".**
 
+- **Every meeting in the diary can be edited, not only the next one.** Mistype the time or the
+  joining link on a meeting further out and the only way back was to take it out and put it in
+  again — which told everybody a second time and dropped it out of every subscribed calendar in
+  between. There is a ✏️ on every line now.
+
+- **A card whose thing has been taken away says so and goes.** Reply to a meeting somebody took
+  out of the diary a moment ago and the answer used to be a bare "Not found." over a card that
+  stayed there, composer and all. Now it says "Somebody took that out of the diary" and the card
+  leaves the page.
+
+- **A reply that fails for any other reason stays in the box.** It used to be cleared the moment
+  you pressed Say it, whatever came back — so a hiccup at our end lost what you had written.
+
+- **The bell tells you whether it is on again.** In a card's corner it had become a grey outline
+  in both states — the same empty bell whether you were being told about that card or not. It is
+  🔔 when either of its switches is on and 🔕 when neither is, the way the heart is ♡ until you
+  give one. The bell in the top bar is a bell you can see too, dim until something is waiting.
+
+- **The "notify me on this device" offer can be pressed where it appears.** Ticking a category on
+  a card near the bottom of a phone screen raised the offer _behind_ the little menu you ticked it
+  in, so the button did nothing however many times you pressed it. The strip now sits above the
+  menu.
+
 - **A lead role is something you can talk about now.** The feed had two shapes on it: cards you
   could reply to, and one-line news you could not — which by the end was only the lead roles.
   Adding a role, taking the lead, handing it over and joining or leaving a team all show as one

@@ -55,7 +55,7 @@ describe('an icon', () => {
   })
 
   it('is hidden from anything reading the page aloud', () => {
-    const { container } = render(<Icon name="bell" />)
+    const { container } = render(<Icon name="comment" />)
 
     expect(drawn(container)?.getAttribute('aria-hidden')).toBe('true')
   })

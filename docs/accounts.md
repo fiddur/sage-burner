@@ -1049,9 +1049,12 @@ the one under the settings table too, and state inside a component cannot say th
 somebody switching four kinds on in a sitting must be asked at most once, which is what the shared
 flag makes true.
 
-**The strip is fixed to the bottom of the window.** It answers a tick that can happen anywhere, and
-the settings table is three screens long while the feed is longer, so a notice in the flow at the
-top of the page would appear off-screen exactly when it was raised. `usePushHere` lives inside the
+**The strip is fixed to the bottom of the window, and above the popdown that raised it** (#589).
+It answers a tick that can happen anywhere, and the settings table is three screens long while the
+feed is longer, so a notice in the flow at the top of the page would appear off-screen exactly when
+it was raised. It sat _under_ the card bell's menu for a while, which put the offer behind the very
+panel it had been ticked in whenever the card was low in the window — the tap landed on the menu and
+did nothing at all, with no way out but pressing somewhere unrelated first. `usePushHere` lives inside the
 strip rather than beside it, so a page nobody has ticked anything on registers no service worker and
 re-posts no subscription.
 

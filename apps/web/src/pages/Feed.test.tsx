@@ -184,6 +184,39 @@ describe('the bell in a card’s corner', () => {
     fireEvent.click(await screen.findByRole('button', { name: `Notification settings for ${what}` }))
   }
 
+  it('is a lit bell where something is on and a struck one where nothing is', async () => {
+    renderPage(
+      stub({}, [
+        aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true }),
+        aCard({ id: 'c-2', title: 'Cacao ceremony', entity_id: 's-2' }),
+      ]),
+    )
+
+    const lit = await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' })
+    expect(lit.textContent).toBe('🔔')
+    expect(screen.getByRole('button', { name: 'Notification settings for Cacao ceremony' }).textContent).toBe(
+      '🔕',
+    )
+  })
+
+  it('lights up for the kind as well as for the card', async () => {
+    renderPage(
+      stub(
+        {
+          getMyNotificationSettings: () =>
+            Promise.resolve({ on: ['dream_offered'], email: [], digest: 'off' }),
+        },
+        [aCard({ id: 'c-1', title: 'Sauna at dawn' })],
+      ),
+    )
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Notification settings for Sauna at dawn' }).textContent,
+      ).toBe('🔔'),
+    )
+  })
+
   it('opens on a press and closes on Escape', async () => {
     renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
@@ -966,6 +999,50 @@ describe('what everyone has been doing', () => {
 
     await waitFor(() => expect(posted).toHaveBeenCalledWith('c-1', { body: 'is one person enough?' }))
     expect(await screen.findByText('is one person enough?')).toBeTruthy()
+  })
+
+  it('takes a card away when its thing has gone, and says which thing it was', async () => {
+    // #614: a meeting taken out of the diary deletes its thread, so a reply from a page that
+    // was already showing the card answers 404. The card used to stay, composer and all, under
+    // a banner reading "Not found." — and what had been typed was gone with it.
+    const posted = vi.fn<FeedApi['postComment']>(() =>
+      Promise.reject(apiError(404, 'not_found', 'Not found.')),
+    )
+    const getFeed = vi
+      .fn<FeedApi['getFeed']>()
+      .mockResolvedValueOnce({
+        threads: [aCard({ id: 'c-1', title: 'Planning call', entity_type: 'meeting' })],
+      })
+      .mockResolvedValue({ threads: [] })
+    renderPage(stub({ getFeed, postComment: posted }))
+
+    const box = await screen.findByLabelText('Say something about Planning call')
+    fireEvent.input(box, { target: { value: 'that time does not work' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    expect(
+      await screen.findByText('Somebody took that out of the diary. It is off the page now.'),
+    ).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Planning call')).toBeNull())
+  })
+
+  it('keeps the card and the ordinary wording where the failure is not a disappearance', async () => {
+    // The passing sibling: a 500 is something to try again, not something that has gone.
+    const posted = vi.fn<FeedApi['postComment']>(() =>
+      Promise.reject(apiError(500, 'internal_error', 'Something went wrong at our end.')),
+    )
+    renderPage(stub({ postComment: posted }, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    const box = await screen.findByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: 'is one mat enough?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    expect(await screen.findByText('Something went wrong at our end.')).toBeTruthy()
+    expect(screen.getByText('Sauna at dawn')).toBeTruthy()
+    expect(screen.getByLabelText('Say something about Sauna at dawn')).toHaveProperty(
+      'value',
+      'is one mat enough?',
+    )
   })
 
   it('asks for the rest of a conversation only when there is more of it', async () => {

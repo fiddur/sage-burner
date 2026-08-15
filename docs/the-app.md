@@ -175,8 +175,10 @@ something else.
 would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
 against that wrapper instead of the viewport — which is `.bottom-bar` and `.bell-panel`,
 and exactly the class of bug #344 and #348 were. The z-index scale gains two: bar 20,
-popdown 30, the drawer's backdrop 34, the drawer 35, modal 40 — the backdrop one rung
-under what it sits behind rather than a round number of its own.
+popdown 30, the push nudge 32, the drawer's backdrop 34, the drawer 35, modal 40 — the
+backdrop one rung under what it sits behind rather than a round number of its own, and the
+nudge above the popdown because a popdown is what raises it (#589). `styles.test.ts` holds
+that order, the stylesheet being the only place it is written down.
 
 It is **rendered only while open** rather than hidden with CSS, so its links are out of
 the tab order the rest of the time with no `inert` to keep in step with an animation.
@@ -316,8 +318,16 @@ Three rules the pages follow, all of them things a phone found first:
 emoji — 🎵 Songbook, 🛻 Rideshares, 🍽️ Meals — and so do the marks on a card's entries and
 the before/during/after phases on Leads. Those say _what this is_, and a grey
 outline pan is worse than 🍳. Every control went the other way: a pencil, a trashcan, a
-bell, a hand, one weight and one colour. A row may hold both — a page's own mark beside the
+hand, one weight and one colour. A row may hold both — a page's own mark beside the
 arrow saying it opens elsewhere — but two _controls_ in one row are never one of each.
+
+**The bell and the heart are the exception, and it is a state rather than a control** (#672).
+A pencil is a door; a bell is a switch you can read, and what it has to say is _on_ or _off_ at
+a glance. As line art both states were the same empty outline — 🔔 and 🔕 differ by one diagonal
+stroke, which at the 0.9rem a card's corner gives it is nothing — so a card with both switches
+ticked looked like a card with neither. Emoji carry the fill: 🔔 / 🔕 in the corner, ♡ / ❤️‍🔥 on
+the heart. That also means the mark takes no `color`, so the top bell's quiet-until-something
+signal is opacity and its count badge rather than the ember a drawing could be given.
 
 The drawings are [Lucide](https://lucide.dev)'s, pasted as path data into `Icon.tsx` exactly
 as #492 pasted Simple Icons' brand marks into `MusicIcon.tsx`, with the ISC notice in
@@ -330,9 +340,9 @@ sets `sideEffects: false` is that this app has already lost that argument once.
 **`currentColor` and `em` are what kept it to one new rule.** `.icon` is `1.1em` square and
 the drawing is `fill: none; stroke: currentColor`, so every rule that already set a control's
 colour and its `:hover` reaches the icon untouched, in both themes, and each place decides
-the size from its own `font-size`. The bell gained something in the move: it was greyed with
-`filter: grayscale(1)`, which does nothing to a drawing that is one colour already, so
-unseen notifications turn it `--ember` instead.
+the size from its own `font-size`. That is what the bell then lost by going back (#672): an
+emoji takes neither `currentColor` nor the `filter: grayscale(1)` it wore before #621, so the
+quiet-until-something-happens signal is opacity and the count badge.
 
 **The drawing is `aria-hidden` and the name stays on the button**, which was already true of
 the emoji and is why six assertions in eighteen hundred had to change — a control is found by
@@ -405,6 +415,17 @@ left. A meeting and a talking point delete their thread outright (#608), so they
 spelling of "withdrawn" is a second thing to keep in step, and the entity that gains a soft
 withdrawal next would have to remember both. The cut to fifty happens after, so a run of tombstones
 takes the page's slots but never a live card's place in the order.
+
+**And a page already open finds out from a 404** (#614). Every other disappearance here is soft, so
+until #608 a thread could not vanish under a page that was showing it; a meeting or a point deleted
+outright can. Every write a card offers goes through one wrapper that reads a 404 as _this is not
+there any more_: the card is dropped from the page, the feed is re-read, and the message names what
+went in the words that kind is taken away in — "Somebody took that out of the diary." A generic
+"Not found." over a card still sitting there with its composer open is the thing this replaces.
+
+**What was typed survives a failed reply.** `DreamThread` emptied its box on the way out rather
+than on the answer, so a reply to a thread somebody had just deleted was lost to a banner. The box
+is cleared by a `done` the caller passes, which is the shape the rewording form already used.
 
 #611 was the first answer to this, and the wrong one: it made a `withdrawn` entry not count as
 liveliness, so the card stayed where it already was, marked "taken back", and a comment on it could

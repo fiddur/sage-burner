@@ -1,6 +1,6 @@
 import type { Thread, ThreadEntry } from '@sage-burner/shared'
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { DreamThread } from './DreamThread.tsx'
@@ -113,15 +113,32 @@ describe('a conversation about a dream', () => {
     expect(screen.queryByRole('button', { name: /Rewrite what you said/ })).toBeNull()
   })
 
-  it('sends what was typed, and clears the box', () => {
+  it('sends what was typed, and clears the box once the caller says it landed', async () => {
     const { say } = show(aThread([]))
 
     const box = screen.getByLabelText('Say something about Sauna at dawn')
     fireEvent.input(box, { target: { value: '  is one mat enough?  ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
 
-    expect(say).toHaveBeenCalledWith('is one mat enough?')
+    expect(say).toHaveBeenCalledWith('is one mat enough?', expect.any(Function))
+    expect((box as HTMLTextAreaElement).value).toBe('  is one mat enough?  ')
+
+    await act(() => say.mock.calls[0]?.[1]?.())
+
     expect((box as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('keeps what was typed where the reply never landed', () => {
+    // #614: a reply to a thread somebody has just deleted answers 404, and the box used to
+    // empty anyway — what you wrote was gone, under a banner reading "Not found."
+    const { say } = show(aThread([]))
+
+    const box = screen.getByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: 'is one mat enough?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    expect(say).toHaveBeenCalled()
+    expect((box as HTMLTextAreaElement).value).toBe('is one mat enough?')
   })
 
   it('will not send an empty comment', () => {
@@ -159,7 +176,7 @@ describe('a conversation about a dream', () => {
     fireEvent.input(box, { target: { value: 'look at this ![](/api/images/img-1)' } })
     fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
 
-    expect(say).toHaveBeenCalledWith('look at this ![](/api/images/img-1)')
+    expect(say).toHaveBeenCalledWith('look at this ![](/api/images/img-1)', expect.any(Function))
   })
 
   it('will not save a rewrite with a picture still on the way', () => {
