@@ -15,7 +15,7 @@ under today's heading, and make a new heading when there is none.
   give one. The bell in the top bar is a bell you can see too, dim until something is waiting.
 
 - **The "notify me on this device" offer can be pressed where it appears.** Ticking a category on
-  a card near the bottom of a phone screen raised the offer *behind* the little menu you ticked it
+  a card near the bottom of a phone screen raised the offer _behind_ the little menu you ticked it
   in, so the button did nothing however many times you pressed it. The strip now sits above the
   menu.
 
