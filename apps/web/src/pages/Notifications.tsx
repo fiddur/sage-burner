@@ -7,14 +7,22 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NotificationList } from '../components/NotificationList.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { useLoad } from '../load.ts'
+import { useNotificationRows } from '../notification-rows.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
-export type NotificationsApi = Pick<ApiClient, 'getMyNotifications' | 'markNotificationsSeen'>
+export type NotificationsApi = Pick<
+  ApiClient,
+  | 'deleteMyNotification'
+  | 'getMyNotifications'
+  | 'getMyNotificationSettings'
+  | 'markNotificationsSeen'
+  | 'updateMyNotificationSettings'
+>
 
 export const Notifications = ({ api }: { api: NotificationsApi }) => {
   const viewer = useViewer()
   const signedIn = viewer.account !== undefined
-  const { loaded, refreshing } = useLoad(async (signal) => await api.getMyNotifications(signal), {
+  const { loaded, refreshing, reload } = useLoad(async (signal) => await api.getMyNotifications(signal), {
     enabled: signedIn,
     fallback: 'Could not load what has happened. Please reload the page.',
     live: true,
@@ -27,6 +35,8 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
 
     api.markNotificationsSeen().catch(() => undefined)
   }, [api, unseen])
+
+  const rows = useNotificationRows(api, () => void reload())
 
   const arrivedNew = useRef<Set<string>>(new Set())
 
@@ -54,7 +64,11 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
       {loaded.status === 'loading' && <p class="form-note">One moment…</p>}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {loaded.status === 'ready' && <NotificationList items={asRead} />}
+      <ErrorText message={rows.error} />
+
+      {loaded.status === 'ready' && (
+        <NotificationList items={asRead} busy={rows.busy} onStop={rows.stop} onRemove={rows.remove} />
+      )}
     </GuardedPage>
   )
 }

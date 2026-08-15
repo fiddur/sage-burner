@@ -299,6 +299,11 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     getNotificationLog: (signal?: AbortSignal) =>
       request<NotificationLogResponse>(apiRoutes.getNotificationLog.path(), { signal }),
 
+    deleteMyNotification: (id: string) =>
+      request<NotificationsResponse>(apiRoutes.deleteMyNotification.path(id), {
+        method: apiRoutes.deleteMyNotification.method,
+      }),
+
     markNotificationsSeen: () =>
       request<NotificationsResponse>(apiRoutes.markNotificationsSeen.path(), {
         method: apiRoutes.markNotificationsSeen.method,
