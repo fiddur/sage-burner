@@ -87,17 +87,27 @@ const givenBurn = async () => {
 
 const TOLD: Told = { category: 'dream_offered', body: 'Ada offered a dream', link: '/dreams' }
 
-/** The queue the last `telling` deferred onto, so a test can wait for the email leg to run. */
-let queue = createEmailQueue(() => undefined)
+const quietly = createEmailQueue(() => undefined)
 
 const telling = (
   deps: PushDeps,
   post?: EmailChannel,
   log: (trouble: PushTrouble) => void = () => undefined,
-) => {
-  queue = createEmailQueue(() => undefined)
+) => recordAndPush(deps, () => clock, log, post === undefined ? undefined : { post, defer: quietly.defer })
 
-  return recordAndPush(deps, () => clock, log, post === undefined ? undefined : { post, defer: queue.defer })
+/** The email leg runs off the queue, so a test asserting on it waits for this one's `drain`. */
+const emailing = (deps: PushDeps, post: EmailChannel) => {
+  const queue = createEmailQueue(() => undefined)
+
+  return {
+    notify: recordAndPush(
+      deps,
+      () => clock,
+      () => undefined,
+      { post, defer: queue.defer },
+    ),
+    queue,
+  }
 }
 
 const rows = async () => await db().select().from(notificationBatch)
@@ -174,31 +184,34 @@ describe('the record of a notification going out', () => {
     const deps = build()
     const accountId = await givenAccount({ email: true })
 
-    await telling(deps, () => Promise.resolve({ sent: true, reason: null }))(accountId, TOLD)
-    await queue.drain()
+    const email = emailing(deps, () => Promise.resolve({ sent: true, reason: null }))
+
+    await email.notify(accountId, TOLD)
+    await email.queue.drain()
 
     expect(await rows()).toMatchObject([{ emailed: 1 }])
   })
 
   it('counts none where the mail server refused it', async () => {
-    // #583: the count was decided from the ticked box, before the queue had run — so a
-    // relay that answered "550" was logged as an email that went.
     const deps = build()
     const accountId = await givenAccount({ email: true })
 
-    await telling(deps, () => Promise.resolve({ sent: false, reason: '550 nope' }))(accountId, TOLD)
-    await queue.drain()
+    const email = emailing(deps, () => Promise.resolve({ sent: false, reason: '550 nope' }))
+
+    await email.notify(accountId, TOLD)
+    await email.queue.drain()
 
     expect(await rows()).toMatchObject([{ emailed: 0 }])
   })
 
   it('counts none where the installation has no mail server, nothing being attempted', async () => {
-    // What `emailChannel` answers with no `mail_setting` row: it returns before posting.
     const deps = build()
     const accountId = await givenAccount({ email: true })
 
-    await telling(deps, () => Promise.resolve(undefined))(accountId, TOLD)
-    await queue.drain()
+    const email = emailing(deps, () => Promise.resolve(undefined))
+
+    await email.notify(accountId, TOLD)
+    await email.queue.drain()
 
     expect(await rows()).toMatchObject([{ emailed: 0 }])
   })
@@ -207,8 +220,10 @@ describe('the record of a notification going out', () => {
     const deps = build()
     const accountId = await givenAccount()
 
-    await telling(deps, () => Promise.resolve({ sent: true, reason: null }))(accountId, TOLD)
-    await queue.drain()
+    const email = emailing(deps, () => Promise.resolve({ sent: true, reason: null }))
+
+    await email.notify(accountId, TOLD)
+    await email.queue.drain()
 
     expect(await rows()).toMatchObject([{ emailed: 0 }])
   })

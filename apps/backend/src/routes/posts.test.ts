@@ -247,10 +247,6 @@ describe('naming somebody in an announcement', () => {
   })
 
   it('writes one line in the log for the naming, however many people it names', async () => {
-    // #582: the mention loops were left out of `oneBatch`, justified as "separate notifications
-    // with separate bodies" — and the body is one string handed to everybody. `@everybody` then
-    // turned one mention into one log line per attendee, which is the flood `oneBatch` exists
-    // to prevent.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')

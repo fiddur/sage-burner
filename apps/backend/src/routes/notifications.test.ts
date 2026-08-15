@@ -540,7 +540,6 @@ describe('the waiting list', () => {
     await setPaid(server, admin.cookie, paid.id)
 
     const [told] = (await list(server, unpaid.cookie)).json().notifications
-    // #572: the count agreed and the clause after it did not — "1 place left, and *they* go".
     expect(told.body).toContain('1 place left, and it goes to whoever pays')
     expect(told.body).not.toContain('1 places')
   })

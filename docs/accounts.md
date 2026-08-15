@@ -1084,7 +1084,9 @@ page holds. One category per row, so a comment is two rows — the participants'
 notifications with separate bodies — and the body is one string, `${who} named you in ${what}`,
 handed to everybody named. `@everybody` then turned a single mention into one row per attendee,
 which is the flood this exists to stop; the log read as several identical lines nobody could tell
-apart. `tellNamed` and the two in `posts.ts` mint one batch and share it.
+apart. All four sites mint one batch and share it: `tellNamed` in `threads.ts`, `bring.ts` and
+`meetings.ts`, and the announcement's two in `posts.ts`. Every one of them goes through `namedBy`,
+which is what expands `@everybody`, so one left out leaves the flood open.
 
 **`accepted` is not `delivered`, and the column is named so it cannot be read as one.** It counts
 the subscriptions the push service took; `gone` is a 404 or 410, meaning the subscription is dead

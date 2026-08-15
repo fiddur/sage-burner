@@ -771,8 +771,6 @@ describe('naming somebody in a comment', () => {
     expect((await bell(server, dag.cookie)).map((one) => one.category)).toEqual(['mentioned'])
     expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['mentioned'])
     expect(await bell(server, bea.cookie)).toEqual([])
-    // And one line in the log for it, not one per person named (#582): the body is one
-    // string handed to all of them.
     const log = await db().select().from(notificationBatch)
     expect(log.filter((row) => row.category === 'mentioned')).toMatchObject([{ told: 2 }])
   })

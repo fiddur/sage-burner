@@ -148,13 +148,8 @@ export const recordAndPush =
   (deps: PushDeps, now: () => Date, log: (trouble: PushTrouble) => void, email?: Email): Notifier =>
   async (accountId, told) => {
     const channels = await wants(deps.db, accountId, told.category)
-    // Pinned here rather than left to `countInto`, which mints one per call: the email leg is
-    // counted from the queue, long after this returns, and the two halves have to find the same row.
     const one = oneBatch(told)
 
-    // Counted where the send lands rather than where it is asked for (#583): the queue runs after
-    // the request, `emailChannel` answers `undefined` on an installation with no mail server, and
-    // a ticked box is not a message. So the column can be read as "messages a mail server took".
     if (channels.email && email !== undefined) {
       email.defer(async () => {
         const posted = await email.post(accountId, one)
