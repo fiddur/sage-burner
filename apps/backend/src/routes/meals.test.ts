@@ -1210,13 +1210,16 @@ describe('the card a sitting carries', () => {
     expect(card.entries.map((entry) => entry.body)).toEqual(['said what it will be: Dahl and rice'])
   })
 
-  it('says nothing when the idea is saved unchanged', async () => {
+  it('says nothing when the idea is saved unchanged, whoever saves it', async () => {
     const { server, ada, meal } = await setUp()
+    const bea = await givenAttending('Bea')
     await send(server, 'PUT', `/api/meals/${meal.id}/idea`, ada.cookie, { food_idea: 'Dahl and rice' })
 
-    await send(server, 'PUT', `/api/meals/${meal.id}/idea`, ada.cookie, { food_idea: 'Dahl and rice' })
+    await send(server, 'PUT', `/api/meals/${meal.id}/idea`, bea.cookie, { food_idea: 'Dahl and rice' })
 
-    expect(await entriesOn(server, ada.cookie, meal.id)).toHaveLength(1)
+    expect(await entriesOn(server, ada.cookie, meal.id)).toEqual([
+      ['Ada', 'edited', 'said what it will be: Dahl and rice'],
+    ])
   })
 
   it('takes the card off the feed with the sitting', async () => {
@@ -1250,7 +1253,6 @@ describe('the card a sitting carries', () => {
       }[]
 
     expect((await bell(watching.cookie)).map((one) => one.body)).toEqual(['Bea is cooking Dinner'])
-    // The one who did it and the one it was given to: the second already has the personal one.
     expect((await bell(admin.cookie)).map((one) => one.category)).toEqual([])
     expect((await bell(bea.cookie)).map((one) => one.category)).toEqual(['meal_role'])
     expect((await bell(ada.cookie)).map((one) => one.category)).toEqual([])

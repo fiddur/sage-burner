@@ -706,9 +706,7 @@ describe('the waiting list', () => {
   })
 
   it('says nothing to whoever is left when somebody leaves, an unpaid place never having been one', async () => {
-    // No fixture can reject a recompute wired into the leave route: `left` is the cap less what
-    // has been paid for, and leaving only ever removes an unpaid row, so the words never change
-    // and `toldAlready` swallows the re-send. This records the decision; `docs/burns.md` has why.
+    // No fixture can reject a recompute here: leaving only removes an unpaid row (docs/burns.md).
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])
