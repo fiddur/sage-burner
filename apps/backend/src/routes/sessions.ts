@@ -42,7 +42,7 @@ import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow } from './events.ts'
-import { addEntry, renameThread, threadFor, threadIdFor } from './threads.ts'
+import { addEntry, renameThread, tellHeartedDream, threadFor, threadIdFor } from './threads.ts'
 
 export interface SessionDeps extends GuardDeps {
   now: () => Date
@@ -618,10 +618,14 @@ export const registerSessionRoutes = (
       const found = await asAttendee(request)
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
-      await db
+      const added = await db
         .insert(sessionSupport)
         .values({ session_id: found.dream.id, attendance_id: found.mine })
         .onConflictDoNothing()
+        .returning()
+
+      const by = found.callerId
+      if (added.length > 0 && by !== undefined) await tellHeartedDream(db, notify, found.dream, by)
 
       return { session: await oneDream(db, found.dream, found.mine) } satisfies SessionResponse
     },

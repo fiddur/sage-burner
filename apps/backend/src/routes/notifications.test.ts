@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { notificationCategories } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -42,6 +43,12 @@ afterEach(async () => {
 
 const db = () => {
   const found = handle?.db
+  if (found === undefined) throw new Error('build() first')
+  return found
+}
+
+const client = () => {
+  const found = handle?.client
   if (found === undefined) throw new Error('build() first')
   return found
 }
@@ -316,6 +323,7 @@ describe('what somebody has switched on', () => {
     'mentioned',
     'lead_role_comment',
     'meal_comment',
+    'hearted',
     'application',
     'application_news',
   ]
@@ -1284,5 +1292,55 @@ describe('what one line in the log covers', () => {
 
     const said = (await log(server, admin.cookie)).json().entries
     expect(said.filter((one: { body: string }) => one.body.includes('said something'))).toHaveLength(2)
+  })
+})
+
+describe('the vocabulary the database will accept', () => {
+  const insertable = (table: 'notification' | 'notification_setting', category: string): boolean => {
+    try {
+      if (table === 'notification') {
+        client()
+          .prepare('insert into notification (id, account_id, category, body, created_at) values (?,?,?,?,?)')
+          .run(randomUUID(), CATEGORY_CHECK_ACCOUNT, category, 'a line', NOW)
+      } else {
+        client()
+          .prepare('insert into notification_setting (account_id, category, enabled, email) values (?,?,?,?)')
+          .run(CATEGORY_CHECK_ACCOUNT, category, 1, 0)
+      }
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const CATEGORY_CHECK_ACCOUNT = 'a0000000-0000-4000-8000-0000000000ff'
+
+  const givenSomebody = async () => {
+    await db().insert(account).values({
+      id: CATEGORY_CHECK_ACCOUNT,
+      email: 'checks@example.org',
+      password_hash: null,
+      created_at: NOW,
+    })
+  }
+
+  it('takes every category the app knows about, on both tables', async () => {
+    await build()
+    await givenSomebody()
+
+    const refused = notificationCategories.filter(
+      (category) => !insertable('notification', category) || !insertable('notification_setting', category),
+    )
+
+    expect(refused).toEqual([])
+  })
+
+  it('refuses one it has never heard of, so the CHECK is doing something', async () => {
+    await build()
+    await givenSomebody()
+
+    expect(insertable('notification', 'not_a_category')).toBe(false)
+    expect(insertable('notification_setting', 'not_a_category')).toBe(false)
   })
 })

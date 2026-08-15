@@ -889,6 +889,51 @@ describe('helping with a dream', () => {
 })
 
 describe('supporting a dream', () => {
+  const bell = async (
+    server: FastifyInstance,
+    cookie: string,
+  ): Promise<{ category: string; body: string }[]> =>
+    (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
+      .notifications
+
+  it('tells whoever offered it, from the panel as from the feed card', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const bea = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    await selfService(server, bea.cookie, id, 'support', 'POST')
+
+    expect(await bell(server, ada.cookie)).toMatchObject([
+      { category: 'hearted', body: expect.stringContaining('hearts Sunrise yoga') },
+    ])
+  })
+
+  it('tells them once however many times it is pressed', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const bea = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    await selfService(server, bea.cookie, id, 'support', 'POST')
+    await selfService(server, bea.cookie, id, 'support', 'POST')
+
+    expect(await bell(server, ada.cookie)).toHaveLength(1)
+  })
+
+  it('says nothing for your own dream', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+
+    expect(await bell(server, ada.cookie)).toEqual([])
+  })
+
   it('counts one heart per person, however many times they click', async () => {
     const server = await build()
     const eventId = await givenEvent()

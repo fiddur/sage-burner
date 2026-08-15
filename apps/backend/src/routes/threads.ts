@@ -823,6 +823,68 @@ const authorRow = async (
   return row?.author == null ? [] : [row.author]
 }
 
+const cardAuthor = {
+  attendance: (_db: Database, found: Whose) => Promise.resolve(found.subject_account_id),
+  post: async (db: Database, found: Whose) => (await authorRow(db, post, found.entity_id))[0] ?? null,
+  song: async (db: Database, found: Whose) => (await authorRow(db, song, found.entity_id))[0] ?? null,
+  bring: async (db: Database, found: Whose) => (await authorRow(db, bringItem, found.entity_id))[0] ?? null,
+  point: async (db: Database, found: Whose) =>
+    (await authorRow(db, meetingPoint, found.entity_id))[0] ?? null,
+  meeting: async (db: Database, found: Whose) => (await authorRow(db, meeting, found.entity_id))[0] ?? null,
+  session: async (db: Database, found: Whose) => {
+    const [offered] = await db
+      .select({ author: threadEntry.author_account_id })
+      .from(threadEntry)
+      .where(and(eq(threadEntry.thread_id, found.id), eq(threadEntry.kind, 'offered')))
+      .orderBy(asc(threadEntry.seq))
+      .limit(1)
+
+    return offered?.author ?? null
+  },
+  role: () => Promise.resolve(null),
+  meal: () => Promise.resolve(null),
+} as const satisfies Record<ThreadEntityType, (db: Database, found: Whose) => Promise<string | null>>
+
+const wroteIt = async (db: Database, found: Whose): Promise<string | null> =>
+  await cardAuthor[found.entity_type](db, found)
+
+/**
+ * A dream's heart has two doors — the card on the feed and the panel on Dreams and Schedule —
+ * and they write the same `session_support` row, so they have to say the same thing (#706).
+ */
+export const tellHeartedDream = async (
+  db: Database,
+  notify: Notifier,
+  dream: { id: string; event_id: string | null; title: string },
+  by: string,
+): Promise<void> => {
+  const [card] = await db
+    .select({ id: thread.id })
+    .from(thread)
+    .where(and(eq(thread.entity_type, 'session'), eq(thread.entity_id, dream.id)))
+    .limit(1)
+
+  if (card === undefined) return
+
+  const author = await wroteIt(db, {
+    id: card.id,
+    entity_type: 'session',
+    entity_id: dream.id,
+    subject_account_id: null,
+  })
+
+  if (author === null || author === by) return
+
+  await notify(
+    author,
+    oneBatch({
+      category: 'hearted',
+      body: `${await displayName(db, by)} hearts ${dream.title}`,
+      link: dream.event_id === null ? null : dreamPage(dream.event_id, dream.id),
+    }),
+  )
+}
+
 const alsoInIt = {
   attendance: (_db: Database, found: Whose) =>
     Promise.resolve(found.subject_account_id === null ? [] : [found.subject_account_id]),
@@ -1052,12 +1114,16 @@ export const registerThreadRoutes = (
         event_id: thread.event_id,
         entity_type: thread.entity_type,
         entity_id: thread.entity_id,
+        subject_account_id: thread.subject_account_id,
+        title: thread.title,
       })
       .from(thread)
       .where(eq(thread.id, request.params.id))
       .limit(1)
 
     if (found === undefined) return sendError(reply, 404)
+
+    let given = false
 
     if (found.entity_type === 'session') {
       const [dream] = await db
@@ -1073,24 +1139,36 @@ export const registerThreadRoutes = (
       if (mine === undefined) return sendError(reply, 403)
 
       if (put) {
-        await db
+        const added = await db
           .insert(sessionSupport)
           .values({ session_id: found.entity_id, attendance_id: mine })
           .onConflictDoNothing()
+          .returning()
+
+        given = added.length > 0
       } else {
         await db
           .delete(sessionSupport)
           .where(and(eq(sessionSupport.session_id, found.entity_id), eq(sessionSupport.attendance_id, mine)))
       }
     } else if (put) {
-      await db
+      const added = await db
         .insert(threadSupport)
         .values({ thread_id: found.id, account_id: viewer.account_id })
         .onConflictDoNothing()
+        .returning()
+
+      given = added.length > 0
     } else {
       await db
         .delete(threadSupport)
         .where(and(eq(threadSupport.thread_id, found.id), eq(threadSupport.account_id, viewer.account_id)))
+    }
+
+    if (given) {
+      await (found.entity_type === 'session'
+        ? tellHeartedDream(db, notify, { ...found, id: found.entity_id }, viewer.account_id)
+        : tellHearted(found, viewer.account_id, await wroteIt(db, found)))
     }
 
     return await whole(reply, found.id, viewer)
@@ -1151,7 +1229,11 @@ export const registerThreadRoutes = (
     if (viewer === undefined) return sendError(reply, 401)
 
     const [comment] = await db
-      .select({ id: threadEntry.id, thread_id: threadEntry.thread_id })
+      .select({
+        id: threadEntry.id,
+        thread_id: threadEntry.thread_id,
+        author_account_id: threadEntry.author_account_id,
+      })
       .from(threadEntry)
       .where(and(eq(threadEntry.id, request.params.id), eq(threadEntry.kind, 'comment')))
       .limit(1)
@@ -1159,10 +1241,15 @@ export const registerThreadRoutes = (
     if (comment === undefined) return sendError(reply, 404)
 
     if (put) {
-      await db
+      const added = await db
         .insert(entrySupport)
         .values({ entry_id: comment.id, account_id: viewer.account_id })
         .onConflictDoNothing()
+        .returning()
+
+      if (added.length > 0) {
+        await tellHeartedComment(comment.thread_id, viewer.account_id, comment.author_account_id)
+      }
     } else {
       await db
         .delete(entrySupport)
@@ -1299,6 +1386,47 @@ export const registerThreadRoutes = (
             .from(attendance)
             .where(and(eq(attendance.event_id, eventId), ne(attendance.account_id, author)))
         ).map((row) => row.account_id)
+
+  const tellHearted = async (found: Subject & { id: string }, by: string, author: string | null) => {
+    if (author === null || author === by) return
+
+    const { link, what } = await aboutWhat(found)
+
+    await notify(
+      author,
+      oneBatch({ category: 'hearted', body: `${await displayName(db, by)} hearts ${what}`, link }),
+    )
+  }
+
+  const tellHeartedComment = async (threadId: string, by: string, author: string | null) => {
+    if (author === null || author === by) return
+
+    const [found] = await db
+      .select({
+        id: thread.id,
+        event_id: thread.event_id,
+        entity_type: thread.entity_type,
+        entity_id: thread.entity_id,
+        subject_account_id: thread.subject_account_id,
+        title: thread.title,
+      })
+      .from(thread)
+      .where(eq(thread.id, threadId))
+      .limit(1)
+
+    if (found === undefined) return
+
+    const { link, what } = await aboutWhat(found)
+
+    await notify(
+      author,
+      oneBatch({
+        category: 'hearted',
+        body: `${await displayName(db, by)} hearts what you said about ${what}`,
+        link,
+      }),
+    )
+  }
 
   const tellAbout = async (
     found: {
