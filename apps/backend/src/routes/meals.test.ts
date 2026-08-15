@@ -1231,6 +1231,47 @@ describe('the card a sitting carries', () => {
     expect((await send(server, 'GET', `/api/threads/${card.id}`, ada.cookie)).statusCode).toBe(404)
   })
 
+  it('tells the burn who took it on, and never the two who did it', async () => {
+    const { server, admin, ada, meal } = await setUp()
+    const bea = await givenAttending('Bea')
+    const watching = await givenAttending('Cai')
+    await send(server, 'PUT', '/api/me/notification-settings', watching.cookie, {
+      on: ['meal_taken'],
+      email: [],
+      digest: 'off',
+    })
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, admin.cookie, { account_id: bea.id })
+
+    const bell = async (cookie: string) =>
+      (await send(server, 'GET', '/api/me/notifications', cookie)).json().notifications as {
+        category: string
+        body: string
+      }[]
+
+    expect((await bell(watching.cookie)).map((one) => one.body)).toEqual(['Bea is cooking Dinner'])
+    // The one who did it and the one it was given to: the second already has the personal one.
+    expect((await bell(admin.cookie)).map((one) => one.category)).toEqual([])
+    expect((await bell(bea.cookie)).map((one) => one.category)).toEqual(['meal_role'])
+    expect((await bell(ada.cookie)).map((one) => one.category)).toEqual([])
+  })
+
+  it('tells the burn about a hand going up for a crew as well', async () => {
+    const { server, ada, meal } = await setUp()
+    const watching = await givenAttending('Cai')
+    await send(server, 'PUT', '/api/me/notification-settings', watching.cookie, {
+      on: ['meal_taken'],
+      email: [],
+      digest: 'off',
+    })
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/cleanup`, ada.cookie, { account_id: ada.id })
+
+    const bell = (await send(server, 'GET', '/api/me/notifications', watching.cookie)).json()
+      .notifications as { body: string }[]
+    expect(bell.map((one) => one.body)).toEqual(['Ada is on cleanup for Dinner'])
+  })
+
   it('tells whoever is cooking when somebody says something about it', async () => {
     const { server, ada, meal } = await setUp()
     const bea = await givenAttending('Bea')

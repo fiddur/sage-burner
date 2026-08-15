@@ -94,9 +94,12 @@ opening a card each would put forty things on the feed that nobody has done. `th
 card on the first entry, which is the first time there is anything to read.
 
 The card's title is the sitting's label and its body is the food idea, both read live through the
-join, so renaming a sitting cannot leave the old name on the feed. `meal_taken` is the burn-wide
-category — off by default, like every "what somebody else did" — and `meal_role` stays what it was:
-the personal one, for being put on or taken off. **Deleting a sitting deletes its card**, in the
+join, so renaming a sitting cannot leave the old name on the feed.
+
+**Two categories, and the split is #259's.** `meal_role` is the personal one and unchanged — you
+were put on something, or taken off it. `meal_taken` is the burn-wide one, sent where a lead is
+taken and where a hand goes up for a crew, never to the two people in the exchange: the actor knows,
+and the taker already has the personal one. Off by default, like every "what somebody else did". **Deleting a sitting deletes its card**, in the
 transaction that deletes the row.
 
 ### The kitchen is not a place

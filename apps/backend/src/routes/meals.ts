@@ -34,7 +34,7 @@ import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
-import { displayName } from '../push/notify.ts'
+import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow } from './events.ts'
 import { addEntry, forgetThread, threadFor } from './threads.ts'
 
@@ -146,6 +146,21 @@ export const registerMealRoutes = (
     await notify(accountId, { category: 'meal_role', body: message, link: mealsPage(eventId) })
   }
 
+  const tellTheBurn = async (
+    sitting: { event_id: string; label: string },
+    by: string,
+    taker: string,
+    message: string,
+  ) => {
+    await tellAttendees(
+      db,
+      notify,
+      sitting.event_id,
+      { category: 'meal_taken', body: message, link: mealsPage(sitting.event_id) },
+      { except: [by, taker] },
+    )
+  }
+
   const noteOnMeal = async (
     sitting: { id: string; event_id: string; label: string },
     kind: ThreadEntryKind,
@@ -159,6 +174,22 @@ export const registerMealRoutes = (
     })
 
     await addEntry(db, { thread_id: card, kind, author_account_id: by ?? null, body }, now())
+  }
+
+  const cookMoved = async (sitting: MealRow, by: string, was: string | undefined, after: string | null) => {
+    if (was !== undefined && was !== after) {
+      await tell(by, was, sitting.event_id, `You are no longer leading ${sitting.label}`)
+    }
+    if (after !== null && after !== was) {
+      await tell(by, after, sitting.event_id, `You are leading ${sitting.label}`)
+    }
+
+    const said = await cookLine(by, was, after)
+    if (said !== undefined) await noteOnMeal(sitting, 'facilitator', by, said)
+
+    if (after === null || after === was) return
+
+    await tellTheBurn(sitting, by, after, `${await displayName(db, after)} is cooking ${sitting.label}`)
   }
 
   const cookLine = async (by: string, was: string | undefined, after: string | null) => {
@@ -281,17 +312,8 @@ export const registerMealRoutes = (
       })
 
       const viewer = await viewerFor(request, { db, sessions })
-      const by = viewer?.account_id ?? ''
 
-      if (held !== undefined && held !== body.account_id) {
-        await tell(by, held, existing.event_id, `You are no longer leading ${existing.label}`)
-      }
-      if (body.account_id !== null && body.account_id !== held) {
-        await tell(by, body.account_id, existing.event_id, `You are leading ${existing.label}`)
-      }
-
-      const said = await cookLine(by, held, body.account_id)
-      if (said !== undefined) await noteOnMeal(existing, 'facilitator', by, said)
+      await cookMoved(existing, viewer?.account_id ?? '', held, body.account_id)
 
       return answer(reply, existing.id)
     },
@@ -343,6 +365,12 @@ export const registerMealRoutes = (
             accountId === viewer.account_id
               ? `put a hand up for ${role}`
               : `asked ${await displayName(db, accountId)} onto ${role}`,
+          )
+          await tellTheBurn(
+            existing,
+            viewer.account_id,
+            accountId,
+            `${await displayName(db, accountId)} is on ${role} for ${existing.label}`,
           )
         }
       } else {
