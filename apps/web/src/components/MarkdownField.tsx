@@ -45,8 +45,6 @@ export const MarkdownField = ({
 
   const subject = accessibleName ?? label
 
-  // The arrow keys carry focus with the selection, which is what makes the roving
-  // `tabIndex` navigable rather than a way of losing the keyboard on a dead button.
   const goTo = (wanted: boolean) => {
     setPreviewing(wanted)
     tabs.current[wanted ? 1 : 0]?.focus()
@@ -88,7 +86,13 @@ export const MarkdownField = ({
         </div>
 
         {previewing ? (
-          <div id={panelId} class="md-field-preview" role="tabpanel" aria-label={`${subject}, as it reads`}>
+          <div
+            id={panelId}
+            class="md-field-preview"
+            role="tabpanel"
+            tabIndex={0}
+            aria-label={`${subject}, as it reads`}
+          >
             {value.trim() === '' ? (
               <p class="form-note">Nothing written yet.</p>
             ) : (
@@ -99,7 +103,7 @@ export const MarkdownField = ({
         ) : (
           <div id={panelId} role="tabpanel">
             <SyntaxToolbar syntax={syntax} subject={subject}>
-              <AddPicture pictures={pictures} label={label} />
+              <AddPicture pictures={pictures} label={subject} />
             </SyntaxToolbar>
 
             <textarea
@@ -120,12 +124,18 @@ export const MarkdownField = ({
         )}
       </div>
 
-      <MentionMenu candidates={mentioning.candidates} subject={subject} onChoose={mentioning.choose} />
+      {!previewing && (
+        <MentionMenu candidates={mentioning.candidates} subject={subject} onChoose={mentioning.choose} />
+      )}
 
       <PictureTrouble pictures={pictures} />
 
       <p class="form-note md-field-help">
-        <a href={formattingPage()}>Markdown is supported</a>
+        {/* Away, so `preact-iso` leaves the click to the browser: routing here unmounts the
+            composer, and every draft in this app is component state. */}
+        <a href={formattingPage()} target="_blank" rel="noreferrer">
+          Markdown is supported
+        </a>
         {pictures.enabled && ' · paste, drop or click 🖼 to add a picture'}
       </p>
     </div>

@@ -11,8 +11,6 @@ const EXAMPLES: readonly { what: string; source: string }[] = [
   { what: 'A line between things', source: 'before\n\n---\n\nafter' },
 ]
 
-const NAMING = 'Ask @Somebody — the box offers names after an @, and picks the person, not the text.'
-
 const RAW_HTML = 'Raw HTML like <b>this</b> is shown as you typed it, never as formatting.'
 
 const Example = ({ what, source }: { what: string; source: string }) => (
@@ -65,7 +63,7 @@ export const Formatting = () => (
 
     <h2>Naming somebody</h2>
 
-    <p>{NAMING}</p>
+    <p>Ask @Somebody — the box offers names after an @, and picks the person, not the text.</p>
 
     <p>
       <code>@everybody</code> names everyone coming to the burn — or everyone here, on something that belongs

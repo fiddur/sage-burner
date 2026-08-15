@@ -18,8 +18,6 @@ describe('MarkdownField', () => {
   })
 
   it('carries focus with the selection when an arrow key moves it', () => {
-    // The roving `tabIndex` makes the unselected tab untabbable, so a selection that
-    // moves without focus leaves the keyboard on a button nothing can reach again.
     render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
 
     const write = screen.getByRole('tab', { name: 'Write' })
@@ -38,6 +36,14 @@ describe('MarkdownField', () => {
     expect(named).not.toBeNull()
     expect(document.getElementById(named ?? '')).not.toBeNull()
     expect(screen.getByRole('tab', { name: 'Preview' }).getAttribute('aria-controls')).toBeNull()
+  })
+
+  it('opens the formatting help away, so a draft is not routed out from under somebody', () => {
+    render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
+
+    const help = screen.getByRole('link', { name: 'Markdown is supported' })
+    expect(help.getAttribute('target')).toBe('_blank')
+    expect(help.getAttribute('rel')).toBe('noreferrer')
   })
 
   it('reports what was typed', () => {

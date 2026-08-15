@@ -15,8 +15,6 @@ describe('the formatting page', () => {
   })
 
   it('renders the examples through the app’s own renderer, so the page cannot promise more', () => {
-    // The heading example is `## Saturday`, which `renderMarkdown` shifts down one level —
-    // written out as HTML this page would say `h2` while every other page said `h3`.
     render(<Formatting />)
 
     expect(screen.getByRole('heading', { name: 'Saturday', level: 3 })).toBeTruthy()
