@@ -379,6 +379,17 @@ phone" means 360px.
       picture button is dimmed. Choosing an SVG says so below the box, not in the toolbar.
 - [ ] A field the public reads — the welcome text — has four buttons and no picture one.
 
+## The nav on a wide screen
+
+- [ ] A member sees a column of pages down the left on load, with every page in it —
+      Feed, Members, Schedule, Leads, Meals, FAQ, Songbook, Rideshares, Bring list,
+      Meetings, and the map where one is set, which still opens away. The top bar carries
+      the brand, the burn selector and the corner, and no page links at all.
+- [ ] The page you are on is marked in that column.
+- [ ] Press « at the top of it: the column goes and ☰ appears at the leading edge of the
+      bar. Reload: still gone. Press ☰: it is back, and a reload keeps it back.
+- [ ] Signed out, there is no column and no ☰.
+
 ## On a phone
 
 - [ ] Below 45rem a member gets the six-icon bottom bar; the top bar keeps ☰,

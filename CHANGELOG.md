@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **On a laptop, everything is in one menu down the left.** Half the pages were words along
+  the top and the other half were behind ☰, and which half a page was in came down to what
+  fitted. Every page is in the column now — Feed, Members, Schedule, Leads, Meals, FAQ,
+  Songbook, Rideshares, Bring list, Meetings and the map — with the one you are on marked. The
+  « at the top of it puts it away if you would rather have the room, ☰ brings it back, and it
+  stays however you left it. On a phone nothing changes.
+
 - **Meals are on the feed now.** Taking a sitting's cooking on, handing it over, putting a hand up
   for the crew or writing what it will be all show as one card per sitting, with the food idea on
   it and a box to ask "is it vegan?". Generating the plan itself puts nothing on the feed — a card

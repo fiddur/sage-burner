@@ -319,6 +319,71 @@ a:hover {
   max-width: var(--measure);
 }
 
+/* Wide viewports put every page in a column of its own (#681). A grid rather than the
+   drawer's `position: fixed`, because this one **is** part of the page: fixing it would
+   need the main column padded by hand to the same width, and the two would go out of step
+   the first time either changed. The header spans both columns so the brand and the
+   session corner stay where they were. */
+.layout.has-sidebar {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    'head head'
+    'side main'
+    'side foot';
+}
+
+.layout.has-sidebar > .site-header {
+  grid-area: head;
+}
+
+.layout.has-sidebar > .sidebar {
+  grid-area: side;
+}
+
+.layout.has-sidebar > .site-main {
+  grid-area: main;
+}
+
+.layout.has-sidebar > .site-footer {
+  grid-area: foot;
+}
+
+/* `sticky` rather than `fixed` for the same reason: it scrolls with a long page and stops
+   at the top, without being taken out of the grid that gave it its column. */
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0;
+  border-inline-end: 1px solid var(--line);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.sidebar-hide {
+  align-self: end;
+  padding: 0.3rem 1rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sidebar-hide:hover,
+.sidebar-hide:focus-visible {
+  color: var(--ink);
+}
+
+/* The page you are on, marked the way the bottom bar marks it. */
+.menu-entry.is-current {
+  background: color-mix(in srgb, var(--sage) 14%, transparent);
+  font-weight: 600;
+}
+
 /* The menu button and what it slides out. Over the page rather than pushing it aside —
    `docs/the-app.md` says why that is not a taste question. */
 .menu-wrap {

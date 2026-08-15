@@ -2,6 +2,7 @@ import type { AccountRole, MyBurn } from '@sage-burner/shared'
 
 import { apiRoutes } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -33,9 +34,24 @@ const signedInAs = (...roles: AccountRole[]): Viewer => ({
   account: { id: 'a-1', name: 'Ada Lovelace', avatar: null, roles },
 })
 
-// The gear is a glyph, so its name comes from `aria-label` rather than its text.
-const links = () =>
-  screen.getAllByRole('link').map((link) => link.getAttribute('aria-label') ?? link.textContent)
+/**
+ * The gear is a glyph, so its name comes from `aria-label` rather than its text — and a
+ * page link carries its icon in an `aria-hidden` span, which a screen reader skips and
+ * `textContent` does not. Dropping those is what makes this the name rather than the words.
+ */
+const nameOf = (link: Element): string => {
+  const said = link.getAttribute('aria-label')
+  if (said !== null) return said
+
+  const copy = link.cloneNode(true)
+  if (!(copy instanceof Element)) return link.textContent?.trim() ?? ''
+
+  for (const hidden of copy.querySelectorAll('[aria-hidden="true"]')) hidden.remove()
+
+  return copy.textContent?.trim() ?? ''
+}
+
+const links = () => screen.getAllByRole('link').map(nameOf)
 
 /**
  * Asserted one at a time, never as a negated `arrayContaining`.
@@ -158,7 +174,8 @@ describe('the nav', () => {
 })
 
 describe('the shape of the bar', () => {
-  it('opens with ☰, at the edge its drawer comes from', () => {
+  it('opens with ☰ on a phone, at the edge its drawer comes from', () => {
+    onAPhone()
     renderNav(signedInAs('member'))
 
     const bar = document.querySelector('.site-header')
@@ -168,6 +185,13 @@ describe('the shape of the bar', () => {
       'brand',
       'top-nav',
     ])
+  })
+
+  it('has no ☰ on a wide screen while the pages are beside it', () => {
+    renderNav(signedInAs('member'))
+
+    expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'Pages' })).toBeTruthy()
   })
 
   it('holds the bell, ⚙️ and the face in one group a narrow bar cannot break up', () => {
@@ -185,6 +209,7 @@ describe('the shape of the bar', () => {
 
 describe('the menu at the edge of the bar', () => {
   it('carries the pages the bar has no room for', async () => {
+    onAPhone()
     renderNav(signedInAs('member'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
@@ -218,6 +243,7 @@ describe('the link to the map of the area', () => {
   })
 
   it('is in the menu, opening where the map lives', async () => {
+    onAPhone()
     renderNav(signedInAs('member'), withMapLink(MAP))
 
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
@@ -229,6 +255,7 @@ describe('the link to the map of the area', () => {
   })
 
   it('says it leaves the app, since nothing else in the drawer does', async () => {
+    onAPhone()
     renderNav(signedInAs('member'), withMapLink(MAP))
 
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
@@ -239,6 +266,7 @@ describe('the link to the map of the area', () => {
   })
 
   it('is not there at all where nobody has set one', async () => {
+    onAPhone()
     renderNav(signedInAs('member'), withMapLink(null))
 
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
@@ -252,6 +280,112 @@ describe('the link to the map of the area', () => {
     renderNav({ status: 'signed-out' }, { ...noBell, getMapLink })
 
     expect(getMapLink).not.toHaveBeenCalled()
+  })
+})
+
+describe('the column of pages beside a wide page', () => {
+  const ALL = [
+    'Feed',
+    'Members',
+    'Schedule',
+    'Leads',
+    'Meals',
+    'FAQ',
+    'Songbook',
+    'Rideshares',
+    'Bring list',
+    'Meetings',
+  ]
+
+  const beside = () =>
+    [...screen.getByRole('navigation', { name: 'Pages' }).querySelectorAll('a')].map(nameOf)
+
+  const MAP = 'https://maps.example.org/the-field'
+
+  const withTheMap: LayoutApi = { ...noBell, getMapLink: () => Promise.resolve({ map: { url: MAP } }) }
+
+  /** Under the router, which is where a link finds out whether it is the page you are on. */
+  const renderNavAt = (at: string) => {
+    history.replaceState(null, '', at)
+
+    return render(
+      <LocationProvider>
+        <InstallationProvider title="Sage Burner">
+          <ViewerProvider viewer={signedInAs('member')}>
+            <Layout api={noBell}>
+              <p>the page</p>
+            </Layout>
+          </ViewerProvider>
+        </InstallationProvider>
+      </LocationProvider>,
+    )
+  }
+
+  afterEach(() => globalThis.localStorage.clear())
+
+  it('is there on load, carrying every page and not only the six', async () => {
+    renderNav(signedInAs('member'), withTheMap)
+
+    await screen.findByRole('link', { name: /Map of area/ })
+    expect(beside()).toEqual([...ALL, 'Map of area'])
+  })
+
+  it('marks the page somebody is on, the way the bottom bar does', () => {
+    renderNavAt('/feed')
+
+    expect(screen.getByRole('link', { name: 'Feed' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('link', { name: 'Members' }).getAttribute('aria-current')).toBeNull()
+  })
+
+  it('hides on the button, and ☰ brings it back', () => {
+    renderNav(signedInAs('member'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the menu' }))
+
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    expect(screen.getByRole('navigation', { name: 'Pages' })).toBeTruthy()
+  })
+
+  it('stays hidden on the next load, that being a decision rather than a state', () => {
+    renderNav(signedInAs('member'))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the menu' }))
+    cleanup()
+
+    renderNav(signedInAs('member'))
+
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeTruthy()
+  })
+
+  it('comes back on the next load once it is asked back', () => {
+    // The passing sibling: showing it again has to clear what hiding it wrote, or the
+    // choice is one-way and only a cleared browser undoes it.
+    renderNav(signedInAs('member'))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the menu' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    cleanup()
+
+    renderNav(signedInAs('member'))
+
+    expect(screen.getByRole('navigation', { name: 'Pages' })).toBeTruthy()
+  })
+
+  it('is not there for somebody who may open none of it, and nor is ☰', () => {
+    renderNav({ status: 'signed-out' })
+
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull()
+  })
+
+  it('is not there on a phone, where the bottom bar and the drawer are', () => {
+    onAPhone()
+    renderNav(signedInAs('member'))
+
+    expect(document.querySelector('.sidebar')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeTruthy()
   })
 })
 
@@ -270,9 +404,10 @@ describe('the nav on a phone', () => {
     )
 
   const inTheTopBar = () =>
-    [...screen.getByRole('navigation', { name: 'Main' }).querySelectorAll('a')].map(
-      (link) => link.getAttribute('aria-label') ?? link.textContent,
-    )
+    [...screen.getByRole('navigation', { name: 'Main' }).querySelectorAll('a')].map(nameOf)
+
+  const inTheSidebar = () =>
+    [...screen.getByRole('navigation', { name: 'Pages' }).querySelectorAll('a')].map(nameOf)
 
   it('moves the pages to a bar along the bottom', () => {
     onAPhone()
@@ -294,14 +429,16 @@ describe('the nav on a phone', () => {
     }
   })
 
-  it('keeps the words where there is room for them', () => {
-    // The success path the two above cannot show: a wide viewport is unchanged, and
-    // there is no second copy of any link hiding in a bar nobody can see.
+  it('puts the words in the column beside the page where there is room for them', () => {
+    // The success path the two above cannot show: a wide viewport keeps every page
+    // reachable, and there is no second copy of any link left in the bar.
     onADesktop()
     renderNav(signedInAs('member'))
 
-    for (const label of pages) expect(inTheTopBar(), `${label} should be in the bar`).toContain(label)
-    expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
+    for (const label of pages) {
+      expect(inTheSidebar(), `${label} should be beside the page`).toContain(label)
+      expect(inTheTopBar(), `${label} should have left the bar`).not.toContain(label)
+    }
   })
 
   it('starts the bar shown, whatever it does on a scroll', () => {
