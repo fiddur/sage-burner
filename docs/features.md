@@ -133,9 +133,10 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Anything taken back leaves the feed: a withdrawn announcement, dream, song or
   bring item, and a stay somebody left. The conversation is kept, its place on
   the page is not.
-- A heart on every card and on every comment, quietly — no notification, no bump.
-  One control throughout: the heart toggles your own, and the overlapping faces
-  beside it unfold into who gave one.
+- A heart on every card and on every comment. One control throughout: the heart
+  toggles your own, and the overlapping faces beside it unfold into who gave one.
+  Whoever wrote the thing is told, once, and never for their own click; nothing
+  else happens — no bump up the feed, no line in the thread.
 
 ## The songbook — [the-app.md](./the-app.md)
 

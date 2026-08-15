@@ -192,10 +192,12 @@ phone" means 360px.
 - [ ] Stop the backend, type a reply on any card and press **Say it**: the message says
       something went wrong, the card stays, and what was typed is still in the box to
       send again.
-- [ ] Heart a card: the count moves, nothing is notified, nothing bumps.
+- [ ] Heart a card somebody else announced: the count moves, nothing bumps, and **they**
+      get a bell line saying you hearted it. Press it again — no second line. Take it back —
+      still one line. Heart your own: nothing at all.
 - [ ] The ♡ on a comment sits on the same line as the pen and the bin beside it, hearted or not.
 - [ ] Heart a comment under any card: the ♡ fills, the count appears beside it rather
-      than inside it, and nothing is notified. From a second account, heart the same
+      than inside it, and whoever wrote it is told. From a second account, heart the same
       comment: the count is 2 and both faces are stacked.
 - [ ] Press the faces-and-count: the list of who gave one unfolds under the comment,
       each row linking to that person's page. Press again and it folds away.
@@ -259,6 +261,8 @@ phone" means 360px.
       another browser: the badge appears while the page is up, and clears itself
       within a minute — when the page has refetched and is showing the change.
 - [ ] Switch a category off; cause that event; neither bell nor push arrives.
+- [ ] Switch **Somebody hearts something you wrote** off, have somebody heart your comment:
+      nothing arrives, and the heart is still saved.
 - [ ] Turn on "any dream" comments, then mute one card from its bell: a reply there
       rings nothing, while a reply on another dream still does.
 - [ ] Heart a card with more comments than it shows: the count fills and the card

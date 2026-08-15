@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **You are told when somebody hearts what you wrote.** A heart used to reach nobody — it was
+  news only if you went back and looked — so now whoever wrote the comment, the announcement,
+  the song or the dream gets a line in the bell. Once, however many times the button is pressed,
+  and never for your own. It is on to begin with and switches off under **Somebody hearts
+  something you wrote** on your details page.
+
 - **The ⋯ on the last notification opens upward instead of off the edge.** On the bell panel it
   used to hang past the bottom, so **Remove this notification** was drawn where nothing could
   click it and mostly off screen entirely. It now opens above the row when there is no room

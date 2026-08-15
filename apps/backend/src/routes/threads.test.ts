@@ -949,6 +949,49 @@ describe('the heart on a comment', () => {
     expect((await love(server, ada.cookie, randomUUID())).statusCode).toBe(404)
   })
 
+  it('tells whoever said it, once, and says who hearted it', async () => {
+    const { server, ada, comment } = await setUp()
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+
+    await love(server, bea.cookie, comment.id)
+    await love(server, bea.cookie, comment.id)
+
+    expect(await bell(server, ada.cookie)).toMatchObject([
+      { category: 'hearted', body: 'Bea hearts what you said about Sauna at dawn' },
+    ])
+  })
+
+  it('says nothing for your own, taking your own heart being nobody’s news', async () => {
+    const { server, ada, comment } = await setUp()
+
+    await love(server, ada.cookie, comment.id)
+
+    expect(await bell(server, ada.cookie)).toEqual([])
+  })
+
+  it('says nothing when it is taken back', async () => {
+    const { server, ada, comment } = await setUp()
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await love(server, bea.cookie, comment.id)
+
+    await unlove(server, bea.cookie, comment.id)
+
+    expect(await bell(server, ada.cookie)).toHaveLength(1)
+  })
+
+  it('says nothing to somebody who has switched hearts off', async () => {
+    const { server, ada, comment } = await setUp()
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await setOn(server, ada.cookie, [])
+
+    await love(server, bea.cookie, comment.id)
+
+    expect(await bell(server, ada.cookie)).toEqual([])
+  })
+
   it('answers 404 for an entry that is not a comment, a done thing being nobody’s to love', async () => {
     const { server, ada, card } = await setUp()
     const [done] = (await entriesOf(server, ada.cookie, card)).filter((one) => one.kind !== 'comment')
@@ -1123,6 +1166,63 @@ describe('the heart on a card', () => {
     const ada = await givenAccount('Ada')
 
     expect((await heart(server, ada.cookie, randomUUID())).statusCode).toBe(404)
+  })
+
+  it('tells whoever announced it, once however often it is pressed', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    const card = await announce(server, ada.cookie, 'The planning call is Sunday')
+
+    await heart(server, bea.cookie, card.id)
+    await heart(server, bea.cookie, card.id)
+
+    expect(await bell(server, ada.cookie)).toMatchObject([
+      { category: 'hearted', body: 'Bea hearts The planning call is Sunday' },
+    ])
+  })
+
+  it('tells whoever offered a dream, the offer being the only record of whose it is', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await heart(server, bea.cookie, id)
+
+    expect(await bell(server, ada.cookie)).toMatchObject([
+      { category: 'hearted', body: 'Bea hearts Sauna at dawn' },
+    ])
+  })
+
+  it('says nothing for your own, on a card as on a comment', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const card = await announce(server, ada.cookie, 'The planning call is Sunday')
+
+    await heart(server, ada.cookie, card.id)
+
+    expect(await bell(server, ada.cookie)).toEqual([])
+  })
+
+  it('tells nobody about a sitting, which nobody wrote', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const card = await announce(server, ada.cookie, 'The planning call is Sunday')
+    await db().update(thread).set({ entity_type: 'meal' }).where(eq(thread.id, card.id))
+
+    expect((await heart(server, ada.cookie, card.id)).statusCode).toBe(200)
+    expect(await bell(server, ada.cookie)).toEqual([])
   })
 })
 
