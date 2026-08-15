@@ -6,6 +6,47 @@ import type { NavPage } from './Layout.tsx'
 import { useOverlay } from '../overlay.ts'
 import { Icon } from './Icon.tsx'
 
+export const MenuEntry = ({
+  page,
+  current,
+  onFollow,
+}: {
+  page: NavPage
+  current: boolean
+  onFollow?: () => void
+}) => (
+  <a
+    class={current ? 'menu-entry is-current' : 'menu-entry'}
+    href={page.href}
+    aria-current={current ? 'page' : undefined}
+    {...(page.away === true ? { rel: 'noreferrer noopener', target: '_blank' } : {})}
+    onClick={onFollow}
+  >
+    <span aria-hidden="true">{page.icon}</span> {page.label}
+    {page.away === true && (
+      <span class="menu-away" aria-label="opens elsewhere">
+        <Icon name="away" />
+      </span>
+    )}
+  </a>
+)
+
+export const Sidebar = ({ pages, onHide }: { pages: readonly NavPage[]; onHide: () => void }) => {
+  const { path } = useLocation()
+
+  return (
+    <nav class="sidebar" aria-label="Pages">
+      <button type="button" class="sidebar-hide" aria-label="Hide the menu" onClick={onHide}>
+        <Icon name="chevron-left" />
+      </button>
+
+      {pages.map((page) => (
+        <MenuEntry key={page.href} page={page} current={path === page.href} />
+      ))}
+    </nav>
+  )
+}
+
 export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
   const [open, setOpen] = useState(false)
   const button = useRef<HTMLButtonElement>(null)
@@ -62,20 +103,12 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
           <div class="menu-backdrop" onPointerDown={close} />
           <nav id="menu-drawer" ref={drawer} class="menu-drawer" aria-label="More">
             {pages.map((page) => (
-              <a
+              <MenuEntry
                 key={page.href}
-                class="menu-entry"
-                href={page.href}
-                {...(page.away === true ? { rel: 'noreferrer noopener', target: '_blank' } : {})}
-                onClick={() => setOpen(false)}
-              >
-                <span aria-hidden="true">{page.icon}</span> {page.label}
-                {page.away === true && (
-                  <span class="menu-away" aria-label="opens elsewhere">
-                    <Icon name="away" />
-                  </span>
-                )}
-              </a>
+                page={page}
+                current={path === page.href}
+                onFollow={() => setOpen(false)}
+              />
             ))}
 
             <button type="button" class="menu-close" onClick={close}>

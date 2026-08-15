@@ -4,6 +4,7 @@ export type IconName =
   | 'bullets'
   | 'calendar'
   | 'chevron-down'
+  | 'chevron-left'
   | 'chevron-right'
   | 'close'
   | 'comment'
@@ -43,6 +44,7 @@ export const ICONS: Record<IconName, readonly string[]> = {
     'M8 2v3',
   ],
   'chevron-down': ['m6 9 6 6 6-6'],
+  'chevron-left': ['m15 18-6-6 6-6'],
   'chevron-right': ['m9 18 6-6-6-6'],
   close: ['M18 6 6 18', 'm6 6 12 12'],
   comment: [

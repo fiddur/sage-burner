@@ -171,6 +171,34 @@ costs. **Ahead of the logo**, at the edge its drawer slides in from — a contro
 opens from the left, sitting to the right of something else, reads as belonging to that
 something else.
 
+### One column of pages on a wide screen (#681)
+
+**Everything above 45rem puts every page in a sidebar**, and the bar keeps only what is
+not a page: the brand, the burn selector, and the bell, ⚙️ and face that are the session.
+Navigation used to be in two places on a desktop — six words in the bar and five more
+behind ☰ — and which half a page landed in was decided by how many fitted, which is not
+something a person can learn. There is room down the side of a wide screen and none across
+the top, so that is where they go: eleven entries with their icons, the six member pages
+first, then what ☰ held, the map last and still leaving the app.
+
+**A grid rather than a fixed column.** The drawer is `position: fixed` and the page does
+not move; this one _is_ the page, so `.layout.has-sidebar` becomes a grid whose header
+spans both columns. Fixing it instead would mean padding the main column by hand to the
+same width, and the two would go out of step the first time either changed. The sidebar
+itself is `sticky`, so it holds at the top of a long page without leaving the grid that
+gave it its column.
+
+**Hiding it is a decision, so it is remembered.** « at the top of the column takes it
+away and ☰ — the same control, back at the leading edge of the bar — brings it back, with
+the answer in `localStorage`. It is read in the state initialiser rather than an effect:
+an effect would draw the sidebar and take it away again on every load for whoever has
+hidden it. Showing it again _clears_ the key rather than writing a second value, so the
+default and the choice cannot disagree.
+
+**A phone is untouched.** The bottom bar and the overlay drawer are what that viewport
+gets, and `usePhone` is what picks — the sidebar and the drawer are never both rendered,
+which is why both navs can be called _Pages_ without ever colliding.
+
 **The drawer slides over the page, and the page does not move.** Pushing the site aside
 would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
 against that wrapper instead of the viewport — which is `.bottom-bar` and `.bell-panel`,

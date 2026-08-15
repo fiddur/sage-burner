@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **On a laptop, everything is in one menu down the left.** Half the pages were words along
+  the top and the other half were behind ☰, and which half a page was in came down to what
+  fitted. Every page is in the column now — Feed, Members, Schedule, Leads, Meals, FAQ,
+  Songbook, Rideshares, Bring list, Meetings and the map — with the one you are on marked. The
+  « at the top of it puts it away if you would rather have the room, ☰ brings it back, and it
+  stays however you left it. On a phone nothing changes.
+
 - **Every longer box is now the same editor, and it tells you what it can do.** Write and Preview
   tabs over it, the toolbar under them, and a line beneath saying markdown is supported and that a
   picture can be pasted, dropped or picked. The comment boxes, the meeting notes, the bring list's
