@@ -26,9 +26,11 @@ export const registerFeedRoutes = (app: FastifyInstance, { db, sessions }: Guard
       const viewer = await viewerFor(request, { db, sessions })
 
       const asked = feedKindsFrom(request.query.kinds)
+      // Never empty: `feedKindsFrom` keeps only kinds that are entity types, so an unknown
+      // one leaves nothing asked for, which means everything rather than nothing.
       const entities = threadEntityTypes.filter((type) => asked.length === 0 || asked.includes(type))
 
-      const recent = entities.length === 0 ? [] : await recentThreads(db, FEED_LIMIT, entities)
+      const recent = await recentThreads(db, FEED_LIMIT, entities)
 
       const cards = await readThreads(
         db,
