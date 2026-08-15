@@ -125,6 +125,9 @@ export const notificationCategories = [
   'lead_role_filled',
   'lead_role_comment',
   'lead_role_comment_any',
+  'meal_taken',
+  'meal_comment',
+  'meal_comment_any',
   'new_version',
   'application',
   'application_news',
@@ -186,6 +189,9 @@ export const notificationCategoryInfo = {
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
   lead_role_comment: { label: 'Somebody comments on a role you are on', on: true, about: 'you' },
   lead_role_comment_any: { label: 'Somebody comments on any lead role', on: false, about: 'else' },
+  meal_taken: { label: 'Somebody takes on a meal or a chore', on: false, about: 'else' },
+  meal_comment: { label: 'Somebody comments on a meal you are on', on: true, about: 'you' },
+  meal_comment_any: { label: 'Somebody comments on any meal', on: false, about: 'else' },
   new_version: { label: 'A new version of the app is out', on: false, about: 'else' },
   application: { label: 'Somebody applies to join', on: true, about: 'admin' },
   application_news: { label: 'News about your application', on: true, about: 'you' },
@@ -212,6 +218,7 @@ export const threadEntityTypes = [
   'point',
   'meeting',
   'role',
+  'meal',
 ] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
@@ -230,6 +237,7 @@ export const feedKindLabel = {
   point: 'Points',
   meeting: 'Meetings',
   role: 'Leads',
+  meal: 'Meals',
 } as const satisfies Record<FeedKind, string>
 
 export const KINDS_PARAM = 'kinds'
@@ -329,6 +337,13 @@ const roleCategory = (kind: ThreadEntryKind): NotificationCategory | undefined =
   return undefined
 }
 
+const mealCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'meal_comment_any'
+  if (kind === 'facilitator' || kind === 'helper') return 'meal_taken'
+
+  return undefined
+}
+
 const categoriesFor = {
   session: sessionCategory,
   attendance: attendanceCategory,
@@ -338,6 +353,7 @@ const categoriesFor = {
   point: pointCategory,
   meeting: meetingCategory,
   role: roleCategory,
+  meal: mealCategory,
 } as const satisfies Record<ThreadEntityType, (kind: ThreadEntryKind) => NotificationCategory | undefined>
 
 export const entryCategory = (

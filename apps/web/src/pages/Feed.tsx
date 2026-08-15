@@ -555,6 +555,7 @@ const wentAway = {
   point: 'Somebody took that point off. It is off the page now.',
   meeting: 'Somebody took that out of the diary. It is off the page now.',
   role: 'Somebody took that role off. It is off the page now.',
+  meal: 'Somebody took that sitting off the plan. It is off the page now.',
 } as const satisfies Record<Thread['entity_type'], string>
 
 const goneLabel = {
@@ -566,6 +567,7 @@ const goneLabel = {
   point: ' · taken off',
   meeting: ' · out of the diary',
   role: ' · no longer a role',
+  meal: ' · off the plan',
 } as const satisfies Record<Thread['entity_type'], string>
 
 const isGone = (failure: unknown): boolean => isApiError(failure) && failure.status === 404

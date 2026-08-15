@@ -1,4 +1,11 @@
-import type { Meal, MealResponse, MealSlot, MealSlotsResponse, MealsResponse } from '@sage-burner/shared'
+import type {
+  Meal,
+  MealResponse,
+  MealSlot,
+  MealSlotsResponse,
+  MealsResponse,
+  ThreadEntryKind,
+} from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
@@ -10,6 +17,7 @@ import {
   mealLeadSchema,
   mealSlotCreateSchema,
   mealSlotUpdateSchema,
+  mealsPage,
   mealUpdateSchema,
 } from '@sage-burner/shared'
 import { and, asc, eq, inArray } from 'drizzle-orm'
@@ -26,7 +34,9 @@ import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
+import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow } from './events.ts'
+import { addEntry, forgetThread, threadFor } from './threads.ts'
 
 export interface MealDeps extends GuardDeps {
   now: () => Date
@@ -130,10 +140,69 @@ export const registerMealRoutes = (
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  const tell = async (by: string, accountId: string, message: string) => {
+  const tell = async (by: string, accountId: string, eventId: string, message: string) => {
     if (accountId === by) return
 
-    await notify(accountId, { category: 'meal_role', body: message, link: '/meals' })
+    await notify(accountId, { category: 'meal_role', body: message, link: mealsPage(eventId) })
+  }
+
+  const tellTheBurn = async (
+    sitting: { event_id: string; label: string },
+    by: string,
+    taker: string,
+    message: string,
+  ) => {
+    await tellAttendees(
+      db,
+      notify,
+      sitting.event_id,
+      { category: 'meal_taken', body: message, link: mealsPage(sitting.event_id) },
+      { except: [by, taker] },
+    )
+  }
+
+  const noteOnMeal = async (
+    sitting: { id: string; event_id: string; label: string },
+    kind: ThreadEntryKind,
+    by: string | undefined,
+    body: string,
+  ) => {
+    const card = await threadFor(db, 'meal', {
+      id: sitting.id,
+      event_id: sitting.event_id,
+      title: sitting.label,
+    })
+
+    await addEntry(db, { thread_id: card, kind, author_account_id: by ?? null, body }, now())
+  }
+
+  const cookMoved = async (sitting: MealRow, by: string, was: string | undefined, after: string | null) => {
+    if (was !== undefined && was !== after) {
+      await tell(by, was, sitting.event_id, `You are no longer leading ${sitting.label}`)
+    }
+    if (after !== null && after !== was) {
+      await tell(by, after, sitting.event_id, `You are leading ${sitting.label}`)
+    }
+
+    const said = await cookLine(by, was, after)
+    if (said !== undefined) await noteOnMeal(sitting, 'facilitator', by, said)
+
+    if (after === null || after === was) return
+
+    await tellTheBurn(sitting, by, after, `${await displayName(db, after)} is cooking ${sitting.label}`)
+  }
+
+  const cookLine = async (by: string, was: string | undefined, after: string | null) => {
+    if (after === null) {
+      if (was === undefined) return undefined
+
+      return was === by ? 'stepped back from cooking it' : `took ${await displayName(db, was)} off cooking it`
+    }
+
+    if (after === was) return undefined
+    if (after === by) return was === undefined ? 'is cooking it' : 'took over the cooking'
+
+    return `asked ${await displayName(db, after)} to cook it`
   }
 
   const openMeal = async (id: string): Promise<MealRow | undefined> => {
@@ -243,14 +312,8 @@ export const registerMealRoutes = (
       })
 
       const viewer = await viewerFor(request, { db, sessions })
-      const by = viewer?.account_id ?? ''
 
-      if (held !== undefined && held !== body.account_id) {
-        await tell(by, held, `You are no longer leading ${existing.label}`)
-      }
-      if (body.account_id !== null && body.account_id !== held) {
-        await tell(by, body.account_id, `You are leading ${existing.label}`)
-      }
+      await cookMoved(existing, viewer?.account_id ?? '', held, body.account_id)
 
       return answer(reply, existing.id)
     },
@@ -289,7 +352,26 @@ export const registerMealRoutes = (
         const added = await db.insert(mealRole).values(row).onConflictDoNothing().returning()
 
         if (added.length > 0) {
-          await tell(viewer.account_id, accountId, `You are on ${role} for ${existing.label}`)
+          await tell(
+            viewer.account_id,
+            accountId,
+            existing.event_id,
+            `You are on ${role} for ${existing.label}`,
+          )
+          await noteOnMeal(
+            existing,
+            'helper',
+            viewer.account_id,
+            accountId === viewer.account_id
+              ? `put a hand up for ${role}`
+              : `asked ${await displayName(db, accountId)} onto ${role}`,
+          )
+          await tellTheBurn(
+            existing,
+            viewer.account_id,
+            accountId,
+            `${await displayName(db, accountId)} is on ${role} for ${existing.label}`,
+          )
         }
       } else {
         const gone = await db
@@ -304,7 +386,20 @@ export const registerMealRoutes = (
           .returning()
 
         if (gone.length > 0) {
-          await tell(viewer.account_id, accountId, `You are off ${role} for ${existing.label}`)
+          await tell(
+            viewer.account_id,
+            accountId,
+            existing.event_id,
+            `You are off ${role} for ${existing.label}`,
+          )
+          await noteOnMeal(
+            existing,
+            'helper',
+            viewer.account_id,
+            accountId === viewer.account_id
+              ? `cannot do ${role} after all`
+              : `took ${await displayName(db, accountId)} off ${role}`,
+          )
         }
       }
 
@@ -372,7 +467,18 @@ export const registerMealRoutes = (
 
       if (await refuseIfStale(request, reply, () => plan(existing.event_id))) return reply
 
-      await db.update(meal).set({ food_idea: body.food_idea.trim() }).where(eq(meal.id, existing.id))
+      const idea = body.food_idea.trim()
+      await db.update(meal).set({ food_idea: idea }).where(eq(meal.id, existing.id))
+
+      if (idea !== existing.food_idea) {
+        const viewer = await viewerFor(request, { db, sessions })
+        await noteOnMeal(
+          existing,
+          'edited',
+          viewer?.account_id,
+          idea === '' ? 'took the food idea off it' : `said what it will be: ${idea}`,
+        )
+      }
 
       return answer(reply, existing.id)
     },
@@ -526,7 +632,10 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db, now }: MealD
     if (existing === undefined) return sendError(reply, 404)
     if ((await openEventNow(db, now, existing.event_id)) === undefined) return sendError(reply, 404)
 
-    await db.delete(meal).where(eq(meal.id, request.params.id))
+    db.transaction((tx) => {
+      tx.delete(meal).where(eq(meal.id, request.params.id)).run()
+      forgetThread(tx, 'meal', request.params.id)
+    })
 
     return reply.code(204).send()
   })

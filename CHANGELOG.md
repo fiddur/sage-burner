@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **Meals are on the feed now.** Taking a sitting's cooking on, handing it over, putting a hand up
+  for the crew or writing what it will be all show as one card per sitting, with the food idea on
+  it and a box to ask "is it vegan?". Generating the plan itself puts nothing on the feed — a card
+  appears the first time somebody does something with that sitting. It was the last shared list
+  the feed said nothing about, so it was also missing from the email summary.
+
 - **Naming everybody in one message is one line in the log again, not one per person.** ⚙️ →
   Notifications sent filled up with identical rows whenever somebody wrote `@everybody`, pushing
   everything else off the page.
