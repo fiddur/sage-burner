@@ -14,10 +14,13 @@ under today's heading, and make a new heading when there is none.
   again — which told everybody a second time and dropped it out of every subscribed calendar in
   between. There is a ✏️ on every line now.
 
-- **A reply to something somebody has just taken away is not lost.** If a meeting is taken out of
-  the diary while you are typing on its card, your reply now stays in the box, the message says
-  what happened rather than "Not found.", and the card leaves the page instead of sitting there
-  taking replies nobody will read.
+- **A card whose thing has been taken away says so and goes.** Reply to a meeting somebody took
+  out of the diary a moment ago and the answer used to be a bare "Not found." over a card that
+  stayed there, composer and all. Now it says "Somebody took that out of the diary" and the card
+  leaves the page.
+
+- **A reply that fails for any other reason stays in the box.** It used to be cleared the moment
+  you pressed Say it, whatever came back — so a hiccup at our end lost what you had written.
 
 - **A lead role is something you can talk about now.** The feed had two shapes on it: cards you
   could reply to, and one-line news you could not — which by the end was only the lead roles.

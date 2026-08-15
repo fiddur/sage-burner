@@ -115,7 +115,7 @@ phone" means 360px.
       places (lanes) with emoji and colour; add meal slots and generate the
       sittings — generating again adds nothing and removes nothing.
 - [ ] Seed the FAQ and the lead roles from a previous burn where one exists;
-      seeding into a non-empty list is refused. Every seeded role has a card on the feed.
+      seeding into a non-empty list is refused.
 
 ## Joining, and the stay
 
@@ -178,8 +178,10 @@ phone" means 360px.
       leaves the feed, and a reload does not bring it back.
 - [ ] With the feed open in a second browser, take a meeting out of the diary in the
       first, then reply to its card in the second: the reply is refused with "Somebody
-      took that out of the diary", the card leaves the page, and what was typed is still
-      in the box.
+      took that out of the diary" and the card leaves the page, composer and all.
+- [ ] Stop the backend, type a reply on any card and press **Say it**: the message says
+      something went wrong, the card stays, and what was typed is still in the box to
+      send again.
 - [ ] Heart a card: the count moves, nothing is notified, nothing bumps.
 
 ## The songbook
