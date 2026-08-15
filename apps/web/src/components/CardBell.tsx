@@ -3,8 +3,6 @@ import type { NotificationCategory } from '@sage-burner/shared'
 import { notificationCategoryInfo } from '@sage-burner/shared'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 
-import { Icon } from './Icon.tsx'
-
 export const CardBell = ({
   what,
   category,
@@ -55,7 +53,7 @@ export const CardBell = ({
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
       >
-        <Icon name={on || following ? 'bell' : 'bell-off'} />
+        <span aria-hidden="true">{on || following ? '🔔' : '🔕'}</span>
       </button>
 
       {open && (

@@ -9,6 +9,16 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **The bell tells you whether it is on again.** In a card's corner it had become a grey outline
+  in both states — the same empty bell whether you were being told about that card or not. It is
+  🔔 when either of its switches is on and 🔕 when neither is, the way the heart is ♡ until you
+  give one. The bell in the top bar is a bell you can see too, dim until something is waiting.
+
+- **The "notify me on this device" offer can be pressed where it appears.** Ticking a category on
+  a card near the bottom of a phone screen raised the offer *behind* the little menu you ticked it
+  in, so the button did nothing however many times you pressed it. The strip now sits above the
+  menu.
+
 - **A lead role is something you can talk about now.** The feed had two shapes on it: cards you
   could reply to, and one-line news you could not — which by the end was only the lead roles.
   Adding a role, taking the lead, handing it over and joining or leaving a team all show as one

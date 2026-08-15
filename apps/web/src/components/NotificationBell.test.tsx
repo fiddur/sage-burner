@@ -41,6 +41,14 @@ describe('the bell', () => {
     expect(await screen.findByRole('link', { name: 'Notifications, 1 new' })).toBeTruthy()
   })
 
+  it('is a bell somebody can see, rather than a mark that takes the page’s colour', async () => {
+    // #672: line art whose whole signal was `color` and opacity. The emoji carries its own,
+    // and the count is what says how much.
+    render(<NotificationBell api={stub()} />)
+
+    expect((await screen.findByRole('link', { name: 'Notifications' })).textContent).toBe('🔔')
+  })
+
   it('says nothing about a count when there is none', async () => {
     render(<NotificationBell api={stub()} />)
 

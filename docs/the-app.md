@@ -175,8 +175,10 @@ something else.
 would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
 against that wrapper instead of the viewport — which is `.bottom-bar` and `.bell-panel`,
 and exactly the class of bug #344 and #348 were. The z-index scale gains two: bar 20,
-popdown 30, the drawer's backdrop 34, the drawer 35, modal 40 — the backdrop one rung
-under what it sits behind rather than a round number of its own.
+popdown 30, the push nudge 32, the drawer's backdrop 34, the drawer 35, modal 40 — the
+backdrop one rung under what it sits behind rather than a round number of its own, and the
+nudge above the popdown because a popdown is what raises it (#589). `styles.test.ts` holds
+that order, the stylesheet being the only place it is written down.
 
 It is **rendered only while open** rather than hidden with CSS, so its links are out of
 the tab order the rest of the time with no `inert` to keep in step with an animation.
@@ -316,8 +318,16 @@ Three rules the pages follow, all of them things a phone found first:
 emoji — 🎵 Songbook, 🛻 Rideshares, 🍽️ Meals — and so do the marks on a card's entries and
 the before/during/after phases on Leads. Those say _what this is_, and a grey
 outline pan is worse than 🍳. Every control went the other way: a pencil, a trashcan, a
-bell, a hand, one weight and one colour. A row may hold both — a page's own mark beside the
+hand, one weight and one colour. A row may hold both — a page's own mark beside the
 arrow saying it opens elsewhere — but two _controls_ in one row are never one of each.
+
+**The bell and the heart are the exception, and it is a state rather than a control** (#672).
+A pencil is a door; a bell is a switch you can read, and what it has to say is _on_ or _off_ at
+a glance. As line art both states were the same empty outline — 🔔 and 🔕 differ by one diagonal
+stroke, which at the 0.9rem a card's corner gives it is nothing — so a card with both switches
+ticked looked like a card with neither. Emoji carry the fill: 🔔 / 🔕 in the corner, ♡ / ❤️‍🔥 on
+the heart. That also means the mark takes no `color`, so the top bell's quiet-until-something
+signal is opacity and its count badge rather than the ember a drawing could be given.
 
 The drawings are [Lucide](https://lucide.dev)'s, pasted as path data into `Icon.tsx` exactly
 as #492 pasted Simple Icons' brand marks into `MusicIcon.tsx`, with the ISC notice in

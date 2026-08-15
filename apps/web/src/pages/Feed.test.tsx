@@ -184,6 +184,42 @@ describe('the bell in a card’s corner', () => {
     fireEvent.click(await screen.findByRole('button', { name: `Notification settings for ${what}` }))
   }
 
+  it('is a lit bell where something is on and a struck one where nothing is', async () => {
+    // #672: both states were grey line art differing by one diagonal stroke, so at the size
+    // the corner gives it a card with both switches on looked like a card with neither.
+    renderPage(
+      stub({}, [
+        aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true }),
+        aCard({ id: 'c-2', title: 'Cacao ceremony', entity_id: 's-2' }),
+      ]),
+    )
+
+    const lit = await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' })
+    expect(lit.textContent).toBe('🔔')
+    expect(screen.getByRole('button', { name: 'Notification settings for Cacao ceremony' }).textContent).toBe(
+      '🔕',
+    )
+  })
+
+  it('lights up for the kind as well as for the card', async () => {
+    // The passing sibling: either switch alone is enough to make it ring.
+    renderPage(
+      stub(
+        {
+          getMyNotificationSettings: () =>
+            Promise.resolve({ on: ['dream_offered'], email: [], digest: 'off' }),
+        },
+        [aCard({ id: 'c-1', title: 'Sauna at dawn' })],
+      ),
+    )
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Notification settings for Sauna at dawn' }).textContent,
+      ).toBe('🔔'),
+    )
+  })
+
   it('opens on a press and closes on Escape', async () => {
     renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
