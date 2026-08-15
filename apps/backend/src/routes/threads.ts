@@ -42,6 +42,7 @@ import {
   attendance,
   bringHand,
   bringItem,
+  entrySupport,
   event,
   leadRole,
   leadRoleMember,
@@ -261,6 +262,33 @@ export const recentThreads = async (
 }
 
 type Hearts = ReadonlyMap<string, Supporter[]>
+
+const heartsOnEntries = async (db: Database, ids: readonly string[]): Promise<Hearts> => {
+  if (ids.length === 0) return new Map()
+
+  const rows = await db
+    .select({
+      entry_id: entrySupport.entry_id,
+      account_id: account.id,
+      name: account.name,
+      avatar: accountAvatar.updated_at,
+    })
+    .from(entrySupport)
+    .innerJoin(account, eq(account.id, entrySupport.account_id))
+    .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
+    .where(inArray(entrySupport.entry_id, [...ids]))
+    .orderBy(asc(account.name), asc(account.id))
+
+  const held = new Map<string, Supporter[]>()
+  for (const row of rows) {
+    held.set(row.entry_id, [
+      ...(held.get(row.entry_id) ?? []),
+      { account_id: row.account_id, name: row.name, avatar: row.avatar },
+    ])
+  }
+
+  return held
+}
 
 const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> => {
   const rows = await db
@@ -526,8 +554,15 @@ export const readThreads = async (
     .where(newest === undefined ? undefined : lte(ranked.newness, newest))
     .orderBy(asc(ranked.thread_id), asc(ranked.seq))
 
+  const loved = await heartsOnEntries(
+    db,
+    entries.filter((row) => row.kind === 'comment').map((row) => row.id),
+  )
+
   const held = new Map<string, ThreadEntry[]>()
   for (const row of entries) {
+    const given = loved.get(row.id) ?? []
+
     held.set(row.thread_id, [
       ...(held.get(row.thread_id) ?? []),
       {
@@ -537,6 +572,9 @@ export const readThreads = async (
         body: row.body,
         created_at: row.created_at,
         edited_at: row.edited_at,
+        supporters: given,
+        support_count: given.length,
+        supported_by_me: given.some((person) => person.account_id === viewer?.account_id),
       },
     ])
   }
@@ -1090,6 +1128,50 @@ export const registerThreadRoutes = (
     apiRoutes.withdrawSupportForThread.fastify,
     { preHandler: requireApproved },
     async (request, reply) => await heart(request, reply, false),
+  )
+
+  const heartComment = async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+    put: boolean,
+  ) => {
+    void noStore(reply)
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer === undefined) return sendError(reply, 401)
+
+    const [comment] = await db
+      .select({ id: threadEntry.id, thread_id: threadEntry.thread_id })
+      .from(threadEntry)
+      .where(and(eq(threadEntry.id, request.params.id), eq(threadEntry.kind, 'comment')))
+      .limit(1)
+
+    if (comment === undefined) return sendError(reply, 404)
+
+    if (put) {
+      await db
+        .insert(entrySupport)
+        .values({ entry_id: comment.id, account_id: viewer.account_id })
+        .onConflictDoNothing()
+    } else {
+      await db
+        .delete(entrySupport)
+        .where(and(eq(entrySupport.entry_id, comment.id), eq(entrySupport.account_id, viewer.account_id)))
+    }
+
+    return await whole(reply, comment.thread_id, viewer)
+  }
+
+  app.post<{ Params: { id: string } }>(
+    apiRoutes.supportComment.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => await heartComment(request, reply, true),
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    apiRoutes.withdrawSupportForComment.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => await heartComment(request, reply, false),
   )
 
   const whole = async (reply: FastifyReply, threadId: string, viewer?: Viewer) => {

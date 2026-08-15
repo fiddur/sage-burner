@@ -831,6 +831,19 @@ export const threadSupport = sqliteTable(
   (table) => [primaryKey({ columns: [table.thread_id, table.account_id] })],
 )
 
+export const entrySupport = sqliteTable(
+  'entry_support',
+  {
+    entry_id: text('entry_id')
+      .notNull()
+      .references(() => threadEntry.id, { onDelete: 'cascade' }),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.entry_id, table.account_id] })],
+)
+
 export const threadFollow = sqliteTable(
   'thread_follow',
   {

@@ -4,6 +4,13 @@ import { threadEntityTypes, threadEntryKinds } from '../enums.ts'
 import { MAX_COMMENT, MAX_TITLE } from '../limits.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 
+export const supporterSchema = z.object({
+  account_id: idSchema,
+  name: z.string().nullable(),
+  avatar: dateTimeSchema.nullable(),
+})
+export type Supporter = z.infer<typeof supporterSchema>
+
 export const threadEntrySchema = z.object({
   id: idSchema,
   kind: z.enum(threadEntryKinds),
@@ -11,15 +18,11 @@ export const threadEntrySchema = z.object({
   body: z.string(),
   created_at: dateTimeSchema,
   edited_at: dateTimeSchema.nullable(),
+  supporters: z.array(supporterSchema),
+  support_count: z.int().min(0),
+  supported_by_me: z.boolean(),
 })
 export type ThreadEntry = z.infer<typeof threadEntrySchema>
-
-export const supporterSchema = z.object({
-  account_id: idSchema,
-  name: z.string().nullable(),
-  avatar: dateTimeSchema.nullable(),
-})
-export type Supporter = z.infer<typeof supporterSchema>
 
 export const threadSchema = z.object({
   id: idSchema,

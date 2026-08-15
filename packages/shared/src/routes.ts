@@ -949,6 +949,11 @@ export const apiRoutes = {
     fastify: '/api/threads/:id/support/me',
     path: (id: string) => `/api/threads/${encodeURIComponent(id)}/support/me`,
   },
+  supportComment: {
+    method: 'POST',
+    fastify: '/api/comments/:id/support/me',
+    path: (id: string) => `/api/comments/${encodeURIComponent(id)}/support/me`,
+  },
   setThreadFollow: {
     method: 'PUT',
     fastify: '/api/threads/:id/follow/me',
@@ -1108,6 +1113,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/threads/:id/support/me',
     path: (id: string) => `/api/threads/${encodeURIComponent(id)}/support/me`,
+  },
+  withdrawSupportForComment: {
+    method: 'DELETE',
+    fastify: '/api/comments/:id/support/me',
+    path: (id: string) => `/api/comments/${encodeURIComponent(id)}/support/me`,
   },
   webManifest: {
     method: 'GET',
