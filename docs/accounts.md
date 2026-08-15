@@ -1060,6 +1060,20 @@ The dropdown is the `card-bell-menu` pattern, and opening it in a second place i
 moved the click-away-and-Escape half into `useAway` — the same behaviour written twice is
 the kind of thing that goes one fix stale.
 
+**It opens upward on the rows it would otherwise hang past** (#699). The bell panel caps at
+70vh and scrolls, and the menu is drawn inside that scroller, so the last row's hung outside
+it: 60px of a 93px menu below the panel's edge, neither entry hit-testable where it was drawn,
+and **Remove this notification** entirely off screen. Opening it silently made the panel
+scrollable, so the content was technically reachable — but nothing before the click suggested
+it continued. `/notifications` was never affected, having no enclosing scroller.
+
+`flipsUp(menu, above, below)` is the whole rule and it is a plain function, because the
+interesting part is the decision rather than the plumbing: flip only where it does not fit
+below **and** there is more room above. Both halves are load-bearing — flipping whenever it
+does not fit below moves the clipping to the first row of a short panel instead, which was
+measured, not reasoned about. `useFlipUp` measures against the nearest scrolling ancestor
+rather than the window, since that is the box the menu is actually drawn outside of.
+
 ### Asked for at the moment somebody joins (#574)
 
 The permission prompt used to live in one place, the toggle, and the toggle was rendered in two:

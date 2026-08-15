@@ -173,7 +173,8 @@ phone" means 360px.
       its card appears, headed by the sitting's slot **and its day** — "Dinner · Sat 1" —
       and carrying the food idea; the **Meals** chip shows it. Do the same for the next
       day's Dinner: two cards, headed differently. A comment on it reaches whoever is
-      cooking, and names the sitting the same way.
+      cooking, and names the sitting the same way — and so does the bell line for being put
+      on a crew or handed the lead.
 - [ ] Comment on a dream's card; the same conversation shows in the dream's
       panel. Edit your own comment; delete it; an admin can delete anyone's.
 - [ ] Mention the member by name from the picker — they are notified once, not
@@ -192,6 +193,7 @@ phone" means 360px.
       something went wrong, the card stays, and what was typed is still in the box to
       send again.
 - [ ] Heart a card: the count moves, nothing is notified, nothing bumps.
+- [ ] The ♡ on a comment sits on the same line as the pen and the bin beside it, hearted or not.
 - [ ] Heart a comment under any card: the ♡ fills, the count appears beside it rather
       than inside it, and nothing is notified. From a second account, heart the same
       comment: the count is 2 and both faces are stacked.
@@ -289,6 +291,8 @@ phone" means 360px.
       `meeting_scheduled` being the one of its kinds that is on. Press the mixed one: every
       row under it comes back ticked, and one save went out. Press it again: all off.
 - [ ] Open a section and untick one row: the switch above it goes mixed without a reload.
+- [ ] Open the ⋯ on the **last** row of the bell panel: the menu opens upward and both entries
+      are inside the panel and clickable. On a row near the top it still opens downward.
 - [ ] On the bell panel and on `/notifications`, a row's ⋯ offers two things. **Stop telling
       me about this** names the kind; press it, and that kind is off in both columns on the
       details page. **Remove this notification** takes the row off, and a reload does not

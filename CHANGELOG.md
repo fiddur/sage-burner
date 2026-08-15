@@ -9,6 +9,19 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-15
 
+- **The ⋯ on the last notification opens upward instead of off the edge.** On the bell panel it
+  used to hang past the bottom, so **Remove this notification** was drawn where nothing could
+  click it and mostly off screen entirely. It now opens above the row when there is no room
+  below.
+
+- **A comment's ♡ now sits on the line with the pen and the bin.** It had been drawn a few
+  pixels high, which showed most on comments nobody had hearted yet.
+
+- **Being handed a meal job says which sitting.** "You are leading Dinner" was the same
+  sentence on a burn with three Dinners, and the notification links to the whole plan — so
+  there was nothing to say which. It reads "You are leading Dinner · Sat 1" now, matching what
+  the card and the digest already said.
+
 - **A comment can be given a ❤️‍🔥 now, the way a card already could.** The heart itself only
   gives yours and takes it back — the count has moved out of it and sits beside it, behind a
   little stack of the faces of whoever gave one. Press that stack and the whole list unfolds

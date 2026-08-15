@@ -1881,6 +1881,15 @@ a.person-badge:focus-visible span:last-child {
   font-size: 0.85rem;
 }
 
+/* Above the row instead, where below would put it outside the scroller it is drawn in (#699).
+   The bell panel caps at 70vh and scrolls, so the last row's menu hung past that edge — drawn,
+   but clipped and not hit-testable, with no scrollbar beforehand to hint it continued. */
+.card-bell-menu.is-above {
+  inset-block-start: auto;
+  inset-block-end: 100%;
+  margin-block-end: 0.2rem;
+}
+
 .card-bell-title {
   margin: 0;
   color: var(--muted);
@@ -1947,11 +1956,16 @@ a.person-badge:focus-visible span:last-child {
 }
 
 /* The heart is everybody's and the pen is the author's, so this is no longer only theirs.
-   `flex-start` keeps the buttons their own height when the heart unfolds its list. */
+
+   `baseline` rather than `center` or `flex-start`, and it is the only one of the three that
+   holds in all three states this row has. The heart is a glyph on a baseline in a 16px box;
+   the icons are 1.1em SVGs at `vertical-align: -0.2em` in a 25.6px box. Aligning the boxes
+   (`flex-start`) left the ♡ 4.9px above the pen, and `center` is right until the heart unfolds
+   its list, which makes this row 33px taller and strands the pen halfway down it. Measured. */
 .thread-foot {
   margin: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   gap: 0.4rem;
 }
 
@@ -2742,10 +2756,9 @@ img.avatar {
   align-items: center;
 }
 
-/* An anchor, so it gets `a.person-badge`'s treatment for the same reason: a face is not
-   body copy, and an underline through one looks like a mistake. Only a visually-hidden
-   span is inside it today, so nothing underlines — which is why this was the one link
-   that escaped. */
+/* An anchor in `Faces` and a plain span in `Heart`'s stack, so the selector carries no
+   element: the anchor needs `a.person-badge`'s treatment because a face is not body copy and
+   an underline through one looks like a mistake, and the span needs the same overlap. */
 .face {
   display: inline-flex;
   margin-inline-start: -0.35rem;
