@@ -113,7 +113,6 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     held({
       ...fresh,
       entries: shown.entries.map((entry) => fresher.get(entry.id) ?? entry),
-      entry_count: shown.entry_count,
     })
   }
 
