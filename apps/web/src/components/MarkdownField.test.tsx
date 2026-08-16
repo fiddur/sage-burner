@@ -145,26 +145,80 @@ describe('MarkdownField', () => {
     expect(field.getAttribute('aria-label')).toBeNull()
   })
 
-  it('writes the syntax rather than talking about it, wherever the field appears', () => {
-    render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
+  it('leaves no <label> pointing at a box that is not there, while previewing', () => {
+    render(<MarkdownField label="Help text" value="something" maxLength={2000} onInput={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: 'Bold in Help text' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    expect(document.querySelector('.field > label')).toBeNull()
+    expect(document.querySelector('.field > span')?.textContent).toBe('Help text')
   })
 
-  it('names the toolbar after what the field is for where the label is not that', () => {
+  it('names both panels after the tab that opens them, so neither is an unnamed region', () => {
+    render(<MarkdownField label="Help text" value="something" maxLength={2000} onInput={vi.fn()} />)
+
+    const named = () => {
+      const panel = screen.getByRole('tabpanel')
+      const by = panel.getAttribute('aria-labelledby') ?? ''
+
+      return document.getElementById(by)?.textContent
+    }
+
+    expect(named()).toBe('Write')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    expect(named()).toBe('Preview')
+  })
+
+  it('says which field the two tabs belong to, a page holding several', () => {
     render(
       <MarkdownField
-        label="Anything more"
-        accessibleName="What you want to say about Sauna at dawn"
+        label="what you said"
+        labelHidden
+        accessibleName="Rewrite what you said"
         value=""
         maxLength={2000}
         onInput={vi.fn()}
       />,
     )
 
-    expect(
-      screen.getByRole('button', { name: 'Bold in What you want to say about Sauna at dawn' }),
-    ).toBeTruthy()
+    expect(screen.getByRole('tablist', { name: 'Write or preview Rewrite what you said' })).toBeTruthy()
+  })
+
+  it('comes back to Write when the box is emptied from outside, as a post empties it', () => {
+    const { rerender } = render(
+      <MarkdownField label="Help text" value="is one mat enough?" maxLength={2000} onInput={vi.fn()} />,
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    expect(screen.getByRole('tab', { name: 'Preview' }).getAttribute('aria-selected')).toBe('true')
+
+    rerender(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
+
+    expect(screen.getByRole('tab', { name: 'Write' }).getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('writes the syntax rather than talking about it, wherever the field appears', () => {
+    render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: 'Bold in Help text' })).toBeTruthy()
+  })
+
+  it('names the toolbar after the label, not after the name that says which box this is', () => {
+    render(
+      <MarkdownField
+        label="what you said"
+        labelHidden
+        accessibleName="Rewrite what you said"
+        value=""
+        maxLength={2000}
+        onInput={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Bold in what you said' })).toBeTruthy()
+    expect(screen.getByLabelText('Rewrite what you said').tagName).toBe('TEXTAREA')
   })
 
   it('opens as tall as the text it holds', () => {

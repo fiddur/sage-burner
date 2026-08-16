@@ -1,6 +1,6 @@
 import type { FeedKind } from '@sage-burner/shared'
 
-import { feedPage } from '@sage-burner/shared'
+import { detailsPage, feedPage } from '@sage-burner/shared'
 
 import type { Message } from './mail.ts'
 import type { Block } from './template.ts'
@@ -121,7 +121,6 @@ export const digestMessage = ({
   installation,
   to,
   sections,
-  settings,
   origin,
 }: {
   installation: string
@@ -132,10 +131,10 @@ export const digestMessage = ({
     total: number
     entries: readonly { body: string; link: string | undefined }[]
   }[]
-  settings: string | undefined
   origin: string | undefined
 }): Message => {
   const total = countOf(sections)
+  const settings = absolute(origin, detailsPage())
 
   return written({
     installation,

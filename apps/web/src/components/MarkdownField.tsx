@@ -1,5 +1,5 @@
 import { formattingPage } from '@sage-burner/shared'
-import { useId, useRef, useState } from 'preact/hooks'
+import { useEffect, useId, useRef, useState } from 'preact/hooks'
 
 import type { UploadImage } from '../image-upload.ts'
 import type { Mentionable } from '../mentioning.ts'
@@ -39,27 +39,34 @@ export const MarkdownField = ({
   const mentioning = useMentioning({ value, people, maxLength, onInput })
   const fieldId = useId()
   const panelId = useId()
+  const tabId = useId()
   const pictures = useImageUpload({ value, maxLength, onInput, upload })
   const syntax = useSyntax({ value, maxLength, onInput })
   const [previewing, setPreviewing] = useState(false)
   const tabs = useRef<(HTMLButtonElement | null)[]>([null, null])
 
-  const subject = accessibleName ?? label
+  const named = accessibleName ?? label
+
+  useEffect(() => {
+    if (value === '') setPreviewing(false)
+  }, [value])
 
   const goTo = (wanted: boolean) => {
     setPreviewing(wanted)
     tabs.current[wanted ? 1 : 0]?.focus()
   }
 
+  const tabIdFor = (wanted: boolean) => `${tabId}-${wanted ? 'preview' : 'write'}`
+
   return (
     <div class="field">
-      {!labelHidden && <label {...(previewing ? {} : { for: fieldId })}>{label}</label>}
+      {!labelHidden && (previewing ? <span>{label}</span> : <label for={fieldId}>{label}</label>)}
 
       <div class="md-field">
         <div
           class="md-tabs"
           role="tablist"
-          aria-label="Write or preview"
+          aria-label={`Write or preview ${named}`}
           onKeyDown={(keyEvent) => {
             if (keyEvent.key !== 'ArrowLeft' && keyEvent.key !== 'ArrowRight') return
 
@@ -73,6 +80,7 @@ export const MarkdownField = ({
               ref={(node) => {
                 tabs.current[at] = node
               }}
+              id={tabIdFor(wanted)}
               type="button"
               role="tab"
               class={previewing === wanted ? 'md-tab is-on' : 'md-tab'}
@@ -92,7 +100,7 @@ export const MarkdownField = ({
             class="md-field-preview"
             role="tabpanel"
             tabIndex={0}
-            aria-label={`${subject}, as it reads`}
+            aria-labelledby={tabIdFor(true)}
           >
             {value.trim() === '' ? (
               <p class="form-note">Nothing written yet.</p>
@@ -102,9 +110,9 @@ export const MarkdownField = ({
             )}
           </div>
         ) : (
-          <div id={panelId} role="tabpanel">
-            <SyntaxToolbar syntax={syntax} subject={subject}>
-              <AddPicture pictures={pictures} label={subject} />
+          <div id={panelId} role="tabpanel" aria-labelledby={tabIdFor(false)}>
+            <SyntaxToolbar syntax={syntax} subject={label}>
+              <AddPicture pictures={pictures} label={label} />
             </SyntaxToolbar>
 
             <textarea
@@ -113,7 +121,7 @@ export const MarkdownField = ({
               ref={syntax.ref}
               maxLength={maxLength}
               rows={rowsFor(value, rows)}
-              aria-label={labelHidden ? subject : accessibleName}
+              aria-label={labelHidden ? named : accessibleName}
               placeholder={placeholder}
               value={value}
               onInput={(inputEvent) => onInput(inputEvent.currentTarget.value)}
@@ -126,7 +134,7 @@ export const MarkdownField = ({
       </div>
 
       {!previewing && (
-        <MentionMenu candidates={mentioning.candidates} subject={subject} onChoose={mentioning.choose} />
+        <MentionMenu candidates={mentioning.candidates} subject={label} onChoose={mentioning.choose} />
       )}
 
       <PictureTrouble pictures={pictures} />

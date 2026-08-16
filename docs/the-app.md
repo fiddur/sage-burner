@@ -869,7 +869,7 @@ is drawn inside a scroller, so `flipsUp` measures against that ancestor's box ra
 window's — and it flips only where the whole menu **fits** above, never merely where there is
 more of it above. The two overflows are not the same kind of loss: past the bottom of a
 scroller adds to what can be scrolled to, past the top does not. Choosing the roomier side
-sent a two-row panel's menu upward with 28px of it permanently unreachable, where staying put
+sent a two-row panel's menu upward with 25px of it permanently unreachable, where staying put
 would have cost a scroll. Where neither side holds it, down is the answer.
 
 **Escape shuts the innermost open thing.** The ⋯ sits inside the bell panel, which closes on
@@ -1946,6 +1946,25 @@ button to add a picture_, drawing the same mark the toolbar's own button does. T
 right-hand column out as HTML, so what it promises is what the app does; a change to what the
 renderer allows shows up there without anybody remembering to edit it. It sits with the public
 pages, since an applicant writing to the organisers has the same box.
+
+**Two names, and each is used for one thing** (#697). `label` is the short name — visible above
+the field unless `labelHidden`, and what the toolbar's own controls are phrased from: _Bold in
+what you said_. `accessibleName` is the long one, and names the box itself so a page holding
+several says which is which: _Rewrite what you said_. Naming the toolbar from the long one turned
+_Bold_ into an instruction to rewrite, and where both were passed the short one rendered nowhere
+at all — a prop with nothing depending on it, which is a string nobody would notice going wrong.
+
+**Neither panel is an unnamed region**, and neither name collides with the field's. Each
+`tabpanel` is `aria-labelledby` its own tab, so it is called _Write_ or _Preview_; the tablist
+carries the field's name, which is where "which of the four boxes on this page" belongs. Giving
+the panel the field's name instead made two elements answer to one string, and a query for the
+box found the panel. Previewing also unmounts the textarea, so the visible label becomes a
+`<span>` rather than a `<label for>` pointing at nothing — `.field > span` is already styled as
+`.field > label` is, so nothing moves.
+
+**An empty box goes back to Write.** Previewing survives a post, and what a post leaves behind is
+an empty box — so the composer sat on _Nothing written yet._ until somebody pressed Write. The
+value emptying is the signal, which covers somebody clearing it by hand for the same reason.
 
 **What is not a `MarkdownField`**: the song sheet, where chords and verses are preformatted rather
 than markdown; allergies; a ride's note; a stay's helping note; and the answers on the application

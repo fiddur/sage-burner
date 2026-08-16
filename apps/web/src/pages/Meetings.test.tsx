@@ -140,9 +140,9 @@ describe('the meetings page', () => {
     const deleteMeeting = vi.fn<MeetingsApi['deleteMeeting']>(() => Promise.resolve(undefined))
     renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), deleteMeeting }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Take out of the diary Planning call' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Take out of the diary Planning call, /u }))
 
-    expect(screen.getByText('Take out of the diary Planning call?')).toBeTruthy()
+    expect(screen.getByText(/^Take out of the diary Planning call, .*\?$/u)).toBeTruthy()
     expect(deleteMeeting).not.toHaveBeenCalled()
   })
 
@@ -150,8 +150,8 @@ describe('the meetings page', () => {
     const deleteMeeting = vi.fn<MeetingsApi['deleteMeeting']>(() => Promise.resolve(undefined))
     renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), deleteMeeting }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Take out of the diary Planning call' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Really take out of the diary Planning call' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Take out of the diary Planning call, /u }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really take out of the diary Planning call, /u }))
 
     await waitFor(() => expect(deleteMeeting).toHaveBeenCalledWith('m-1'))
   })
@@ -178,7 +178,7 @@ describe('the meetings page', () => {
     const updateMeeting = vi.fn<MeetingsApi['updateMeeting']>(() => Promise.resolve({ meeting: aMeeting() }))
     renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), updateMeeting }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit Planning call, /u }))
     fireEvent.input(screen.getByLabelText('What the meeting is'), {
       target: { value: 'Planning call, moved' },
     })
@@ -202,7 +202,7 @@ describe('the meetings page', () => {
       }),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit Planning call, /u }))
 
     expect(screen.getByLabelText('A link to join the meeting on')).toHaveProperty(
       'value',
@@ -213,7 +213,7 @@ describe('the meetings page', () => {
   it('takes the notes in the same editor as everything else, with a preview', async () => {
     renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }) }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit Planning call, /u }))
     const box = screen.getByLabelText('Anything else about the meeting')
     fireEvent.input(box, { target: { value: '- the door code is 1234' } })
 
@@ -226,7 +226,7 @@ describe('the meetings page', () => {
   it('refuses to save while a picture in the notes is still going up', async () => {
     renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }) }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit Planning call, /u }))
     fireEvent.input(screen.getByLabelText('Anything else about the meeting'), {
       target: { value: '![Uploading room.jpg…]()' },
     })
@@ -251,10 +251,15 @@ describe('the meetings page', () => {
     await screen.findAllByText('Planning call')
 
     const named = (kind: RegExp) =>
-      screen.getAllByRole('button', { name: kind }).map((one) => one.getAttribute('aria-label'))
+      screen.getAllByRole('button', { name: kind }).map((one) => one.getAttribute('aria-label') ?? '')
 
+    // Each one carries the time, not merely a set of three distinct strings: leaving the
+    // banner's controls on the bare title keeps the set distinct and says nothing.
     for (const kind of [/^Edit Planning call/u, /^Take out of the diary Planning call/u]) {
-      expect(new Set(named(kind)).size).toBe(named(kind).length)
+      const labels = named(kind)
+
+      expect(labels).toHaveLength(3)
+      for (const one of labels) expect(one).toMatch(/Planning call, \w/u)
     }
   })
 

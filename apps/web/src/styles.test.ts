@@ -135,9 +135,6 @@ describe('the stylesheet', () => {
   })
 
   it('spaces a diary row rather than leaving its controls against the time', () => {
-    // A plain `list-item` ran `Destroy`'s question straight into the timestamp —
-    // "14:18Take out of the diary …?" (#605). The banner above it reads right because
-    // `p.row` is a flex row with a gap.
     const row = rules.find((rule) => rule.selector === '.meeting-list li')
 
     expect(row?.body).toMatch(/display:\s*flex/)

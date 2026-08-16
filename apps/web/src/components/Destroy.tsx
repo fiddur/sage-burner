@@ -29,8 +29,6 @@ export const Destroy = ({
   const opener = useRef<HTMLButtonElement>(null)
   const moved = useRef(false)
 
-  // Not on the first render, only on a change: every one of these on a page would otherwise
-  // reach for focus as it mounts, and the last drawn would win.
   useLayoutEffect(() => {
     if (!moved.current) {
       moved.current = true

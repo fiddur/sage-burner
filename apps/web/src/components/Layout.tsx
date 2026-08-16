@@ -65,8 +65,6 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
   const everyPage = approved ? [...memberPages, ...withMap(menuPages, mapUrl)] : []
   const aside = !phone && everyPage.length > 0 && !sidebar.hidden
 
-  // Only after the click that hid it: the sidebar also starts hidden for whoever hid it last
-  // time, and moving focus on load would take it off whatever the page put it on.
   useLayoutEffect(() => {
     if (!handingBack) return
 

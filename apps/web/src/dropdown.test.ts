@@ -23,7 +23,7 @@ describe('which way a dropdown opens', () => {
 
   it('stays below when neither side holds it, the overflow below being the reachable one', () => {
     // One notification in the bell (#708): a 66px panel, 11px above the row's menu button and
-    // 33px under it, for a 93px menu. Flipping would put 28px past the panel's top, which no
+    // 33px under it, for a 93px menu. Flipping would put 82px past the panel's top, which no
     // scrolling reaches; below it is 60px past the bottom, which scrolling does.
     expect(flipsUp(93, 11, 33)).toBe(false)
   })

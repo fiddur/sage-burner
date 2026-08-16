@@ -1,7 +1,7 @@
 import type { MailSettingsResponse, MailTestResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, detailsPage, digestPreviewSchema, mailSettingsUpdateSchema } from '@sage-burner/shared'
+import { apiRoutes, digestPreviewSchema, mailSettingsUpdateSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -13,7 +13,7 @@ import { account, installation, INSTALLATION_ID, mailSetting } from '../db/schem
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { digestPreviewFor } from '../mail/digest.ts'
 import { installationTitle, NOT_CONFIGURED, post } from '../mail/mail.ts'
-import { absolute, digestMessage, testMessage } from '../mail/messages.ts'
+import { digestMessage, testMessage } from '../mail/messages.ts'
 
 export const NOTHING_TO_PREVIEW = 'Nothing has happened in that stretch, so there is no digest to show you.'
 
@@ -111,7 +111,6 @@ export const registerMailRoutes = (
         installation: await installationTitle(db),
         to: who.email,
         sections,
-        settings: absolute(config.public_origin, detailsPage()),
         origin: config.public_origin,
       }),
     )
