@@ -141,22 +141,40 @@ describe('AdminInvites', () => {
     expect((await screen.findByLabelText('Closes on')).getAttribute('min')).toBe(todayForInput())
   })
 
+  const mintGroupLink = async () => {
+    fireEvent.input(await screen.findByLabelText('Which group'), { target: { value: 'The Facebook group' } })
+    fireEvent.input(screen.getByLabelText('Closes on'), {
+      target: { value: todayForInput(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create a group link' }))
+  }
+
   it('says which field a refusal was about, rather than "Request failed (400)"', async () => {
+    renderPage(
+      stub({
+        createGroupInvite: () => Promise.reject(apiError(400, 'expired', 'Request failed (400).')),
+      }),
+    )
+
+    await mintGroupLink()
+
+    const said = await screen.findByRole('alert')
+    expect(said.textContent).toContain('closing date has gone')
+    expect(said.textContent).not.toContain('Request failed')
+  })
+
+  it('does not blame the closing date for a refusal that was about something else', async () => {
+    // `groupInviteCreateSchema` 400s on the label and on `max_uses` too, and naming the date
+    // for those sends the admin to correct a field that was fine.
     renderPage(
       stub({
         createGroupInvite: () => Promise.reject(apiError(400, 'bad_request', 'Request failed (400).')),
       }),
     )
 
-    fireEvent.input(await screen.findByLabelText('Which group'), { target: { value: 'The Facebook group' } })
-    fireEvent.input(screen.getByLabelText('Closes on'), {
-      target: { value: todayForInput(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)) },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Create a group link' }))
+    await mintGroupLink()
 
-    const said = await screen.findByRole('alert')
-    expect(said.textContent).toContain('closing date has gone')
-    expect(said.textContent).not.toContain('Request failed')
+    expect((await screen.findByRole('alert')).textContent).not.toContain('closing date has gone')
   })
 
   it('names a group link by its label and counts who has come in on it', async () => {

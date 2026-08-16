@@ -79,6 +79,11 @@ phone" means 360px.
       SMTP is configured.
 - [ ] The new applicant, signed in, reaches their own application and their bell
       and nothing else — no Feed, no Members.
+- [ ] Send the same application a second time (two tabs, or the back button): the page turns
+      into "Application sent" rather than leaving the form up.
+- [ ] Once approved, `/apply` reads "You are on _burn_" and never flickers the between-burns
+      sentence on the way. Leave that burn and join another by hand: it names the one you are
+      on, and claims nobody added you to it.
 - [ ] The group-link form offers no closing date before today, and says so rather than
       answering "Request failed" if one is typed anyway.
 - [ ] Mint a group link under ⚙️ → Invites with a closing date and a cap of 2.
@@ -88,6 +93,9 @@ phone" means 360px.
 - [ ] With Discord or Facebook configured, open a group link and take it up with the
       provider button: one round trip makes a member, and the invites list counts the
       arrival. The page does not tell a group link's arrival it is good for one person.
+- [ ] Fill a group link's last place through the provider button: the next person through it
+      is turned back to the login page saying the link has run out, and the list still counts
+      what the cap allows and no more.
 - [ ] As somebody who signed up through that provider and has no role yet — the pending
       applicant above — open a second group link and press the provider button: they come
       out a member, and the list counts the arrival against that link. Pressing it again
@@ -140,6 +148,11 @@ phone" means 360px.
       burn's roster, and a second payment does not say "full" again.
 - [ ] A paid member transfers their place to an unpaid one: the payment moves,
       the giver's stay is deleted, the taker is notified.
+- [ ] With every place paid for and somebody waiting, un-record one of those payments: the
+      waiting member is told the line has moved. Removing a paid member from ⚙️ → Roster does
+      the same.
+- [ ] Do either of those on a burn whose dates have passed: nothing is posted to anybody's
+      bell about its waiting list.
 
 ## The programme
 

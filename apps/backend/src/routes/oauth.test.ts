@@ -317,6 +317,48 @@ describe('signing up from an invite link through a provider', () => {
     expect(await db().select().from(accountRole)).toEqual([])
   })
 
+  it('lets one in where two arrive on the last place at once (#561)', async () => {
+    // Both read the link before either writes to it, which is the whole of the window:
+    // `openInvite` awaits, and its answer is one redemption stale by the time the second
+    // transaction runs. The count inside the transaction is what refuses that one.
+    let handed = 0
+    const server = await build(
+      fakeOAuth({
+        identify: () => {
+          handed += 1
+
+          return Promise.resolve({
+            profile: { subject: `provider-${handed}`, email: `wren${handed}@example.org` },
+          })
+        },
+      }),
+    )
+    await givenProvider()
+    const token = await givenLink()
+    await db().update(inviteToken).set({ max_uses: 1 })
+
+    const states = async () => (await db().select().from(oauthState)).map((row) => row.state)
+
+    const leavingOne = await server.inject({
+      method: 'GET',
+      url: `/api/auth/oauth/facebook?invite=${encodeURIComponent(token)}`,
+    })
+    const [stateOne] = await states()
+
+    const leavingTwo = await server.inject({
+      method: 'GET',
+      url: `/api/auth/oauth/facebook?invite=${encodeURIComponent(token)}`,
+    })
+    const stateTwo = (await states()).find((one) => one !== stateOne)
+
+    await Promise.all([
+      callback(server, 'facebook', `code=a&state=${stateOne ?? ''}`, nonceFrom(leavingOne)),
+      callback(server, 'facebook', `code=b&state=${stateTwo ?? ''}`, nonceFrom(leavingTwo)),
+    ])
+
+    expect(await db().select().from(inviteRedemption)).toHaveLength(1)
+  })
+
   it('makes no member of a group link with no room left on it', async () => {
     const server = await build()
     await givenProvider()

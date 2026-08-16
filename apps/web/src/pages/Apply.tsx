@@ -63,7 +63,8 @@ const identityProblem = (value: string, max: number) => {
   return undefined
 }
 
-/** Blank is not a problem: the account's own address is what the server falls back to (#510). */
+// Blank is deliberate rather than missing: the account's own address is what the server
+// falls back to.
 const emailProblem = (value: string) =>
   value.trim() === ''
     ? undefined
@@ -120,7 +121,7 @@ const Answered = ({
         Welcome. You are a member here now.{' '}
         {joined === undefined
           ? 'Every burn being planned is open to you — join the one you are coming to and say when you arrive.'
-          : `You were added to ${joined}, so all that is left is to say when you arrive and leave — or to leave the burn, if you know you cannot come.`}{' '}
+          : `You are on ${joined}, so all that is left is to say when you arrive and leave — or to leave the burn, if you know you cannot come.`}{' '}
         <a href={detailsPage()}>Your details</a> is where both of those are. Either way you are welcome to
         stay and watch the planning; the next burn will be announced here as well.
       </p>
@@ -152,10 +153,29 @@ const hasProblem = (problems: string[], field: string) =>
  * Which of the four things somebody sees, which is the whole of what account-first changed here
  * (#476): sign up, fill the form in, wait, or read the answer.
  */
+const Decided = ({ api, mine }: { api: ApplyApi; mine: MyApplication }) => {
+  const { status, burns } = useBurns()
+  const approved = mine.application?.status === 'approved'
+
+  // Nothing is drawn until the burns land: `joined` decides which of two sentences this is,
+  // and `undefined` is also what "on no burn" looks like, so the page would say the wrong
+  // one first and then swap it.
+  if (approved && status === 'loading') return <article class="column" />
+
+  return (
+    <article class="column">
+      <Answered
+        approved={approved}
+        organisers={mine.organisers}
+        joined={burns.find((one) => one.attendance !== null)?.event.name}
+      />
+      <Talk api={api} messages={mine.messages} />
+    </article>
+  )
+}
+
 export const Apply = ({ api }: ApplyProps) => {
   const viewer = useViewer()
-  const { burns } = useBurns()
-  const joinedBurnName = burns.find((one) => one.attendance !== null)?.event.name
   const setViewer = useSetViewer()
   const sendsEmail = useInstallationSendsEmail()
   const { outcome } = useOauthOutcome()
@@ -197,16 +217,7 @@ export const Apply = ({ api }: ApplyProps) => {
   }
 
   if (mine?.application != null && mine.application.status !== 'pending') {
-    return (
-      <article class="column">
-        <Answered
-          approved={mine.application.status === 'approved'}
-          organisers={mine.organisers}
-          joined={joinedBurnName}
-        />
-        <Talk api={api} messages={mine.messages} />
-      </article>
-    )
+    return <Decided api={api} mine={mine} />
   }
 
   if (sent || mine?.application != null) {
@@ -332,12 +343,17 @@ const ApplicationForm = ({
 
     run(
       async () => {
-        await api.submitApplication({
-          applicant_name: name.trim(),
-          ...(email.trim() === '' ? {} : { applicant_email: email.trim() }),
-          answers,
-          asked: questions.map((question) => question.id),
-        })
+        try {
+          await api.submitApplication({
+            applicant_name: name.trim(),
+            ...(email.trim() === '' ? {} : { applicant_email: email.trim() }),
+            answers,
+            asked: questions.map((question) => question.id),
+          })
+        } catch (failure) {
+          if (!isApiError(failure) || failure.code !== 'already_applied') throw failure
+        }
+
         onSent()
       },
       (failure) => {
@@ -348,9 +364,7 @@ const ApplicationForm = ({
           return 'The questions changed while you were filling this in. Please reload the page and send it again.'
         }
         if (failure.status === 409) {
-          return failure.code === 'already_applied'
-            ? 'Your application is already in — it was sent, and this page will show where it stands.'
-            : 'You are already a member here — there is nothing to apply for. Log in the way you usually do.'
+          return 'You are already a member here — there is nothing to apply for. Log in the way you usually do.'
         }
 
         return 'Could not send your application. Please check your connection and try again.'
@@ -411,13 +425,15 @@ const ApplicationForm = ({
             autocomplete="email"
             aria-invalid={hasProblem(identityProblems, 'applicant_email')}
             aria-describedby={
-              hasProblem(identityProblems, 'applicant_email') ? 'applicant_email-error' : undefined
+              hasProblem(identityProblems, 'applicant_email')
+                ? 'applicant_email-note applicant_email-error'
+                : 'applicant_email-note'
             }
             value={email}
             onInput={(event) => setEmail(event.currentTarget.value)}
           />
         </label>
-        <p class="form-note">
+        <p class="form-note" id="applicant_email-note">
           Left blank, we write to the address you signed in with. Fill it in only if something else would
           reach you better.
         </p>

@@ -118,16 +118,17 @@ const givenAccount = async (roles: ('admin' | 'member')[] = ['member']) => {
   return { id, cookie: cookieFor(id) }
 }
 
-const givenBurn = async (cap = 3) => {
-  await db().insert(event).values({
-    id: BURN,
-    name: 'Summer burn',
-    slug: 'summer',
-    start_date: '2026-08-01',
-    end_date: '2026-08-03',
-    member_cap: cap,
-    created_at: NOW,
-  })
+const givenBurn = async (cap = 3, dates = { start_date: '2026-08-01', end_date: '2026-08-03' }) => {
+  await db()
+    .insert(event)
+    .values({
+      id: BURN,
+      name: 'Summer burn',
+      slug: 'summer',
+      ...dates,
+      member_cap: cap,
+      created_at: NOW,
+    })
 }
 
 const givenComing = async (accountId: string, paid = false, joined_at = NOW) => {
@@ -722,6 +723,87 @@ describe('the waiting list', () => {
       payload: { account_id: added.id },
     })
     expect(put.statusCode).toBe(201)
+
+    const theirs = (await list(server, added.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).toEqual(['waiting_list_pushed'])
+  })
+
+  it('moves the line when an admin takes a paid place away', async () => {
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const waiting = await givenAccount()
+    await givenComing(paid.id)
+    await givenComing(waiting.id, false, joinedAt(1))
+    await setPaid(server, admin.cookie, paid.id)
+
+    const gone = await server.inject({
+      method: 'DELETE',
+      url: `/api/admin/events/${BURN}/attendance/${paid.id}`,
+      headers: { cookie: admin.cookie },
+    })
+    expect(gone.statusCode).toBe(204)
+
+    const theirs = (await list(server, waiting.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).toContain('waiting_list_near')
+  })
+
+  it('moves the line when a payment is un-recorded', async () => {
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const waiting = await givenAccount()
+    await givenComing(paid.id)
+    await givenComing(waiting.id, false, joinedAt(1))
+    await setPaid(server, admin.cookie, paid.id)
+
+    const undone = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/events/${BURN}/attendance/${paid.id}/payment`,
+      headers: { cookie: admin.cookie },
+      payload: { payment_status: 'unpaid' },
+    })
+    expect(undone.statusCode).toBe(200)
+
+    const theirs = (await list(server, waiting.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).toContain('waiting_list_near')
+  })
+
+  it('says nothing about the waiting list of a burn that has ended', async () => {
+    const server = await build()
+    await givenBurn(1, { start_date: '2025-08-01', end_date: '2025-08-03' })
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    await givenComing(paid.id, true)
+    const added = await givenAccount()
+
+    const put = await server.inject({
+      method: 'POST',
+      url: `/api/admin/events/${BURN}/attendance`,
+      headers: { cookie: admin.cookie },
+      payload: { account_id: added.id },
+    })
+    expect(put.statusCode).toBe(201)
+
+    expect((await list(server, added.cookie)).json().notifications).toEqual([])
+  })
+
+  it('still says it for a burn that has not ended, which is the case that has to keep working', async () => {
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    await givenComing(paid.id, true)
+    const added = await givenAccount()
+
+    await server.inject({
+      method: 'POST',
+      url: `/api/admin/events/${BURN}/attendance`,
+      headers: { cookie: admin.cookie },
+      payload: { account_id: added.id },
+    })
 
     const theirs = (await list(server, added.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).toEqual(['waiting_list_pushed'])

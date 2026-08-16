@@ -130,7 +130,10 @@ export const registerRosterRoutes = (
       if (patched.kind !== 'ok') return sendError(reply, 404)
       const updated = patched.row
 
-      if (updated.payment_status === 'paid' && before?.payment_status !== 'paid') {
+      const nowPaid = updated.payment_status === 'paid'
+      const wasPaid = before?.payment_status === 'paid'
+
+      if (nowPaid && !wasPaid) {
         const actor = (await viewerFor(request, { db, sessions }))?.account_id
         if (actor !== accountId) {
           await notify(accountId, {
@@ -139,9 +142,9 @@ export const registerRosterRoutes = (
             link: '/members',
           })
         }
-
-        await tellAboutTheWaitingList(db, eventId, notify)
       }
+
+      if (nowPaid !== wasPaid) await tellAboutTheWaitingList(db, eventId, notify, todayIso(now))
 
       return { attendance: await withHelping(updated) } satisfies AttendanceResponse
     },

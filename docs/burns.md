@@ -582,17 +582,21 @@ so that door only ever removes a row the line never counted, and there is nothin
 anybody. Handing a place over does not move it either: it marks the taker paid and deletes the
 giver, who was.
 
-**Three other doors do move it and tell nobody**, which is the same open question rather than three:
+**Freeing a paid place recomputes too** (#647). Two admin doors open one: `DELETE
+/api/admin/events/:eventId/attendance/:accountId`, which deletes whatever the payment status is —
+unlike the member's own leave route, which filters on `unpaid` — and un-recording a payment, where
+the `PATCH` used to recompute only on the transition _to_ paid. Both are now `nowPaid !== wasPaid`
+and "was this row paid", so the condition is the change rather than one direction of it. Neither
+pushes anybody below the line, which is why they were not #564's bug; what they left was somebody
+whose bell still said the burn was full while the roster said otherwise.
 
-- **Lowering `member_cap`** pushes people onto the waiting list with nothing said.
-- **An admin removing somebody** — `DELETE /api/admin/events/:eventId/attendance/:accountId` —
-  deletes whatever their payment status is, so removing a paid member opens a place.
-- **Un-recording a payment**, since the payment `PATCH` only recomputes on the transition _to_
-  paid.
+**Lowering `member_cap` still moves it and tells nobody**, which is the one door left open.
 
-The last two open a place rather than take one, so nobody is pushed below the line by them — which
-is why they are not #564's bug. They still leave the person who would now get in unaware that they
-would.
+**A burn that has ended tells nobody at all** (#648). `tellAboutTheWaitingList` reads `end_date`
+and returns early, in one place rather than at each caller: the member join route goes through
+`openEventNow`, but the admin-add and payment callers do not, so bookkeeping on last year's burn
+posted "…is full, you are on the waiting list until one is handed over" about a gathering that was
+over.
 
 ## Handing a place over
 

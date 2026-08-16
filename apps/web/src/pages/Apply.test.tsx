@@ -66,10 +66,15 @@ const APPLICANT: Viewer = {
   account: { id: 'a-1', name: 'Fredrik', avatar: null, roles: [] },
 }
 
-const renderPage = (api: ApplyApi, viewer: Viewer = APPLICANT, burns: MyBurn[] = []) =>
+const renderPage = (
+  api: ApplyApi,
+  viewer: Viewer = APPLICANT,
+  burns: MyBurn[] = [],
+  status: 'loading' | 'ready' | 'failed' = 'ready',
+) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <BurnProvider value={{ status: 'ready', burns, selected: burns[0] }}>
+      <BurnProvider value={{ status, burns, selected: burns[0] }}>
         <Apply api={api} />
       </BurnProvider>
     </ViewerProvider>,
@@ -533,6 +538,17 @@ describe('Apply', () => {
     expect(screen.getByText(/we write to the address you signed in with/)).toBeTruthy()
   })
 
+  it('describes the address box with the note about leaving it blank', async () => {
+    renderPage(stub())
+
+    await ready()
+    const box = screen.getByLabelText('Your email address')
+    const described = box.getAttribute('aria-describedby')?.split(' ') ?? []
+    const note = described.map((id) => document.getElementById(id)?.textContent ?? '').join(' ')
+
+    expect(note).toContain('we write to the address you signed in with')
+  })
+
   it('still refuses an address that is not one, past the field’s own check', async () => {
     renderPage(stub())
 
@@ -544,7 +560,7 @@ describe('Apply', () => {
     expect((await screen.findByText(/does not look like an email address/)).textContent).toBeTruthy()
   })
 
-  it('tells a second submit its application is already in, not that it is a member (#531)', async () => {
+  it('shows a second submit where its application stands, rather than the form again', async () => {
     renderPage(
       stub({
         submitApplication: () => Promise.reject(apiError(409, 'already_applied', 'Request failed (409).')),
@@ -555,9 +571,22 @@ describe('Apply', () => {
     fill('Your name', 'Fredrik')
     send()
 
-    const said = await screen.findByRole('alert')
-    expect(said.textContent).toContain('already in')
-    expect(said.textContent).not.toContain('nothing to apply for')
+    expect(await screen.findByRole('heading', { name: 'Application sent' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Send application' })).toBeNull()
+  })
+
+  it('tells a member there is nothing to apply for, where the same status means that instead', async () => {
+    renderPage(
+      stub({
+        submitApplication: () => Promise.reject(apiError(409, 'already_member', 'Request failed (409).')),
+      }),
+    )
+
+    await ready()
+    fill('Your name', 'Fredrik')
+    send()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('nothing to apply for')
   })
 
   it('tells a member there is nothing to apply for, and shows them no form (#531)', async () => {
@@ -783,7 +812,7 @@ describe('where an application already stands', () => {
     expect(labelled('Your name')).toHaveProperty('value', 'Fredrik')
   })
 
-  it('says so once it has been accepted, and names the burn it added them to', async () => {
+  it('says so once it has been accepted, and names the burn they are on', async () => {
     renderPage(
       stub({
         getMyApplication: () =>
@@ -795,9 +824,43 @@ describe('where an application already stands', () => {
 
     const said = (await screen.findByRole('status')).textContent
     expect(said).toContain('You are a member here now')
-    expect(said).toContain('added to Summer burn')
+    expect(said).toContain('You are on Summer burn')
     expect(said).toContain('leave the burn')
     expect(screen.getByRole('link', { name: 'Your details' }).getAttribute('href')).toBe('/profile')
+  })
+
+  it('does not say approval put them there, having no record of what approval did (#560)', async () => {
+    // The burn list is the current one. Somebody approved onto one burn, who has since left
+    // it and joined another by hand, would be told they "were added to" the one they chose.
+    renderPage(
+      stub({
+        getMyApplication: () =>
+          Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
+      }),
+      APPLICANT,
+      [aBurn('Summer burn', true)],
+    )
+
+    expect((await screen.findByRole('status')).textContent).not.toContain('added to')
+  })
+
+  it('says neither sentence while the burns are still loading', async () => {
+    // `joined` is `undefined` both for "on no burn" and for "not answered yet", so without
+    // the gate the page reads the between-burns sentence and then swaps it.
+    renderPage(
+      stub({
+        getMyApplication: () =>
+          Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
+      }),
+      APPLICANT,
+      [],
+      'loading',
+    )
+
+    // The settle point: the application's own "Loading…" going away is what proves the
+    // approved branch has been reached, so the absence below is not an absence of anything.
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull())
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('claims no join where none happened, which is approval between burns (#522)', async () => {

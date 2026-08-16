@@ -41,14 +41,16 @@ export const tellAboutTheWaitingList = async (
   db: Database,
   eventId: string,
   notify: Notifier,
+  today: string,
 ): Promise<void> => {
   const [burn] = await db
-    .select({ name: event.name, member_cap: event.member_cap })
+    .select({ name: event.name, member_cap: event.member_cap, end_date: event.end_date })
     .from(event)
     .where(eq(event.id, eventId))
     .limit(1)
 
   if (burn === undefined) return
+  if (burn.end_date < today) return
 
   const rows = await db
     .select({ account_id: attendance.account_id, payment_status: attendance.payment_status })
