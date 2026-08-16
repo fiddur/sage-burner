@@ -65,7 +65,6 @@ export interface ImageUpload {
   }
   take: (files: readonly File[]) => void
   sending: number
-  busy: boolean
   error: string | undefined
 }
 
@@ -162,7 +161,6 @@ export const useImageUpload = ({
     },
     take,
     sending,
-    busy: sending > 0,
     error,
   }
 }

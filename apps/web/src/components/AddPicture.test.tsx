@@ -200,9 +200,10 @@ describe('putting a picture in a markdown field', () => {
 
     const help = container.querySelector('.md-field-help')
 
-    expect(help?.textContent).toContain('paste, drop or click')
     expect(help?.textContent).not.toContain('🖼')
     expect(help?.querySelector('[data-icon="picture"]')).toBeTruthy()
+    // The icon is `aria-hidden`, so without a word beside it the sentence points at nothing.
+    expect(help?.textContent).toContain('paste, drop or click the picture button to add a picture')
   })
 
   it('refuses when there is no room left in the field', async () => {

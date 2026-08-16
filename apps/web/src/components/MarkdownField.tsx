@@ -139,6 +139,7 @@ export const MarkdownField = ({
           <>
             {' · paste, drop or click '}
             <Icon name="picture" />
+            <span class="visually-hidden">the picture button</span>
             {' to add a picture'}
           </>
         )}

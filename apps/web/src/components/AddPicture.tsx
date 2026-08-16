@@ -15,7 +15,7 @@ export const AddPicture = ({ pictures, label }: { pictures: ImageUpload; label: 
         accept="image/*"
         multiple
         aria-label={`Add a picture to ${label}`}
-        disabled={pictures.busy}
+        disabled={pictures.sending > 0}
         onChange={(changeEvent) => {
           const chosen = [...(changeEvent.currentTarget.files ?? [])]
           changeEvent.currentTarget.value = ''
