@@ -134,6 +134,23 @@ describe('the stylesheet', () => {
     expect(layer('.push-nudge')).toBeGreaterThan(layer('.bottom-bar'))
   })
 
+  it('spaces a diary row rather than leaving its controls against the time', () => {
+    // A plain `list-item` ran `Destroy`'s question straight into the timestamp —
+    // "14:18Take out of the diary …?" (#605). The banner above it reads right because
+    // `p.row` is a flex row with a gap.
+    const row = rules.find((rule) => rule.selector === '.meeting-list li')
+
+    expect(row?.body).toMatch(/display:\s*flex/)
+    expect(row?.body).toMatch(/gap:\s*[^;]+/)
+  })
+
+  it('lets the stuck sidebar scroll, its entries being taller than a short viewport', () => {
+    const sidebar = rules.find((rule) => rule.selector === '.sidebar')
+
+    expect(sidebar?.body).toMatch(/overflow-y:\s*auto/)
+    expect(sidebar?.body).toMatch(/max-height:/)
+  })
+
   it('positions every box that scrolls sideways', () => {
     // Anything establishing a horizontal scroll container has to be a containing
     // block, so an absolutely positioned descendant cannot escape to the document and

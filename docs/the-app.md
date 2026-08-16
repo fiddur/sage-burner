@@ -188,16 +188,20 @@ same width, and the two would go out of step the first time either changed. The 
 itself is `sticky`, so it holds at the top of a long page without leaving the grid that
 gave it its column.
 
-**Hiding it is a decision, so it is remembered.** « at the top of the column takes it
+**Hiding it is a decision, so it is remembered.** ‹ at the top of the column takes it
 away and ☰ — the same control, back at the leading edge of the bar — brings it back, with
 the answer in `localStorage`. It is read in the state initialiser rather than an effect:
 an effect would draw the sidebar and take it away again on every load for whoever has
 hidden it. Showing it again _clears_ the key rather than writing a second value, so the
-default and the choice cannot disagree.
+default and the choice cannot disagree. Focus follows the swap, as it does out of the
+drawer: the button that hid the column is gone with it, so ☰ takes the focus — but only
+on that click, never on a load, where the sidebar starts hidden for the same person and
+moving focus would take it off whatever the page put it on.
 
 **A phone is untouched.** The bottom bar and the overlay drawer are what that viewport
-gets, and `usePhone` is what picks — the sidebar and the drawer are never both rendered,
-which is why both navs can be called _Pages_ without ever colliding.
+gets, and `usePhone` is what picks — the sidebar and the bottom bar are never both
+rendered, which is why both navs can be called _Pages_ without ever colliding. The drawer
+is _More_, and shares a name with neither.
 
 **The drawer slides over the page, and the page does not move.** Pushing the site aside
 would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
@@ -398,6 +402,18 @@ scheduled meeting was lost with one press.
 **Inline, not a modal.** The question replaces the control in place: no overlay, no portal, nothing
 to trap focus in. That is what the four originals did and it is the cheaper thing to get right.
 
+**Replacing the control means moving the focus that was on it** (#602). Focus would otherwise fall
+to `<body>` and a keyboard user would be back at the top of the page — twice, once opening the
+question and once on _Keep it_ — so the answer takes it on the way in and the trigger takes it
+back on the way out. Only on a change: on mount every one of these on a page would reach for
+focus, and the last drawn would win. The question is not a live region; it is the answers'
+`aria-describedby`, so it is read where focus lands rather than announced over whatever else the
+page is saying, and an error banner stays the only `role="alert"` on screen.
+
+**`busy` bars, `working` marks.** One write in flight disables every control on the page, which is
+`busy`; which of them is the reason is `working`, and only that one wears `aria-busy`. Passing
+`busy || working` to the one prop lost that distinction where a list has a control per row.
+
 **The wording comes from two props.** `what` names the thing and `verb` says what is about to
 happen to it, so the trigger reads _Remove Sauna_, the question _Remove Sauna? Everyone on it goes
 too._ and the answer carries the accessible name _Really remove Sauna_ — which is what a test keys
@@ -444,6 +460,21 @@ spelling of "withdrawn" is a second thing to keep in step, and the entity that g
 withdrawal next would have to remember both. The cut to fifty happens after, so a run of tombstones
 takes the page's slots but never a live card's place in the order.
 
+#611 was the first answer to this, and the wrong one: it made a `withdrawn` entry not count as
+liveliness, so the card stayed where it already was, marked "taken back", and a comment on it could
+still lift it. There is no card left to order, so that rule is gone and `recentThreads` is back to
+`max(created_at)` — a card whose newest entry is a withdrawal is never on the page for the ordering
+to matter.
+
+**Only the place on the page goes.** `GET /api/threads/:id` answers for a withdrawn card exactly as
+it did, which is what the soft withdrawal is for and how the tests read one. The web still renders
+`gone`, because a card on a page already open can be withdrawn under it — but no load will bring one
+back.
+
+**What it costs.** A withdrawn dream's conversation is now reachable from nowhere in the app: the
+panel went with the dream, and the card was the last door. The rows are all there; a page for a
+thread of its own is a separate thing to want.
+
 **And a page already open finds out from a 404** (#614). Every other disappearance here is soft, so
 until #608 a thread could not vanish under a page that was showing it; a meeting or a point deleted
 outright can. Every write addressed to the card's own thread goes through one wrapper that reads a
@@ -465,24 +496,10 @@ comment's — and `GET /api/threads/:id` then 404s too. That second answer is wh
 `onCard`'s handling back, wording and `forget` and `reload` alike. Neither loss can be read off the
 first 404, which carries the same status either way.
 
-**What was typed survives a failed reply.** `DreamThread` emptied its box on the way out rather
+**What was typed survives a failed write.** `DreamThread` emptied its box on the way out rather
 than on the answer, so a reply to a thread somebody had just deleted was lost to a banner. The box
-is cleared by a `done` the caller passes, which is the shape the rewording form already used.
-
-#611 was the first answer to this, and the wrong one: it made a `withdrawn` entry not count as
-liveliness, so the card stayed where it already was, marked "taken back", and a comment on it could
-still lift it. There is no card left to order, so that rule is gone and `recentThreads` is back to
-`max(created_at)` — a card whose newest entry is a withdrawal is never on the page for the ordering
-to matter.
-
-**Only the place on the page goes.** `GET /api/threads/:id` answers for a withdrawn card exactly as
-it did, which is what the soft withdrawal is for and how the tests read one. The web still renders
-`gone`, because a card can go stale under a page that is already open — that it can is its own bug
-(#614) — but no load will bring one back.
-
-**What it costs.** A withdrawn dream's conversation is now reachable from nowhere in the app: the
-panel went with the dream, and the card was the last door. The rows are all there; a page for a
-thread of its own is a separate thing to want.
+is cleared by a `done` the caller passes, which is the shape the rewording form already used. The
+rewrite box under ✏️ had the same fault one form up and takes the same `done`.
 
 ### The chip row
 
@@ -846,6 +863,19 @@ exist for one card: this kind of thing, and this card. It is the app's first dro
 the pattern — a real button with `aria-expanded` and `aria-controls`, and closing on outside-press
 and Escape. It is now the only shape there is: the one-line news that kept an inline chip
 went with #610, which turned the last of it into cards.
+
+**Which way it opens is about reach, not about room** (#708). A row's ⋯ inside the bell panel
+is drawn inside a scroller, so `flipsUp` measures against that ancestor's box rather than the
+window's — and it flips only where the whole menu **fits** above, never merely where there is
+more of it above. The two overflows are not the same kind of loss: past the bottom of a
+scroller adds to what can be scrolled to, past the top does not. Choosing the roomier side
+sent a two-row panel's menu upward with 28px of it permanently unreachable, where staying put
+would have cost a scroll. Where neither side holds it, down is the answer.
+
+**Escape shuts the innermost open thing.** The ⋯ sits inside the bell panel, which closes on
+Escape too, so one press used to take both. `useAway` listens in the capture phase and stops
+the event, which is the only ordering that works: both listeners are on `document`, and the
+panel's — registered first — would otherwise run first whatever the menu did.
 
 **It is not a menu, and it stopped saying it was** (#487). `role="menu"` puts a screen reader into
 menu mode, where it expects `menuitem` children and arrow-key navigation; what is inside is a title

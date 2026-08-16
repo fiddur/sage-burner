@@ -622,8 +622,11 @@ const Talk = ({
             done()
           }, 'Could not say that.')
         }
-        onRewrite={(id, body) =>
-          run(async () => setThread((await api.updateComment(id, { body })).thread), 'Could not save that.')
+        onRewrite={(id, body, done) =>
+          run(async () => {
+            setThread((await api.updateComment(id, { body })).thread)
+            done()
+          }, 'Could not save that.')
         }
         onRemove={(id) =>
           run(async () => setThread((await api.deleteComment(id)).thread), 'Could not take that back.')

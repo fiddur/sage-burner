@@ -352,13 +352,18 @@ a:hover {
 
 /* `sticky` rather than `fixed` for the same reason: it scrolls with a long page and stops
    at the top, without being taken out of the grid that gave it its column. */
+/* `max-height` and the scroll are load-bearing once it is stuck: eleven entries come to
+   roughly 32rem, so a shorter viewport left the last of them off the bottom with no way to
+   reach them. `.menu-drawer` scrolls for the same reason. */
 .sidebar {
   position: sticky;
   top: 0;
   align-self: start;
   display: flex;
+  max-height: 100vh;
   flex-direction: column;
   padding: 1rem 0;
+  overflow-y: auto;
   border-inline-end: 1px solid var(--line);
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
@@ -2111,6 +2116,21 @@ a.person-badge:focus-visible span:last-child {
   gap: 0.5rem;
 }
 
+/* A plain `list-item` ran the row's controls straight into the time, so `Destroy`'s question
+   opened mid-timestamp — "14:18Take out of the diary …?" (#605). The banner above already
+   reads right because `p.row` is a flex row with a gap; this gives the diary the same. */
+.meeting-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/* The editor is a block, not another control on the line. */
+.meeting-list li > .meeting-edit {
+  flex: 1 0 100%;
+}
+
 .point-row {
   padding: 0.6rem 0.8rem;
   border: 1px solid var(--line);
@@ -2203,11 +2223,11 @@ a.person-badge:focus-visible span:last-child {
   table-layout: fixed;
 }
 
-/* The header row of a collapsed section (#682). */
 .notification-section {
   margin-block: 0.75rem;
 }
 
+/* The header row of a section, which is all of it while the section is collapsed (#682). */
 .notification-section-head {
   display: flex;
   align-items: center;
@@ -2224,12 +2244,6 @@ a.person-badge:focus-visible span:last-child {
   gap: 0.5rem;
 }
 
-/* Fixed width so Here sits under Here down the page: the headings above them differ in
-   length, and a switch that moves per section reads as a different control. */
-.notification-master {
-  width: 4.5rem;
-}
-
 .notification-section-name {
   display: flex;
   align-items: center;
@@ -2240,8 +2254,11 @@ a.person-badge:focus-visible span:last-child {
   text-align: start;
 }
 
+/* Fixed width so Here sits under Here down the page: the headings above them differ in
+   length, and a switch that moves per section reads as a different control. */
 .notification-master {
   display: flex;
+  width: 4.5rem;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8rem;

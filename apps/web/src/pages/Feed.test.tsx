@@ -1142,9 +1142,6 @@ describe('what everyone has been doing', () => {
   })
 
   it('takes a card away when its thing has gone, and says which thing it was', async () => {
-    // #614: a meeting taken out of the diary deletes its thread, so a reply from a page that
-    // was already showing the card answers 404. The card used to stay, composer and all, under
-    // a banner reading "Not found." — and what had been typed was gone with it.
     const posted = vi.fn<FeedApi['postComment']>(() =>
       Promise.reject(apiError(404, 'not_found', 'Not found.')),
     )

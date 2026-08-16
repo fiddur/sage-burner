@@ -121,11 +121,6 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     setWhole(({ [threadId]: _gone, ...rest }) => rest)
   }
 
-  /**
-   * Every write a card offers, with the one answer a soft delete never gave: a 404 means the
-   * thing itself has gone since the page was drawn (#614). The card goes with it and the page
-   * says which, rather than leaving a composer over something nobody has.
-   */
   const onCard = (card: Thread, work: () => Promise<unknown>, fallback: string) => {
     run(
       async () => {
@@ -188,10 +183,13 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         'Could not say that.',
       )
     },
-    rewrite: (card: Thread, id: string, body: string) => {
+    rewrite: (card: Thread, id: string, body: string, done: () => void) => {
       onComment(
         card,
-        async () => held((await api.updateComment(id, { body })).thread),
+        async () => {
+          held((await api.updateComment(id, { body })).thread)
+          done()
+        },
         'Could not save that.',
       )
     },
@@ -517,7 +515,7 @@ const Card = ({
   on: readonly NotificationCategory[] | undefined
   talk: {
     say: (card: Thread, body: string, done: () => void) => void
-    rewrite: (card: Thread, id: string, body: string) => void
+    rewrite: (card: Thread, id: string, body: string, done: () => void) => void
     remove: (card: Thread, id: string) => void
     showAll: (card: Thread) => void
     reword: (threadId: string, id: string, title: string, body: string, done: () => void) => void
@@ -582,7 +580,7 @@ const Card = ({
         upload={upload}
         people={people}
         onSay={(body, done) => talk.say(card, body, done)}
-        onRewrite={(id, body) => talk.rewrite(card, id, body)}
+        onRewrite={(id, body, done) => talk.rewrite(card, id, body, done)}
         onRemove={(id) => talk.remove(card, id)}
         onHeart={(id, hearting) => talk.heartComment(card, id, hearting)}
         onShowAll={() => talk.showAll(card)}
@@ -604,7 +602,6 @@ const Card = ({
   )
 }
 
-/** What a 404 from a card's own routes means, in the words each kind is taken away in. */
 const wentAway = {
   session: 'Somebody withdrew that dream. It is off the page now.',
   attendance: 'They are no longer coming. Their card is off the page now.',

@@ -208,7 +208,7 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - A shared link draws a proper card — the backend injects the installation's
   name, the burn's dates and a banner into the shell for crawlers.
 - Getting around: on a wide screen every page is a column down the left, marked with
-  the page you are on — « hides it, ☰ brings it back, and the browser remembers which.
+  the page you are on — ‹ hides it, ☰ brings it back, and the browser remembers which.
   On a phone the six member pages are a bar along the bottom and the rest are behind ☰.
 - The app installs to a home screen and works offline from its cache; signing
   out deletes the cached data.

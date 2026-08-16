@@ -108,4 +108,61 @@ describe('destroying something', () => {
 
     expect(screen.queryByText('Remove Planning call?')).toBeNull()
   })
+
+  it('takes focus to the answer, the trigger it replaced having gone', () => {
+    render(<Destroy what="Planning call" busy={false} onDestroy={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Planning call' }))
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Really remove Planning call' }))
+  })
+
+  it('hands focus back to the trigger when the answer is no', () => {
+    render(<Destroy what="Planning call" busy={false} onDestroy={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Planning call' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove Planning call' }))
+  })
+
+  it('reaches for nothing on the way in, so a page of these does not fight over focus', () => {
+    render(
+      <>
+        <Destroy what="the first" busy={false} onDestroy={vi.fn()} />
+        <Destroy what="the second" busy={false} onDestroy={vi.fn()} />
+      </>,
+    )
+
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it('describes both answers with the question, which nothing else announces', () => {
+    render(
+      <Destroy
+        what="Sauna at dawn"
+        verb="Withdraw"
+        because="Its helpers and hearts go too."
+        busy={false}
+        onDestroy={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Withdraw Sauna at dawn' }))
+
+    const asked = screen.getByText('Withdraw Sauna at dawn? Its helpers and hearts go too.')
+
+    for (const name of ['Really withdraw Sauna at dawn', 'Keep it']) {
+      expect(screen.getByRole('button', { name }).getAttribute('aria-describedby')).toBe(asked.id)
+    }
+  })
+
+  it('marks the one being worked on rather than dimming every other', () => {
+    // `busy` bars the whole page's controls; `working` is which of them is the reason.
+    render(<Destroy what="Planning call" busy={false} working onDestroy={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: 'Remove Planning call' }).getAttribute('aria-busy')).toBe(
+      'true',
+    )
+  })
 })

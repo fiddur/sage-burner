@@ -90,6 +90,17 @@ describe('what to be told about', () => {
     expect(screen.queryByLabelText('Somebody applies to join — Here')).toBeNull()
   })
 
+  it('heads an open section with an empty corner and one cell per channel', async () => {
+    // A header row one cell short would put every switch column under the wrong heading.
+    render(<NotificationSettingsField api={stub()} />)
+
+    await open('What happens to you')
+
+    const head = [...document.querySelectorAll('.notification-settings thead th')]
+
+    expect(head.map((cell) => cell.textContent)).toEqual(['', 'Here'])
+  })
+
   it('gives the one-category section no expander, its header row being the row', async () => {
     render(<NotificationSettingsField api={stub()} />)
 
@@ -99,8 +110,6 @@ describe('what to be told about', () => {
   })
 
   it('says which section a switch belongs to, the visible word being the same in each', async () => {
-    // Four sections all showing "Here" is four boxes with one name between them
-    // without this — the heading is what tells them apart.
     render(<NotificationSettingsField api={stub()} />)
 
     expect(await screen.findByLabelText('What happens to you — Here')).toBeTruthy()

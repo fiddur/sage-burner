@@ -129,7 +129,11 @@ describe('the meetings page', () => {
       }),
     )
 
-    expect(await screen.findByText('Nothing in the diary. Put the next one in below.')).toBeTruthy()
+    expect(
+      await screen.findByText(
+        'Nothing in the diary. Put the next one in under “Put a meeting in the diary”.',
+      ),
+    ).toBeTruthy()
   })
 
   it('asks before taking a meeting out of the diary, there being no undo', async () => {
@@ -230,6 +234,30 @@ describe('the meetings page', () => {
     expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
   })
 
+  it('tells two meetings of the same name apart, on the ✏️ as well as the bin', async () => {
+    renderPage(
+      stub({
+        getMeetings: () =>
+          Promise.resolve({
+            meetings: [
+              aMeeting(),
+              aMeeting({ id: 'm-2', starts_at: '2099-08-25T17:00:00.000Z' }),
+              aMeeting({ id: 'm-3', starts_at: '2099-08-26T17:00:00.000Z' }),
+            ],
+          }),
+      }),
+    )
+
+    await screen.findAllByText('Planning call')
+
+    const named = (kind: RegExp) =>
+      screen.getAllByRole('button', { name: kind }).map((one) => one.getAttribute('aria-label'))
+
+    for (const kind of [/^Edit Planning call/u, /^Take out of the diary Planning call/u]) {
+      expect(new Set(named(kind)).size).toBe(named(kind).length)
+    }
+  })
+
   it('changes one further down the diary too, not only the next one', async () => {
     // #587: `MeetingFields` rendered from `NextMeeting` alone, so mistyping the time on
     // anything but the imminent meeting left 🗑️ and scheduling it again as the way back —
@@ -248,7 +276,7 @@ describe('the meetings page', () => {
       }),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Toves meeting' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit Toves meeting, /u }))
     fireEvent.input(screen.getByLabelText('What the meeting is'), {
       target: { value: 'Toves meeting, moved' },
     })
@@ -279,10 +307,10 @@ describe('the meetings page', () => {
       }),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Toves meeting' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit Toves meeting, /u }))
     expect(screen.getAllByLabelText('What the meeting is')).toHaveLength(1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Long build sync' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Edit Long build sync, /u }))
 
     const open = screen.getAllByLabelText('What the meeting is')
     expect(open).toHaveLength(1)
@@ -302,8 +330,8 @@ describe('the meetings page', () => {
       }),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Toves meeting' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Toves meeting' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit Toves meeting, /u }))
+    fireEvent.click(screen.getByRole('button', { name: /^Edit Toves meeting, /u }))
 
     expect(screen.queryByLabelText('What the meeting is')).toBeNull()
   })

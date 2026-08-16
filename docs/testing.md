@@ -297,11 +297,15 @@ phone" means 360px.
       `meeting_scheduled` being the one of its kinds that is on. Press the mixed one: every
       row under it comes back ticked, and one save went out. Press it again: all off.
 - [ ] Open a section and untick one row: the switch above it goes mixed without a reload.
-- [ ] Open the ⋯ on the **last** row of the bell panel: the menu opens upward and both entries
-      are inside the panel and clickable. On a row near the top it still opens downward.
+- [ ] Open the ⋯ on the **last** row of a **full** bell panel: the menu opens upward and both
+      entries are inside the panel and clickable. On a row near the top it still opens downward.
+- [ ] With only one or two notifications in the bell, open the last row's ⋯: nothing is drawn
+      above the panel's top edge, and scrolling the panel brings the whole menu into view.
+- [ ] Escape with a row's ⋯ open shuts the menu and leaves the bell panel open, with focus back
+      on the ⋯. A second Escape shuts the panel.
 - [ ] On the bell panel and on `/notifications`, a row's ⋯ offers two things. **Stop telling
-      me about this** names the kind; press it, and that kind is off in both columns on the
-      details page. **Remove this notification** takes the row off, and a reload does not
+      me about this** names the kind; press it, and a line under the panel says which kind was
+      switched off, and that kind is off in both columns on the details page. **Remove this notification** takes the row off, and a reload does not
       bring it back — with an unseen row, the count above drops with it.
 - [ ] In a browser with push off, tick a category on the details page: a strip appears at the
       bottom of the window offering to turn notifications on here.
@@ -455,6 +459,11 @@ phone" means 360px.
       map when one is set); backdrop, ✕ and Escape all close it and focus
       returns to ☰.
 - [ ] At 360px nothing anywhere scrolls the page sideways.
+- [ ] On a wide screen, ‹ puts the page column away and focus lands on the ☰ that replaced it.
+- [ ] With the browser window made short — under about 500px tall — the page column scrolls, so
+      Meetings at the bottom of it can be reached.
+- [ ] Press a 🗑️ anywhere: focus is on the confirming button, and pressing **Keep it** puts it
+      back on the 🗑️.
 
 ## Installing, offline, and the installation's face
 
