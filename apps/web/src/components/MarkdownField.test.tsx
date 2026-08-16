@@ -206,9 +206,6 @@ describe('MarkdownField', () => {
   })
 
   it('names the toolbar after the label, not after the name that says which box this is', () => {
-    // `accessibleName` says which of several boxes on a page this is, which is what the box
-    // itself needs; a control named from it reads as an instruction — "Bold in Rewrite what
-    // you said" — rather than naming the thing being emboldened.
     render(
       <MarkdownField
         label="what you said"

@@ -45,13 +45,8 @@ export const MarkdownField = ({
   const [previewing, setPreviewing] = useState(false)
   const tabs = useRef<(HTMLButtonElement | null)[]>([null, null])
 
-  // What the field itself is called, which has to say *which* box on a page of them. The
-  // toolbar's controls take `label` instead: "Bold in Rewrite what you said" reads as an
-  // instruction to rewrite, where "Bold in what you said" names the thing being emboldened.
   const named = accessibleName ?? label
 
-  // A post empties the box from outside, and previewing nothing is "Nothing written yet."
-  // with no way back until somebody presses Write.
   useEffect(() => {
     if (value === '') setPreviewing(false)
   }, [value])

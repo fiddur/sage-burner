@@ -251,10 +251,15 @@ describe('the meetings page', () => {
     await screen.findAllByText('Planning call')
 
     const named = (kind: RegExp) =>
-      screen.getAllByRole('button', { name: kind }).map((one) => one.getAttribute('aria-label'))
+      screen.getAllByRole('button', { name: kind }).map((one) => one.getAttribute('aria-label') ?? '')
 
+    // Each one carries the time, not merely a set of three distinct strings: leaving the
+    // banner's controls on the bare title keeps the set distinct and says nothing.
     for (const kind of [/^Edit Planning call/u, /^Take out of the diary Planning call/u]) {
-      expect(new Set(named(kind)).size).toBe(named(kind).length)
+      const labels = named(kind)
+
+      expect(labels).toHaveLength(3)
+      for (const one of labels) expect(one).toMatch(/Planning call, \w/u)
     }
   })
 
