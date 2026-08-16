@@ -1282,9 +1282,16 @@ newest fifty things rather than the whole history of the burn.
 printed line carries its own link and the remainder announces what is not printed, so before it
 had a href the only other link in a digest was _Your details_ — the settings page rather than the
 list. The one population this mail is written for is the people who have stopped opening the app,
-so "there are three more" with nothing to press is the worst place in it to leave a dead end. It
-points at `/notifications`, and takes no href at all where there is no `PUBLIC_ORIGIN` to build an
-absolute one from — the rule every other link in these messages follows.
+so "there are three more" with nothing to press is the worst place in it to leave a dead end.
+
+**It points at the feed, filtered to that section's kind**, which is what the section is a slice
+of — `feedPage([section.kind])`, so the chip row opens already set to Songs under the songs
+heading. Not `/notifications`: the digest has been the feed rather than the notifications since
+#620, and a card about something the reader is not part of produces no notification row at all,
+so that page can show none of the things the line counts. Which is why the section's `kind` is
+threaded through `digestMessage` rather than a single link being handed to it. The line takes no
+href where there is no `PUBLIC_ORIGIN` to build an absolute one from — the rule every other link
+in these messages follows.
 
 **The sections are the feed's own chips** — `feedKindLabel`, so Burns, Dreams, People, Posts,
 Songs, Bring, Points, Meetings, in `feedKinds` order. The digest then reads as the page it

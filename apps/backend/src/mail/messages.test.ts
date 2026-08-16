@@ -1,3 +1,4 @@
+import { feedPage } from '@sage-burner/shared'
 import { describe, expect, it } from 'vitest'
 
 import { absolute, digestMessage, inviteMessage, notificationMessage, testMessage } from './messages.ts'
@@ -104,7 +105,8 @@ describe('the test message', () => {
 describe('the digest', () => {
   const sections = [
     {
-      label: 'Somebody comments on a dream',
+      kind: 'session' as const,
+      label: 'Dreams',
       total: 1,
       entries: [{ body: 'Ada commented', link: undefined }],
     },
@@ -116,7 +118,7 @@ describe('the digest', () => {
       to: 'ada@example.org',
       sections,
       settings: 'https://burn.example.org/profile',
-      all: 'https://burn.example.org/notifications',
+      origin: 'https://burn.example.org',
     })
 
     expect(digest.html.match(/Your details/gu)).toHaveLength(1)
@@ -130,28 +132,29 @@ describe('the digest', () => {
       to: 'ada@example.org',
       sections,
       settings: undefined,
-      all: undefined,
+      origin: undefined,
     })
 
     expect(digest.text.replaceAll(/\s+/gu, ' ')).toContain('Your details → Notifications')
   })
 
-  it('gives the remainder line somewhere to go, it being what the reader wants next', () => {
+  it('sends the remainder to the feed it is a slice of, filtered to that kind', () => {
     const digest = digestMessage({
       installation: 'The Burning Sage',
       to: 'ada@example.org',
       sections: [
         {
-          label: 'Somebody comments on a dream',
+          kind: 'song',
+          label: 'Songs',
           total: 8,
-          entries: [{ body: 'Ada commented', link: 'https://burn.example.org/posts/one' }],
+          entries: [{ body: 'Ada added one', link: 'https://burn.example.org/songs/one' }],
         },
       ],
       settings: 'https://burn.example.org/profile',
-      all: 'https://burn.example.org/notifications',
+      origin: 'https://burn.example.org',
     })
 
-    expect(digest.text).toContain('  https://burn.example.org/notifications')
+    expect(digest.text).toContain(`  https://burn.example.org${feedPage(['song'])}`)
   })
 
   it('still prints the remainder where there is no origin to build a link from', () => {
@@ -160,13 +163,14 @@ describe('the digest', () => {
       to: 'ada@example.org',
       sections: [
         {
-          label: 'Somebody comments on a dream',
+          kind: 'song',
+          label: 'Songs',
           total: 8,
-          entries: [{ body: 'Ada commented', link: undefined }],
+          entries: [{ body: 'Ada added one', link: undefined }],
         },
       ],
       settings: undefined,
-      all: undefined,
+      origin: undefined,
     })
 
     expect(digest.text).toContain('and 7 more')

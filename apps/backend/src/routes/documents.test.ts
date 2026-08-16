@@ -110,9 +110,6 @@ describe('the privacy policy', () => {
   })
 
   it('names the one thing that arrives unasked, and where to stop it', async () => {
-    // `DEFAULT_DIGEST` is `daily` and `account.digest` is nullable, so an upgrade starts
-    // posting to an inbox nobody switched anything on in. "The notifications you have asked
-    // for" read as a promise that could not survive that.
     const held = readDocument('PRIVACY.md')
 
     expect(held).toMatch(/unless\s+you\s+say\s+otherwise/i)
@@ -120,9 +117,6 @@ describe('the privacy policy', () => {
   })
 
   it('says when you were here is kept, that being the one thing not typed in', async () => {
-    // Everything else on that list is something somebody entered; `account.last_active_at`
-    // is a record of behaviour, and the page goes out of its way to say there is no tracker
-    // in this app — which makes an unlisted usage timestamp exactly what a reader wants named.
     const held = readDocument('PRIVACY.md')
 
     expect(held).toMatch(/When\s+you\s+were\s+last\s+here/i)

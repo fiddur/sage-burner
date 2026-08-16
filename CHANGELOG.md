@@ -15,7 +15,8 @@ under today's heading, and make a new heading when there is none.
 
 - **"and 3 more" at the foot of a summary is a link now.** It was the one line in the message
   with nowhere to go — everything else printed carried its own link, and the only other link
-  was to your settings page rather than to the things waiting.
+  was to your settings page rather than to the things waiting. It opens the feed, already
+  filtered to the kind of thing that line is counting.
 
 - **The privacy page says two things it had been quiet about.** That the summary email arrives
   unless you say otherwise, rather than only what you have asked for; and that when you were

@@ -1,13 +1,7 @@
 import type { MailSettingsResponse, MailTestResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import {
-  apiRoutes,
-  detailsPage,
-  digestPreviewSchema,
-  mailSettingsUpdateSchema,
-  notificationsPage,
-} from '@sage-burner/shared'
+import { apiRoutes, detailsPage, digestPreviewSchema, mailSettingsUpdateSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -118,7 +112,7 @@ export const registerMailRoutes = (
         to: who.email,
         sections,
         settings: absolute(config.public_origin, detailsPage()),
-        all: absolute(config.public_origin, notificationsPage()),
+        origin: config.public_origin,
       }),
     )
 

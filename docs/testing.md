@@ -284,9 +284,9 @@ phone" means 360px.
       as "+N comments" rather than the comment itself. Change 24 to 1 and press again: less,
       or a note that nothing has happened in that stretch. Neither press changes when your
       real digest next goes out.
-- [ ] Give one section more than five things to say — six comments on your own announcement,
-      say — and press it again: the section lists five and ends with "and N more", which is a
-      link to `/notifications`.
+- [ ] Give one section more than five things to say — six songs into the songbook, say — and
+      press it again: the section lists five and ends with "and N more", which opens the feed
+      already filtered to that section's chip.
 - [ ] Raise a talking point from a second account with **every** notification category
       switched off on your own. The digest preview still carries it: it is the feed, not
       your notifications.
