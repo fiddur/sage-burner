@@ -71,7 +71,7 @@ export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }
 
     const body = bodyOf(groupInviteCreateSchema, request)
     if (body === undefined) return sendError(reply, 400)
-    if (Date.parse(body.expires_at) <= now().getTime()) return sendError(reply, 400)
+    if (Date.parse(body.expires_at) <= now().getTime()) return sendError(reply, 400, 'expired')
 
     const viewer = await viewerFor(request, { db, sessions })
     if (viewer === undefined) return sendError(reply, 401)

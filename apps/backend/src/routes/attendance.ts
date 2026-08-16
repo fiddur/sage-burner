@@ -188,7 +188,7 @@ export const registerAttendanceRoutes = (
 
       if (joined.created) {
         await announceJoined(db, notify, { stay: joined.stay, account_id: viewer.account_id }, now)
-        await tellAboutTheWaitingList(db, joined.stay.event_id, notify)
+        await tellAboutTheWaitingList(db, joined.stay.event_id, notify, now)
       }
 
       const answer = { attendance: joined.stay } satisfies AttendanceResponse
@@ -320,7 +320,7 @@ export const registerAttendanceRoutes = (
     const made = await joinedRow(request.params.eventId, body.account_id)
     if (made === undefined) return sendError(reply, 404)
 
-    await tellAboutTheWaitingList(db, request.params.eventId, notify)
+    await tellAboutTheWaitingList(db, request.params.eventId, notify, now)
 
     return reply.code(201).send({ attendance: made } satisfies AttendanceResponse)
   })
@@ -338,9 +338,15 @@ export const registerAttendanceRoutes = (
             eq(attendance.account_id, request.params.accountId),
           ),
         )
-        .returning({ id: attendance.id })
+        .returning({ id: attendance.id, payment_status: attendance.payment_status })
 
-      return removed.length > 0 ? reply.code(204).send() : sendError(reply, 404)
+      if (removed.length === 0) return sendError(reply, 404)
+
+      if (removed.some((row) => row.payment_status === 'paid')) {
+        await tellAboutTheWaitingList(db, request.params.eventId, notify, now)
+      }
+
+      return reply.code(204).send()
     },
   )
 }

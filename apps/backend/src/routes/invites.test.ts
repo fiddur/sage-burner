@@ -105,7 +105,23 @@ describe('a group link', () => {
     const { cookie } = await givenAdmin()
 
     const payload = { expires_at: '2020-01-01T00:00:00.000Z', label: 'Old' }
-    expect((await createGroup(server, cookie, payload)).statusCode).toBe(400)
+    const refused = await createGroup(server, cookie, payload)
+
+    expect(refused.statusCode).toBe(400)
+    // The admin's message names the date, so a refusal about the label or the cap must not
+    // carry this code.
+    expect(refused.json().error).toBe('expired')
+  })
+
+  it('refuses a label the schema will not take, and does not blame the date for it', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+
+    const payload = { expires_at: '2099-01-01T00:00:00.000Z', label: '' }
+    const refused = await createGroup(server, cookie, payload)
+
+    expect(refused.statusCode).toBe(400)
+    expect(refused.json().error).not.toBe('expired')
   })
 
   it('is closed rather than deleted, the accounts behind it being the record', async () => {
