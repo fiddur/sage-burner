@@ -142,7 +142,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
         setMinted(response.invite)
       },
       (failure) =>
-        isApiError(failure) && failure.status === 400
+        isApiError(failure) && failure.code === 'expired'
           ? 'That closing date has gone. Pick one in the future — a link has to close some time.'
           : errorMessage(failure, 'Could not create that link. Please try again.'),
     )

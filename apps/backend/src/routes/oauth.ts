@@ -42,7 +42,7 @@ import {
   oauthState,
 } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
-import { digestOf, redemptionsOf } from '../invites.ts'
+import { digestOf, redemptionsOf, roomInside } from '../invites.ts'
 import { anotherWayInSurvives, identitiesFor } from '../oauth/identities.ts'
 import { authorizeUrl } from '../oauth/providers.ts'
 import { usableOauthSetting } from '../oauth/settings.ts'
@@ -294,8 +294,11 @@ export const registerOauthRoutes = (
 
     const accountId = randomUUID()
 
+    let admitted: boolean
     try {
-      db.transaction((tx) => {
+      admitted = db.transaction((tx) => {
+        if (invite !== undefined && !roomInside(tx, invite)) return false
+
         tx.insert(account)
           .values({
             id: accountId,
@@ -319,12 +322,16 @@ export const registerOauthRoutes = (
           .run()
 
         if (invite !== undefined) claimInvite(tx, invite, accountId)
+
+        return true
       })
     } catch (failure) {
       request.log.warn({ err: failure, provider }, 'could not make an account for a new identity')
 
       return back(reply, loginPage(isUniqueViolation(failure, 'account.email') ? 'address-taken' : 'refused'))
     }
+
+    if (!admitted) return back(reply, loginPage('refused'))
 
     try {
       await maybeAvatar(accountId, profile.picture)
@@ -355,6 +362,8 @@ export const registerOauthRoutes = (
 
     try {
       db.transaction((tx) => {
+        if (!roomInside(tx, invite)) return
+
         claimInvite(tx, invite, accountId)
       })
     } catch (failure) {

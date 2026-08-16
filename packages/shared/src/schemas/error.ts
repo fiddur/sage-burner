@@ -23,6 +23,7 @@ export const errorCodes = [
   'not_attending',
   'already_member',
   'already_applied',
+  'expired',
 ] as const
 export type ErrorCode = (typeof errorCodes)[number]
 

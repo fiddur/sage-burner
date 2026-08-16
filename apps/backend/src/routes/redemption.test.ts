@@ -250,9 +250,7 @@ describe('a group link, which many people come in on', () => {
   })
 
   it('refuses a burst that fills the cap while somebody’s password is being hashed (#524)', async () => {
-    // The pre-read passes before the scrypt, so a link one below its cap admits everybody who
-    // arrives during it. `hash` is where the arrival is simulated: the count inside the
-    // transaction is what refuses this one, and nothing else can reach that branch.
+    // `hash` is where the other arrival is simulated; nothing else can reach that branch.
     let filled = false
     const server = await build(undefined, async (password) => {
       if (!filled) {

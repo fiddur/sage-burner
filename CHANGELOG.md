@@ -22,6 +22,23 @@ under today's heading, and make a new heading when there is none.
   unless you say otherwise, rather than only what you have asked for; and that when you were
   last here is kept, which is what decides whether that summary is sent at all.
 
+- **A place freed by an organiser moves the waiting list.** Taking a paid member off a burn, or
+  un-recording a payment, used to leave everybody waiting still being told the burn was full —
+  which the roster on the same page disagreed with.
+
+- **A burn that has ended says nothing about its waiting list.** Adding somebody to last year's
+  gathering, or tidying up a payment on it, told them they were on its waiting list.
+
+- **"You were added to …" now reads "You are on …".** The page was naming whatever burn you are
+  on, which is not necessarily the one approving you put you on — you may have left that one and
+  joined another yourself.
+
+- **Sending an application twice shows you where it stands** instead of leaving the form up with
+  a line saying the page would show it.
+
+- **A group invite link cannot be over-used through Discord or Facebook.** Two people clicking a
+  link on its last place at the same moment could both get in.
+
 - **The burn's welcome text can carry a picture now.** It was the one box with no picture
   button, because a picture needed signing in to fetch and the homepage is read by people who
   have not — so the welcome text is where the button was missing and where a picture would

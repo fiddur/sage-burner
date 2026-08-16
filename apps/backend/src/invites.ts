@@ -1,7 +1,7 @@
 import { count, eq } from 'drizzle-orm'
 import { createHash, randomBytes } from 'node:crypto'
 
-import type { Database } from './db/client.ts'
+import type { Database, Transaction } from './db/client.ts'
 
 import { inviteRedemption } from './db/schema.ts'
 
@@ -28,3 +28,19 @@ export const redemptionsOf = async (db: Database, tokenId: string): Promise<numb
 
   return tally?.taken ?? 0
 }
+
+export const redemptionsIn = (tx: Transaction, tokenId: string): number => {
+  const [tally] = tx
+    .select({ taken: count() })
+    .from(inviteRedemption)
+    .where(eq(inviteRedemption.token_id, tokenId))
+    .all()
+
+  return tally?.taken ?? 0
+}
+
+export const roomInside = (
+  tx: Transaction,
+  invite: { id: string; kind: string; max_uses: number | null },
+): boolean =>
+  invite.kind !== 'group' || invite.max_uses === null || redemptionsIn(tx, invite.id) < invite.max_uses

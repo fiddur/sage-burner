@@ -64,6 +64,15 @@ test that inserts a redemption _while the password is being hashed_ is exactly t
 in-transaction count is the only thing that refuses it. Deleting the check fails that test and
 nothing else.
 
+**And the provider path is checked the same twice** (#561). `signUpThrough` awaits `openInvite`
+and then runs its transaction, so two callbacks whose reads are both in flight each see the link
+one below its cap — a narrower window than the scrypt one, being a microtask gap rather than a
+hash and a queue, but on a link posted in a Discord server simultaneous clicks are the ordinary
+shape rather than the exotic one. `roomInside` is the one spelling of "how full is this link"
+that both paths ask, taking the synchronous `tx` so the answer cannot be stale by the time the
+insert runs; two callbacks fired at once leave one redemption, and the second is sent back to
+`loginPage('refused')`, which is where "the link has run out or been used up" already lives.
+
 **Revoking closes rather than deletes.** A direct invite is a row nobody has used, so
 `DELETE /api/admin/invites/:id` removes it. A group link has accounts behind it and rows pointing
 at it, so the same route stamps `revoked_at` instead — the door shuts, and the record of who came
@@ -545,13 +554,24 @@ where a link is the only thing there is to offer. For everything since, approval
 outright and mints nothing. What follows describes that older path, which the two outstanding
 invites still ride.
 
-**What the approved person is told is written in the past tense, and only where it happened**
-(#517, #522). Approval calls `joinTheNextBurn`, which joins nothing where no burn is planned — so
-the page's old fallback, "you have been added to the burn that is coming", asserted a membership of
-a burn for somebody on none, and offered to let them leave it. It also read the _current_ burn list
-rather than a record of what approval did, so a member who joined and then left was still told they
-were on it. The sentence now names the burn only when one is joined, and otherwise says what is
-true: every burn being planned is open to them, and joining is theirs to do.
+**What the approved person is told is in the present tense, and only where it is true**
+(#517, #522, #560). Approval calls `joinTheNextBurn`, which joins nothing where no burn is planned
+— so the page's old fallback, "you have been added to the burn that is coming", asserted a
+membership of a burn for somebody on none, and offered to let them leave it. The sentence names a
+burn only when one is joined, and otherwise says what is true: every burn being planned is open to
+them, and joining is theirs to do.
+
+**The past tense was the remaining half of the same claim.** The page reads the _current_ burn
+list, which is not a record of what approval did: somebody approved onto one burn who then left it
+and joined another by hand was told they "were added to" the one they chose themselves. Keeping a
+record of the join — `joined_at` against `decided_at`, or a column on the application — would buy
+one sentence a tense. "You are on _X_" is true in both cases and needs no extra state, so that is
+what it says.
+
+**Nothing is drawn until the burn list lands.** `joined` is `undefined` both for "on no burn" and
+for "not answered yet", so the approved page rendered the between-burns sentence first and swapped
+it — a flicker towards a claim that was about to be corrected. `useBurns` carries a `status`, and
+the approved branch waits on it.
 
 32 CSPRNG bytes, base64url, valid 30 days. Only
 the SHA-256 digest is stored, so the raw token exists in that one response and

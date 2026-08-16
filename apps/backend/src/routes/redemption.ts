@@ -2,7 +2,7 @@ import type { InviteState, RedeemResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
-import { and, count, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Gate } from '../auth/gate.ts'
@@ -24,7 +24,7 @@ import {
   inviteToken,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { digestOf, redemptionsOf } from '../invites.ts'
+import { digestOf, redemptionsOf, roomInside } from '../invites.ts'
 import { writeAllergyTicks } from './allergy-ticks.ts'
 import { announceJoined, joinBurn } from './attendance.ts'
 import { cookieHeader } from './auth.ts'
@@ -137,15 +137,7 @@ export const registerRedemptionRoutes = (
     const claimed = ((): boolean | 'unknown-allergy' => {
       try {
         return db.transaction((tx) => {
-          if (invite.kind === 'group' && invite.max_uses !== null) {
-            const [tally] = tx
-              .select({ taken: count() })
-              .from(inviteRedemption)
-              .where(eq(inviteRedemption.token_id, invite.id))
-              .all()
-
-            if ((tally?.taken ?? 0) >= invite.max_uses) return false
-          }
+          if (!roomInside(tx, invite)) return false
 
           if (invite.kind === 'single') {
             const stamped = tx
