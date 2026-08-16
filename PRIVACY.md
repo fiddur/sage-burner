@@ -24,6 +24,9 @@ paying for your data because nobody is being offered it.
 - **What you write** — dreams you offer, comments, questions and answers — and any pictures you
   add to them.
 - **Your picture**, if you upload one.
+- **When you were last here**, so that a summary of what you have missed is only sent to
+  somebody who has been away. It is one moment in time, written no more than once an hour and
+  overwritten each time — not a record of what you looked at, and shown to nobody.
 
 # If you sign in with Discord or Facebook
 
@@ -95,8 +98,16 @@ If you turn on notifications, the browser you turned them on in is registered wi
 push service that browser uses — Mozilla's, Google's or Apple's, depending on the browser. That
 service carries the message and knows nothing about this gathering.
 
-If the organisers have set up an email server, invitations and the notifications you have asked
-for are sent through it. That is their own mail server or provider, not ours.
+If the organisers have set up an email server, invitations are sent through it, and so is
+anything you have asked to be emailed about. That is their own mail server or provider, not
+ours. Every category is off by email until you switch it on, under **Your details →
+Notifications**.
+
+**One email is the exception, and arrives unless you say otherwise:** a summary of what you
+have not seen, sent only when you have been away from the site. It is the one thing here you
+have to switch off rather than on, because the people it is written for are the ones who have
+stopped opening the app and will therefore never come and switch it on. The same page turns it
+off, or makes it weekly instead of daily.
 
 # How long it is kept, and getting rid of it
 

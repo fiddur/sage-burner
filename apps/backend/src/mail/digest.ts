@@ -1,6 +1,13 @@
 import type { DigestChoice, FeedKind, Thread, ThreadEntry } from '@sage-burner/shared'
 
-import { DEFAULT_DIGEST, detailsPage, feedKindLabel, feedKinds, threadEntityTypes } from '@sage-burner/shared'
+import {
+  DEFAULT_DIGEST,
+  detailsPage,
+  feedKindLabel,
+  feedKinds,
+  notificationsPage,
+  threadEntityTypes,
+} from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
@@ -196,6 +203,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
         to: candidate.email,
         sections,
         settings: absolute(deps.origin, detailsPage()),
+        all: absolute(deps.origin, notificationsPage()),
       }),
     )
 

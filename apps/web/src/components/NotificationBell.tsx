@@ -1,5 +1,6 @@
 import type { Notification } from '@sage-burner/shared'
 
+import { notificationsPage } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
@@ -137,7 +138,7 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
     <span class="bell-wrap" ref={wrap}>
       <a
         ref={bell}
-        href="/notifications"
+        href={notificationsPage()}
         class={unseen > 0 ? 'bell has-unseen' : 'bell'}
         aria-expanded={phone ? undefined : open}
         aria-label={unseen === 0 ? 'Notifications' : `Notifications, ${unseen} new`}

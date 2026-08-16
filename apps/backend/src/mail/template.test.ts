@@ -93,6 +93,16 @@ describe('the html part', () => {
     expect(htmlFrom({ installation: 'The Burning Sage', blocks })).toContain('The Burning Sage')
   })
 
+  it('lays out at the width of the phone it is read on', () => {
+    // Without it a client rendering in a webview falls back to a 980px layout viewport, so
+    // the 560px card takes the left half of a wide empty document and the whole thing is
+    // scaled down — 16px body type ends up around 6 physical px on a 360px screen. The app
+    // shell has carried the same line all along.
+    const html = htmlFrom({ installation: 'X', blocks })
+
+    expect(html).toContain('<meta name="viewport" content="width=device-width,initial-scale=1">')
+  })
+
   it('holds every style inline, since a mail client strips a stylesheet', () => {
     const html = htmlFrom({ installation: 'X', blocks })
 

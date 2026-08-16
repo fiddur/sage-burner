@@ -118,6 +118,7 @@ export const digestMessage = ({
   to,
   sections,
   settings,
+  all,
 }: {
   installation: string
   to: string
@@ -127,6 +128,7 @@ export const digestMessage = ({
     entries: readonly { body: string; link: string | undefined }[]
   }[]
   settings: string | undefined
+  all: string | undefined
 }): Message => {
   const total = countOf(sections)
 
@@ -147,7 +149,9 @@ export const digestMessage = ({
                 text: entry.body,
                 ...(entry.link === undefined ? {} : { href: entry.link }),
               })),
-              ...(left === 0 ? [] : [{ text: `and ${left} more` }]),
+              ...(left === 0
+                ? []
+                : [{ text: `and ${left} more`, ...(all === undefined ? {} : { href: all }) }]),
             ],
           },
         ]

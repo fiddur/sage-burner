@@ -116,6 +116,7 @@ describe('the digest', () => {
       to: 'ada@example.org',
       sections,
       settings: 'https://burn.example.org/profile',
+      all: 'https://burn.example.org/notifications',
     })
 
     expect(digest.html.match(/Your details/gu)).toHaveLength(1)
@@ -129,8 +130,45 @@ describe('the digest', () => {
       to: 'ada@example.org',
       sections,
       settings: undefined,
+      all: undefined,
     })
 
     expect(digest.text.replaceAll(/\s+/gu, ' ')).toContain('Your details → Notifications')
+  })
+
+  it('gives the remainder line somewhere to go, it being what the reader wants next', () => {
+    const digest = digestMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      sections: [
+        {
+          label: 'Somebody comments on a dream',
+          total: 8,
+          entries: [{ body: 'Ada commented', link: 'https://burn.example.org/posts/one' }],
+        },
+      ],
+      settings: 'https://burn.example.org/profile',
+      all: 'https://burn.example.org/notifications',
+    })
+
+    expect(digest.text).toContain('  https://burn.example.org/notifications')
+  })
+
+  it('still prints the remainder where there is no origin to build a link from', () => {
+    const digest = digestMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      sections: [
+        {
+          label: 'Somebody comments on a dream',
+          total: 8,
+          entries: [{ body: 'Ada commented', link: undefined }],
+        },
+      ],
+      settings: undefined,
+      all: undefined,
+    })
+
+    expect(digest.text).toContain('and 7 more')
   })
 })

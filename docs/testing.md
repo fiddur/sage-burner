@@ -276,12 +276,17 @@ phone" means 360px.
       the installation's name, the app's colours and its serif body, with the action as a
       filled button. Read it in a client with images off: nothing is missing, because there
       are none. Read it as plain text: the same words, and every link on a line of its own.
+- [ ] Read one on a phone, or at a 360px window: the card fills the width rather than
+      sitting in the left half of a wider page with the type shrunk to fit.
 - [ ] With SMTP configured, ⚙️ → Settings offers **Send me a digest of the last [24] hours**.
       Press it: a digest of the last day's feed arrives — the same headings as the chips on
       the feed, a card as one line saying who did what, and a card somebody only commented on
       as "+N comments" rather than the comment itself. Change 24 to 1 and press again: less,
       or a note that nothing has happened in that stretch. Neither press changes when your
       real digest next goes out.
+- [ ] Give one section more than five things to say — six comments on your own announcement,
+      say — and press it again: the section lists five and ends with "and N more", which is a
+      link to `/notifications`.
 - [ ] Raise a talking point from a second account with **every** notification category
       switched off on your own. The digest preview still carries it: it is the feed, not
       your notifications.
