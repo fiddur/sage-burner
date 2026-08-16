@@ -11,6 +11,7 @@ import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { useInstallationBanner, useInstallationTitle } from '../installation.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
@@ -18,7 +19,7 @@ import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
 type Active = Loaded<Event | null>
 
-export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome'>
+export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome' | 'uploadImage'>
 
 const Banner = ({ version }: { version?: string | null }) =>
   version === undefined || version === null ? null : (
@@ -125,13 +126,20 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 label="Welcome text"
                 value={editing}
                 maxLength={MAX_WELCOME_LENGTH}
+                upload={api.uploadImage}
                 onInput={setEditing}
               />
 
               <FormError error={formError} />
               <TheirVersion failure={refused} at={['event', 'welcome_markdown']} />
 
-              <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
+              <PendingButton
+                busy={saving}
+                disabled={stillUploading(editing)}
+                label="Save"
+                busyLabel="Saving…"
+                type="submit"
+              />
               <button
                 type="button"
                 class="link-button"

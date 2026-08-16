@@ -169,16 +169,29 @@ describe('a picture written into markdown', () => {
     expect((await fetchImage(server, bea.cookie, stored.json().id)).statusCode).toBe(200)
   })
 
-  it('is nobody’s to see who is not approved', async () => {
+  it('is nobody’s to upload who is not approved', async () => {
     const server = await build()
-    const ada = await givenAccount()
     const stranger = await givenAccount([])
-    const stored = await upload(server, ada.cookie)
 
-    expect((await fetchImage(server, stranger.cookie, stored.json().id)).statusCode).toBe(403)
-    expect((await fetchImage(server, undefined, stored.json().id)).statusCode).toBe(401)
     expect((await upload(server, stranger.cookie)).statusCode).toBe(403)
     expect((await upload(server, undefined)).statusCode).toBe(401)
+  })
+
+  it('is read by anybody, so the burn’s welcome text can carry one', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const stored = await upload(server, ada.cookie)
+
+    const anonymous = await fetchImage(server, undefined, stored.json().id)
+
+    expect(anonymous.statusCode).toBe(200)
+    expect(anonymous.rawPayload.equals(PNG)).toBe(true)
+  })
+
+  it('answers 404 to a stranger asking for one that is not there', async () => {
+    const server = await build()
+
+    expect((await fetchImage(server, undefined, randomUUID())).statusCode).toBe(404)
   })
 
   it('will not let a browser decide the bytes are something else', async () => {

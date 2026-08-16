@@ -1,7 +1,7 @@
 This app is run by the people organising the gathering you are part of. It holds what it needs
 to plan that gathering and nothing else, and what it holds is visible to the other members of
-it — not to anybody outside, with the one exception described under **The calendar feed**
-below.
+it — not to anybody outside, with the two exceptions described under **Pictures you add** and
+**The calendar feed** below.
 
 **Nothing here is shared, sold, or sent anywhere for advertising or analytics.** There is no
 analytics service, no advertising network and no third-party tracker in this app. Nobody is
@@ -62,6 +62,18 @@ since edited yourself stays too — once you have changed it, it is yours rather
 the link put there, so taking the link off leaves it. If that link is the only way you have left of signing
 in, the app says so and keeps it rather than locking you out of your own account — set a
 password or add a passkey first, and then it can go.
+
+# Pictures you add
+
+A picture you put in a comment, a dream or anywhere else you write is stored here and drawn on
+the page for the other members, like everything else you write. Its address works without a
+login: **anybody holding it can open it.** That is so the burn's welcome text, which is the
+front page and is read by people who have not signed in, can carry a picture at all.
+
+The address has an unguessable identifier in it — one of a number large enough that nobody
+finds it by trying, and it is published nowhere. So a picture reaches only whoever is handed
+its address, and handing it on is what would make it public. The page it sits on is still only
+shown to members; it is the picture on its own that has no login in front of it.
 
 # The calendar feed
 

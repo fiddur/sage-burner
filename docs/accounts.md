@@ -1967,10 +1967,11 @@ a phone, and this is the first field that exists _because_ of that rather than o
 gained it. So the Save button is disabled while a placeholder is still in the value, like
 every other markdown field's.
 
-**`requireApproved`, the same guard as the page it sits on and as the pictures inside it.**
-That last part is not a coincidence: #379 chose `requireApproved` for `/api/images/:id`, so an
-introduction full of photographs renders for members and would show broken images to anybody
-else. This is the field where that decision pays off rather than pinches.
+**`requireApproved`, the same guard as the page it sits on.** The pictures inside it are not
+under that guard any more — #692 opened `GET /api/images/:id` to everybody so the burn's
+welcome text could carry one — so what keeps an introduction between members is this route,
+not the images it names. A photograph in one is reachable by whoever holds its address, which
+is a v4 UUID and published nowhere; `docs/the-app.md` has the trade.
 
 **Nothing renders it anywhere else** — not the roster, not a hover card, not the feed's card.
 It is a page you go to, and it is long; a truncated introduction in a table cell is the shape

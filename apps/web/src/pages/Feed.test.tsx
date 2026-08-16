@@ -488,6 +488,32 @@ describe('the heart on a card', () => {
     expect(screen.getByRole('button', { name: /Show the whole thread \(4\)/ })).toBeTruthy()
   })
 
+  it('names the count the answer gave, not the one the card was showing', async () => {
+    const supportThread = vi.fn<FeedApi['supportThread']>(() =>
+      Promise.resolve({
+        thread: aCard({
+          id: 'c-1',
+          title: 'Sauna at dawn',
+          support_count: 1,
+          supported_by_me: true,
+          entry_count: 7,
+          entries: [
+            anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' }),
+            anEntry({ id: 't-2', body: 'the earliest thing said' }),
+          ],
+        }),
+      }),
+    )
+    renderPage(stub({ supportThread }, [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 4 })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Show the whole thread \(7\)/ })).toBeTruthy(),
+    )
+    expect(screen.queryByText('the earliest thing said')).toBeNull()
+  })
+
   it('takes it back', async () => {
     const withdrawSupportForThread = vi.fn<FeedApi['withdrawSupportForThread']>(() =>
       Promise.resolve({ thread: aCard({ id: 'c-1', title: 'Sauna at dawn' }) }),

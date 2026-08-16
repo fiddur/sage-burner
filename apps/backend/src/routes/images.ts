@@ -56,24 +56,20 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
     },
   )
 
-  app.get<{ Params: { id: string } }>(
-    apiRoutes.storedImage.fastify,
-    { preHandler: requireApproved },
-    async (request, reply) => {
-      const [row] = await db.select().from(image).where(eq(image.id, request.params.id)).limit(1)
+  app.get<{ Params: { id: string } }>(apiRoutes.storedImage.fastify, async (request, reply) => {
+    const [row] = await db.select().from(image).where(eq(image.id, request.params.id)).limit(1)
 
-      if (row === undefined) {
-        void noStore(reply)
-        return sendError(reply, 404)
-      }
+    if (row === undefined) {
+      void noStore(reply)
+      return sendError(reply, 404)
+    }
 
-      return reply
-        .header('content-type', row.content_type)
-        .header('x-content-type-options', 'nosniff')
-        .header('cache-control', 'private, max-age=31536000, immutable')
-        .send(row.bytes)
-    },
-  )
+    return reply
+      .header('content-type', row.content_type)
+      .header('x-content-type-options', 'nosniff')
+      .header('cache-control', 'private, max-age=31536000, immutable')
+      .send(row.bytes)
+  })
 
   app.get(apiRoutes.getMyImages.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)

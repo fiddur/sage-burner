@@ -30,7 +30,7 @@ const summer: Event = {
 }
 
 /** These cases are about rendering, not saving; a call here is a test bug. */
-const notStubbed = () => Promise.reject(new Error('updateWelcome is not stubbed here'))
+const notStubbed = () => Promise.reject(new Error('that call is not stubbed here'))
 
 const SIGNED_OUT: Viewer = { status: 'signed-out' }
 
@@ -43,7 +43,9 @@ const renderHome = (
   render(
     <InstallationProvider title="The Burning Sage" banner={banner}>
       <ViewerProvider viewer={viewer}>
-        <Home api={{ getActiveEvent: () => Promise.resolve({ event }), updateWelcome }} />
+        <Home
+          api={{ getActiveEvent: () => Promise.resolve({ event }), updateWelcome, uploadImage: notStubbed }}
+        />
       </ViewerProvider>
     </InstallationProvider>,
   )
@@ -152,7 +154,13 @@ describe('Home', () => {
     render(
       <InstallationProvider>
         <ViewerProvider viewer={SIGNED_OUT}>
-          <Home api={{ getActiveEvent: () => Promise.resolve({ event: null }), updateWelcome: notStubbed }} />
+          <Home
+            api={{
+              getActiveEvent: () => Promise.resolve({ event: null }),
+              updateWelcome: notStubbed,
+              uploadImage: notStubbed,
+            }}
+          />
         </ViewerProvider>
       </InstallationProvider>,
     )
@@ -167,7 +175,11 @@ describe('Home', () => {
     render(
       <ViewerProvider viewer={SIGNED_OUT}>
         <Home
-          api={{ getActiveEvent: () => Promise.reject(new Error('offline')), updateWelcome: notStubbed }}
+          api={{
+            getActiveEvent: () => Promise.reject(new Error('offline')),
+            updateWelcome: notStubbed,
+            uploadImage: notStubbed,
+          }}
         />
       </ViewerProvider>,
     )
@@ -191,7 +203,7 @@ describe('Home', () => {
     })
     render(
       <ViewerProvider viewer={SIGNED_OUT}>
-        <Home api={{ getActiveEvent: () => pending, updateWelcome: notStubbed }} />
+        <Home api={{ getActiveEvent: () => pending, updateWelcome: notStubbed, uploadImage: notStubbed }} />
       </ViewerProvider>,
     )
 
@@ -216,7 +228,7 @@ describe('Home', () => {
     // `api` identity and legitimately refetches — which is why `App` memoises
     // the client. This pins the half that lives here: given a stable client,
     // re-rendering must not refetch.
-    const api = { getActiveEvent, updateWelcome: notStubbed }
+    const api = { getActiveEvent, updateWelcome: notStubbed, uploadImage: notStubbed }
 
     const { rerender } = render(
       <ViewerProvider viewer={SIGNED_OUT}>
@@ -276,6 +288,7 @@ describe('Home', () => {
                   written = true
                   return await updateWelcome(id, body)
                 },
+                uploadImage: notStubbed,
               }}
             />
           </ViewerProvider>
@@ -319,6 +332,23 @@ describe('Home', () => {
       expect(screen.getByLabelText<HTMLTextAreaElement>('Welcome text').value).toBe('Nope')
     })
 
+    it('offers a picture here too, and holds the save while one is going up', async () => {
+      renderHome(summer, asRoles(['member']))
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      await screen.findByLabelText('Welcome text')
+
+      expect(screen.getByLabelText('Add a picture to Welcome text')).toBeTruthy()
+
+      fireEvent.input(screen.getByLabelText('Welcome text'), {
+        target: { value: 'Bring water ![Uploading sauna.jpg…]()' },
+      })
+
+      await waitFor(() =>
+        expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save' }).disabled).toBe(true),
+      )
+    })
+
     it('opens on the text as it is now, not as it was when the page loaded', async () => {
       // The whole field is overwritten on save, so a homepage left open while
       // somebody else edited would discard their work. Re-reading on open is what
@@ -329,7 +359,7 @@ describe('Home', () => {
         .mockResolvedValue({ event: { ...summer, welcome_markdown: 'Written by someone else' } })
       render(
         <ViewerProvider viewer={asRoles(['member'])}>
-          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed, uploadImage: notStubbed }} />
         </ViewerProvider>,
       )
 
@@ -350,7 +380,7 @@ describe('Home', () => {
       const updateWelcome = vi.fn<HomeApi['updateWelcome']>(notStubbed)
       render(
         <ViewerProvider viewer={asRoles(['member'])}>
-          <Home api={{ getActiveEvent, updateWelcome }} />
+          <Home api={{ getActiveEvent, updateWelcome, uploadImage: notStubbed }} />
         </ViewerProvider>,
       )
 
@@ -378,7 +408,7 @@ describe('Home', () => {
         .mockReturnValue(held)
       render(
         <ViewerProvider viewer={asRoles(['member'])}>
-          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed, uploadImage: notStubbed }} />
         </ViewerProvider>,
       )
 
@@ -401,7 +431,7 @@ describe('Home', () => {
         .mockRejectedValue(new Error('offline'))
       render(
         <ViewerProvider viewer={asRoles(['member'])}>
-          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed, uploadImage: notStubbed }} />
         </ViewerProvider>,
       )
 
