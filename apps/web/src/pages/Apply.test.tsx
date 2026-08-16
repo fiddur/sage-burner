@@ -830,8 +830,6 @@ describe('where an application already stands', () => {
   })
 
   it('does not say approval put them there, having no record of what approval did (#560)', async () => {
-    // The burn list is the current one. Somebody approved onto one burn, who has since left
-    // it and joined another by hand, would be told they "were added to" the one they chose.
     renderPage(
       stub({
         getMyApplication: () =>

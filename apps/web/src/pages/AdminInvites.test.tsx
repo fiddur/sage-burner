@@ -164,8 +164,6 @@ describe('AdminInvites', () => {
   })
 
   it('does not blame the closing date for a refusal that was about something else', async () => {
-    // `groupInviteCreateSchema` 400s on the label and on `max_uses` too, and naming the date
-    // for those sends the admin to correct a field that was fine.
     renderPage(
       stub({
         createGroupInvite: () => Promise.reject(apiError(400, 'bad_request', 'Request failed (400).')),

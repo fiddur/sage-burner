@@ -144,7 +144,7 @@ export const registerRosterRoutes = (
         }
       }
 
-      if (nowPaid !== wasPaid) await tellAboutTheWaitingList(db, eventId, notify, todayIso(now))
+      if (nowPaid !== wasPaid) await tellAboutTheWaitingList(db, eventId, notify, now)
 
       return { attendance: await withHelping(updated) } satisfies AttendanceResponse
     },

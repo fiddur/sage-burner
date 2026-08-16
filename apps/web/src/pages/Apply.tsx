@@ -149,17 +149,10 @@ const Answered = ({
 const hasProblem = (problems: string[], field: string) =>
   problems.some((problem) => problem.startsWith(`${field}:`))
 
-/**
- * Which of the four things somebody sees, which is the whole of what account-first changed here
- * (#476): sign up, fill the form in, wait, or read the answer.
- */
 const Decided = ({ api, mine }: { api: ApplyApi; mine: MyApplication }) => {
   const { status, burns } = useBurns()
   const approved = mine.application?.status === 'approved'
 
-  // Nothing is drawn until the burns land: `joined` decides which of two sentences this is,
-  // and `undefined` is also what "on no burn" looks like, so the page would say the wrong
-  // one first and then swap it.
   if (approved && status === 'loading') return <article class="column" />
 
   return (
@@ -174,6 +167,10 @@ const Decided = ({ api, mine }: { api: ApplyApi; mine: MyApplication }) => {
   )
 }
 
+/**
+ * Which of the four things somebody sees, which is the whole of what account-first changed here
+ * (#476): sign up, fill the form in, wait, or read the answer.
+ */
 export const Apply = ({ api }: ApplyProps) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()

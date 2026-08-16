@@ -297,9 +297,6 @@ export const registerOauthRoutes = (
     let admitted: boolean
     try {
       admitted = db.transaction((tx) => {
-        // Re-read inside the transaction, as the redeem route does: `openInvite` awaits, and
-        // two callbacks whose reads are both in flight would each see the link one below its
-        // cap. A group link is posted where simultaneous clicks are the ordinary shape.
         if (invite !== undefined && !roomInside(tx, invite)) return false
 
         tx.insert(account)

@@ -318,9 +318,8 @@ describe('signing up from an invite link through a provider', () => {
   })
 
   it('lets one in where two arrive on the last place at once (#561)', async () => {
-    // Both read the link before either writes to it, which is the whole of the window:
-    // `openInvite` awaits, and its answer is one redemption stale by the time the second
-    // transaction runs. The count inside the transaction is what refuses that one.
+    // Deterministic rather than lucky: both `openInvite` reads resolve before either
+    // synchronous transaction runs, so the second one's count is genuinely stale.
     let handed = 0
     const server = await build(
       fakeOAuth({

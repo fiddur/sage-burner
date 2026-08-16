@@ -196,6 +196,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
         to: candidate.email,
         sections,
         settings: absolute(deps.origin, detailsPage()),
+        origin: deps.origin,
       }),
     )
 

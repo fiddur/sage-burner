@@ -8,6 +8,7 @@ import type { Notifier, Told } from '../push/notify.ts'
 
 import { attendance, event, notification } from '../db/schema.ts'
 import { oneBatch } from '../push/notify.ts'
+import { todayIso } from './events.ts'
 
 const NEARLY_FULL = 4
 
@@ -41,7 +42,7 @@ export const tellAboutTheWaitingList = async (
   db: Database,
   eventId: string,
   notify: Notifier,
-  today: string,
+  now: () => Date,
 ): Promise<void> => {
   const [burn] = await db
     .select({ name: event.name, member_cap: event.member_cap, end_date: event.end_date })
@@ -50,7 +51,7 @@ export const tellAboutTheWaitingList = async (
     .limit(1)
 
   if (burn === undefined) return
-  if (burn.end_date < today) return
+  if (burn.end_date < todayIso(now)) return
 
   const rows = await db
     .select({ account_id: attendance.account_id, payment_status: attendance.payment_status })
