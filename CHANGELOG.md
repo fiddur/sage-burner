@@ -7,6 +7,25 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-16
+
+- **The burn's welcome text can carry a picture now.** It was the one box with no picture
+  button, because a picture needed signing in to fetch and the homepage is read by people who
+  have not — so the welcome text is where the button was missing and where a picture would
+  have been most use. Pictures are readable without signing in from now on; the address of one
+  is a long random string nobody can guess, but anybody holding it can open it.
+
+- **A folded card names the right number of comments.** Giving a card a heart used to leave
+  "Show the whole thread (6)" saying six while the answer had already said seven, so pressing
+  it opened more than it promised.
+
+- **"Sending pictures…" when more than one is.** The picture button takes several at once and
+  the note under the box said "a picture" whatever it was carrying.
+
+- **The help line under every box shows the button it means.** It said to click 🖼 while the
+  toolbar draws a plain outlined picture icon, so there was nothing on screen matching what
+  the sentence pointed at.
+
 # 2026-08-15
 
 - **You are told when somebody hearts what you wrote.** A heart used to reach nobody — it was
