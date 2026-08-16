@@ -418,6 +418,8 @@ phone" means 360px.
       the body; pasting one and dropping one on the box still do the same.
 - [ ] While it is going up, the note below the box says a picture is on its way and the
       picture button is dimmed. Choosing an SVG says so below the box, not in the toolbar.
+- [ ] Choosing two at once puts two placeholders in the box and the note reads _Sending
+      pictures…_ rather than naming one.
 - [ ] Every longer box wears the same editor — a card's comment box, the rewrite box under
       ✏️, a meeting's notes, a bring item's "anything else", the welcome text, and the
       applicant's box on `/apply` — each with **Write | Preview** over it and a footer under
@@ -428,8 +430,10 @@ phone" means 360px.
 - [ ] The footer's _Markdown is supported_ opens `/formatting`, which reads the same signed
       out. Every example's right-hand column is what its left-hand column renders to.
 - [ ] The picture half of that footer is there only where pictures are — present on a
-      comment and on **How to pay**, absent on the applicant's box and on the **welcome
-      text**, which the public reads and cannot fetch an uploaded picture from.
+      comment, on **How to pay** and on the **welcome text**, absent on the applicant's box.
+      It draws the same outlined icon the toolbar's button does, not a coloured emoji.
+- [ ] A picture put in the **welcome text** is drawn on the homepage while signed out, in a
+      private window that has never signed in.
 
 ## The nav on a wide screen
 
