@@ -2,7 +2,12 @@ import type { RefObject } from 'preact'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
-export const useAway = <T extends HTMLElement>(open: boolean, close: () => void): RefObject<T> => {
+export type Dismissal = 'away' | 'escape'
+
+export const useAway = <T extends HTMLElement>(
+  open: boolean,
+  close: (why: Dismissal) => void,
+): RefObject<T> => {
   const wrap = useRef<T>(null)
   const latest = useRef(close)
   latest.current = close
@@ -12,19 +17,24 @@ export const useAway = <T extends HTMLElement>(open: boolean, close: () => void)
 
     const away = (event: Event) => {
       if (!(event.target instanceof Node) || wrap.current?.contains(event.target) !== true) {
-        latest.current()
+        latest.current('away')
       }
     }
+    // Captured, and the event stopped: this menu sits inside panels with an Escape handler of
+    // their own, and one press should shut the innermost open thing rather than everything.
     const escape = (keyEvent: KeyboardEvent) => {
-      if (keyEvent.key === 'Escape') latest.current()
+      if (keyEvent.key !== 'Escape') return
+
+      keyEvent.stopPropagation()
+      latest.current('escape')
     }
 
     document.addEventListener('pointerdown', away)
-    document.addEventListener('keydown', escape)
+    document.addEventListener('keydown', escape, true)
 
     return () => {
       document.removeEventListener('pointerdown', away)
-      document.removeEventListener('keydown', escape)
+      document.removeEventListener('keydown', escape, true)
     }
   }, [open])
 
@@ -32,11 +42,12 @@ export const useAway = <T extends HTMLElement>(open: boolean, close: () => void)
 }
 
 /**
- * A dropdown hangs below what opened it until that would put it somewhere nobody can reach.
- * Both halves are needed: a menu that does not fit below is no better flipped above a row near
- * the top of a short panel, so it only flips where there is more room to flip into.
+ * A dropdown hangs below what opened it unless that puts it somewhere nobody can reach and
+ * above would hold the whole of it. Room to spare is not the test: overflow past the bottom of
+ * a scroller can be scrolled to and overflow past its top cannot, so a side that merely has
+ * more of the menu on screen is worse than the side that can be reached at all.
  */
-export const flipsUp = (menu: number, above: number, below: number): boolean => menu > below && above > below
+export const flipsUp = (menu: number, above: number, below: number): boolean => menu > below && above >= menu
 
 const clipping = (from: HTMLElement): HTMLElement | undefined => {
   for (let node = from.parentElement; node !== null; node = node.parentElement) {

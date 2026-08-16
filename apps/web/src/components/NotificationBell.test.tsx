@@ -191,6 +191,29 @@ describe('the bell', () => {
     expect(screen.queryByText('You are on helper for Dinner')).toBeTruthy()
   })
 
+  it('shuts only the row menu on Escape, the panel behind it staying open', async () => {
+    await opened()
+
+    const dots = screen.getByRole('button', { name: /^What to do with/u })
+    fireEvent.click(dots)
+    await screen.findByRole('button', { name: 'Remove this notification' })
+
+    fireEvent.keyDown(dots, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove this notification' })).toBeNull())
+    expect(screen.queryByText('You are on helper for Dinner')).toBeTruthy()
+    expect(document.activeElement).toBe(dots)
+  })
+
+  it('says so when a category is switched off, there being nothing else to see', async () => {
+    await opened()
+
+    fireEvent.click(screen.getByRole('button', { name: /^What to do with/u }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Stop telling me about this/u }))
+
+    expect((await screen.findByRole('status')).textContent).toContain('Put on or taken off a meal')
+  })
+
   it('says nothing at all when the server cannot be reached', async () => {
     // A bell that cannot reach the server has nothing useful to say, and an error
     // where a count goes would be worse than the absence of one.

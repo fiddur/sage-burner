@@ -66,7 +66,7 @@ export const DreamThread = ({
   upload: UploadImage
   people?: readonly Mentionable[]
   onSay: (body: string, done: () => void) => void
-  onRewrite: (id: string, body: string) => void
+  onRewrite: (id: string, body: string, done: () => void) => void
   onRemove: (id: string) => void
   onHeart: (id: string, hearting: boolean) => void
   onShowAll?: () => void
@@ -76,8 +76,6 @@ export const DreamThread = ({
 
   if (thread === undefined) return null
 
-  // Emptied by the caller's `done` rather than on the way out: a reply to a thread somebody has
-  // just deleted answers 404, and what was typed used to go with it (#614).
   const say = () => {
     if (saying.trim() === '') return
 
@@ -122,10 +120,7 @@ export const DreamThread = ({
                   <button
                     type="button"
                     disabled={busy || stillUploading(editing.body) || editing.body.trim() === ''}
-                    onClick={() => {
-                      onRewrite(entry.id, editing.body.trim())
-                      setEditing(undefined)
-                    }}
+                    onClick={() => onRewrite(entry.id, editing.body.trim(), () => setEditing(undefined))}
                   >
                     Save
                   </button>

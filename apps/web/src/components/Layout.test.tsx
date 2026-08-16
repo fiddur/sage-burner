@@ -308,6 +308,8 @@ describe('the column of pages beside a wide page', () => {
 
   const withTheMap: LayoutApi = { ...noBell, getMapLink: () => Promise.resolve({ map: { url: MAP } }) }
 
+  const startedAt = `${globalThis.location.pathname}${globalThis.location.search}`
+
   /** Under the router, which is where a link finds out whether it is the page you are on. */
   const renderNavAt = (at: string) => {
     history.replaceState(null, '', at)
@@ -326,6 +328,7 @@ describe('the column of pages beside a wide page', () => {
   }
 
   afterEach(() => globalThis.localStorage.clear())
+  afterEach(() => history.replaceState(null, '', startedAt))
 
   it('is there on load, carrying every page and not only the six', async () => {
     renderNav(signedInAs('member'), withTheMap)
@@ -339,6 +342,24 @@ describe('the column of pages beside a wide page', () => {
 
     expect(screen.getByRole('link', { name: 'Feed' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('link', { name: 'Members' }).getAttribute('aria-current')).toBeNull()
+  })
+
+  it('hands focus to ☰ when the column it was in goes away', () => {
+    renderNav(signedInAs('member'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the menu' }))
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Menu' }))
+  })
+
+  it('leaves focus alone on a load that starts hidden', () => {
+    renderNav(signedInAs('member'))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the menu' }))
+    cleanup()
+
+    renderNav(signedInAs('member'))
+
+    expect(document.activeElement).toBe(document.body)
   })
 
   it('hides on the button, and ☰ brings it back', () => {
@@ -365,8 +386,6 @@ describe('the column of pages beside a wide page', () => {
   })
 
   it('comes back on the next load once it is asked back', () => {
-    // The passing sibling: showing it again has to clear what hiding it wrote, or the
-    // choice is one-way and only a cleared browser undoes it.
     renderNav(signedInAs('member'))
     fireEvent.click(screen.getByRole('button', { name: 'Hide the menu' }))
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))

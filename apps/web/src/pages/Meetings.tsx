@@ -288,15 +288,17 @@ const TheDiary = ({
       <ul class="meeting-list">
         {meetings.map((one) => (
           <li key={one.id}>
-            <strong>{one.title}</strong> — {whenItIs(one)}
+            <span>
+              <strong>{one.title}</strong> — {whenItIs(one)}
+            </span>
             <IconButton
               icon="edit"
-              label={`Edit ${one.title}`}
+              label={`Edit ${one.title}, ${whenItIs(one)}`}
               disabled={busy}
               onClick={() => onEditing(editing === one.id ? undefined : one.id)}
             />
             <Destroy
-              what={one.title}
+              what={`${one.title}, ${whenItIs(one)}`}
               verb="Take out of the diary"
               busy={busy}
               onDestroy={() => onDelete(one.id)}
@@ -470,7 +472,7 @@ const NextMeeting = ({
     <h2>Next meeting</h2>
 
     {next === undefined ? (
-      <p class="form-note">Nothing in the diary. Put the next one in below.</p>
+      <p class="form-note">Nothing in the diary. Put the next one in under “Put a meeting in the diary”.</p>
     ) : (
       <p>
         <strong>{next.title}</strong> — {whenItIs(next)}

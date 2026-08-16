@@ -1,7 +1,7 @@
 import type { Notification, NotificationCategory } from '@sage-burner/shared'
 
 import { notificationCategoryInfo } from '@sage-burner/shared'
-import { useId, useState } from 'preact/hooks'
+import { useId, useRef, useState } from 'preact/hooks'
 
 import { localDay } from '../datetime.ts'
 import { useAway, useFlipUp } from '../dropdown.ts'
@@ -20,13 +20,18 @@ const RowMenu = ({
 }) => {
   const [open, setOpen] = useState(false)
   const panelId = useId()
-  const wrap = useAway<HTMLDivElement>(open, () => setOpen(false))
+  const trigger = useRef<HTMLButtonElement>(null)
+  const wrap = useAway<HTMLDivElement>(open, (why) => {
+    setOpen(false)
+    if (why === 'escape') trigger.current?.focus()
+  })
   const { menu, up } = useFlipUp<HTMLDivElement>(open)
   const said = item.body
 
   return (
     <div ref={wrap} class="notification-menu">
       <button
+        ref={trigger}
         type="button"
         class="notification-menu-button"
         aria-label={`What to do with “${said}”`}

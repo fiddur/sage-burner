@@ -76,6 +76,11 @@ export const Notifications = ({
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       <ErrorText message={rows.error} />
+      {rows.note !== undefined && (
+        <p class="form-note" role="status">
+          {rows.note}
+        </p>
+      )}
 
       {loaded.status === 'ready' && (
         <NotificationList items={asRead} busy={rows.busy} onStop={rows.stop} onRemove={rows.remove} />
