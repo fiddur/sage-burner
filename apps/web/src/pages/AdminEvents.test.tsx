@@ -228,13 +228,25 @@ describe('AdminEvents', () => {
     })
   })
 
-  it('offers no picture in the welcome text, which the public reads and cannot fetch one from', async () => {
+  it('offers a picture in the welcome text too, the read being open to the public', async () => {
     renderPage(stub())
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text')
 
-    expect(screen.queryByLabelText('Add a picture to Welcome text')).toBeNull()
+    expect(screen.getByLabelText('Add a picture to Welcome text')).toBeTruthy()
     expect(screen.getByLabelText('Add a picture to How to pay')).toBeTruthy()
+  })
+
+  it('holds the save while a picture in the welcome text is still going up', async () => {
+    renderPage(stub())
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Welcome text')
+
+    fill('Welcome text', 'Bring water ![Uploading sauna.jpg…]()')
+
+    await waitFor(() =>
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save event' }).disabled).toBe(true),
+    )
   })
 
   it('escapes raw HTML in the preview, so it shows what a visitor gets', async () => {

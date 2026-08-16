@@ -63,7 +63,7 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   Admins create and edit them: name, dates, daily hours, location, member cap,
   welcome text, payment and transfer instructions.
 - The public homepage shows the active burn — name, dates, place, welcome
-  markdown — with Apply and Log in for a visitor.
+  markdown, pictures and all — with Apply and Log in for a visitor.
 - Members join burn by burn from their own details page. A stay starts as the
   whole burn and carries arrival, departure, lodging, helping preferences and
   notes.

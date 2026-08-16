@@ -9,6 +9,7 @@ import { renderMarkdown } from '../markdown.ts'
 import { useMentioning } from '../mentioning.ts'
 import { rowsFor } from '../textarea.ts'
 import { AddPicture, PictureTrouble } from './AddPicture.tsx'
+import { Icon } from './Icon.tsx'
 import { MentionMenu } from './MentionMenu.tsx'
 import { SyntaxToolbar, useSyntax } from './SyntaxToolbar.tsx'
 
@@ -134,7 +135,14 @@ export const MarkdownField = ({
         <a href={formattingPage()} target="_blank" rel="noreferrer">
           Markdown is supported
         </a>
-        {pictures.enabled && ' · paste, drop or click 🖼 to add a picture'}
+        {pictures.enabled && (
+          <>
+            {' · paste, drop or click '}
+            <Icon name="picture" />
+            <span class="visually-hidden">the picture button</span>
+            {' to add a picture'}
+          </>
+        )}
       </p>
     </div>
   )

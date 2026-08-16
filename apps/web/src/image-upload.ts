@@ -64,7 +64,7 @@ export interface ImageUpload {
     onDragOver: (event: DragEvent) => void
   }
   take: (files: readonly File[]) => void
-  busy: boolean
+  sending: number
   error: string | undefined
 }
 
@@ -82,7 +82,7 @@ export const useImageUpload = ({
   onInput: (value: string) => void
   upload?: UploadImage
 }): ImageUpload => {
-  const [busy, setBusy] = useState(false)
+  const [sending, setSending] = useState(0)
   const [error, setError] = useState<string | undefined>(undefined)
   const latest = useRef(value)
   latest.current = value
@@ -131,9 +131,9 @@ export const useImageUpload = ({
 
     if (started.length === 0) return
 
-    setBusy(true)
+    setSending((sofar) => sofar + started.length)
     void Promise.all(started.map(({ file, placeholder }) => send(file, placeholder, upload))).finally(() => {
-      setBusy(false)
+      setSending((sofar) => sofar - started.length)
     })
   }
 
@@ -160,7 +160,7 @@ export const useImageUpload = ({
       },
     },
     take,
-    busy,
+    sending,
     error,
   }
 }

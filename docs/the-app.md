@@ -1801,16 +1801,19 @@ the rule here is to prefer deleting the thing that needs syncing over syncing it
 few hundred pictures a burn, capped, an orphan is cheaper than the machinery that would
 find it. The one deletion that must work is the person's, and that is the cascade.
 
-**`requireApproved` on both ends**, like the avatar and the name beside it: a photograph
-in a comment thread is at least as personal as a face. The consequence is worth stating
-rather than discovering — a picture hand-written into the burn's **welcome text**, which
-is public, is broken for the public. That is why `MarkdownField` takes its uploader as an
-optional prop and the public-facing fields do not pass one: the welcome text and the
-application form's question text offer no picture button, and a paste into them is left
-as an ordinary paste.
+**`requireApproved` to upload, nothing to read** (#692). The write is the members', because
+storage is theirs to fill; the read is open, because the burn's **welcome text** is the
+homepage and a picture in it is drawn for people who have not signed in. Guarding the read
+made that field the one composer that could not carry a picture, and a button that appears
+for the admin and breaks for everybody else is worse than no button — so the guard came off
+the read rather than the picture off the page. What stands between one URL and the next is
+the id: a v4 UUID, 122 CSPRNG bits. An address that escapes is readable by whoever holds it,
+which is the trade this makes; the response stays `cache-control: private` so nothing shared
+keeps a copy on the way.
 
-The id is a v4 UUID, so 122 CSPRNG bits stand between one URL and the next. That is
-defence in depth rather than the guard.
+`MarkdownField` still takes its uploader as an optional prop, and the application form's
+question text still passes none — nothing there wants a picture, and the field a stranger
+reads is not the field a stranger writes.
 
 **Nothing on the server decodes an image**, which is the rule the other three state and
 the one that matters most here, because this is the upload that takes whatever a camera
@@ -1938,8 +1941,8 @@ the fields were written in. `useSyntax` + `SyntaxToolbar` is the same hook-and-c
 that wants all three now asks for `MarkdownField` rather than wiring them again.
 
 **A footer says what the box can do**, because nothing else did: _Markdown is supported_, linking
-to `/formatting`, and — only where an `upload` is wired — _paste, drop or click 🖼 to add a
-picture_. The help page renders its own examples through `renderMarkdown` rather than writing the
+to `/formatting`, and — only where an `upload` is wired — _paste, drop or click the picture
+button to add a picture_, drawing the same mark the toolbar's own button does. The help page renders its own examples through `renderMarkdown` rather than writing the
 right-hand column out as HTML, so what it promises is what the app does; a change to what the
 renderer allows shows up there without anybody remembering to edit it. It sits with the public
 pages, since an applicant writing to the organisers has the same box.

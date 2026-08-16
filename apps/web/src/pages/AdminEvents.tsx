@@ -309,6 +309,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     value={welcome}
                     maxLength={MAX_WELCOME_LENGTH}
                     rows={12}
+                    upload={api.uploadImage}
                     onInput={(next) => {
                       setWelcome(next)
                       setSaved(false)
@@ -348,7 +349,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
                   <PendingButton
                     busy={saving}
-                    disabled={stillUploading(payment) || stillUploading(transfer)}
+                    disabled={stillUploading(welcome) || stillUploading(payment) || stillUploading(transfer)}
                     label="Save event"
                     busyLabel="Saving…"
                     type="button"

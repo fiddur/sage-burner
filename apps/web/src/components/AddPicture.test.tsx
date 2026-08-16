@@ -171,6 +171,36 @@ describe('putting a picture in a markdown field', () => {
     await waitFor(() => expect(box().value).toBe('![](/api/images/img-a)![](/api/images/img-b)'))
   })
 
+  it('takes several at once, which is why the note has a plural to say', () => {
+    render(<Field upload={() => Promise.resolve({ id: 'img-1' })} />)
+
+    expect(screen.getByLabelText('Add a picture to Say something')).toHaveProperty('multiple', true)
+  })
+
+  it('says pictures while the several the picker takes are going up', async () => {
+    const waiting: ((stored: { id: string }) => void)[] = []
+    render(<Field upload={() => new Promise((resolve) => waiting.push(resolve))} />)
+
+    fireEvent.change(screen.getByLabelText('Add a picture to Say something'), {
+      target: { files: [aPicture('one.jpg'), aPicture('two.jpg')] },
+    })
+
+    await waitFor(() => expect(screen.getByText('Sending pictures…')).toBeTruthy())
+
+    waiting.forEach((resolve, at) => resolve({ id: `img-${at}` }))
+    await waitFor(() => expect(screen.queryByText(/^Sending/)).toBeNull())
+  })
+
+  it('points the help line at the mark the toolbar draws', () => {
+    const { container } = render(<Field upload={() => Promise.resolve({ id: 'img-1' })} />)
+
+    const help = container.querySelector('.md-field-help')
+
+    expect(help?.textContent).not.toContain('🖼')
+    expect(help?.querySelector('[data-icon="picture"]')).toBeTruthy()
+    expect(help?.textContent).toContain('paste, drop or click the picture button to add a picture')
+  })
+
   it('refuses when there is no room left in the field', async () => {
     render(<Field upload={() => Promise.resolve({ id: 'img-6' })} maxLength={10} start="0123456789" />)
 
@@ -213,10 +243,7 @@ describe('putting a picture in a markdown field', () => {
     expect(event.defaultPrevented).toBe(false)
   })
 
-  it('offers nothing where the field is one the public reads', () => {
-    // `/api/images/:id` is `requireApproved`, so a picture in the welcome text would be
-    // broken for exactly the people that text is written for. `docs/the-app.md` has why
-    // that is the trade rather than the bug.
+  it('offers nothing where the field was given no uploader', () => {
     render(<Field />)
 
     expect(screen.queryByLabelText('Add a picture to Say something')).toBeNull()
