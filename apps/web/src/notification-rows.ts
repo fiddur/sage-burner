@@ -16,6 +16,7 @@ export interface NotificationRowActions {
   busy: boolean
   error: string | undefined
   note: string | undefined
+  forget: () => void
   stop: (category: NotificationCategory) => void
   remove: (id: string) => void
 }
@@ -45,6 +46,10 @@ export const useNotificationRows = (
     busy,
     error,
     note,
+    forget: () => {
+      setNote(undefined)
+      setError(undefined)
+    },
     stop: (category) => {
       run(
         async () => {
@@ -58,7 +63,7 @@ export const useNotificationRows = (
           return undefined
         },
         'Could not switch that off. Please try again.',
-        `Switched off: “${notificationCategoryInfo[category].label}”. Your details has it back on again.`,
+        `Switched off: “${notificationCategoryInfo[category].label}”. Your details can turn it back on.`,
       )
     },
     remove: (id) => {

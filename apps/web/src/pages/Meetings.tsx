@@ -495,12 +495,12 @@ const NextMeeting = ({
       <p class="row">
         <IconButton
           icon="edit"
-          label={`Edit ${next.title}`}
+          label={`Edit ${next.title}, ${whenItIs(next)}`}
           disabled={busy}
           onClick={() => onEditing(editing === next.id ? undefined : next.id)}
         />
         <Destroy
-          what={next.title}
+          what={`${next.title}, ${whenItIs(next)}`}
           verb="Take out of the diary"
           busy={busy}
           onDestroy={() => onDelete(next.id)}

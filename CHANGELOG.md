@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-16
 
+- **Saying something while Preview is showing comes back to Write.** The box emptied on the way
+  out and then sat on "Nothing written yet." until you pressed Write yourself.
+
+- **The rewrite box under ✏️ carries the time of the meeting it belongs to**, so a diary with two
+  meetings of one name offers two different controls rather than two identical ones.
+
 - **Email from the app fits a phone.** It was being laid out as though the screen were 980
   pixels wide and then shrunk to fit, so the card sat in the left half of the message with
   type too small to read comfortably.

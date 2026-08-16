@@ -116,6 +116,7 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
   const toggle = () => {
     const opening = !open
     setOpen(opening)
+    rows.forget()
     if (!opening || unseen === 0) return
 
     setUnseen(0)

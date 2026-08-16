@@ -1,4 +1,4 @@
-import { changelogPage, formattingPage } from '@sage-burner/shared'
+import { changelogPage, formattingPage, notificationsPage } from '@sage-burner/shared'
 import { LocationProvider, Route, Router } from 'preact-iso'
 import { useMemo } from 'preact/hooks'
 
@@ -326,7 +326,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/meetings" component={MeetingsRoute} />
       <Route path="/faq" component={FaqRoute} />
       <Route path="/feed" component={FeedRoute} />
-      <Route path="/notifications" component={NotificationsRoute} />
+      <Route path={notificationsPage()} component={NotificationsRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/invite/:token" component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />

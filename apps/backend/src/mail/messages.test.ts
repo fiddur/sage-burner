@@ -1,4 +1,3 @@
-import { feedPage } from '@sage-burner/shared'
 import { describe, expect, it } from 'vitest'
 
 import { absolute, digestMessage, inviteMessage, notificationMessage, testMessage } from './messages.ts'
@@ -117,7 +116,6 @@ describe('the digest', () => {
       installation: 'The Burning Sage',
       to: 'ada@example.org',
       sections,
-      settings: 'https://burn.example.org/profile',
       origin: 'https://burn.example.org',
     })
 
@@ -131,7 +129,6 @@ describe('the digest', () => {
       installation: 'The Burning Sage',
       to: 'ada@example.org',
       sections,
-      settings: undefined,
       origin: undefined,
     })
 
@@ -150,11 +147,10 @@ describe('the digest', () => {
           entries: [{ body: 'Ada added one', link: 'https://burn.example.org/songs/one' }],
         },
       ],
-      settings: 'https://burn.example.org/profile',
       origin: 'https://burn.example.org',
     })
 
-    expect(digest.text).toContain(`  https://burn.example.org${feedPage(['song'])}`)
+    expect(digest.text).toContain('  https://burn.example.org/feed?kinds=song')
   })
 
   it('still prints the remainder where there is no origin to build a link from', () => {
@@ -169,10 +165,10 @@ describe('the digest', () => {
           entries: [{ body: 'Ada added one', link: undefined }],
         },
       ],
-      settings: undefined,
       origin: undefined,
     })
 
     expect(digest.text).toContain('and 7 more')
+    expect(digest.text).not.toContain('http')
   })
 })

@@ -436,6 +436,10 @@ phone" means 360px.
       markdown.
 - [ ] **Preview** renders what **Write** holds, and an empty box previews as _Nothing
       written yet._ rather than blank. Switching back keeps what was typed.
+- [ ] Say something on a card with **Preview** showing: the box empties and comes back to
+      **Write**, rather than sitting on _Nothing written yet._
+- [ ] The toolbar's controls name the box the way it is labelled — _Bold in what you said_
+      under a comment's ✏️, not _Bold in Rewrite what you said_.
 - [ ] The footer's _Markdown is supported_ opens `/formatting`, which reads the same signed
       out. Every example's right-hand column is what its left-hand column renders to.
 - [ ] The picture half of that footer is there only where pictures are — present on a
@@ -451,8 +455,12 @@ phone" means 360px.
       Meetings, and the map where one is set, which still opens away. The top bar carries
       the brand, the burn selector and the corner, and no page links at all.
 - [ ] The page you are on is marked in that column.
-- [ ] Press « at the top of it: the column goes and ☰ appears at the leading edge of the
-      bar. Reload: still gone. Press ☰: it is back, and a reload keeps it back.
+- [ ] Press ‹ at the top of it: the column goes, ☰ appears at the leading edge of the bar and
+      focus lands on it. Reload: still gone. Press ☰: it is back, and a reload keeps it back.
+- [ ] With the browser window made short — under about 500px tall — the column scrolls, so
+      Meetings at the bottom of it can be reached.
+- [ ] Press a 🗑️ anywhere: focus is on the confirming button, and pressing **Keep it** puts it
+      back on the 🗑️.
 - [ ] Signed out, there is no column and no ☰.
 
 ## On a phone
@@ -468,11 +476,6 @@ phone" means 360px.
       map when one is set); backdrop, ✕ and Escape all close it and focus
       returns to ☰.
 - [ ] At 360px nothing anywhere scrolls the page sideways.
-- [ ] On a wide screen, ‹ puts the page column away and focus lands on the ☰ that replaced it.
-- [ ] With the browser window made short — under about 500px tall — the page column scrolls, so
-      Meetings at the bottom of it can be reached.
-- [ ] Press a 🗑️ anywhere: focus is on the confirming button, and pressing **Keep it** puts it
-      back on the 🗑️.
 
 ## Installing, offline, and the installation's face
 

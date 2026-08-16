@@ -20,8 +20,6 @@ export const useAway = <T extends HTMLElement>(
         latest.current('away')
       }
     }
-    // Captured, and the event stopped: this menu sits inside panels with an Escape handler of
-    // their own, and one press should shut the innermost open thing rather than everything.
     const escape = (keyEvent: KeyboardEvent) => {
       if (keyEvent.key !== 'Escape') return
 
