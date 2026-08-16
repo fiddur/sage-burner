@@ -1,3 +1,7 @@
+import type { FeedKind } from '@sage-burner/shared'
+
+import { feedPage } from '@sage-burner/shared'
+
 import type { Message } from './mail.ts'
 import type { Block } from './template.ts'
 
@@ -118,15 +122,18 @@ export const digestMessage = ({
   to,
   sections,
   settings,
+  origin,
 }: {
   installation: string
   to: string
   sections: readonly {
+    kind: FeedKind
     label: string
     total: number
     entries: readonly { body: string; link: string | undefined }[]
   }[]
   settings: string | undefined
+  origin: string | undefined
 }): Message => {
   const total = countOf(sections)
 
@@ -138,6 +145,7 @@ export const digestMessage = ({
       { paragraph: 'While you have been away:' },
       ...sections.flatMap((section): Block[] => {
         const left = section.total - section.entries.length
+        const rest = absolute(origin, feedPage([section.kind]))
 
         return [
           { heading: section.total === 1 ? section.label : `${section.label} (${section.total})` },
@@ -147,7 +155,9 @@ export const digestMessage = ({
                 text: entry.body,
                 ...(entry.link === undefined ? {} : { href: entry.link }),
               })),
-              ...(left === 0 ? [] : [{ text: `and ${left} more` }]),
+              ...(left === 0
+                ? []
+                : [{ text: `and ${left} more`, ...(rest === undefined ? {} : { href: rest }) }]),
             ],
           },
         ]

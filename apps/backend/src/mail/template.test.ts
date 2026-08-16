@@ -93,6 +93,12 @@ describe('the html part', () => {
     expect(htmlFrom({ installation: 'The Burning Sage', blocks })).toContain('The Burning Sage')
   })
 
+  it('lays out at the width of the phone it is read on', () => {
+    const html = htmlFrom({ installation: 'X', blocks })
+
+    expect(html).toContain('<meta name="viewport" content="width=device-width,initial-scale=1">')
+  })
+
   it('holds every style inline, since a mail client strips a stylesheet', () => {
     const html = htmlFrom({ installation: 'X', blocks })
 

@@ -9,6 +9,19 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-16
 
+- **Email from the app fits a phone.** It was being laid out as though the screen were 980
+  pixels wide and then shrunk to fit, so the card sat in the left half of the message with
+  type too small to read comfortably.
+
+- **"and 3 more" at the foot of a summary is a link now.** It was the one line in the message
+  with nowhere to go — everything else printed carried its own link, and the only other link
+  was to your settings page rather than to the things waiting. It opens the feed, already
+  filtered to the kind of thing that line is counting.
+
+- **The privacy page says two things it had been quiet about.** That the summary email arrives
+  unless you say otherwise, rather than only what you have asked for; and that when you were
+  last here is kept, which is what decides whether that summary is sent at all.
+
 - **The burn's welcome text can carry a picture now.** It was the one box with no picture
   button, because a picture needed signing in to fetch and the homepage is read by people who
   have not — so the welcome text is where the button was missing and where a picture would

@@ -112,6 +112,7 @@ export const registerMailRoutes = (
         to: who.email,
         sections,
         settings: absolute(config.public_origin, detailsPage()),
+        origin: config.public_origin,
       }),
     )
 

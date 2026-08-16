@@ -109,6 +109,19 @@ describe('the privacy policy', () => {
     expect(held).toMatch(/give\s+the\s+calendar\s+a\s+new\s+address/i)
   })
 
+  it('names the one thing that arrives unasked, and where to stop it', async () => {
+    const held = readDocument('PRIVACY.md')
+
+    expect(held).toMatch(/unless\s+you\s+say\s+otherwise/i)
+    expect(held).toMatch(/Your\s+details\s+→\s+Notifications/i)
+  })
+
+  it('says when you were here is kept, that being the one thing not typed in', async () => {
+    const held = readDocument('PRIVACY.md')
+
+    expect(held).toMatch(/When\s+you\s+were\s+last\s+here/i)
+  })
+
   it('says the things app review is checking the page against', async () => {
     // Not a style assertion. A reviewer looks for what is collected, who sees it, and how to
     // get rid of it; and the provider paragraph is the one they read most closely, since it

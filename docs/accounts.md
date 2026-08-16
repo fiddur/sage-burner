@@ -1278,6 +1278,21 @@ the count in the subject is what is waiting rather than what was printed. The re
 before that too, by the same `FEED_LIMIT` the page uses, so somebody away six months gets the
 newest fifty things rather than the whole history of the burn.
 
+**That remainder line is the one thing in the message that has to lead somewhere** (#652). Every
+printed line carries its own link and the remainder announces what is not printed, so before it
+had a href the only other link in a digest was _Your details_ — the settings page rather than the
+list. The one population this mail is written for is the people who have stopped opening the app,
+so "there are three more" with nothing to press is the worst place in it to leave a dead end.
+
+**It points at the feed, filtered to that section's kind**, which is what the section is a slice
+of — `feedPage([section.kind])`, so the chip row opens already set to Songs under the songs
+heading. Not `/notifications`: the digest has been the feed rather than the notifications since
+#620, and a card about something the reader is not part of produces no notification row at all,
+so that page can show none of the things the line counts. Which is why the section's `kind` is
+threaded through `digestMessage` rather than a single link being handed to it. The line takes no
+href where there is no `PUBLIC_ORIGIN` to build an absolute one from — the rule every other link
+in these messages follows.
+
 **The sections are the feed's own chips** — `feedKindLabel`, so Burns, Dreams, People, Posts,
 Songs, Bring, Points, Meetings, in `feedKinds` order. The digest then reads as the page it
 links to, and a new kind will not compile until it has a heading.
@@ -1327,6 +1342,12 @@ whole reason for the rule. The guarantee used to be asserted for the invite alon
 heading and the list entry were pushed whole until #631's review found it — which mattered
 because the digest is the message built from exactly those two, and its entry bodies carry
 member-written titles.
+
+**The `<head>` carries a viewport line, exactly as the app shell does** (#642). Most phone
+clients render in a webview, and a webview with no `meta[name=viewport]` lays the document out
+at the 980px default and scales it down to fit — so the 560px card took the left 57% of a wide
+empty page and the 16px serif body came out around 6 physical px. `max-width:560px` means "as
+wide as the phone" only with that line; a client that ignores it is unaffected.
 
 **Lengths are spelled the way a mail client reads them**, not the way a browser does: Outlook
 renders with Word, which ignores logical properties, so a `padding-inline-start` on a list
