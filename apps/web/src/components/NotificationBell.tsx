@@ -155,6 +155,11 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
       {open && (
         <div class="bell-panel">
           <ErrorText message={rows.error} />
+          {rows.note !== undefined && (
+            <p class="form-note" role="status">
+              {rows.note}
+            </p>
+          )}
           <NotificationList
             items={items}
             busy={rows.busy}

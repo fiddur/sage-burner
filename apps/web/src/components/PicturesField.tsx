@@ -50,7 +50,8 @@ export const PicturesField = ({ api }: { api: PicturesApi }) => {
                 <Destroy
                   what={`picture ${at + 1} of ${images.length}, added ${stored(picture.created_at)}`}
                   verb="Take off"
-                  busy={busy || busyWith === picture.id}
+                  busy={busy}
+                  working={busyWith === picture.id}
                   onDestroy={() => {
                     run(
                       async () => {

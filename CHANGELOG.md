@@ -38,6 +38,32 @@ under today's heading, and make a new heading when there is none.
   toolbar draws a plain outlined picture icon, so there was nothing on screen matching what
   the sentence pointed at.
 
+- **The ⋯ on a short bell fits on screen at last.** With one or two notifications in it there
+  was nowhere for the little menu to go: it hung off the bottom where nothing could press it,
+  or — after last week's fix — opened upward and had its first line cut off above the panel,
+  where no amount of scrolling reached it. It now opens upward only where the whole of it fits,
+  and otherwise stays where scrolling can bring it into view.
+
+- **Escape closes the ⋯ and leaves the bell open.** One press used to shut both.
+
+- **"Stop telling me about this" now says it did.** Nothing on screen changed before, so
+  pressing it twice was the natural next move.
+
+- **The diary reads as a list again.** "Thu 13 Aug 14:18🗑️" ran together, and asking to take a
+  meeting out opened the question mid-timestamp — "14:18Take out of the diary …?". There is
+  space between the time and the controls now, and two meetings with the same name no longer
+  offer two identical ✏️ buttons.
+
+- **Rewriting a comment keeps what you typed when the save is refused.** The box used to close
+  and take the text with it.
+
+- **Keyboard focus stops getting dropped.** Answering "Really remove …?" or pressing ‹ to put
+  the page column away used to leave focus nowhere, so the next Tab started at the top of the
+  page. And the column of pages scrolls now, so on a short screen its last entries are reachable.
+
+- **"Nothing in the diary" points at the form it means**, which is further down the page rather
+  than immediately below.
+
 # 2026-08-15
 
 - **You are told when somebody hearts what you wrote.** A heart used to reach nobody — it was
@@ -83,7 +109,7 @@ under today's heading, and make a new heading when there is none.
   the top and the other half were behind ☰, and which half a page was in came down to what
   fitted. Every page is in the column now — Feed, Members, Schedule, Leads, Meals, FAQ,
   Songbook, Rideshares, Bring list, Meetings and the map — with the one you are on marked. The
-  « at the top of it puts it away if you would rather have the room, ☰ brings it back, and it
+  ‹ at the top of it puts it away if you would rather have the room, ☰ brings it back, and it
   stays however you left it. On a phone nothing changes.
 
 - **Every longer box is now the same editor, and it tells you what it can do.** Write and Preview

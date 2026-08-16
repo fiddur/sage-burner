@@ -1,4 +1,4 @@
-import type { MeResponse } from '@sage-burner/shared'
+import type { AccountRole, MeResponse } from '@sage-burner/shared'
 
 import { apiRoutes, applyPage, feedPage, oauthProviderInfo, oauthProviders } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
@@ -23,7 +23,7 @@ const messageForFailure = (failure: unknown): string => {
   return 'Could not sign in just now. Please try again.'
 }
 
-export const landsOn = (roles: readonly ('admin' | 'member')[]): string =>
+export const landsOn = (roles: readonly AccountRole[]): string =>
   roles.length === 0 ? applyPage() : feedPage()
 
 export const Login = ({

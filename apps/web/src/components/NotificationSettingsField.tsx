@@ -30,13 +30,15 @@ type Channel = 'on' | 'email'
 type About = (typeof notificationSections)[number]['about']
 
 const Master = ({
-  label,
+  section,
+  channel,
   every,
   chosen,
   busy,
   onSet,
 }: {
-  label: string
+  section: string
+  channel: string
   every: readonly NotificationCategory[]
   chosen: readonly NotificationCategory[]
   busy: boolean
@@ -49,12 +51,12 @@ const Master = ({
       <input
         type="checkbox"
         disabled={busy}
-        aria-label={label}
+        aria-label={`${section} — ${channel}`}
         checked={many === every.length}
         indeterminate={many > 0 && many < every.length}
         onChange={(changeEvent) => onSet(changeEvent.currentTarget.checked)}
       />
-      <span aria-hidden="true">{label.split(' — ').at(-1)}</span>
+      <span aria-hidden="true">{channel}</span>
     </label>
   )
 }
@@ -177,7 +179,8 @@ export const NotificationSettingsField = ({
                 {channels.map(({ channel, heading }) => (
                   <Master
                     key={channel}
-                    label={`${section.heading} — ${heading}`}
+                    section={section.heading}
+                    channel={heading}
                     every={every}
                     chosen={settings[channel]}
                     busy={busy}

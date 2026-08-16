@@ -1,6 +1,6 @@
 import type { ComponentChildren } from 'preact'
 
-import { useState } from 'preact/hooks'
+import { useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { IconButton } from './IconButton.tsx'
 
@@ -11,6 +11,7 @@ export const Destroy = ({
   trigger,
   triggerLabel,
   busy,
+  working = false,
   onDestroy,
 }: {
   what: string
@@ -19,19 +20,45 @@ export const Destroy = ({
   trigger?: string
   triggerLabel?: string
   busy: boolean
+  working?: boolean
   onDestroy: () => void
 }) => {
   const [asking, setAsking] = useState(false)
+  const questionId = useId()
+  const confirm = useRef<HTMLButtonElement>(null)
+  const opener = useRef<HTMLButtonElement>(null)
+  const moved = useRef(false)
+
+  // Not on the first render, only on a change: every one of these on a page would otherwise
+  // reach for focus as it mounts, and the last drawn would win.
+  useLayoutEffect(() => {
+    if (!moved.current) {
+      moved.current = true
+      return
+    }
+
+    if (asking) confirm.current?.focus()
+    else opener.current?.focus({ preventScroll: true })
+  }, [asking])
 
   if (!asking) {
     return trigger === undefined ? (
-      <IconButton icon="destroy" label={`${verb} ${what}`} disabled={busy} onClick={() => setAsking(true)} />
+      <IconButton
+        buttonRef={opener}
+        icon="destroy"
+        label={`${verb} ${what}`}
+        busy={working}
+        disabled={busy}
+        onClick={() => setAsking(true)}
+      />
     ) : (
       <button
+        ref={opener}
         type="button"
         class="link-button"
         {...(triggerLabel === undefined ? {} : { 'aria-label': triggerLabel })}
-        disabled={busy}
+        aria-busy={working}
+        disabled={busy || working}
         onClick={() => setAsking(true)}
       >
         {trigger}
@@ -41,13 +68,15 @@ export const Destroy = ({
 
   return (
     <>
-      <span class="form-note">
+      <span class="form-note" id={questionId}>
         {verb} {what}?{because === undefined ? null : <> {because}</>}
       </span>
       <button
+        ref={confirm}
         type="button"
         disabled={busy}
         aria-label={`Really ${verb.toLowerCase()} ${what}`}
+        aria-describedby={questionId}
         onClick={() => {
           setAsking(false)
           onDestroy()
@@ -55,7 +84,13 @@ export const Destroy = ({
       >
         {verb}
       </button>
-      <button type="button" class="link-button" disabled={busy} onClick={() => setAsking(false)}>
+      <button
+        type="button"
+        class="link-button"
+        disabled={busy}
+        aria-describedby={questionId}
+        onClick={() => setAsking(false)}
+      >
         Keep it
       </button>
     </>

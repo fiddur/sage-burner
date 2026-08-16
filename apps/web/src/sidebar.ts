@@ -27,8 +27,6 @@ export interface SidebarState {
   show: () => void
 }
 
-// Read before the first paint rather than in an effect: an effect would draw the sidebar
-// and take it away again on every load for whoever has hidden it.
 export const useSidebar = (): SidebarState => {
   const [hidden, setHidden] = useState(() => sidebarHidden())
 

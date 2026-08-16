@@ -139,8 +139,6 @@ describe('a conversation about a dream', () => {
   })
 
   it('keeps what was typed where the reply never landed', () => {
-    // #614: a reply to a thread somebody has just deleted answers 404, and the box used to
-    // empty anyway — what you wrote was gone, under a banner reading "Not found."
     const { say } = show(aThread([]))
 
     const box = screen.getByLabelText('Say something about Sauna at dawn')
@@ -231,7 +229,30 @@ describe('a conversation about a dream', () => {
     fireEvent.input(box, { target: { value: 'bring a towel' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(rewrite).toHaveBeenCalledWith('t-1', 'bring a towel')
+    expect(rewrite).toHaveBeenCalledWith('t-1', 'bring a towel', expect.any(Function))
+  })
+
+  it('keeps the rewrite box open, and what is in it, where the save never landed', () => {
+    show(aThread([anEntry({ id: 't-1', body: 'bring a towl' })]))
+
+    fireEvent.click(screen.getByRole('button', { name: /Rewrite what you said/ }))
+    fireEvent.input(screen.getByLabelText('Rewrite what you said'), {
+      target: { value: 'bring a towel' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Rewrite what you said').value).toBe('bring a towel')
+  })
+
+  it('shuts the rewrite box once the save lands', () => {
+    show(aThread([anEntry({ id: 't-1', body: 'bring a towl' })]), {
+      onRewrite: (_id, _body, done) => done(),
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Rewrite what you said/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(screen.queryByRole('textbox', { name: 'Rewrite what you said' })).toBeNull()
   })
 
   it('says a comment was rewritten, so nobody reads an edit as the original', () => {

@@ -171,23 +171,19 @@ describe('putting a picture in a markdown field', () => {
     await waitFor(() => expect(box().value).toBe('![](/api/images/img-a)![](/api/images/img-b)'))
   })
 
-  it('says a picture while one is going up', async () => {
-    const waiting: ((stored: { id: string }) => void)[] = []
-    render(<Field upload={() => new Promise((resolve) => waiting.push(resolve))} />)
+  it('takes several at once, which is why the note has a plural to say', () => {
+    render(<Field upload={() => Promise.resolve({ id: 'img-1' })} />)
 
-    drop([aPicture('one.jpg')])
-
-    await waitFor(() => expect(screen.getByText('Sending a picture…')).toBeTruthy())
-
-    waiting.forEach((resolve, at) => resolve({ id: `img-${at}` }))
-    await waitFor(() => expect(screen.queryByText(/^Sending/)).toBeNull())
+    expect(screen.getByLabelText('Add a picture to Say something')).toHaveProperty('multiple', true)
   })
 
   it('says pictures while the several the picker takes are going up', async () => {
     const waiting: ((stored: { id: string }) => void)[] = []
     render(<Field upload={() => new Promise((resolve) => waiting.push(resolve))} />)
 
-    drop([aPicture('one.jpg'), aPicture('two.jpg')])
+    fireEvent.change(screen.getByLabelText('Add a picture to Say something'), {
+      target: { files: [aPicture('one.jpg'), aPicture('two.jpg')] },
+    })
 
     await waitFor(() => expect(screen.getByText('Sending pictures…')).toBeTruthy())
 
@@ -202,7 +198,6 @@ describe('putting a picture in a markdown field', () => {
 
     expect(help?.textContent).not.toContain('🖼')
     expect(help?.querySelector('[data-icon="picture"]')).toBeTruthy()
-    // The icon is `aria-hidden`, so without a word beside it the sentence points at nothing.
     expect(help?.textContent).toContain('paste, drop or click the picture button to add a picture')
   })
 

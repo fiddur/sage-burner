@@ -56,9 +56,10 @@ export const Formatting = () => (
     <h2>Pictures</h2>
 
     <p>
-      Where a box has the 🖼 button you can also paste a picture straight in, or drop one on the box. It is
-      uploaded and left in the text as <code>![](…)</code>, which you can move or delete like any other words.
-      A picture from elsewhere on the web works too, as long as its address starts with <code>https://</code>.
+      Where a box has a picture button in its toolbar you can also paste a picture straight in, or drop one on
+      the box. It is uploaded and left in the text as <code>![](…)</code>, which you can move or delete like
+      any other words. A picture from elsewhere on the web works too, as long as its address starts with{' '}
+      <code>https://</code>.
     </p>
 
     <h2>Naming somebody</h2>

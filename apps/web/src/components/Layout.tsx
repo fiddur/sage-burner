@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact'
 
 import { apiRoutes } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
+import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { BellApi } from './NotificationBell.tsx'
@@ -58,9 +59,20 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
   const bottomBar = phone && pages.length > 0
   const hidden = useHidingBar(bottomBar)
   const sidebar = useSidebar()
+  const opener = useRef<HTMLButtonElement>(null)
+  const [handingBack, setHandingBack] = useState(false)
 
   const everyPage = approved ? [...memberPages, ...withMap(menuPages, mapUrl)] : []
   const aside = !phone && everyPage.length > 0 && !sidebar.hidden
+
+  // Only after the click that hid it: the sidebar also starts hidden for whoever hid it last
+  // time, and moving focus on load would take it off whatever the page put it on.
+  useLayoutEffect(() => {
+    if (!handingBack) return
+
+    opener.current?.focus()
+    setHandingBack(false)
+  }, [handingBack])
 
   return (
     <div class={classesFor({ bottomBar, aside })}>
@@ -70,7 +82,7 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
         ) : (
           everyPage.length > 0 &&
           sidebar.hidden && (
-            <button type="button" class="menu-button" aria-label="Menu" onClick={sidebar.show}>
+            <button ref={opener} type="button" class="menu-button" aria-label="Menu" onClick={sidebar.show}>
               <Icon name="menu" />
             </button>
           )
@@ -99,7 +111,15 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
         <TopNav api={api} />
       </header>
 
-      {aside && <Sidebar pages={everyPage} onHide={sidebar.hide} />}
+      {aside && (
+        <Sidebar
+          pages={everyPage}
+          onHide={() => {
+            sidebar.hide()
+            setHandingBack(true)
+          }}
+        />
+      )}
 
       <main class="site-main">{children}</main>
 
