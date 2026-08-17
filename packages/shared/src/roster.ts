@@ -22,7 +22,7 @@ export interface Places {
   waiting: number
 }
 
-export const placesIn = (entries: { readonly length: number }, cap: number): Places => {
+export const placesIn = (entries: readonly unknown[], cap: number): Places => {
   const taken = Math.min(entries.length, Math.max(0, cap))
 
   return { taken, left: Math.max(0, cap - taken), waiting: entries.length - taken }

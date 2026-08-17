@@ -185,9 +185,26 @@ describe('signing out', () => {
   })
 
   it('can be raised again after signing back in, the refusal not being what happened', async () => {
-    app(stub(), aBrowser(false), undefined, { viewer: { status: 'signed-out' } })
+    const { rerender } = app(stub(), aBrowser(false))
+    await tick()
+    expect(await screen.findByText(NUDGE)).toBeTruthy()
 
-    expect(screen.queryByText(NUDGE)).toBeNull()
+    const signedOut = (viewer: Viewer) => (
+      <ViewerProvider viewer={viewer}>
+        <PushNudgeProvider>
+          <PushToggle api={stub()} browser={aBrowser(false)} />
+          <PushNudge api={stub()} browser={aBrowser(false)} />
+        </PushNudgeProvider>
+      </ViewerProvider>
+    )
+
+    rerender(signedOut({ status: 'signed-out' }))
+    await waitFor(() => expect(screen.queryByText(NUDGE)).toBeNull())
+
+    rerender(signedOut(SIGNED_IN))
+    await tick()
+
+    expect(await screen.findByText(NUDGE)).toBeTruthy()
   })
 })
 

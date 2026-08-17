@@ -1,6 +1,5 @@
 import type { MemberRosterEntry, MemberRosterResponse } from '@sage-burner/shared'
 
-import { placesIn } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
@@ -11,6 +10,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { PersonCell } from '../components/PersonCell.tsx'
+import { PlacesTaken } from '../components/PlacesTaken.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { Table } from '../components/Table.tsx'
 import { startsTheWaitingList, WaitingListLine } from '../components/WaitingListLine.tsx'
@@ -19,17 +19,6 @@ import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
 export type MembersApi = Pick<ApiClient, 'getMembers'>
-
-const PlacesTaken = ({ entries, cap }: { entries: readonly MemberRosterEntry[]; cap: number }) => {
-  const places = placesIn(entries, cap)
-
-  return (
-    <p class="form-note">
-      {places.taken} of {cap} places taken
-      {places.waiting > 0 ? `, ${places.waiting} waiting` : ''}.
-    </p>
-  )
-}
 
 export const Members = ({ api }: { api: MembersApi }) => {
   const viewer = useViewer()
@@ -63,7 +52,9 @@ export const Members = ({ api }: { api: MembersApi }) => {
       {roster !== undefined && roster.event !== null && (
         <>
           <h2>{roster.event.name}</h2>
-          <PlacesTaken entries={roster.entries} cap={roster.event.member_cap} />
+          <p class="form-note">
+            <PlacesTaken entries={roster.entries} cap={roster.event.member_cap} />
+          </p>
 
           <HowToPay event={roster.event} entries={roster.entries} me={viewer.account?.id} />
 

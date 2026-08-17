@@ -220,7 +220,11 @@ export const registerAttendanceRoutes = (
         )
         .returning({ id: attendance.id })
 
-      if (removed.length > 0) return reply.code(204).send()
+      if (removed.length > 0) {
+        await tellAboutTheWaitingList(db, found.id, notify, now)
+
+        return reply.code(204).send()
+      }
 
       const existing = await joinedRow(found.id, viewer.account_id)
 
@@ -258,6 +262,8 @@ export const registerAttendanceRoutes = (
         body: `Your place at ${open.name} is paid — somebody transferred theirs to you.`,
         link: membersPage(open.id),
       })
+
+      await tellAboutTheWaitingList(db, open.id, notify, now)
 
       return reply.code(204).send()
     },
@@ -342,9 +348,7 @@ export const registerAttendanceRoutes = (
 
       if (removed.length === 0) return sendError(reply, 404)
 
-      if (removed.some((row) => row.payment_status === 'paid')) {
-        await tellAboutTheWaitingList(db, request.params.eventId, notify, now)
-      }
+      await tellAboutTheWaitingList(db, request.params.eventId, notify, now)
 
       return reply.code(204).send()
     },

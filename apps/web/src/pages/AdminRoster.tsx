@@ -1,6 +1,5 @@
 import type { RosterEntry } from '@sage-burner/shared'
 
-import { placesIn } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 import { useState } from 'preact/hooks'
 
@@ -10,6 +9,7 @@ import { allergiesOf } from '../allergies.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { PersonCell } from '../components/PersonCell.tsx'
+import { PlacesTaken } from '../components/PlacesTaken.tsx'
 import { Table } from '../components/Table.tsx'
 import { startsTheWaitingList, WaitingListLine } from '../components/WaitingListLine.tsx'
 import { toCsv } from '../csv.ts'
@@ -66,7 +66,6 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
   }
 
   const roster = loaded.status === 'ready' ? loaded.data : undefined
-  const places = placesIn(roster?.entries ?? [], roster?.event?.member_cap ?? 0)
 
   return (
     <GuardedPage title="Who is coming" require="admin">
@@ -86,10 +85,9 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
         <>
           <h2>{roster.event.name}</h2>
           <p class="form-note">
-            {places.taken} of {roster.event.member_cap} places taken
-            {places.waiting > 0 ? `, ${places.waiting} waiting` : ''}. Paid members come first, then in the
-            order people said they were coming — so recording a payment can move someone else onto the waiting
-            list.
+            <PlacesTaken entries={roster.entries} cap={roster.event.member_cap} /> Paid members come first,
+            then in the order people said they were coming — so recording a payment can move someone else onto
+            the waiting list.
           </p>
 
           <p class="row">

@@ -161,6 +161,10 @@ phone" means 360px.
 - [ ] With every place paid for and somebody waiting, un-record one of those payments: the
       waiting member is told the line has moved. Removing a paid member from ⚙️ → Roster does
       the same.
+- [ ] With a cap of two, one paid member and two unpaid, have the middle one leave — from their own
+      Your details, from ⚙️ → Roster, or by handing a paid place over. The one behind them is told
+      they are in a place now, rather than left with "you are on the waiting list" while the roster
+      says otherwise (#726).
 - [ ] Do either of those on a burn whose dates have passed: nothing is posted to anybody's
       bell about its waiting list.
 - [ ] ⚙️ → Events, on a burn whose dates have passed: **Meal times** lists the times with no

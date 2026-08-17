@@ -592,19 +592,23 @@ would ever have fired for them — they were below the line on the roster and ha
 it. **Every way an unpaid row appears recomputes it**: joining, and an admin adding somebody. Those
 are the two doors onto the same bug.
 
-**A member leaving does not**, and that is not an omission. `left` is the cap less what has been
-paid for, and `DELETE /api/events/:eventId/attendance/me` filters on `payment_status = 'unpaid'` —
-so that door only ever removes a row the line never counted, and there is nothing new to say to
-anybody. Handing a place over does not move it either: it marks the taker paid and deletes the
-giver, who was.
+**Every door that removes a row recomputes as well** (#726), and that is a consequence of the
+counting above rather than a separate decision. While `left` was the cap less what had been _paid
+for_, a leaving member changed nothing the line counted — `DELETE
+/api/events/:eventId/attendance/me` only ever deletes an unpaid row, and handing a place over marked
+the taker paid and deleted the giver, who was. So three doors were deliberately left out: leaving,
+an admin removing an **unpaid** member, and the transfer.
 
-**Freeing a paid place recomputes too** (#647). Two admin doors open one: `DELETE
-/api/admin/events/:eventId/attendance/:accountId`, which deletes whatever the payment status is —
-unlike the member's own leave route, which filters on `unpaid` — and un-recording a payment, where
-the `PATCH` used to recompute only on the transition _to_ paid. Both are now `nowPaid !== wasPaid`
-and "was this row paid", so the condition is the change rather than one direction of it. Neither
-pushes anybody below the line, which is why they were not #564's bug; what they left was somebody
-whose bell still said the burn was full while the roster said otherwise.
+A place taken by whoever is standing in it makes all three move the line. With a cap of two and
+`[A paid, B unpaid, C unpaid]`, C has been told they are on the waiting list; B leaving by any of
+those doors puts C in a place on the roster, and without the recompute their bell would go on saying
+otherwise — the same disagreement this counting exists to close. All five doors now call
+`tellAboutTheWaitingList`: joining, an admin adding, a payment changing in either direction, a row
+being deleted by either route, and the transfer.
+
+**Un-recording a payment counts too** (#647), where the `PATCH` used to recompute only on the
+transition _to_ paid. It is `nowPaid !== wasPaid`, so the condition is the change rather than one
+direction of it.
 
 **Lowering `member_cap` still moves it and tells nobody**, which is the one door left open.
 
