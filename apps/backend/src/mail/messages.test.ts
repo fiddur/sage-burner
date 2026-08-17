@@ -100,7 +100,7 @@ describe('the digest', () => {
       kind: 'session' as const,
       label: 'Dreams',
       total: 1,
-      entries: [{ body: 'Ada commented', link: undefined }],
+      entries: [{ body: 'Ada commented', burn: 'Summer burn', link: undefined }],
     },
   ]
 
@@ -135,13 +135,44 @@ describe('the digest', () => {
           kind: 'song',
           label: 'Songs',
           total: 8,
-          entries: [{ body: 'Ada added one', link: 'https://burn.example.org/songs/one' }],
+          entries: [{ body: 'Ada added one', burn: 'Songbook', link: 'https://burn.example.org/songs/one' }],
         },
       ],
       origin: 'https://burn.example.org',
     })
 
     expect(digest.text).toContain('  https://burn.example.org/feed?kinds=song')
+  })
+
+  it('says which burn each line is about, both parts', () => {
+    const digest = digestMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      sections,
+      origin: 'https://burn.example.org',
+    })
+
+    expect(digest.text).toContain('- Ada commented (Summer burn)')
+    expect(digest.html).toContain('(Summer burn)')
+  })
+
+  it('says nothing where a line belongs nowhere', () => {
+    const digest = digestMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      sections: [
+        {
+          kind: 'session',
+          label: 'Dreams',
+          total: 1,
+          entries: [{ body: 'Ada commented', burn: undefined, link: undefined }],
+        },
+      ],
+      origin: undefined,
+    })
+
+    expect(digest.text).toContain('- Ada commented')
+    expect(digest.text).not.toContain('(Summer burn)')
   })
 
   it('still prints the remainder where there is no origin to build a link from', () => {
@@ -153,7 +184,7 @@ describe('the digest', () => {
           kind: 'song',
           label: 'Songs',
           total: 8,
-          entries: [{ body: 'Ada added one', link: undefined }],
+          entries: [{ body: 'Ada added one', burn: 'Songbook', link: undefined }],
         },
       ],
       origin: undefined,

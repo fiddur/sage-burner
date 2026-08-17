@@ -648,9 +648,14 @@ card reads it at query time, so a rewording cannot leave the feed quoting the ol
 coalesces — so six passes leave one line rather than six, and each of them still brings the card
 back to the top, because coalescing rewrites the entry's `created_at`.
 
-**Its card links nowhere, because the card is the post.** A dream's card links to its panel
-and a person's to their page; an announcement has no elsewhere to be. The notification about a
-comment on one therefore points at `/feed`, which is where the card is.
+**Its card links to the feed's own Posts, an announcement having no page of its own** (#724).
+A dream's card links to its panel and a person's to their page; a post is only ever read on the
+feed, so the honest destination is the list it is a slice of — `feedPage(['post'], event_id)`,
+which lights the Posts chip and moves the burn selector. It does **not** narrow the list to that
+burn: `GET /api/feed` takes `kinds` and nothing else, and `?burn=` is read by
+`FetchedBurnProvider` alone. Every notification about a post uses the same call, so the card and
+the bell cannot drift apart. It was `null` until #724, which made every printed Posts line in a
+digest a dead end.
 
 **Withdrawing keeps the conversation**, exactly as a dream's does: `withdrawn_at` is set, a
 `withdrawn` entry is added, the title stays and the body goes. The author may withdraw their

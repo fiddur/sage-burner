@@ -84,6 +84,52 @@ describe('the footer note', () => {
 
     expect(text.split('\n')).toContain('https://x/profile')
   })
+
+  it('keeps the label in the plain-text part, which is where a reader has only words', () => {
+    const text = textFrom([
+      { note: 'Change it:', link: { href: 'https://x/profile', label: 'Your details' } },
+    ])
+
+    expect(text.split('\n')).toEqual(['--', 'Change it:', 'Your details', 'https://x/profile'])
+  })
+})
+
+describe('where a line belongs', () => {
+  it('says the burn beside what happened on it, so two same-named lines differ', () => {
+    const text = textFrom([
+      {
+        lines: [
+          { text: 'A new lead role: Kitchen lead', aside: 'Boundary Burn' },
+          { text: 'A new lead role: Kitchen lead', aside: 'Midsummer Burn' },
+        ],
+      },
+    ])
+
+    expect(text.split('\n')).toEqual([
+      '- A new lead role: Kitchen lead (Boundary Burn)',
+      '- A new lead role: Kitchen lead (Midsummer Burn)',
+    ])
+  })
+
+  it('draws the burn as its own muted span rather than inside the link', () => {
+    const html = htmlFrom({
+      installation: 'X',
+      blocks: [{ lines: [{ text: 'Kitchen lead', href: 'https://x/roles?burn=1', aside: 'Boundary Burn' }] }],
+    })
+
+    expect(html).toContain('<a href="https://x/roles?burn=1"')
+    expect(html).toMatch(/<\/a>[^<]*<span[^>]*>\(Boundary Burn\)<\/span>/u)
+  })
+
+  it('says nothing where a line belongs nowhere', () => {
+    expect(textFrom([{ lines: [{ text: 'Ada added one' }] }]).split('\n')).toEqual(['- Ada added one'])
+  })
+
+  it('does not read as a second separator beside a title that carries one', () => {
+    const text = textFrom([{ lines: [{ text: 'Breakfast · Sat — Ada is cooking', aside: 'Autumn burn' }] }])
+
+    expect(text.split('\n')).toEqual(['- Breakfast · Sat — Ada is cooking (Autumn burn)'])
+  })
 })
 
 describe('the html part', () => {

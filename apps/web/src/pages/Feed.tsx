@@ -10,6 +10,7 @@ import {
   KINDS_PARAM,
   MAX_POST,
   MAX_TITLE,
+  whereItBelongs,
 } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
 import { useState } from 'preact/hooks'
@@ -626,9 +627,6 @@ const goneLabel = {
 } as const satisfies Record<Thread['entity_type'], string>
 
 const isGone = (failure: unknown): boolean => isApiError(failure) && failure.status === 404
-
-const whereItBelongs = (card: Thread): string | undefined =>
-  card.burn ?? (card.entity_type === 'song' ? 'Songbook' : undefined)
 
 const chipFor = (card: Thread): NotificationCategory | undefined =>
   card.entries.reduceRight<NotificationCategory | undefined>(

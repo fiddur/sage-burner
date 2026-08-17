@@ -306,6 +306,14 @@ phone" means 360px.
 - [ ] Give one section more than five things to say — six songs into the songbook, say — and
       press it again: the section lists five and ends with "and N more", which opens the feed
       already filtered to that section's chip.
+- [ ] Put a lead role of the same name on two burns and press it again: the two lines read the
+      same but end with different burns, and each opens its own. A song's line says "Songbook".
+- [ ] Announce something and press it again: the Posts line is a link, and it opens the feed
+      with the Posts chip lit. It lists posts from every burn — the feed has no burn filter, and
+      the `burn` in the address only moves the selector.
+- [ ] Read the same digest as plain text (most clients offer it, or look at the raw message):
+      the footer carries "Your details → Notifications" on its own line above the address,
+      rather than the address alone.
 - [ ] Raise a talking point from a second account with **every** notification category
       switched off on your own. The digest preview still carries it: it is the feed, not
       your notifications.

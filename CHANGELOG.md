@@ -7,6 +7,19 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-17
+
+- **The digest says which burn each line is about.** Two lead roles with the same name on two
+  different burns read as the same line twice, and following either one landed on whichever burn
+  happened to be selected. Every line now ends with its burn — and a song with "Songbook".
+
+- **A Posts line in the digest has somewhere to go.** Every other section's lines were links;
+  a post's was plain text, so being told eight comments had landed on your announcement left you
+  with nowhere to press. It opens the feed with the Posts chip lit.
+
+- **The plain-text version of an email says where to press again.** It had been reduced to a bare
+  web address where the formatted version reads "under Your details → Notifications".
+
 # 2026-08-16
 
 - **Saying something while Preview is showing comes back to Write.** The box emptied on the way

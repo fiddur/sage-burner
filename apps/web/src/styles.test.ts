@@ -92,6 +92,7 @@ describe('the stylesheet', () => {
       '.dream-modal',
     ]
 
+    expect(scale.map(layer).every(Number.isFinite)).toBe(true)
     expect(scale.map(layer)).toEqual(scale.map(layer).sort((one, other) => one - other))
     expect(new Set(scale.map(layer)).size).toBe(scale.length)
     expect(layer('.bell-panel')).toBe(layer('.card-bell-menu'))

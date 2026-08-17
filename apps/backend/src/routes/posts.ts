@@ -81,7 +81,7 @@ export const registerPostRoutes = (
     const said = oneBatch({
       category: 'mentioned',
       body: `${who} named you in: ${row.title}`,
-      link: feedPage(),
+      link: feedPage(['post'], event_id),
     })
 
     await Promise.all(named.map(async (accountId) => await notify(accountId, said)))
@@ -90,7 +90,11 @@ export const registerPostRoutes = (
       db,
       notify,
       event_id,
-      { category: 'post_written', body: `${who} announced: ${row.title}`, link: feedPage() },
+      {
+        category: 'post_written',
+        body: `${who} announced: ${row.title}`,
+        link: feedPage(['post'], event_id),
+      },
       { except: [viewer.account_id, ...named] },
     )
 
@@ -123,7 +127,7 @@ export const registerPostRoutes = (
     const said = oneBatch({
       category: 'mentioned',
       body: `${by} named you in: ${patched.row.title}`,
-      link: feedPage(),
+      link: feedPage(['post'], existing.event_id),
     })
 
     await Promise.all(newly.map(async (accountId) => await notify(accountId, said)))

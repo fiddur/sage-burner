@@ -18,6 +18,7 @@ import {
   leadRole,
   mailSetting,
   meetingPoint,
+  post,
   song,
   thread,
   threadEntry,
@@ -102,13 +103,13 @@ const givenAccount = async ({
   return id
 }
 
-const givenBurn = async () => {
+const givenBurn = async (name = 'Burning Sage Autumn') => {
   const id = randomUUID()
   await db()
     .insert(event)
     .values({
       id,
-      name: 'Burning Sage Autumn',
+      name,
       slug: `burn-${id}`,
       start_date: '2026-09-18',
       end_date: '2026-09-20',
@@ -176,6 +177,20 @@ const givenSongCard = async ({
   await db()
     .insert(thread)
     .values({ id: threadId, event_id: null, entity_type: 'song', entity_id: songId, title })
+
+  return threadId
+}
+
+const givenPostCard = async (eventId: string, title = 'Fold count') => {
+  const postId = randomUUID()
+  const threadId = randomUUID()
+
+  await db()
+    .insert(post)
+    .values({ id: postId, event_id: eventId, author_account_id: null, title, created_at: ago(10 * DAY) })
+  await db()
+    .insert(thread)
+    .values({ id: threadId, event_id: eventId, entity_type: 'post', entity_id: postId, title })
 
   return threadId
 }
@@ -386,8 +401,56 @@ describe('what a digest holds', () => {
 
     expect(sections.map((section) => section.label)).toEqual(['Points', 'Leads'])
     expect(sections[1]?.entries).toEqual([
-      { body: 'Kitchen — Somebody is leading it', link: `https://burn.example/roles?burn=${burn}` },
+      {
+        body: 'Kitchen — Somebody is leading it',
+        burn: 'Burning Sage Autumn',
+        link: `https://burn.example/roles?burn=${burn}`,
+      },
     ])
+  })
+
+  it('says which burn a line is about, so two same-titled ones are not one line twice', async () => {
+    build()
+    const boundary = await givenBurn('Boundary Burn')
+    const midsummer = await givenBurn('Midsummer Burn')
+    await givenRoleCard(boundary, { title: 'Kitchen lead' })
+    await givenRoleCard(midsummer, { title: 'Kitchen lead', at: ago(HOUR) })
+
+    const sections = await feedSince(db(), { after: null, origin: 'https://burn.example' })
+
+    expect(sections[0]?.entries).toEqual([
+      {
+        body: 'Kitchen lead — Somebody is leading it',
+        burn: 'Midsummer Burn',
+        link: `https://burn.example/roles?burn=${midsummer}`,
+      },
+      {
+        body: 'Kitchen lead — Somebody is leading it',
+        burn: 'Boundary Burn',
+        link: `https://burn.example/roles?burn=${boundary}`,
+      },
+    ])
+  })
+
+  it('calls the songbook by its name, a song belonging to no burn', async () => {
+    build()
+    const card = await givenSongCard()
+    await givenEntry(card, { kind: 'added', body: 'put it in the book' })
+
+    const sections = await feedSince(db(), { after: null, origin: undefined })
+
+    expect(sections[0]?.entries[0]?.burn).toBe('Songbook')
+  })
+
+  it('gives a Posts line somewhere to go, its burn’s slice of the feed', async () => {
+    build()
+    const burn = await givenBurn()
+    const card = await givenPostCard(burn)
+    await givenEntry(card, { kind: 'posted', body: 'announced this' })
+
+    const sections = await feedSince(db(), { after: null, origin: 'https://burn.example' })
+
+    expect(sections[0]?.entries[0]?.link).toBe(`https://burn.example/feed?kinds=post&burn=${burn}`)
   })
 
   it('carries a card nothing but a comment has touched', async () => {
