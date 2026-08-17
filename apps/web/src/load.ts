@@ -18,7 +18,6 @@ export type Loaded<T> =
 export const errorMessage = (failure: unknown, fallback: string) =>
   isApiError(failure) ? failure.message : fallback
 
-/** The address as the notification that points at it spells one: a path and its query. */
 const whereWeAre = () => `${globalThis.location?.pathname ?? ''}${globalThis.location?.search ?? ''}`
 
 export const useLoad = <T>(

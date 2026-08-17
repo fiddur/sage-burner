@@ -68,8 +68,6 @@ export const browserPush = (): PushBrowser | undefined => {
   }
 }
 
-// A decision of its own, and so a key of its own: `DISMISSED_KEY` is about installing, and
-// somebody who has the app installed may still not want to be asked about notifications.
 export const NUDGE_DISMISSED_KEY = 'sage-burner:push-nudge-dismissed'
 
 export const dismissedPushNudge = (store?: Storage): boolean => {
@@ -90,8 +88,8 @@ export const dismissPushNudge = (store?: Storage): void => {
   } catch {}
 }
 
-// Session storage rather than local, and that is the whole of what "for now" means (#695): the
-// bell's strip is meant to come back, so its ✕ lasts until the browser is closed and no longer.
+// Session storage rather than local: the bell's strip is meant to come back, so its ✕ lasts
+// until the browser is closed and no longer.
 export const NUDGE_LATER_KEY = 'sage-burner:push-nudge-later'
 
 export const nudgedLater = (store?: Storage): boolean => {

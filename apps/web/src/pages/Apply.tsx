@@ -63,8 +63,6 @@ const identityProblem = (value: string, max: number) => {
   return undefined
 }
 
-// Blank is deliberate rather than missing: the account's own address is what the server
-// falls back to.
 const emailProblem = (value: string) =>
   value.trim() === ''
     ? undefined
@@ -167,10 +165,6 @@ const Decided = ({ api, mine }: { api: ApplyApi; mine: MyApplication }) => {
   )
 }
 
-/**
- * Which of the four things somebody sees, which is the whole of what account-first changed here
- * (#476): sign up, fill the form in, wait, or read the answer.
- */
 export const Apply = ({ api }: ApplyProps) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()
@@ -237,7 +231,6 @@ export const Apply = ({ api }: ApplyProps) => {
   )
 }
 
-/** Nothing of theirs to show yet — but a blank form is a claim they have not applied. */
 const NotAppliedYet = ({
   api,
   standing,

@@ -43,11 +43,6 @@ interface Counted {
   gone?: number
 }
 
-/**
- * One notification, however many people it reaches. Every loop that tells a shared audience the
- * same thing calls this once and passes the result to each `notify`, so `notification_batch` gets
- * one row rather than one per recipient — which is what makes the log readable at all.
- */
 export const oneBatch = (told: Told): Told => ({ ...told, batch: told.batch ?? randomUUID() })
 
 const countInto = async (db: Database, at: Date, told: Told, counted: Counted) => {
@@ -98,10 +93,6 @@ export const notificationBatches = async (db: Database, limit: number) =>
 
 export type Notifier = (accountId: string, told: Told) => Promise<unknown>
 
-/**
- * Answers what the mail server did with it — `undefined` where the installation has no mail
- * server or the account no address, so nothing was attempted at all.
- */
 export type EmailChannel = (accountId: string, told: Told) => Promise<Posted | undefined>
 
 export interface Email {
@@ -272,10 +263,6 @@ export const tellApproved = async (
   return audience.length
 }
 
-/**
- * The burn's attendance is the audience for a mention, and every approved account is where
- * there is no burn — the songbook is global, so `@everybody` there cannot mean one gathering.
- */
 export const namedBy = async (
   db: Database,
   body: string,

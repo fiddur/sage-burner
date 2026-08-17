@@ -40,7 +40,6 @@ export const localDay = (iso: string, today: Date = new Date()): string => {
   return `${at.getDate()} ${MONTHS[at.getMonth()] ?? ''}${year}`.trim()
 }
 
-/** A day and a clock time in the reader's own timezone, which is the only one they can act in. */
 export const localMoment = (iso: string, today: Date = new Date()): string => {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return iso

@@ -76,10 +76,6 @@ export const digestChoices = ['daily', 'weekly', 'off'] as const
 export type DigestChoice = (typeof digestChoices)[number]
 export const isDigestChoice = (value: unknown): value is DigestChoice => isOneOf(digestChoices, value)
 
-/**
- * What an account that has never said gets. A stored row is an explicit choice, so absence is
- * "has not said" and the default lives here — the rule `notificationCategoryInfo` already follows.
- */
 export const DEFAULT_DIGEST: DigestChoice = 'daily'
 
 export const digestChoiceInfo = {

@@ -784,7 +784,6 @@ a:hover {
   outline-offset: -2px;
 }
 
-/* The panel behind the Preview tab. */
 .md-field-preview {
   min-height: 5rem;
   padding: 0.6rem 0.75rem;
@@ -1510,8 +1509,8 @@ a.person-badge:focus-visible span:last-child {
 /*
   Over the timetable rather than beside it — the grid is as wide as the screen — and
   above the bottom bar, which is the whole of why this is 40 (#344). The scale:
-  bar 20, popdown 30, the menu's backdrop 34 and its drawer 35, modal 40. `docs/the-app.md`
-  says what happened when two of them shared a number.
+  bar 20, popdown 30, the push nudge 32, the menu's backdrop 34 and its drawer 35,
+  modal 40. `docs/the-app.md` says what happened when two of them shared a number.
 */
 .dream-modal {
   position: fixed;
@@ -2161,11 +2160,11 @@ a.person-badge:focus-visible span:last-child {
   color: var(--muted);
 }
 
-/* As with `.bring-actions`: without the gap two emoji buttons read as one control. */
 .point-actions {
   margin: 0.35rem 0 0;
 }
 
+/* As with `.bring-actions`: without the gap two icon buttons read as one control. */
 .point-actions > * + * {
   margin-inline-start: 0.6rem;
 }

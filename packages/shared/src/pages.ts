@@ -49,11 +49,8 @@ export const songPage = (songId: string): string => `/songs/${encodeURIComponent
 
 export const OAUTH_OUTCOME_PARAM = 'from'
 
-/** Which invite a provider round trip set off from, so the callback can spend it (#512). */
 export const INVITE_PARAM = 'invite'
 
-// What the page tells an organiser to quote: the request id, which is `reqId` on the log line
-// that carries the provider's own words.
 export const OAUTH_REF_PARAM = 'ref'
 
 export const oauthOutcomes = [
@@ -67,14 +64,8 @@ export const oauthOutcomes = [
   'address-taken',
 ] as const
 
-/**
- * Which page an outcome can land on, so each page's copy can be exhaustive over its own half
- * rather than over a list it has to remember to filter. Anything that goes wrong at the provider
- * lands wherever the round trip started, so three appear in both.
- */
 export const signingInOutcomes = ['refused', 'misconfigured', 'unreachable', 'address-taken'] as const
 
-/** `no-address` lands here rather than on login: a provider that gave none cannot sign anybody in. */
 export const applyingOutcomes = ['no-address'] as const
 
 export const linkingOutcomes = [

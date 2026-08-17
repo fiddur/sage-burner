@@ -115,7 +115,6 @@ export const inAWhile = (seconds: number): string => {
   return minutes === 1 ? 'a minute' : `${minutes} minutes`
 }
 
-/** Whole seconds only: the header carries either those or a date, and the app only sends the first. */
 export const waitFrom = (header: string | null): number | undefined => {
   const seconds = Number(header)
 
@@ -177,11 +176,6 @@ export interface ClientDeps {
   onRead?: (response: Response) => void
 }
 
-/**
- * When the server answered the oldest GET made with this signal, which is what
- * `markTargetShown` reports (#527) — a page is only as new as its oldest read, and the
- * device's own clock cannot be trusted to say when either happened.
- */
 export const serverDateOf = (response: Pick<Response, 'headers'>): string | undefined => {
   const header = response.headers.get('date')
   if (header === null) return undefined

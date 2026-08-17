@@ -38,9 +38,8 @@ export const stringField = (body: unknown, name: string): string | undefined => 
   return typeof held === 'string' && held !== '' ? held : undefined
 }
 
-// An unverified address is one somebody typed into the provider, so taking it as a login identity
-// would let a stranger claim an address they do not hold. Absent is better than wrong: the sign-up
-// page asks for one instead.
+// An unverified address would let a stranger claim one they do not hold, so absent is better
+// than wrong — the sign-up page asks for one instead.
 const verifiedEmail = (body: unknown): string | undefined =>
   field(body, 'verified') === true ? stringField(body, 'email') : undefined
 
@@ -52,8 +51,8 @@ export const providerShapes = {
     authorize: 'https://discord.com/oauth2/authorize',
     token: 'https://discord.com/api/oauth2/token',
     profile: () => 'https://discord.com/api/users/@me',
-    // `email` because signing up *is* signing in now (#476), and an account is keyed by an
-    // address. Discord answers a verified one; Facebook is asked the same and often does not.
+    // `email` because an account is keyed by an address. Discord answers a verified one;
+    // Facebook is asked the same and often does not.
     scope: () => 'identify email',
     read: (body) => {
       const subject = stringField(body, 'id')
