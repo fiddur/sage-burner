@@ -156,6 +156,21 @@ describe('announcing something', () => {
     expect(await bell(server, ada.cookie)).toEqual([])
   })
 
+  it('sends the bell where the card sends a reader, so the two cannot drift apart', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await setOn(server, bea.cookie, ['post_written'])
+
+    await announce(server, ada.cookie, { title: 'The planning call is Sunday', body: '' })
+
+    expect((await bell(server, bea.cookie))[0]?.link).toBe(`/feed?kinds=post&burn=${BURN}`)
+    expect((await cards(server, ada.cookie))[0]?.link).toBe(`/feed?kinds=post&burn=${BURN}`)
+  })
+
   it('is refused for a burn that has already ended', async () => {
     const server = await build()
     await givenBurn(OVER, { start_date: '2026-05-01', end_date: '2026-05-03', slug: 'spring' })

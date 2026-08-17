@@ -7,7 +7,7 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, paymentUpdateSchema, withPlaces } from '@sage-burner/shared'
+import { apiRoutes, membersPage, paymentUpdateSchema, withPlaces } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -139,7 +139,7 @@ export const registerRosterRoutes = (
           await notify(accountId, {
             category: 'payment',
             body: 'Your payment has been recorded.',
-            link: '/members',
+            link: membersPage(eventId),
           })
         }
       }

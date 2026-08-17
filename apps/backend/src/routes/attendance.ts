@@ -1,7 +1,7 @@
 import type { AttendanceResponse, EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, attendanceCreateSchema, placeTransferSchema } from '@sage-burner/shared'
+import { apiRoutes, attendanceCreateSchema, membersPage, placeTransferSchema } from '@sage-burner/shared'
 import { and, asc, eq, gte, isNotNull, ne, or, TransactionRollbackError } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -115,7 +115,7 @@ export const announceJoined = async (
     db,
     notify,
     joined.stay.event_id,
-    { category: 'member_joined', body: `${name} is coming.`, link: '/members' },
+    { category: 'member_joined', body: `${name} is coming.`, link: membersPage(joined.stay.event_id) },
     { except: [joined.account_id] },
   )
 }
@@ -220,7 +220,11 @@ export const registerAttendanceRoutes = (
         )
         .returning({ id: attendance.id })
 
-      if (removed.length > 0) return reply.code(204).send()
+      if (removed.length > 0) {
+        await tellAboutTheWaitingList(db, found.id, notify, now)
+
+        return reply.code(204).send()
+      }
 
       const existing = await joinedRow(found.id, viewer.account_id)
 
@@ -256,8 +260,10 @@ export const registerAttendanceRoutes = (
       await notify(body.to_account_id, {
         category: 'payment',
         body: `Your place at ${open.name} is paid — somebody transferred theirs to you.`,
-        link: '/members',
+        link: membersPage(open.id),
       })
+
+      await tellAboutTheWaitingList(db, open.id, notify, now)
 
       return reply.code(204).send()
     },
@@ -338,13 +344,11 @@ export const registerAttendanceRoutes = (
             eq(attendance.account_id, request.params.accountId),
           ),
         )
-        .returning({ id: attendance.id, payment_status: attendance.payment_status })
+        .returning({ id: attendance.id })
 
       if (removed.length === 0) return sendError(reply, 404)
 
-      if (removed.some((row) => row.payment_status === 'paid')) {
-        await tellAboutTheWaitingList(db, request.params.eventId, notify, now)
-      }
+      await tellAboutTheWaitingList(db, request.params.eventId, notify, now)
 
       return reply.code(204).send()
     },

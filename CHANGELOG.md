@@ -22,6 +22,23 @@ under today's heading, and make a new heading when there is none.
 
 - **An empty bring list says so once.** Two notes under two headings each said something true
   about its own half and together read as two problems where there is only nothing there yet.
+- **The bell and the members page now count places the same way.** On a burn where every place was
+  taken but not everybody had paid, the bell said there was a place left to go and win while the
+  page showed you were already holding it. A place is taken by whoever is standing in it, paid or
+  not — and if you have not paid, you are told you are in one for now rather than told to go and
+  win it.
+
+- **A card's 🔔 says whether it is on out loud.** 🔔 and 🔕 read as the same words to a screen
+  reader; the button now ends with "on" or "off".
+
+- **The offer to turn notifications on in this browser goes when you log out**, rather than
+  standing over the signed-out homepage with a button that could not have worked.
+
+- **The meal times of a burn that has ended can only be read.** The editor was still drawn, and
+  pressing anything in it answered "Could not add that." It says the burn has ended instead.
+
+- **A recorded payment and a place handed over link the burn they are about**, rather than
+  whichever burn the selector happened to be on.
 
 - **The digest says which burn each line is about.** Two lead roles with the same name on two
   different burns read as the same line twice, and following either one landed on whichever burn

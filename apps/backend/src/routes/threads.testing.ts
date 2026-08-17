@@ -7,7 +7,7 @@ export const cardOf = async (server: FastifyInstance, cookie: string, threadId: 
 export const bell = async (
   server: FastifyInstance,
   cookie: string,
-): Promise<{ category: string; body: string }[]> =>
+): Promise<{ category: string; body: string; link: string | null }[]> =>
   (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
     .notifications
 

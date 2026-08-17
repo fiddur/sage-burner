@@ -12,6 +12,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { MealSlots } from '../components/MealSlots.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { todayForInput } from '../datetime.ts'
 import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
@@ -64,9 +65,10 @@ const messageFor = (failure: unknown, fallback: string) => {
   return failure.message
 }
 
-export const AdminEvents = ({ api }: { api: EventsApi }) => {
+export const AdminEvents = ({ api, now = () => new Date() }: { api: EventsApi; now?: () => Date }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
+  const today = todayForInput(now())
 
   const [draft, setDraft] = useState(BLANK)
 
@@ -205,7 +207,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
               <details>
                 <summary>Meal times</summary>
-                <MealSlots api={api} eventId={row.id} />
+                <MealSlots api={api} eventId={row.id} shut={row.end_date < today} />
               </details>
 
               {editing === row.id ? (

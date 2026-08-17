@@ -15,3 +15,15 @@ export const byPlace = (a: Placeable, b: Placeable): number => {
 
 export const withPlaces = <T extends Placeable>(entries: readonly T[], cap: number) =>
   [...entries].sort(byPlace).map((entry, index) => ({ ...entry, waiting: index >= cap }))
+
+export interface Places {
+  taken: number
+  left: number
+  waiting: number
+}
+
+export const placesIn = (entries: readonly unknown[], cap: number): Places => {
+  const taken = Math.min(entries.length, Math.max(0, cap))
+
+  return { taken, left: Math.max(0, cap - taken), waiting: entries.length - taken }
+}

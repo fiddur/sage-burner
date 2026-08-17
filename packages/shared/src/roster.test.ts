@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { withPlaces } from './roster.ts'
+import { placesIn, withPlaces } from './roster.ts'
 
 const at = (joined_at: string, payment_status: 'unpaid' | 'paid' = 'unpaid', account_id = joined_at) => ({
   account_id,
@@ -62,5 +62,34 @@ describe('withPlaces', () => {
       'c!',
     ])
     expect(withPlaces([...rows].reverse(), 2).map((entry) => entry.account_id)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('placesIn', () => {
+  it('counts a place taken by whoever holds it, paid or not', () => {
+    expect(placesIn([at('1st')], 1)).toEqual({ taken: 1, left: 0, waiting: 0 })
+  })
+
+  it('agrees with withPlaces about who is not waiting, which is the whole point', () => {
+    const entries = [at('1st'), at('2nd'), at('3rd', 'paid'), at('4th')]
+
+    for (const cap of [0, 1, 2, 3, 4, 5]) {
+      expect(placesIn(entries, cap).taken).toBe(withPlaces(entries, cap).filter((one) => !one.waiting).length)
+      expect(placesIn(entries, cap).waiting).toBe(
+        withPlaces(entries, cap).filter((one) => one.waiting).length,
+      )
+    }
+  })
+
+  it('leaves the places nobody is standing in', () => {
+    expect(placesIn([at('1st')], 4)).toEqual({ taken: 1, left: 3, waiting: 0 })
+  })
+
+  it('never reports a negative remainder on an over-subscribed burn', () => {
+    expect(placesIn([at('1st'), at('2nd'), at('3rd')], 1)).toEqual({ taken: 1, left: 0, waiting: 2 })
+  })
+
+  it('holds an empty burn open', () => {
+    expect(placesIn([], 42)).toEqual({ taken: 0, left: 42, waiting: 0 })
   })
 })

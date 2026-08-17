@@ -539,21 +539,36 @@ that it is _decided_. A burn that opens on a Sunday gives every `joined_at` the 
 without a last resort in the comparison, the line falls in a different place from one read to the
 next, and a member watching the page sees it move with nothing having changed.
 
-**The notification asks a plainer question than the line does** (#565): is there a place left to
-pay for? Among unpaid members the order decides nothing — the list is paid-first, so any of them can
-jump all the others by paying — so "unpaid, third, has a place" and "unpaid, fifth, waiting" are the
-same situation, and telling those two people different things implies a queue position no rule
-honours. Both messages therefore go to **every** unpaid member, and split on `member_cap - paid`:
+**The notification and the roster count places the same way** (#726), and they used not to. The
+notification asked "is there a place nobody has paid for?" (`member_cap - paid`) while the roster
+asked "who is inside the cap?" (`withPlaces`, paid first and then by joining) — so on a burn with a
+cap of one and a single unpaid member, the bell said _1 place left, and it goes to whoever pays_
+while the page said _1 of 1 places taken_ and put that very member in it. Told to go and win a place
+they were already holding.
 
-- places left, and few enough to be worth saying: _N places left, and they go to whoever pays._
-  One place is its own sentence — _1 place left, and it goes to whoever pays._
-- none left: _full — every place is held by somebody who has paid._
+`placesIn(entries, cap)` is now the one answer, and both surfaces read it: a place is **taken by
+whoever is standing in it**, paid or not, so `left` is `cap - entries.length` floored at zero and
+`waiting` is everybody past the cap. It is `withPlaces`' own arithmetic, and `roster.test.ts` holds
+the two against each other across every cap rather than trusting that they agree.
 
-`member_cap - paid` rather than #506's equality test, which told the person below the line nothing on
-an over-subscribed burn whose payments had not landed exactly on the cap, and silenced the message
-altogether for an admin who recorded more payments than places. #506's split of the audience goes with
-it, having said more than the data supports. The roster still draws the line, because for a **paid**
-member it is a real fact and the page is where somebody looks to see it.
+The three things an unpaid member can be told follow from it, and they are disjoint — nobody can be
+waiting while a place stands empty, since that needs more entries than the cap:
+
+- a place stands empty, and few enough to be worth saying: _N places left, and they go to whoever
+  pays._ One place is its own sentence — _1 place left, and it goes to whoever pays._
+- none stands empty and this member holds one: _full, and a place goes to whoever pays for it. You
+  are in one for now — your payment is not recorded yet._
+- none stands empty and this member is past the cap: _full and you are on the waiting list. A place
+  goes to whoever pays for it._
+
+That is #565's rule with the split moved rather than dropped. #565 sent one body to every unpaid
+member because "unpaid, third, has a place" and "unpaid, fifth, waiting" were the same situation and
+distinguishing them implied a queue position no rule honoured. It is not the same situation now: the
+roster ranks them, shows the rank on the page, and the two sentences say only what it already says.
+The counting is `member_cap - paid` no longer, and #506's equality test before that — which told
+the person below the line nothing on an over-subscribed burn whose payments had not landed exactly
+on the cap, and silenced the message altogether for an admin who recorded more payments than
+places.
 
 **Told once per burn, per sentence** — the query asks whether this account already has _this exact
 message_ about _this burn_, so recording the next payment says nothing to somebody already out, while
@@ -577,21 +592,31 @@ would ever have fired for them — they were below the line on the roster and ha
 it. **Every way an unpaid row appears recomputes it**: joining, and an admin adding somebody. Those
 are the two doors onto the same bug.
 
-**A member leaving does not**, and that is not an omission. `left` is the cap less what has been
-paid for, and `DELETE /api/events/:eventId/attendance/me` filters on `payment_status = 'unpaid'` —
-so that door only ever removes a row the line never counted, and there is nothing new to say to
-anybody. Handing a place over does not move it either: it marks the taker paid and deletes the
-giver, who was.
+**Every door that removes a row recomputes as well** (#726), and that is a consequence of the
+counting above rather than a separate decision. While `left` was the cap less what had been _paid
+for_, a leaving member changed nothing the line counted — `DELETE
+/api/events/:eventId/attendance/me` only ever deletes an unpaid row, and handing a place over marked
+the taker paid and deleted the giver, who was. So three doors were deliberately left out: leaving,
+an admin removing an **unpaid** member, and the transfer.
 
-**Freeing a paid place recomputes too** (#647). Two admin doors open one: `DELETE
-/api/admin/events/:eventId/attendance/:accountId`, which deletes whatever the payment status is —
-unlike the member's own leave route, which filters on `unpaid` — and un-recording a payment, where
-the `PATCH` used to recompute only on the transition _to_ paid. Both are now `nowPaid !== wasPaid`
-and "was this row paid", so the condition is the change rather than one direction of it. Neither
-pushes anybody below the line, which is why they were not #564's bug; what they left was somebody
-whose bell still said the burn was full while the roster said otherwise.
+A place taken by whoever is standing in it makes all three move the line. With a cap of two and
+`[A paid, B unpaid, C unpaid]`, C has been told they are on the waiting list; B leaving by any of
+those doors puts C in a place on the roster, and without the recompute their bell would go on saying
+otherwise — the same disagreement this counting exists to close. All five doors now call
+`tellAboutTheWaitingList`: joining, an admin adding, a payment changing in either direction, a row
+being deleted by either route, and the transfer.
+
+**Un-recording a payment counts too** (#647), where the `PATCH` used to recompute only on the
+transition _to_ paid. It is `nowPaid !== wasPaid`, so the condition is the change rather than one
+direction of it.
 
 **Lowering `member_cap` still moves it and tells nobody**, which is the one door left open.
+
+**The dedupe means a round trip is heard once.** Now that the line moves in both directions and
+carries three sentences rather than two, somebody told "You are in one for now" and later pushed off
+again will not hear the waiting-list sentence a second time if they have already had it — "told once
+per burn, per sentence" holds across the whole burn, not per crossing. Deliberate: the alternative is
+a bell that rings on every payment an admin records.
 
 **A burn that has ended tells nobody at all** (#648). `tellAboutTheWaitingList` reads `end_date`
 and returns early, in one place rather than at each caller: the member join route goes through

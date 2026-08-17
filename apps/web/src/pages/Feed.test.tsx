@@ -177,11 +177,20 @@ describe('the chip row over the feed', () => {
   })
 })
 
-describe('the bell in a card’s corner', () => {
-  const bellOn = async (what: string) => {
-    fireEvent.click(await screen.findByRole('button', { name: `Notification settings for ${what}` }))
-  }
+const bellFor = async (what: string, state?: 'on' | 'off') =>
+  await screen.findByRole('button', {
+    name: (name) =>
+      state === undefined
+        ? name === `Notification settings for ${what}, on` ||
+          name === `Notification settings for ${what}, off`
+        : name === `Notification settings for ${what}, ${state}`,
+  })
 
+const bellOn = async (what: string) => {
+  fireEvent.click(await bellFor(what))
+}
+
+describe('the bell in a card’s corner', () => {
   it('is a lit bell where something is on and a struck one where nothing is', async () => {
     renderPage(
       stub({}, [
@@ -190,10 +199,24 @@ describe('the bell in a card’s corner', () => {
       ]),
     )
 
-    const lit = await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' })
+    const lit = await bellFor('Sauna at dawn', 'on')
     expect(lit.textContent).toBe('🔔')
-    expect(screen.getByRole('button', { name: 'Notification settings for Cacao ceremony' }).textContent).toBe(
-      '🔕',
+    expect((await bellFor('Cacao ceremony', 'off')).textContent).toBe('🔕')
+  })
+
+  it('says on or off in its name, a switch nobody can hear the position of otherwise (#675)', async () => {
+    renderPage(
+      stub({}, [
+        aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true }),
+        aCard({ id: 'c-2', title: 'Cacao ceremony', entity_id: 's-2' }),
+      ]),
+    )
+
+    expect((await bellFor('Sauna at dawn', 'on')).getAttribute('aria-label')).toBe(
+      'Notification settings for Sauna at dawn, on',
+    )
+    expect((await bellFor('Cacao ceremony', 'off')).getAttribute('aria-label')).toBe(
+      'Notification settings for Cacao ceremony, off',
     )
   })
 
@@ -210,7 +233,7 @@ describe('the bell in a card’s corner', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByRole('button', { name: 'Notification settings for Sauna at dawn' }).textContent,
+        screen.getByRole('button', { name: 'Notification settings for Sauna at dawn, on' }).textContent,
       ).toBe('🔔'),
     )
   })
@@ -238,7 +261,7 @@ describe('the bell in a card’s corner', () => {
   it('says whether it is open, and names the switches it opens rather than a menu', async () => {
     renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
-    const bell = await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' })
+    const bell = await bellFor('Sauna at dawn')
     expect(bell.getAttribute('aria-expanded')).toBe('false')
     expect(bell.getAttribute('aria-haspopup')).toBeNull()
 
@@ -322,7 +345,7 @@ describe('switching a kind on from a card', () => {
   it('offers push here, which is the moment somebody asked to be told about something', async () => {
     withNudge(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    await bellOn('Sauna at dawn')
     fireEvent.change(screen.getByLabelText(/Notify me on similar/), { target: { checked: true } })
 
     expect(await screen.findByText(NUDGE)).toBeTruthy()
@@ -353,7 +376,7 @@ describe('switching a kind on from a card', () => {
       ),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    await bellOn('Sauna at dawn')
     fireEvent.change(screen.getByLabelText(/Notify me on similar/), { target: { checked: false } })
 
     await waitFor(() => expect(screen.getByText('Notification settings')).toBeTruthy())
@@ -363,7 +386,7 @@ describe('switching a kind on from a card', () => {
   it('offers it on the way on, which is the passing sibling of that', async () => {
     withProbe(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    await bellOn('Sauna at dawn')
     fireEvent.change(screen.getByLabelText(/Notify me on similar/), { target: { checked: true } })
 
     await waitFor(() => expect(screen.getByTestId('asked').textContent).toBe('yes'))
@@ -1072,9 +1095,7 @@ describe('what everyone has been doing', () => {
       ]),
     )
 
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Notification settings for The planning call is Sunday' }),
-    )
+    fireEvent.click(await bellFor('The planning call is Sunday'))
 
     expect(
       screen.getByLabelText(`Notify me on similar (${notificationCategoryInfo.post_comment_any.label})`),
@@ -1094,7 +1115,7 @@ describe('what everyone has been doing', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Ada' }))
+    fireEvent.click(await bellFor('Ada'))
 
     expect(
       screen.getByLabelText(
@@ -1311,10 +1332,10 @@ describe('what everyone has been doing', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Cacao ceremony' }))
+    fireEvent.click(await bellFor('Cacao ceremony'))
     expect(screen.getByLabelText(/Notify me on similar \(Somebody comments on any dream/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    fireEvent.click(await bellFor('Sauna at dawn'))
     expect(screen.getAllByLabelText(/Notify me on similar/)).toHaveLength(1)
     expect(screen.getAllByLabelText('Notify on replies')).toHaveLength(2)
   })
@@ -1326,7 +1347,11 @@ describe('what everyone has been doing', () => {
   })
 
   it('leaves a card with no page of its own as plain text', async () => {
-    renderPage(stub({}, [aCard({ id: 'c-1', title: 'A song nobody kept', link: null })]))
+    renderPage(
+      stub({}, [
+        aCard({ id: 'c-1', title: 'A song nobody kept', entity_type: 'song', burn: null, link: null }),
+      ]),
+    )
 
     await screen.findByText('A song nobody kept')
     expect(screen.queryByRole('link', { name: 'A song nobody kept' })).toBeNull()
@@ -1338,7 +1363,7 @@ describe('what everyone has been doing', () => {
     )
     renderPage(stub({ updateMyNotificationSettings: update }, [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    await bellOn('Sauna at dawn')
     const tick = screen.getByLabelText(/Notify me on similar \(Somebody offers a dream/)
     expect(tick).toHaveProperty('checked', false)
 
@@ -1364,7 +1389,7 @@ describe('what everyone has been doing', () => {
       ),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    await bellOn('Sauna at dawn')
     const tick = screen.getByLabelText(/Notify me on similar \(Somebody offers a dream/)
     expect(tick).toHaveProperty('checked', true)
 

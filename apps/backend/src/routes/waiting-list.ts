@@ -1,6 +1,6 @@
 import type { NotificationCategory } from '@sage-burner/shared'
 
-import { membersPage } from '@sage-burner/shared'
+import { membersPage, placesIn, withPlaces } from '@sage-burner/shared'
 import { and, eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
@@ -54,32 +54,52 @@ export const tellAboutTheWaitingList = async (
   if (burn.end_date < todayIso(now)) return
 
   const rows = await db
-    .select({ account_id: attendance.account_id, payment_status: attendance.payment_status })
+    .select({
+      account_id: attendance.account_id,
+      payment_status: attendance.payment_status,
+      joined_at: attendance.joined_at,
+    })
     .from(attendance)
     .where(eq(attendance.event_id, eventId))
 
-  const unpaid = rows.filter((row) => row.payment_status !== 'paid')
-  const left = burn.member_cap - (rows.length - unpaid.length)
+  const { left } = placesIn(rows, burn.member_cap)
+  const unpaid = withPlaces(rows, burn.member_cap).filter((row) => row.payment_status !== 'paid')
   const link = membersPage(eventId)
 
-  if (left <= 0) {
+  if (left > NEARLY_FULL) return
+
+  if (left > 0) {
     await tellTheUnpaid(db, notify, unpaid, {
-      category: 'waiting_list_pushed',
-      body: `${burn.name} is full — every place is held by somebody who has paid. You are on the waiting list until one is handed over.`,
+      category: 'waiting_list_near',
+      body:
+        left === 1
+          ? `${burn.name} has 1 place left, and it goes to whoever pays. Your payment is not recorded yet.`
+          : `${burn.name} has ${left} places left, and they go to whoever pays. Your payment is not recorded yet.`,
       link,
     })
 
     return
   }
 
-  if (left > NEARLY_FULL) return
+  await tellTheUnpaid(
+    db,
+    notify,
+    unpaid.filter((row) => !row.waiting),
+    {
+      category: 'waiting_list_near',
+      body: `${burn.name} is full, and a place goes to whoever pays for it. You are in one for now — your payment is not recorded yet.`,
+      link,
+    },
+  )
 
-  await tellTheUnpaid(db, notify, unpaid, {
-    category: 'waiting_list_near',
-    body:
-      left === 1
-        ? `${burn.name} has 1 place left, and it goes to whoever pays. Your payment is not recorded yet.`
-        : `${burn.name} has ${left} places left, and they go to whoever pays. Your payment is not recorded yet.`,
-    link,
-  })
+  await tellTheUnpaid(
+    db,
+    notify,
+    unpaid.filter((row) => row.waiting),
+    {
+      category: 'waiting_list_pushed',
+      body: `${burn.name} is full and you are on the waiting list. A place goes to whoever pays for it.`,
+      link,
+    },
+  )
 }
