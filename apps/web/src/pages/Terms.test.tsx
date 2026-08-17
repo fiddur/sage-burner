@@ -8,10 +8,6 @@ import { Terms } from './Terms.tsx'
 
 afterEach(cleanup)
 
-/**
- * The terms (#419). Public, so there is no viewer to provide: a reviewer at Meta opens this
- * as a stranger, and so does anybody deciding whether to apply.
- */
 const stub = (over: Partial<TermsApi> = {}): TermsApi => ({
   getTerms: () => Promise.resolve({ markdown: '# Getting an account\n\nGiven rather than opened.\n' }),
   ...over,
@@ -33,9 +29,6 @@ describe('the terms page', () => {
   })
 
   it('says the read failed rather than showing an empty page', async () => {
-    // A plain rejection rather than an `apiError`, which is what reaches the fallback: `useLoad`
-    // prefers the server's own message when there is one, so an `apiError` here would assert
-    // nothing about the copy this page passes.
     render(<Terms api={stub({ getTerms: () => Promise.reject(new Error('nope')) })} />)
 
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load the terms')

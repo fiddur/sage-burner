@@ -110,7 +110,6 @@ export const meetingUpdateSchema = withValidRun(
 export type MeetingUpdate = z.infer<typeof meetingUpdateSchema>
 export type MeetingUpdateInput = z.input<typeof meetingUpdateSchema>
 
-/** An allowlist: a column added to `meeting` reaches the feed only when somebody names it here. */
 export const publicMeetingFields = meetingSchema
   .pick({ id: true, title: true, link: true })
   .extend({ starts_at: dateTimeSchema, ends_at: dateTimeSchema })

@@ -90,7 +90,6 @@ const TOLD: Told = { category: 'dream_offered', body: 'Ada offered a dream', lin
 const telling = (deps: PushDeps, log: (trouble: PushTrouble) => void = () => undefined) =>
   recordAndPush(deps, () => clock, log)
 
-/** The email leg runs off the queue, so a test asserting on it waits for this one's `drain`. */
 const emailing = (deps: PushDeps, post: EmailChannel) => {
   const queue = createEmailQueue(() => undefined)
 

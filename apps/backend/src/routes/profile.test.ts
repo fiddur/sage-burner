@@ -28,14 +28,6 @@ import { writeAllergyTicks } from './allergy-ticks.ts'
 import { helpingIdsFor, writeHelping } from './helping.ts'
 import { writeStay } from './profile.ts'
 
-/**
- * A member maintaining their own record.
- *
- * The acceptance criterion is authorization: whose row gets written is derived
- * from the session and never from the request, so there is no id to guess. These
- * tests try to guess one anyway.
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 
@@ -176,9 +168,6 @@ describe('a member reading and editing who they are', () => {
   })
 
   it('keeps an introduction, and clears it for an empty one', async () => {
-    // #390. `optionalText` turns empty into null on the way in, so "I wrote nothing" and "I
-    // took it down" are the same stored state — which is what the page reads to decide
-    // whether to invite somebody to write one.
     const server = await build()
     const member = await givenMember()
 
@@ -192,9 +181,6 @@ describe('a member reading and editing who they are', () => {
   })
 
   it('goes with the account, and takes the pictures written into it too', async () => {
-    // #390's erasure note, asserted rather than assumed — and the picture is written for
-    // real, or this would only prove that deleting a row deletes it. `image.uploaded_by`
-    // is what carries the cascade; the column needs none of its own.
     const server = await build()
     const member = await givenMember()
     const pictureId = randomUUID()
@@ -226,7 +212,6 @@ describe('a member reading and editing who they are', () => {
     })
 
     expect(refused.statusCode).toBe(400)
-    // The passing sibling: exactly the limit is fine, so the bound is not off by one.
     const accepted = await patchProfile(server, member.cookie, {
       introduction: 'a'.repeat(MAX_INTRODUCTION),
     })
@@ -234,8 +219,6 @@ describe('a member reading and editing who they are', () => {
   })
 
   it('never touches anyone else, whatever the body says', async () => {
-    // The acceptance criterion. There is no id in the body to aim at, and adding
-    // one is a 400 rather than a redirect of the write.
     const server = await build()
     const member = await givenMember()
     const other = await givenMember({ name: 'Someone Else' })
@@ -259,7 +242,6 @@ describe('a member reading and editing who they are', () => {
   })
 
   it('treats an empty body as a no-op rather than a 500', async () => {
-    // `set({})` is not valid SQL.
     const server = await build()
     const member = await givenMember()
 
@@ -270,8 +252,6 @@ describe('a member reading and editing who they are', () => {
   })
 
   it('refuses to change the login email here', async () => {
-    // Changing the identity you sign in with is a different act, with
-    // verification nothing implements yet.
     const server = await build()
     const member = await givenMember()
 
@@ -288,9 +268,6 @@ describe('a member reading and editing who they are', () => {
   })
 
   it('answers an organiser who is not attending, whose record this also is', async () => {
-    // `requireApproved` since #412. A name, a picture and an introduction belong to the
-    // account rather than to a stay — and their own page invites them to write one, which
-    // `requireMember` here made a dead end.
     const server = await build()
     const boss = await givenMember({ roles: ['admin'] })
 
@@ -299,8 +276,6 @@ describe('a member reading and editing who they are', () => {
   })
 
   it('refuses an account with no role at all', async () => {
-    // The passing sibling for the guard: `approved` is not "signed in", and an applicant
-    // waiting on a decision has no record here to keep.
     const server = await build()
     const nobody = await givenMember({ roles: [] })
 
@@ -343,9 +318,6 @@ describe('a member editing their stay', () => {
   })
 
   it('refuses a single date that inverts the stored pair', async () => {
-    // The case the schema cannot see: the body carries one date, and the conflict
-    // is only visible against the row. Composed into the WHERE rather than
-    // compared after a read, so a concurrent write cannot slip between.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -363,7 +335,6 @@ describe('a member editing their stay', () => {
   })
 
   it('accepts a single date that does not invert it', async () => {
-    // The passing sibling: the condition must not refuse an ordinary edit.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -431,8 +402,6 @@ describe('a member editing their stay', () => {
   })
 
   it('answers 404 for a burn that has ended, and for one that never existed', async () => {
-    // A stay at a finished burn is the record of it, not a form. Both get the same
-    // answer, so that an id cannot be probed for existence.
     const server = await build()
     const gone = await givenEvent({ start_date: '2025-08-01', end_date: '2025-08-05', slug: 'gone' })
     const member = await givenMember()
@@ -493,7 +462,6 @@ describe('picking somewhere to sleep', () => {
   })
 
   it('refuses one that is already full', async () => {
-    // A disabled `<option>` is presentation; the API takes what it is sent.
     const server = await build()
     const eventId = await givenEvent()
     const first = await givenMember()
@@ -506,16 +474,12 @@ describe('picking somewhere to sleep', () => {
     const response = await pick(server, second.cookie, eventId, bed)
 
     expect(response.statusCode).toBe(409)
-    // The code and the slug travel together; a 409 carrying `bad_request` would
-    // tell a client one thing in the status and another in the body.
     expect(response.json()).toEqual({ error: 'conflict' })
     const [row] = await db().select().from(attendance).where(eq(attendance.account_id, second.id))
     expect(row?.lodging_option_id).toBeNull()
   })
 
   it('lets someone re-save the option they are already in', async () => {
-    // Their own choice must not count against them, or editing an unrelated
-    // field would refuse the bed they are already sleeping in.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -527,7 +491,6 @@ describe('picking somewhere to sleep', () => {
   })
 
   it('lets as many in as like when there is no limit', async () => {
-    // The passing sibling: the check must refuse a full option, not every option.
     const server = await build()
     const eventId = await givenEvent()
     const first = await givenMember()
@@ -555,9 +518,6 @@ describe('picking somewhere to sleep', () => {
   })
 
   it('refuses an option belonging to another burn', async () => {
-    // The select cannot offer it, but the API takes what it is sent. Without the
-    // event filter the id resolves, has no capacity for this burn, and is quietly
-    // accepted.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -664,8 +624,6 @@ describe('what someone will help with', () => {
   })
 
   it('refuses a lodging option ticked as a thing to help with', async () => {
-    // The checkboxes only offer the helping list, but the API takes what it is
-    // sent — and a bed is not a chore.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -702,8 +660,6 @@ describe('what someone will help with', () => {
   })
 
   it('writes nothing at all when a tick is refused', async () => {
-    // The form sends the columns and the ticks in one PATCH. Validating the ticks
-    // after the column update answers 400 with the notes already saved.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -740,8 +696,6 @@ describe('what someone will help with', () => {
   })
 
   it('lets an admin remove an option someone ticked, unlike a bed', async () => {
-    // Nobody is displaced by "kitchen" ceasing to be offered, so this cascades
-    // where lodging refuses.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -761,10 +715,6 @@ describe('what someone will help with', () => {
 })
 
 describe('a helping option that vanishes mid-save', () => {
-  // The window `stayProblem` cannot close: an admin deletes a chore between
-  // the pre-check and the write. `inject` serialises requests, so the HTTP route
-  // cannot open it — `writeStay` is exported and driven directly instead, which
-  // is the same code the route runs.
   const givenSauna = async (eventId: string) => {
     const id = randomUUID()
     await db()
@@ -774,9 +724,6 @@ describe('a helping option that vanishes mid-save', () => {
   }
 
   const stayOf = (eventId: string, accountId: string) => {
-    // `and` is typed `SQL | undefined` however many conditions it is given, and
-    // `writeStay` takes a definite one — an unfiltered `UPDATE` on `attendance` is
-    // exactly what its own guard refuses.
     const where = and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId))
     if (where === undefined) throw new Error('unreachable: two conditions')
 
@@ -802,8 +749,6 @@ describe('a helping option that vanishes mid-save', () => {
       }
     })()
 
-    // The route answers 400 on exactly this predicate, so asserting it is what
-    // ties the rollback to the answer the member gets.
     expect(isForeignKeyViolation(thrown)).toBe(true)
 
     const [row] = await db().select().from(attendance).where(eq(attendance.id, stay))
@@ -812,8 +757,6 @@ describe('a helping option that vanishes mid-save', () => {
   })
 
   it('writes both halves when the option is still there', async () => {
-    // The passing sibling: the rollback must mean the option vanished, not that
-    // saving columns and ticks together fails generally.
     await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -828,8 +771,6 @@ describe('a helping option that vanishes mid-save', () => {
   })
 
   it('takes the ticks with the stay when someone withdraws', async () => {
-    // The other side of the cascade. The option side is covered in
-    // `roster.test.ts`; nothing covered this one.
     await build()
     const eventId = await givenEvent()
     const member = await givenMember()
@@ -866,8 +807,6 @@ describe('the allergy ticks on a profile', () => {
   })
 
   it('replaces the whole set rather than adding to it', async () => {
-    // The form sends every box it is showing, so a delta would need the client to
-    // know what it had before in order to say what changed.
     const server = await build()
     const ada = await givenMember()
     await patchProfile(server, ada.cookie, { allergy_item_ids: [LACTOSE, VEGAN] })
@@ -878,8 +817,6 @@ describe('the allergy ticks on a profile', () => {
   })
 
   it('leaves the ticks alone when the body does not mention them', async () => {
-    // The passing sibling: treating an absent field as an empty set would wipe
-    // somebody's allergies every time they fixed a typo in their name.
     const server = await build()
     const ada = await givenMember()
     await patchProfile(server, ada.cookie, { allergy_item_ids: [LACTOSE] })
@@ -890,8 +827,6 @@ describe('the allergy ticks on a profile', () => {
   })
 
   it('refuses an id that is not an allergy item, and saves nothing at all', async () => {
-    // Asked before the columns are written: the form sends both in one PATCH, so a
-    // late refusal would answer 400 over a name that did change.
     const server = await build()
     const ada = await givenMember({ name: 'Ada' })
 
@@ -916,9 +851,6 @@ describe('the allergy ticks on a profile', () => {
 
 describe('an allergy item deleted while somebody is saving', () => {
   it('is a foreign key violation, which is why the write needs catching', () => {
-    // The window the pre-check cannot close: an admin removes the item between
-    // the request arrives and the write. This is what reaches the route when that
-    // happens — `updateMyStay` answers 400 for the identical race.
     return build().then(async () => {
       const ada = await givenMember()
 
@@ -931,8 +863,6 @@ describe('an allergy item deleted while somebody is saving', () => {
   })
 
   it('rolls the name back when the ticks are refused', async () => {
-    // Both halves are one transaction, so neither survives being told no — which is
-    // also why catching the violation and answering 400 saves nothing either.
     const server = await build()
     const ada = await givenMember({ name: 'Ada' })
 
@@ -1005,8 +935,6 @@ describe('an introduction on the burns somebody is coming to', () => {
   })
 
   it('says nothing for a save that did not touch the introduction', async () => {
-    // The entry count alone cannot fail this: `introduced` coalesces, so a redundant announce
-    // leaves one row with the same body either way. What tells them apart is the bell (#449).
     const server = await build()
     const member = await givenMember({ name: 'Ada' })
     const other = await givenMember({ name: 'Bea' })

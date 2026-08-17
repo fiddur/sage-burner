@@ -5,7 +5,6 @@ import type { BadgeCanvas } from './favicon.ts'
 
 import { badgeSpot, composeBadged, markFavicon } from './favicon.ts'
 
-/** A canvas that records what was asked of it rather than drawing anything. */
 const fakeCanvas = (context: Partial<CanvasRenderingContext2D> | null = {}) => {
   const calls: string[] = []
   const recorder = {
@@ -22,9 +21,6 @@ const fakeCanvas = (context: Partial<CanvasRenderingContext2D> | null = {}) => {
     ...context,
   }
 
-  // Assigning `width` throws away everything drawn, which is what a real canvas
-  // does — and the only reason the sizing has to come first. A plain property here
-  // would let a test claim to pin that ordering while passing either way.
   let width = 0
   let height = 0
 
@@ -54,14 +50,10 @@ const anImage = {} as CanvasImageSource
 
 describe('where the dot goes on a canvas', () => {
   it('lands where the SVG puts it, at the mark’s own size', () => {
-    // 64 is the badge's own square, so at that size the numbers pass through
-    // untouched — this is where they are pinned, now that nothing else states them.
     expect(badgeSpot(64)).toEqual({ x: 50, y: 16, radius: 13, stroke: 3 })
   })
 
   it('scales with the canvas rather than staying put', () => {
-    // A favicon drawn at 128 with a dot placed for 64 would sit at the middle of the
-    // image instead of its corner.
     expect(badgeSpot(128)).toEqual({ x: 100, y: 32, radius: 26, stroke: 6 })
     expect(badgeSpot(32)).toEqual({ x: 25, y: 8, radius: 6.5, stroke: 1.5 })
   })
@@ -69,7 +61,6 @@ describe('where the dot goes on a canvas', () => {
 
 describe('composing the tab icon', () => {
   it('draws the icon first and the dot on top of it', () => {
-    // The order is the point: a dot under the icon is a dot nobody sees.
     const { canvas, calls, recorder } = fakeCanvas()
 
     expect(composeBadged(anImage, canvas)).toBe('data:image/png;base64,drawn')
@@ -79,9 +70,6 @@ describe('composing the tab icon', () => {
   })
 
   it('sizes the canvas before it draws, or the drawing is wiped', () => {
-    // Assigning `width` resets a canvas — the fake above does too. Sizing it after
-    // `drawImage` throws the icon away and leaves the dot alone on a transparent
-    // square, so what pins the ordering is that the icon is still in `calls`.
     const { canvas, calls } = fakeCanvas()
 
     composeBadged(anImage, canvas)
@@ -92,8 +80,6 @@ describe('composing the tab icon', () => {
   })
 
   it('answers with nothing when the browser gives no 2D context', () => {
-    // Nothing rather than a broken data URL: the caller keeps the plain icon it set
-    // first, which is the whole failure story.
     const { canvas } = fakeCanvas(null)
 
     expect(composeBadged(anImage, canvas)).toBeUndefined()
@@ -103,30 +89,23 @@ describe('composing the tab icon', () => {
 describe('the tab’s icon link', () => {
   const ICON = apiRoutes.getInstallationIcon.path()
 
-  /** An image that never loads, which is what happy-dom does with a real one. */
   const neverLoads = () => new Promise<HTMLImageElement | undefined>(() => undefined)
 
   const link = () => document.head.querySelector<HTMLLinkElement>('link#app-favicon')
 
   it('points at the installation’s own icon, not at a mark of its own', () => {
-    // Whatever the admin uploaded, or the app's flame when nothing is — the route
-    // answers either way, so there is no unset case here to branch on.
     markFavicon(false, { load: neverLoads })
 
     expect(link()?.getAttribute('href')).toBe(ICON)
   })
 
   it('shows that icon straight away even while something is waiting', () => {
-    // Synchronous and first: composing needs a fetch, and the tab must not sit blank
-    // — nor wear the wrong mark — while that happens.
     markFavicon(true, { load: neverLoads })
 
     expect(link()?.getAttribute('href')).toBe(ICON)
   })
 
   it('draws the dot onto it once the icon has loaded', async () => {
-    // The half that had no test at all: happy-dom fires neither `load` nor `error`
-    // on a real image, so injecting the loader is what makes this reachable.
     markFavicon(true, {
       load: () => Promise.resolve({} as HTMLImageElement),
       canvas: () => fakeCanvas().canvas,
@@ -135,9 +114,6 @@ describe('the tab’s icon link', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    // The fake canvas's own output, not merely "something other than the route":
-    // `link()?.…` yields `undefined` when there is no link at all, so a `not.toBe`
-    // passes on a page with no favicon.
     expect(link()?.getAttribute('href')).toBe('data:image/png;base64,drawn')
   })
 
@@ -151,8 +127,6 @@ describe('the tab’s icon link', () => {
   })
 
   it('does not let a slow drawing land after the cleanup that cancelled it', async () => {
-    // The one piece with a described failure mode: without the guard, a dot arrives
-    // on a tab that has nothing waiting any more.
     let settle: (image: HTMLImageElement | undefined) => void = () => undefined
     const restore = markFavicon(true, {
       load: () => new Promise((resolve) => (settle = resolve)),
@@ -182,8 +156,6 @@ describe('the tab’s icon link', () => {
   })
 
   it('reuses the one link rather than stacking a new one per change', () => {
-    // Two `rel="icon"` links leave it to the browser which wins, which is how the
-    // first attempt at #285 came out inert.
     markFavicon(false, { load: neverLoads })
     markFavicon(true, { load: neverLoads })
     markFavicon(false, { load: neverLoads })

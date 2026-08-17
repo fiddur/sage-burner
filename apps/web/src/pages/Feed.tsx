@@ -263,8 +263,6 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   })
   const members = everybody.status === 'ready' ? everybody.data : []
 
-  // Whom a comment can name depends on the card: the burn's attendance for a burn's card, and
-  // every approved account for one that belongs to no burn — `namedBy` drops the rest silently.
   const mentionable = (card: Thread): readonly Mentionable[] => {
     if (card.entity_type === 'song') return members
 

@@ -42,8 +42,6 @@ describe('cropping a picture to the card', () => {
   })
 
   it('never asks for pixels the picture does not have', () => {
-    // Drawing outside the source is what produces a transparent band down one side —
-    // and in a JPEG that band comes out black.
     for (const [width, height] of [
       [800, 600],
       [600, 800],

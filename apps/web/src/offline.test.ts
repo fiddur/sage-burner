@@ -18,12 +18,6 @@ describe('registering the worker', () => {
   })
 
   it('says nothing when the browser has no workers', () => {
-    // An insecure context, or a browser with them turned off. The app works; it just
-    // will not work offline, and a message about that helps nobody.
-    //
-    // An explicit `undefined` *triggers* the default parameter rather than bypassing
-    // it, so what this actually exercises is the real `navigator.serviceWorker` —
-    // absent in happy-dom, which is the only reason it takes the no-worker branch.
     expect(() => registerServiceWorker(undefined)).not.toThrow()
   })
 
@@ -49,9 +43,6 @@ describe('forgetting member data on the way out', () => {
   })
 
   it('leaves the app itself installed', async () => {
-    // The two caches exist to be treated differently: dropping the shell would mean
-    // the next person to open this offline gets nothing at all, and none of it is
-    // anybody's data.
     const deleted: string[] = []
     await forgetCachedMemberData({
       delete: (name: string) => {
@@ -72,8 +63,6 @@ describe('forgetting member data on the way out', () => {
   })
 
   it('is content with a browser that has no cache storage', async () => {
-    // As above: the explicit `undefined` reaches the default, so this rides on
-    // happy-dom having no `caches`.
     await expect(forgetCachedMemberData(undefined)).resolves.toBe(false)
   })
 })

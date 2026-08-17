@@ -75,8 +75,6 @@ describe('somebody’s page', () => {
   })
 
   it('offers a copy instead where the network has no page to point at', async () => {
-    // Discord: a username is a string you paste into Discord's own search, so an anchor
-    // would go nowhere. This is why the vocabulary lets a kind answer with no address.
     show(stub(aPerson({ connections: [aWay({ id: 'c-1', kind: 'discord', value: 'wren' })] })))
 
     expect(await screen.findByText('wren')).toBeTruthy()
@@ -85,8 +83,6 @@ describe('somebody’s page', () => {
   })
 
   it('names a link with the text it shows, so voice control can address it', async () => {
-    // WCAG 2.5.3: an accessible name that drops the visible text cannot be spoken. The
-    // name still says whose it is, because a page of "wren" links needs telling apart.
     show(stub(aPerson({ connections: [aWay({ id: 'c-1', kind: 'messenger', value: 'wren' })] })))
 
     const link = await screen.findByRole('link', { name: /Messenger/ })
@@ -95,14 +91,12 @@ describe('somebody’s page', () => {
   })
 
   it('says "this person" rather than "them" where a name would go possessive', async () => {
-    // `them` reads well in prose and not at all in "Copy them’s Discord".
     show(stub(aPerson({ name: null, connections: [aWay({ id: 'c-1', kind: 'discord', value: 'wren' })] })))
 
     expect(await screen.findByRole('button', { name: 'Copy this person’s Discord' })).toBeTruthy()
   })
 
   it('writes an email as a mailto, which is what the list is for', async () => {
-    // Not `account.email`: this is the address they typed and chose to publish (#159).
     show(stub(aPerson({ connections: [aWay({ id: 'c-1', kind: 'email', value: 'wren@example.org' })] })))
 
     expect((await screen.findByRole('link', { name: /Email/ })).getAttribute('href')).toBe(
@@ -150,8 +144,6 @@ describe('somebody’s page', () => {
   })
 
   it('draws what they wrote about themselves, as markdown, above the ways to reach them', async () => {
-    // #390: the answer to "who is this", which is the question a name somebody has not met
-    // raises before "how do I contact them".
     show(stub(aPerson({ introduction: '## Wren\n\nI make **fire**.' })))
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Wren' })).toBeTruthy()
@@ -159,9 +151,6 @@ describe('somebody’s page', () => {
   })
 
   it('escapes markup somebody pasted in rather than rendering it', async () => {
-    // The field most likely to be pasted into from a rich-text editor, and the one place
-    // where every member is an untrusted author of prose other members read. `markdown.ts`
-    // escapes raw HTML rather than filtering it — this pins that it reaches here.
     show(stub(aPerson({ introduction: '<img src=x onerror="alert(1)"> and <b>bold</b>' })))
 
     await screen.findByRole('heading', { level: 1, name: /Wren Aldertide/ })
@@ -181,12 +170,10 @@ describe('somebody’s page', () => {
     })
 
     expect(drawn.getAttribute('src')).toBe('/api/images/img-1')
-    // A page of somebody's photographs is a lot of bytes; nothing is fetched until it is near.
     expect(drawn.getAttribute('loading')).toBe('lazy')
   })
 
   it('invites the person whose page it is to write one, and says plainly when it is not theirs', async () => {
-    // The prompt matters more than the field: this only works if people fill it in.
     show(stub(aPerson({ account_id: 'a-1', introduction: null })), 'a-1')
 
     expect(await screen.findByText(/You have not written anything about yourself yet/)).toBeTruthy()
@@ -202,7 +189,6 @@ describe('somebody’s page', () => {
   })
 
   it('draws their Facebook page beside the name, not among the ways to reach them', async () => {
-    // It is not a way of being reached — Messenger is that, and it is a row like any other.
     show(stub(aPerson({ facebook: 'https://facebook.com/wren' })))
 
     const link = await screen.findByRole('link', { name: /on Facebook/ })
@@ -225,8 +211,6 @@ describe('somebody’s page', () => {
   })
 
   it('passes the server’s own refusal through, which says what happened', async () => {
-    // `errorMessage` prefers an `ApiError`'s message because the client already mapped the
-    // status into something a member can read; the fallback is for what never got there.
     show(
       stub(aPerson(), {
         getAccountProfile: () => Promise.reject(apiError(404, 'not_found', 'That is not here.')),

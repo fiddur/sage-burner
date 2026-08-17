@@ -5,7 +5,6 @@ import { HelperStrip } from './HelperStrip.tsx'
 
 afterEach(cleanup)
 
-// `avatar` is when the picture last changed; null draws the initials circle.
 const ADA = { account_id: 'a-1', name: 'Ada', avatar: null }
 const BEA = { account_id: 'a-2', name: 'Bea', avatar: '2026-08-01T00:00:00.000Z' }
 const CAI = { account_id: 'a-3', name: 'Cai', avatar: null }
@@ -29,8 +28,6 @@ const vacancies = () => [...document.querySelectorAll('.helper-vacancy')]
 
 describe('HelperStrip', () => {
   it('draws each person as a face beside their name (#301)', () => {
-    // Bea has a picture, so hers is an `<img>` at the avatar route; Ada has none and
-    // gets the initials circle, so a list is the same height either way.
     strip({ people: [ADA, BEA] })
 
     const badges = [...document.querySelectorAll('.person-badge')]
@@ -43,16 +40,12 @@ describe('HelperStrip', () => {
   })
 
   it('finds the face in `everyone`, not in `candidates`', () => {
-    // Somebody already on the list is filtered out of `candidates` by definition, so
-    // looking there would draw initials for everyone who had taken a spot.
     strip({ people: [BEA], candidates: [] })
 
     expect(document.querySelector('.person-badge img')).not.toBeNull()
   })
 
   it('falls back to the initials circle for somebody it has no face for', () => {
-    // A person on the list who is no longer among the burn's attendees. The badge is
-    // still a badge — the alternative was a bare name, half a row shorter.
     strip({ people: [BEA], everyone: [] })
 
     const badge = document.querySelector('.person-badge')
@@ -64,16 +57,12 @@ describe('HelperStrip', () => {
   it('shows a row per place still wanted', () => {
     strip({ people: [ADA], wanted: 3, viewerId: 'a-3' })
 
-    // Two short of three, and the buttons sit on the first of those rather than on
-    // a row of their own — an extra row appears only when nothing is short.
     expect(vacancies()).toHaveLength(2)
     expect(screen.getAllByText('wanted')).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'Take the spot on the sauna' })).toBeTruthy()
   })
 
   it('still offers a place when the count is met', () => {
-    // #27's rule: the offer outlives the count, because a pair of hands is not a
-    // bed. The row is there, and it does not claim anybody is wanted.
     strip({ people: [ADA, BEA], wanted: 2, viewerId: 'a-3' })
 
     expect(vacancies()).toHaveLength(1)
@@ -82,7 +71,6 @@ describe('HelperStrip', () => {
   })
 
   it('offers a place where nobody has counted at all', () => {
-    // A dream's helpers and a meal's crew have no wanted number.
     strip({ people: [], viewerId: 'a-3' })
 
     expect(vacancies()).toHaveLength(1)
@@ -90,8 +78,6 @@ describe('HelperStrip', () => {
   })
 
   it('puts the buttons on the first empty row and nowhere else', () => {
-    // Slots are interchangeable, so one pair of controls fills the next free place
-    // and the rows below are pure count.
     strip({ people: [], wanted: 4, viewerId: 'a-3' })
 
     expect(screen.getAllByRole('button', { name: 'Take the spot on the sauna' })).toHaveLength(1)
@@ -111,8 +97,6 @@ describe('HelperStrip', () => {
     strip({ people: [ADA], viewerId: 'a-1' })
 
     expect(screen.queryByRole('button', { name: 'Take the spot on the sauna' })).toBeNull()
-    // Appointing somebody else is still there — being on it does not stop you
-    // putting a second pair of hands up for it.
     expect(screen.getByRole('button', { name: 'Appoint someone to the sauna' })).toBeTruthy()
   })
 
@@ -182,8 +166,6 @@ describe('HelperStrip', () => {
   })
 
   it('says what it means on a phone, not only on hover', () => {
-    // `title` is a desktop tooltip and nothing at all to a thumb or a screen
-    // reader, so the meaning is in the accessible name as well.
     strip({ viewerId: 'a-3' })
 
     const hand = screen.getByRole('button', { name: 'Take the spot on the sauna' })

@@ -58,11 +58,8 @@ const stub = (over: Partial<PlacesApi> = {}, places: Place[] = THREE): PlacesApi
   ...over,
 })
 
-/** The selector's view of the same burn, so the two cannot describe different ones. */
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
-// the default, so "no burn" written that way silently rendered the usual one.
 const renderPage = (api: PlacesApi, viewer: Viewer = ADMIN, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -110,8 +107,6 @@ describe('Places', () => {
   })
 
   it('refuses to add one without a name or an emoji, rather than letting the server say no', async () => {
-    // `aria-required`, not `required`, so the browser does not block the submit
-    // before this message can be shown.
     const addPlace = vi.fn<PlacesApi['addPlace']>(() =>
       Promise.resolve({ place: aPlace({ id: 'p-4', name: 'x' }) }),
     )
@@ -173,8 +168,6 @@ describe('Places', () => {
     const reorderPlaces = vi.fn<PlacesApi['reorderPlaces']>(() => Promise.resolve({ places: THREE }))
     renderPage(stub({ reorderPlaces }))
 
-    // By name, not by position: every row now carries three controls — the handle
-    // and the two buttons — so the third `/^Move /` button is the first row's ↓.
     const handle = await screen.findByRole('button', { name: 'Move Front Lawn' })
     const rows = document.querySelectorAll('.reorder-row')
 
@@ -186,9 +179,6 @@ describe('Places', () => {
   })
 
   it('moves a row with the buttons, which is the only way on a phone', async () => {
-    // HTML5 drag-and-drop does not fire for touch at all, so a list with a handle
-    // and nothing else cannot be reordered on the device half of this is read on
-    // (#146).
     const reorderPlaces = vi.fn<PlacesApi['reorderPlaces']>(() => Promise.resolve({ places: THREE }))
     renderPage(stub({ reorderPlaces }))
 
@@ -198,8 +188,6 @@ describe('Places', () => {
   })
 
   it('offers no way past either end', async () => {
-    // The passing sibling for the guard: disabled says what the control will do,
-    // rather than doing nothing when pressed.
     renderPage(stub())
 
     expect((await screen.findByRole('button', { name: 'Move Temple up' })).hasAttribute('disabled')).toBe(
@@ -221,8 +209,6 @@ describe('Places', () => {
   })
 
   it('reorders from the keyboard, so a mouse is not required', async () => {
-    // The handle is the keyboard route as well as the drag one. A reorder only
-    // a pointer can do is one some people here cannot do at all.
     const reorderPlaces = vi.fn<PlacesApi['reorderPlaces']>(() => Promise.resolve({ places: THREE }))
     renderPage(stub({ reorderPlaces }))
 
@@ -274,7 +260,6 @@ describe('Places', () => {
   })
 
   it('offers nothing to a signed-in account with no roles', async () => {
-    // An applicant checking on their application has an account and no roles.
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: THREE }))
     renderPage(stub({ getPlaces }), {
       status: 'signed-in',
@@ -286,7 +271,6 @@ describe('Places', () => {
   })
 
   it('offers the lanes to a member who is not an admin', async () => {
-    // The point of #155: this is not an admin page any more.
     renderPage(stub(), {
       status: 'signed-in',
       account: { id: 'a-2', name: null, avatar: null, roles: ['member'] },
@@ -296,7 +280,6 @@ describe('Places', () => {
   })
 
   it('asks the open burn for its own lanes, not for a global list', async () => {
-    // The point of #156.
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: THREE }))
     renderPage(stub({ getPlaces }))
 
@@ -310,7 +293,6 @@ describe('Places', () => {
 
     expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
     expect(getPlaces).not.toHaveBeenCalled()
-    // No form either: it would take a name and have nowhere to put it.
     expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull()
   })
 

@@ -42,12 +42,6 @@ const db = () => {
   return found
 }
 
-/**
- * The burn, and the address its feed answers at (#408).
- *
- * A token rather than the id, and written here rather than left to the route, because these
- * rows skip `createEvent` — which is what mints one in the app.
- */
 const givenEvent = async (name = 'Summer burn') => {
   const id = randomUUID()
   await db()
@@ -86,12 +80,6 @@ const givenHost = async () => {
   return id
 }
 
-/**
- * The host's place at the burn, made once.
- *
- * A dream's facilitator is an `attendance` since #23, and one host may offer several
- * dreams at the same burn — where a second row would hit the one-per-person index.
- */
 const comingTo = async (eventId: string, accountId: string) => {
   const [existing] = await db()
     .select({ id: attendance.id })
@@ -127,8 +115,6 @@ const givenDream = async (
       title: over.title ?? 'Cacao ceremony',
       facilitator_attendance_id: await comingTo(eventId, hostId),
       description: over.description ?? 'Bring a cup.',
-      // `in` rather than `??`: a deliberate null is the whole point of the
-      // unscheduled case, and `null ?? default` quietly schedules it again.
       time_slot_start: 'time_slot_start' in over ? over.time_slot_start : '2026-08-02T18:00:00.000Z',
       time_slot_end: 'time_slot_end' in over ? over.time_slot_end : '2026-08-02T20:00:00.000Z',
       place_id: over.place_id ?? null,
@@ -167,8 +153,6 @@ const feed = (server: FastifyInstance, eventId: string) =>
 
 describe('the public calendar feed', () => {
   it('answers nothing at the burn’s id, which the public homepage gives away', async () => {
-    // The bug (#408): keyed by `event.id`, this was readable by any stranger who loaded
-    // `/`, because `/api/events/active` is unguarded and answers the whole row.
     const server = await build()
     const eventId = await givenEvent()
 
@@ -227,8 +211,6 @@ describe('the public calendar feed', () => {
   })
 
   it('leaves out a dream nobody has scheduled', async () => {
-    // The acceptance criterion of #20: an unscheduled dream is valid and does
-    // not belong in a calendar.
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenHost()
@@ -242,9 +224,6 @@ describe('the public calendar feed', () => {
   })
 
   it('carries a dream with no place at all, rather than dropping it', async () => {
-    // The passing sibling of the LOCATION test: a scheduled dream is in the
-    // programme whether or not anyone has decided where it happens. The left
-    // join is what makes that true, and an inner one would silently lose it.
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenHost()
@@ -288,24 +267,12 @@ describe('the public calendar feed', () => {
   })
 
   it('leaks no member detail whatsoever', async () => {
-    // The acceptance criterion, asserted against the rendered feed rather than
-    // the query, so a join added later cannot widen it quietly.
-    //
-    // It is a denylist, and a denylist only catches what someone thought of — so
-    // it is seeded with every field the fixtures above carry, and adding a column
-    // to `account` or `attendance` means adding it here too. The structural guard
-    // is elsewhere: `schemas.test.ts` pins the exact key set of
-    // `publicSessionFields`, which fails when a field is added rather than when
-    // one leaks.
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenHost()
     const temple = await givenPlace(eventId)
     await givenDream(eventId, host, { place_id: temple })
 
-    // Filled in rather than inserted: a facilitator *is* an attendance since #23, so
-    // offering the dream already made the row. This is everything on it a feed must
-    // never repeat.
     await db()
       .update(attendance)
       .set({
@@ -338,10 +305,6 @@ describe('the public calendar feed', () => {
   })
 
   it('strips a field the public shape does not name, even when the query selects it', async () => {
-    // The guard rail, exercised rather than merely declared. `publicSessionSchema`
-    // strips what it does not know, so widening the select cannot widen the feed
-    // — a field has to be added to that schema too, and `schemas.test.ts` fails
-    // when one is.
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenHost()
@@ -379,9 +342,6 @@ describe('the public calendar feed', () => {
   })
 
   it('renders a winter burn at the same instant as a summer one', async () => {
-    // The DST case #21 asks for. Both are emitted in UTC, so the server's own
-    // timezone never reaches the output — an October burn is the one where a
-    // local-time renderer would drift by an hour.
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenHost()

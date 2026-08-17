@@ -13,14 +13,6 @@ import { createRemembered, RememberedProvider } from './remembered.tsx'
 
 afterEach(cleanup)
 
-/**
- * The hooks are exercised through a component rather than called directly.
- *
- * `renderHook` would test them in isolation from the thing they exist to fix —
- * effects re-running, a result arriving after unmount, a second click landing while
- * the first is in flight. Those are all render-time behaviours.
- */
-
 const Loader = ({
   fetcher,
   enabled,
@@ -80,7 +72,6 @@ const Actor = ({
   )
 }
 
-/** Two rows, so a click on the second while the first is in flight has somewhere to go. */
 const Rows = ({ work }: { work: () => Promise<unknown> }) => {
   const { busy, busyWith, run } = useAction()
 
@@ -97,12 +88,6 @@ const Rows = ({ work }: { work: () => Promise<unknown> }) => {
   )
 }
 
-/**
- * A page that re-reads after a write, which is every page with a guarded write.
- *
- * The point of the pairing: `busy` has to hold until the re-read has landed, or the
- * controls come back live against the data the write has already changed.
- */
 const Page = ({ fetcher, work }: { fetcher: () => Promise<string>; work: () => Promise<unknown> }) => {
   const { loaded, reload } = useLoad(fetcher, { fallback: 'Could not load it.' })
   const { busy, run } = useAction(reload)
@@ -131,8 +116,6 @@ describe('useLoad', () => {
   })
 
   it('keeps the failure message rather than showing an empty page', async () => {
-    // One page's own `Loaded` union had dropped the message, so its load failures
-    // rendered as nothing at all. That is the drift this hook exists to end.
     render(<Loader fetcher={() => Promise.reject(apiError(500, 'internal', 'Something went wrong.'))} />)
 
     await waitFor(() => {
@@ -164,9 +147,6 @@ describe('useLoad', () => {
   })
 
   it('does not refetch when the caller rebuilds the fetcher on every render', async () => {
-    // Callers write `() => api.getThing(signal)` inline, which is a new function
-    // each render. Depending on it would refetch in a loop; this is what makes the
-    // ref load-bearing rather than tidiness.
     const fetcher = vi.fn(() => Promise.resolve('once'))
     const { rerender } = render(<Loader fetcher={() => fetcher()} />)
 
@@ -180,11 +160,6 @@ describe('useLoad', () => {
   })
 
   it('refetches when the key changes, which the fetcher itself cannot say', async () => {
-    // Every burn-scoped page passes the selected burn's id. Without this the ref
-    // that stops a rebuilt fetcher from refetching would also stop the *selector*
-    // from doing anything: one burn's grid would stay on screen under another's
-    // name. Verified by removing `key` from the dependency list — nothing else in
-    // the suite noticed.
     const fetcher = vi.fn(() => Promise.resolve('a burn'))
     const { rerender } = render(<Loader fetcher={() => fetcher()} loadKey="e-1" />)
 
@@ -200,8 +175,6 @@ describe('useLoad', () => {
   })
 
   it('does not refetch when the key stays the same', async () => {
-    // The passing sibling: what re-runs the effect is the key *changing*, not the
-    // option being present.
     const fetcher = vi.fn(() => Promise.resolve('a burn'))
     const { rerender } = render(<Loader fetcher={() => fetcher()} loadKey="e-1" />)
 
@@ -216,8 +189,6 @@ describe('useLoad', () => {
   })
 
   it('uses the newest fetcher when it does reload', async () => {
-    // The ref must not pin the first one: a page whose fetcher closes over an id
-    // would go on asking for the old one after a reload.
     const first = vi.fn(() => Promise.resolve('first'))
     const second = vi.fn(() => Promise.resolve('second'))
     const { rerender } = render(<Loader fetcher={first} />)
@@ -240,7 +211,6 @@ describe('useLoad', () => {
     expect(fetcher).not.toHaveBeenCalled()
     expect(stateText()).toBe('loading')
 
-    // The viewer resolving to a member is exactly this flip.
     rerender(<Loader fetcher={fetcher} enabled />)
 
     await waitFor(() => {
@@ -249,11 +219,6 @@ describe('useLoad', () => {
   })
 
   it('does not let a superseded request overwrite a newer answer', async () => {
-    // The observable half of the abort check. An unmount test proves nothing here —
-    // a `setState` on an unmounted Preact component is a silent no-op whether or not
-    // the guard is there, so it passes against an implementation with no guard at
-    // all. This is the case that actually goes wrong: a slow first request landing
-    // after a reload has already been answered, putting stale data back on screen.
     const settlers: ((value: string) => void)[] = []
     render(<Loader fetcher={() => new Promise<string>((resolve) => settlers.push(resolve))} />)
 
@@ -316,8 +281,6 @@ describe('coming back to a page', () => {
     })
     cleanup()
 
-    // Back again, against a fetch that has not answered yet. Without the store this
-    // frame reads "loading" — mutation-checked by dropping `remember` below.
     held(
       remembered,
       <Loader fetcher={() => new Promise<string>((resolve) => (settle = resolve))} remember="members" />,
@@ -359,8 +322,6 @@ describe('coming back to a page', () => {
       expect(stateText()).toBe('summer')
     })
 
-    // The burn selector, with the second burn's fetch still in flight. Summer's grid
-    // must not be what winter is drawn as.
     rerender(
       <RememberedProvider remembered={remembered}>
         <Loader fetcher={() => new Promise<string>(() => undefined)} loadKey="e-2" remember="schedule" />
@@ -405,8 +366,6 @@ describe('useAction', () => {
   })
 
   it('refuses a second click while the first is in flight', async () => {
-    // True of one of the four copies this replaces and not the others, so a double
-    // click on those sent the request twice.
     let settle: () => void = () => undefined
     const work = vi.fn(() => new Promise<void>((resolve) => (settle = resolve)))
     render(<Actor work={work} />)
@@ -431,9 +390,6 @@ describe('useAction', () => {
   })
 
   it('stays busy until the re-read it started has landed', async () => {
-    // Otherwise the controls come back live against data the write has already
-    // changed — and a second click computes its body from the row on screen, which is
-    // the pre-write one. `Admin`'s role toggle wrote the earlier grant away that way.
     let answer: (value: string) => void = () => undefined
     const fetcher = vi.fn(() => new Promise<string>((resolve) => (answer = resolve)))
     render(<Page fetcher={fetcher} work={() => Promise.resolve()} />)
@@ -453,9 +409,6 @@ describe('useAction', () => {
   })
 
   it('marks the row it actually started, not the one that was refused', async () => {
-    // The refused click used to set the page's own `deciding` on its row, which then
-    // showed as busy until the *first* action cleared it — feedback for something that
-    // was never going to happen.
     let settle: () => void = () => undefined
     render(<Rows work={() => new Promise<void>((resolve) => (settle = resolve))} />)
 
@@ -509,8 +462,6 @@ describe('useAction', () => {
   })
 
   it('lets a page map a particular status to particular words', async () => {
-    // A 409 on "say you are coming" means the burn is full, which is worth saying
-    // rather than "that did not work".
     render(
       <Actor
         work={() => Promise.reject(apiError(409, 'conflict', 'Request failed (409).'))}
@@ -547,9 +498,6 @@ describe('useAction', () => {
 
 describe('an error a form can focus', () => {
   it('counts every attempt, so a repeated identical failure is still a new one', async () => {
-    // What `FormError` keys its focus on. Two identical failures in a row commit the
-    // same string, so a form watching only the message sits out the second — which is
-    // the original symptom returning: tap, read it, tap again, nothing happens.
     render(<Actor work={() => Promise.reject(new Error('nope'))} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Go' }))
@@ -563,8 +511,6 @@ describe('an error a form can focus', () => {
   })
 
   it('counts a message the page writes itself', async () => {
-    // A page's own complaint — "give it a name" — is the same event to a reader as a
-    // refused write, and it arrives through `setError` rather than through `run`.
     const Refusing = () => {
       const { formError, setError } = useAction()
 
@@ -606,8 +552,6 @@ describe('a page others are changing under you', () => {
   })
 
   it('does not, when it was not asked to', async () => {
-    // The passing sibling. Without it, a `live` that was ignored entirely would look
-    // the same as one that works, since every page also loads once on mount.
     let answered = 0
     render(<Loader fetcher={() => Promise.resolve(`load ${(answered += 1)}`)} />)
     await waitFor(() => {
@@ -621,9 +565,6 @@ describe('a page others are changing under you', () => {
   })
 
   it('keeps what is on screen when a background refresh fails', async () => {
-    // Offline the worker answers most of these from its cache, but not before it has
-    // taken control. Replacing a good roster with "could not load" because a poll
-    // nobody asked for missed would be worse than the page it started with.
     let online = true
     render(
       <Loader
@@ -643,8 +584,6 @@ describe('a page others are changing under you', () => {
   })
 
   it('still reports a failure the member asked for', async () => {
-    // The sibling to the one above, and the reason the two attempts are told apart:
-    // pressing Reload and getting silence would look like the button doing nothing.
     let online = true
     render(
       <Loader
@@ -665,7 +604,6 @@ describe('a page others are changing under you', () => {
   })
 
   it('leaves a hidden tab alone', async () => {
-    // A phone in a pocket polling every minute is somebody's battery.
     const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     try {
       let answered = 0
@@ -725,9 +663,6 @@ describe('a form seeded from what was loaded', () => {
   })
 
   it('seeds once per answer, not once per render', async () => {
-    // The reason `seed` lives in a ref: a caller writes it inline, so a new closure
-    // every render would re-seed on every keystroke and take the form away as it was
-    // being filled in.
     render(<Form fetcher={() => Promise.resolve('from the server')} />)
     await waitFor(() => expect(screen.getByTestId('draft').textContent).toBe('from the server'))
 
@@ -780,8 +715,6 @@ describe('errorMessage', () => {
 
 describe('a write refused because somebody else got there first', () => {
   it('re-reads, so "it has been refreshed" is true by the time it is read', async () => {
-    // The reload is `onSuccess` on every page that has one — which is every page
-    // with a guarded write, since they all re-read after a change anyway.
     const reload = vi.fn()
     render(
       <Actor
@@ -799,9 +732,6 @@ describe('a write refused because somebody else got there first', () => {
   })
 
   it('does not re-read for an ordinary failure, which looking again would not fix', async () => {
-    // The passing sibling. Without it the test above would pass against a `catch`
-    // that reloaded on everything — and a 409 "the burn is full" reloaded over would
-    // read as the app doing something about it.
     const reload = vi.fn()
     render(
       <Actor
@@ -829,9 +759,6 @@ describe('a write refused because somebody else got there first', () => {
   })
 
   it('drops it again when the page writes a message of its own', async () => {
-    // `setError` is how a page reports something it worked out itself — an empty
-    // title, say — and leaving the last failure under it would put somebody else's
-    // paragraph beside an unrelated complaint.
     const Both = () => {
       const { error, failure, setError, run } = useAction()
 

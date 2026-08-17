@@ -17,11 +17,6 @@ const PushNudgeContext = createContext<PushNudging>({
   dismiss: () => undefined,
 })
 
-/**
- * Above every place a category is switched on, so the nudge is one strip with one dismissal.
- * Held here rather than in either control because a dismissal pressed on the feed has to silence
- * the one under the settings table too, and state inside a component cannot say that.
- */
 export const PushNudgeProvider = ({ children, store }: { children: ComponentChildren; store?: Storage }) => {
   const [asked, setAsked] = useState(false)
   const [dropped, setDropped] = useState(() => dismissedPushNudge(store))

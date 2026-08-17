@@ -44,10 +44,6 @@ const stub = (
   ...over,
 })
 
-/**
- * The row *is* the link since #568, so its accessible name carries the artist and the marks
- * as well as the title — hence a match rather than an equality, and a read of the title itself.
- */
 const rowFor = (title: string) => screen.getByRole('link', { name: new RegExp(title) })
 
 const titlesShown = () => [...document.querySelectorAll('.song-what')].map((one) => one.textContent)
@@ -109,8 +105,6 @@ describe('the songbook', () => {
   })
 
   it('links each song to its own page, the whole row being the link (#568)', async () => {
-    // The artist and the marks inside the anchor is the whole of it: as siblings they were
-    // dead space in a box the width of the screen.
     renderPage(
       stub({}, [
         aSong({ id: 's-1', title: 'Ashes', artist: 'Zoe', links: [{ url: 'https://example.org/a' }] }),
@@ -159,8 +153,6 @@ describe('the songbook', () => {
   })
 
   it('shows a song filed under either category while either chip is lit', async () => {
-    // The rule the row is shared on (#472): show what matches *any* lit chip. A card on the
-    // feed has one kind, so this is the half only the songbook exercises.
     renderPage(
       stub({}, [
         aSong({ id: 's-1', title: 'Ashes', category_ids: ['c-1', 'c-2'] }),

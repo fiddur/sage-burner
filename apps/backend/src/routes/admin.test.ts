@@ -27,7 +27,6 @@ afterEach(async () => {
   handle = undefined
 })
 
-/** scrypt at a cost a test can afford — #399 has the measurement. */
 const cheap = { cost: 2 ** 12, blockSize: 8, parallelism: 1 }
 
 const build = async () => {
@@ -79,8 +78,6 @@ const rolesOf = async (accountId: string) =>
 
 describe('an admin editing who holds which role', () => {
   it('grants a role an account did not have', async () => {
-    // An account holding `admin` alone — granted here rather than bootstrapped,
-    // since `admin:create` gives both — cannot say it is coming until `member` is added.
     const server = await build()
     const admin = await givenAccount(['admin'])
 
@@ -92,9 +89,6 @@ describe('an admin editing who holds which role', () => {
   })
 
   it('opens the member routes to them, which is the point of doing it', async () => {
-    // Hiding the nav link was never what stopped them. Saying you are coming is the member
-    // half of the app — `/api/me/profile` is the account half and `requireApproved` since
-    // #412, so it no longer tells the two roles apart.
     const server = await build()
     const admin = await givenAccount(['admin'])
     const join = () =>
@@ -108,8 +102,6 @@ describe('an admin editing who holds which role', () => {
 
     await setRoles(server, admin.cookie, admin.id, { roles: ['admin', 'member'] })
 
-    // 404 rather than 201: no such burn. The guard has been passed, which is what is
-    // being asserted — a 403 here would mean the role change bought nothing.
     expect((await join()).statusCode).toBe(404)
   })
 
@@ -125,8 +117,6 @@ describe('an admin editing who holds which role', () => {
   })
 
   it('replaces the whole set rather than adding to it', async () => {
-    // Declarative on purpose: the editor sends what the row now says, so it
-    // cannot express "add admin, forget to remove member".
     const server = await build()
     const admin = await givenAccount(['admin'])
     const someone = await givenAccount(['admin', 'member'])
@@ -157,7 +147,6 @@ describe('an admin editing who holds which role', () => {
   })
 
   it('lets an admin step down once there is another', async () => {
-    // The passing sibling: the guard must refuse the last one, not every one.
     const server = await build()
     const admin = await givenAccount(['admin'])
     await givenAccount(['admin'])
@@ -169,8 +158,6 @@ describe('an admin editing who holds which role', () => {
   })
 
   it('keeps one admin when two step down at the same moment', async () => {
-    // Two admins stepping down together must still leave one. Removing the
-    // last-admin guard fails this as well as the sequential case.
     const server = await build()
     const first = await givenAccount(['admin'])
     const second = await givenAccount(['admin'])
@@ -255,9 +242,6 @@ describe('an admin setting somebody’s password', () => {
     (await db().select().from(account).where(eq(account.id, accountId)))[0]?.email ?? ''
 
   it('lets them sign in with the new one', async () => {
-    // The whole point: there is no other way to change a password once it is set,
-    // so an account whose owner lost it — or one an admin made and did not write
-    // down — had no way back at all.
     const server = await build()
     const admin = await givenAccount(['admin'])
     const someone = await givenAccount(['member'])
@@ -269,8 +253,6 @@ describe('an admin setting somebody’s password', () => {
   })
 
   it('refuses the old one afterwards', async () => {
-    // The passing sibling. A write that added a second hash rather than replacing
-    // the one there would satisfy the test above.
     const server = await build()
     const admin = await givenAccount(['admin'])
     const someone = await givenAccount(['member'])

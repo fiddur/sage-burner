@@ -55,8 +55,6 @@ const stub = (over: Partial<MealsApi> = {}, meals: Meal[] = [aMeal()]): MealsApi
     Promise.resolve({
       attendees: [
         { account_id: 'a-1', name: 'Ada', avatar: null },
-        // A second, so a control offering everybody can be told from one offering only
-        // whoever is already on the sitting.
         { account_id: 'a-2', name: 'Bea', avatar: null },
       ],
     }),
@@ -89,8 +87,6 @@ describe('the meal plan', () => {
   })
 
   it('gives the sitting one column and what is cooked another', async () => {
-    // Six columns were one too many for a phone. When and Meal say one thing between
-    // them, and so do the sitting's name and the idea for it.
     renderPage(stub())
 
     await screen.findByText('Dinner')
@@ -109,7 +105,6 @@ describe('the meal plan', () => {
 
     const when = await screen.findByRole('rowheader')
 
-    // `Sat 1`, not `Saturday 1`: this column is now as narrow as the table gets.
     expect(when.textContent).toBe('Sat 118:00')
   })
 
@@ -152,8 +147,6 @@ describe('the meal plan', () => {
   })
 
   it('writes a food idea when the field is left, not on every keystroke', async () => {
-    // A note several people pass through, so a request per character would be a
-    // request per character.
     const setMealIdea = vi.fn<MealsApi['setMealIdea']>(() => Promise.resolve({ meal: aMeal() }))
     renderPage(stub({ setMealIdea }))
 
@@ -174,11 +167,9 @@ describe('the meal plan', () => {
     expect(
       screen.queryByRole('button', { name: 'Take the spot on Morning cleanup on 2026-08-01' }),
     ).toBeNull()
-    // Nobody may be added to a chore's cooks, so neither button is offered there.
     expect(
       screen.queryByRole('button', { name: 'Take the spot on cooking at Morning cleanup on 2026-08-01' }),
     ).toBeNull()
-    // Nothing is cooked, so there is nothing to have an idea about.
     expect(screen.queryByLabelText('Food idea for Morning cleanup on 2026-08-01')).toBeNull()
     expect(
       screen.getByRole('button', { name: 'Take the spot on cleanup at Morning cleanup on 2026-08-01' }),
@@ -186,7 +177,6 @@ describe('the meal plan', () => {
   })
 
   it('asks an ordinary meal for all three', async () => {
-    // The passing sibling: hiding them for every sitting would satisfy the test above.
     renderPage(stub())
 
     expect(await screen.findByRole('button', { name: 'Take the spot on Dinner on 2026-08-01' })).toBeTruthy()
@@ -200,7 +190,6 @@ describe('the meal plan', () => {
   })
 
   it('says which kind of nothing it has, when it has none', async () => {
-    // "Nobody set this up" and "set up, not filled in" want different answers.
     renderPage(stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [] }) }, []))
 
     expect(await screen.findByText(/Nobody has set up meal times/)).toBeTruthy()
@@ -231,11 +220,6 @@ describe('the meal plan', () => {
 })
 
 describe('a chore that still has somebody on it', () => {
-  /**
-   * The slot changed under them. The API keeps both escape hatches open — a lead may
-   * vacate, a cook may stand down — so the page has to offer them, or the promise in
-   * the route's own comment is one nothing can act on.
-   */
   const chore = (over: Partial<Meal> = {}) =>
     aMeal({ label: 'Morning cleanup', at: '09:00', kind: 'chore', ...over })
 
@@ -249,9 +233,6 @@ describe('a chore that still has somebody on it', () => {
   })
 
   it('names whoever is on it, and offers nobody else, since the API would refuse', async () => {
-    // The holder is drawn from the meal rather than matched against the attendees,
-    // so a chore — which may take no new lead at all — still shows who is on it and
-    // still offers the ✕ that gets them off.
     renderPage(stub({}, [chore({ lead: { account_id: 'a-1', name: 'Ada' } })]))
 
     expect(await screen.findByText('Ada')).toBeTruthy()
@@ -262,8 +243,6 @@ describe('a chore that still has somebody on it', () => {
   })
 
   it('shows the one on it even after they have withdrawn from the burn', async () => {
-    // They are not among the attendees any more. Reading the holder off the meal is
-    // what keeps the spot from drawing vacant while somebody is still on it.
     renderPage(stub({}, [chore({ lead: { account_id: 'a-9', name: 'Gone' } })]))
 
     expect(await screen.findByText('Gone')).toBeTruthy()
@@ -274,7 +253,6 @@ describe('a chore that still has somebody on it', () => {
     const leaveMealCrew = vi.fn<MealsApi['leaveMealCrew']>(() => Promise.resolve({ meal: chore() }))
     renderPage(stub({ leaveMealCrew }, [chore({ helpers: [{ account_id: 'a-1', name: 'Ada' }] })]))
 
-    // Their own chip's ✕ — coming off is the same gesture as taking anybody else off.
     fireEvent.click(
       await screen.findByRole('button', { name: 'Take Ada off cooking at Morning cleanup on 2026-08-01' }),
     )
@@ -283,9 +261,6 @@ describe('a chore that still has somebody on it', () => {
   })
 
   it('offers nobody else the chance to start cooking at one', async () => {
-    // The viewer is not on this crew. Without the distinction, a chore that had one
-    // stranded cook would invite everybody else to join it — which the API answers
-    // with 400.
     renderPage(stub({}, [chore({ helpers: [{ account_id: 'a-9', name: 'Someone else' }] })]))
 
     await screen.findByText('Someone else')
@@ -294,8 +269,6 @@ describe('a chore that still has somebody on it', () => {
   })
 
   it('offers nothing at all on a chore nobody is on', async () => {
-    // The passing sibling: showing the controls whenever the kind is a chore would
-    // satisfy the three above while putting back the thing they exist to prevent.
     renderPage(stub({}, [chore()]))
 
     await screen.findByText('Morning cleanup')

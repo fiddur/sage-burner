@@ -11,15 +11,6 @@ import { account, attendance, event, notification, notificationSetting } from '.
 import { createEmailQueue } from '../mail/queue.ts'
 import { recordAndPush, tellAttendees } from './notify.ts'
 
-/**
- * The two halves of a notification that are about *timing* rather than about wording:
- * that a fan-out does not wait on one mail server per person, and that the email leg
- * can never be left in flight with nobody holding it.
- *
- * Everything else about who is told what is covered from the routes, in
- * `general-notifications.test.ts`, which is where the audience rules live.
- */
-
 const NOW = '2026-08-03T00:00:00.000Z'
 const BURN = '9f1c2f2a-6f1a-4a2e-9c6d-2f0a1b3c4d5e'
 
@@ -45,15 +36,12 @@ const build = (): PushDeps => {
 
   return {
     db: handle.db,
-    // Nobody is subscribed in these tests, so this is never reached — the bell row is
-    // what the fan-out writes and what the timing is about.
     deliver: () => Promise.resolve('sent'),
     now: NOW_AT,
     mintKeys: () => ({ publicKey: 'pub', privateKey: 'priv' }),
   }
 }
 
-/** Somebody who has asked for this category on both channels — email is off until asked (#30). */
 const givenAsking = async (): Promise<string> => {
   const id = randomUUID()
   await db()
@@ -89,9 +77,6 @@ const TOLD: Told = { category: 'dream_offered', body: 'Ada offered a dream', lin
 
 describe('telling everybody coming to a burn', () => {
   it('does not make the request wait on one mail server wait per person', async () => {
-    // What #313 was about, kept: forty-two fifteen-second waits inside one request is
-    // about ten minutes at the cap. What #356 changed is that it is now *no* waits —
-    // the fan-out queues its posts and answers.
     const deps = build()
     await givenBurn()
     for (let made = 0; made < 3; made += 1) await givenAttendee()
@@ -119,9 +104,6 @@ describe('telling everybody coming to a burn', () => {
   })
 
   it('posts them one at a time, so a burn does not dial the relay once per attendee at once', async () => {
-    // `sendWithSmtp` opens a connection per message. Small relays cap concurrent
-    // connections and refuse the overflow, which `post` turns into a quiet `sent:
-    // false` — so the failure mode was missing email rather than slow email (#356).
     const deps = build()
     await givenBurn()
     for (let made = 0; made < 3; made += 1) await givenAttendee()
@@ -150,10 +132,6 @@ describe('telling everybody coming to a burn', () => {
 
 describe('the email leg beside a bell row', () => {
   it('does not leave the email in flight when the row cannot be written', async () => {
-    // Node's default for an unhandled rejection is to exit the process, and a database
-    // that has gone away fails the insert *and* the posting (#313). The queue is what
-    // holds the rejection now — it is queued before the insert, so a throw in between
-    // cannot leave it floating, and the queue reports rather than rethrows.
     const unhandled: unknown[] = []
     const watch = (reason: unknown) => unhandled.push(reason)
     process.on('unhandledRejection', watch)
@@ -164,8 +142,6 @@ describe('the email leg beside a bell row', () => {
       const failures: unknown[] = []
       const queue = createEmailQueue((failure) => failures.push(failure))
       const byEmail: EmailChannel = () => Promise.reject(new Error('the database went away'))
-      // Spied rather than stubbed, so the read that decides the channels still works:
-      // the posting is only queued after it, which is the window this is about.
       vi.spyOn(deps.db, 'insert').mockImplementation(() => {
         throw new Error('the database went away')
       })
@@ -175,8 +151,6 @@ describe('the email leg beside a bell row', () => {
       ).rejects.toThrow('the database went away')
 
       await queue.drain()
-      // `unhandledRejection` fires once the microtask queue has drained, so a tick of
-      // real time is what makes its absence mean anything.
       await new Promise((resolve) => setTimeout(resolve, 10))
 
       expect(unhandled).toEqual([])
@@ -187,9 +161,6 @@ describe('the email leg beside a bell row', () => {
   })
 
   it('writes the row and posts, when nothing is broken', async () => {
-    // The passing sibling: the guard above must not swallow an ordinary posting.
-    // `emailChannel` answers a failed send instead of throwing, so a mail server that
-    // refused still leaves the bell row behind.
     const deps = build()
     const accountId = await givenAsking()
     const queue = createEmailQueue(() => undefined)

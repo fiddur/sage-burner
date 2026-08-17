@@ -89,7 +89,6 @@ describe('a conversation about a dream', () => {
     show(aThread([anEntry({ id: 't-1', kind: 'offered', body: 'offered this dream' })]))
 
     expect(document.querySelector('.thread-did')?.textContent).toContain('Ada offered this dream')
-    // Nobody edits or deletes what happened: only a comment is anybody's.
     expect(screen.queryByRole('button', { name: /Rewrite/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /Take back this comment/ })).toBeNull()
   })
@@ -113,8 +112,6 @@ describe('a conversation about a dream', () => {
   })
 
   it('lets an admin take somebody else’s comment down without rewriting it', () => {
-    // An admin may take a comment off but not put words in somebody's mouth: a deletion
-    // says who did it and an edit would not.
     show(aThread([anEntry({ id: 't-2', body: 'theirs', author: { account_id: 'a-2', name: 'Bea' } })]), {
       admin: true,
     })
@@ -179,10 +176,6 @@ describe('a conversation about a dream', () => {
   })
 
   it('will not send a comment with a picture still on the way', () => {
-    // Sent mid-upload, the stored comment keeps the literal placeholder for good — it
-    // renders as escaped text, since an empty href fails `isSafeImageSource` — and the
-    // picture that lands a moment later is written into a box that has been cleared, so
-    // it is a row nothing references.
     const { say } = show(aThread([]))
 
     const box = screen.getByLabelText('Say something about Sauna at dawn')
@@ -194,8 +187,6 @@ describe('a conversation about a dream', () => {
   })
 
   it('sends it once the picture has landed', () => {
-    // The passing sibling: the finished markdown is not a placeholder, and a gate that
-    // could not tell them apart would leave the box unsendable for good.
     const { say } = show(aThread([]))
 
     const box = screen.getByLabelText('Say something about Sauna at dawn')

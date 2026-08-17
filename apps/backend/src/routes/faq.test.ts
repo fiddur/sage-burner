@@ -14,17 +14,7 @@ import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, event, faqEntry } from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 
-/**
- * The Q&A the spreadsheet had a tab for (#28).
- *
- * What is worth proving here is what makes it different from the register beside
- * it: an entry may have **no answer**, because the person with the question is
- * rarely the person with the answer; the order is somebody's arrangement and
- * survives a copy; and every write is any approved member's, on an open burn.
- */
-
 const SECRET = 'f'.repeat(40)
-// Before the fixture burn, so the writes are to a burn that has not ended.
 const NOW = '2026-07-02T00:00:00.000Z'
 
 let handle: DbHandle | undefined
@@ -155,8 +145,6 @@ describe('the burn’s Q&A', () => {
   })
 
   it('takes a question with no answer, which is the ordinary way one arrives', async () => {
-    // The person with the question is rarely the person with the answer, so asking
-    // is one field and the answer comes later and from somebody else.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAccount()
@@ -199,8 +187,6 @@ describe('the burn’s Q&A', () => {
   })
 
   it('lets anybody answer a question somebody else asked', async () => {
-    // The whole point of the split: this is the burn's shared furniture, and the
-    // answer is worth more than the etiquette of who wrote the question.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAccount()
@@ -283,7 +269,6 @@ describe('the burn’s Q&A', () => {
 
 describe('who may write it', () => {
   it('is any approved member, admin or not', async () => {
-    // The burn's shared furniture, like the lead-roles register and the lanes.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenAccount(['member'])
@@ -303,8 +288,6 @@ describe('who may write it', () => {
   })
 
   it('refuses every write once the burn has ended', async () => {
-    // A finished burn's Q&A is the record of what was asked, and an id noted while
-    // it was current should not still be a way to rewrite it.
     const server = await build()
     const past = await givenEvent('Last summer', '2026-06-01')
     const ada = await givenAccount()
@@ -319,13 +302,10 @@ describe('who may write it', () => {
     expect((await edit(server, ada.cookie, id, { answer: 'no' })).statusCode).toBe(404)
     expect((await remove(server, ada.cookie, id)).statusCode).toBe(404)
     expect((await sort(server, ada.cookie, past, [id])).statusCode).toBe(404)
-    // The copy too. It checked existence alone at first, which would have seeded a
-    // finished burn with rows nothing could afterwards touch.
     expect((await copy(server, ada.cookie, past, open)).statusCode).toBe(404)
   })
 
   it('still reads a finished burn’s, which is how it gets copied forward', async () => {
-    // The passing sibling: the writes are closed, the record is not.
     const server = await build()
     const past = await givenEvent('Last summer', '2026-06-01')
     const ada = await givenAccount()
@@ -350,13 +330,7 @@ describe('seeding it from a previous burn', () => {
     return past
   }
 
-  /**
-   * A burn that has **ended**, with questions written straight into the table.
-   *
-   * `givenPrevious` above dates its burn after `NOW` and has to: it seeds through the
-   * route, and every write there needs an open burn. So the case the copy action exists
-   * for — seed the next burn from the one that just finished — went untested (#323).
-   */
+  /** Straight into the table: `givenPrevious` seeds through the route, which needs an open burn. */
   const givenFinished = async () => {
     const over = await givenEvent('The burn that ended', '2026-06-01')
     await db()
@@ -397,7 +371,6 @@ describe('seeding it from a previous burn', () => {
   })
 
   it('copies the questions and their answers, in the order they were arranged', async () => {
-    // The order is most of what the copy is for: this list is read top to bottom.
     const server = await build()
     const ada = await givenAccount()
     const past = await givenPrevious(server, ada.cookie)
@@ -406,8 +379,6 @@ describe('seeding it from a previous burn', () => {
     const copied = await copy(server, ada.cookie, next, past)
 
     expect(copied.statusCode).toBe(201)
-    // Tagged with the version a following guarded write has to quote, which is the
-    // half `copyPlaces` does not do — and nothing else pins it.
     expect(copied.headers.etag).toBe((await list(server, ada.cookie, next)).headers.etag)
     expect(questions(copied)).toEqual(['What do I bring?', 'How do I get there?'])
     expect(copied.json().entries[0].answer).toBe('A sleeping bag.')
@@ -490,8 +461,6 @@ describe('the precondition', () => {
   })
 
   it('answers a successful edit with the tag the next one must quote', async () => {
-    // #277: without it the client keeps the tag it has just invalidated, and its
-    // second edit refuses itself with "somebody else changed this".
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAccount()
@@ -533,8 +502,6 @@ describe('the precondition', () => {
 
 describe('what the database refuses on its own', () => {
   it('will not take a question of only spaces, whatever the caller', async () => {
-    // The CHECK, exercised by a write that skips the API — nothing above this could
-    // tell whether the constraint exists.
     await build()
     const eventId = await givenEvent()
 
@@ -548,7 +515,6 @@ describe('what the database refuses on its own', () => {
   })
 
   it('takes one with a question and no answer, by the same path', async () => {
-    // The passing sibling: the refusal above is about the question, not the answer.
     await build()
     const eventId = await givenEvent()
 

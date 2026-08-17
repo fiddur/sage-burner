@@ -9,12 +9,6 @@ import { IconField, messageForFailure } from './IconField.tsx'
 
 afterEach(cleanup)
 
-/**
- * Inside a provider, since the preview's `?v=` is the installation's own (#376).
- *
- * `icon` is what the API has said so far — `null` for "nobody has uploaded one",
- * which is what the manifest spells `default`.
- */
 const renderField = (api: Parameters<typeof IconField>[0]['api'], icon: string | null = null) =>
   render(
     <InstallationProvider icon={icon}>
@@ -41,8 +35,6 @@ describe('choosing the icon on a home screen', () => {
   })
 
   it('sends an SVG exactly as chosen', async () => {
-    // The whole reason SVG is allowed: rasterising a logo to 512 pixels throws away
-    // what made it worth uploading. A canvas would also be unavailable here.
     let sent: Blob | undefined
     renderField(
       stub({
@@ -63,12 +55,8 @@ describe('choosing the icon on a home screen', () => {
   })
 
   it('quotes the version the manifest quotes, so one picture is one URL', async () => {
-    // Two spellings of it would be two entries in the offline cache under one path,
-    // and the newest-wins rule then drops one on every store (#376).
     renderField(stub(), '2026-08-01T00:00:00.000Z')
 
-    // The literal, so the one spelling every caller shares is pinned somewhere rather
-    // than only asserted against the builder that produces it.
     expect(icon().getAttribute('src')).toBe('/api/installation/icon?v=2026-08-01T00%3A00%3A00.000Z')
   })
 
@@ -141,8 +129,6 @@ describe('what to tell an admin about a failure', () => {
   })
 
   it('does not send somebody to re-export a perfectly good file', () => {
-    // The advice is expensive to get wrong: it sends them off to convert an image
-    // that was never the problem, and the second attempt fails the same way.
     expect(messageForFailure(apiError(500, 'unknown', 'x'))).not.toContain('PNG or an SVG')
     expect(messageForFailure(apiError(403, 'forbidden', 'x'))).toContain('admin')
   })

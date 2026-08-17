@@ -8,9 +8,6 @@ afterEach(cleanup)
 
 describe('logging out', () => {
   it('empties the cache before it asks the server, which is the half that has to happen', async () => {
-    // #268. The comment claimed the order and nothing held it up — and the order is
-    // the whole point: a logout that throws must already have taken the roster off
-    // the device.
     const order: string[] = []
     const forget = vi.fn(() => {
       order.push('forget')

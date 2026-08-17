@@ -15,8 +15,6 @@ describe('the circle', () => {
   })
 
   it('carries the version in the URL, so a new picture is a new URL', () => {
-    // What lets the route send a week-long max-age on data that is otherwise
-    // `no-store`: no cache has to be persuaded to let go of the old one.
     render(<Avatar accountId="a-1" name="Ada" avatar="2026-08-05T10:00:00.000Z" />)
 
     const src = document.querySelector('img')?.getAttribute('src') ?? ''

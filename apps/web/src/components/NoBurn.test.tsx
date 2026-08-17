@@ -34,14 +34,8 @@ const FAILED: BurnChoice = { status: 'failed', burns: [], selected: undefined }
 
 describe('NoBurn', () => {
   it('says the fetch failed rather than telling a member they are coming to nothing', () => {
-    // #193. A failed fetch and "you have joined no burn" both left the selector empty,
-    // so the copy made a claim about the *reader* that was false whenever the request
-    // was the thing that broke — and sent them to a page that could not help.
     renderIt(FAILED)
 
-    // The whole sentence, not a prefix of it. `toContain('Could not load your burns')`
-    // passed against a version that rendered the literal text `{absent}`, because the
-    // part it checked came before the hole.
     expect(screen.getByRole('alert').textContent).toBe(
       'Could not load your burns, so there is no grid to lay out. Please reload the page.',
     )
@@ -57,10 +51,6 @@ describe('NoBurn', () => {
   })
 
   it('waits rather than claiming there is no burn while the burns are still arriving', async () => {
-    // The bug this component was extracted for. The burns are fetched once for the
-    // whole session, so a page mounted before they land saw no selected burn and
-    // stated it as fact, then corrected itself — a flash of a wrong claim where a
-    // "Loading…" belonged.
     renderIt(LOADING)
 
     expect(await screen.findByText('Loading…')).toBeTruthy()

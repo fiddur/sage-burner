@@ -16,9 +16,8 @@ export interface PushRouteDeps extends GuardDeps {
 }
 
 export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }: PushRouteDeps) => {
-  // Signed in rather than approved (#476): the moment somebody has a live reason to allow
-  // notifications is while they are waiting on their application, and a subscription is keyed by
-  // account — a push only ever carries what is addressed to you.
+  // Signed in rather than approved: somebody waiting on their application has a live reason to
+  // allow notifications, and a subscription is keyed by account.
   const { requireSignedIn } = createGuards({ db, sessions })
 
   app.get(apiRoutes.getPushKey.fastify, { preHandler: requireSignedIn }, async (_request, reply) => {

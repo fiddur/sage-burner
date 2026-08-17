@@ -6,8 +6,6 @@ const at = (clientX: number, clientY: number) => ({ clientX, clientY })
 
 describe('measuring a pinch', () => {
   it('measures both directions at once, not one of them', () => {
-    // The whole point of one scale factor: a diagonal pinch is a pinch, and a
-    // per-axis measurement would read this as almost nothing on either.
     expect(touchGap(at(0, 0), at(3, 4))).toBe(5)
   })
 
@@ -23,14 +21,10 @@ describe('the zoom a pinch reaches', () => {
   })
 
   it('carries on from where the last pinch left it', () => {
-    // The zoom at `touchstart`, not 1 — otherwise every new pinch would snap the
-    // grid back to its default before moving from there.
     expect(pinchedZoom({ gap: 100, zoom: 2 }, 110)).toBeCloseTo(2.2)
   })
 
   it('is measured from the start of the pinch, so it can be taken back', () => {
-    // Accumulating per move drifts: the same fingers returning to where they began
-    // must land on the zoom they began with.
     const start = { gap: 120, zoom: 1.5 }
 
     expect(pinchedZoom(start, 200)).not.toBe(1.5)
@@ -43,8 +37,6 @@ describe('the zoom a pinch reaches', () => {
   })
 
   it('keeps still when two fingers land on one pixel', () => {
-    // A zero gap divides to infinity. A synthetic event can produce one, and a real
-    // one can round to it.
     expect(pinchedZoom({ gap: 0, zoom: 1.3 }, 80)).toBe(1.3)
   })
 })

@@ -13,15 +13,6 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountAllergy, accountRole, allergyItem } from '../db/schema.ts'
 
-/**
- * The allergy vocabulary: readable by anyone, writable by admin.
- *
- * The property worth proving is the asymmetry. A list of foods says nothing about
- * anybody, so reading is public — but renaming an item rewrites what everybody who
- * ticked it is taken to have said, which is why writing is not the burn's-furniture
- * default the lanes and lodging use.
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 const LACTOSE = 'a11e0000-0000-4000-8000-000000000004'
@@ -95,8 +86,6 @@ const reorder = (server: FastifyInstance, cookie: string, ids: string[]) =>
 
 describe('reading the list', () => {
   it('answers anybody, signed in or not', async () => {
-    // A vocabulary of foods, carrying nothing about a person — and the invite form
-    // needs it before the account exists.
     const server = await build()
 
     expect((await list(server)).statusCode).toBe(200)
@@ -119,8 +108,6 @@ describe('reading the list', () => {
 
 describe('writing the list', () => {
   it('refuses a member who is not admin', async () => {
-    // Not the burn's-furniture default: renaming an item rewrites what everybody who
-    // ticked it is taken to have said.
     const server = await build()
     const member = await givenAccount(['member'])
 
@@ -185,8 +172,6 @@ describe('writing the list', () => {
 
 describe('removing an item', () => {
   it('refuses while somebody has ticked it', async () => {
-    // These rows exist to keep people safe. A label going must not take a person's
-    // record with it — `place` refuses the same way when a dream stands in it.
     const server = await build()
     const admin = await givenAccount(['admin'])
     const ada = await givenAccount(['member'])
@@ -197,7 +182,6 @@ describe('removing an item', () => {
   })
 
   it('removes one nobody has ticked', async () => {
-    // The passing sibling: refusing every deletion would satisfy the test above.
     const server = await build()
     const admin = await givenAccount(['admin'])
 

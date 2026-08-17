@@ -13,7 +13,6 @@ export interface Candidate {
 
 const MOST = 6
 
-/** What is being typed after an `@`, if the caret is inside one. */
 export const fragmentAt = (value: string, caret: number): string | undefined => {
   const before = value.slice(0, caret)
   const at = before.lastIndexOf('@')
@@ -67,8 +66,8 @@ export const useMentioning = ({
 }) => {
   const [caret, setCaret] = useState<number | undefined>(undefined)
 
-  // No `people` means this field does not do mentions at all, so it offers none — an
-  // `@everybody` written where nothing reads it looks like it reached the burn and does not.
+  // No `people` means this field does not do mentions, so it offers none: an `@everybody`
+  // written where nothing reads it looks like it reached the burn.
   const fragment = caret === undefined ? undefined : fragmentAt(value, caret)
   const candidates =
     people === undefined || fragment === undefined

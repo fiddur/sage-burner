@@ -9,23 +9,12 @@ import { RouteOnMessage } from './RouteOnMessage.tsx'
 
 afterEach(cleanup)
 
-// `LocationProvider` reads the document's own history, which `cleanup` does not
-// touch — so a test that routed leaves the next one starting wherever it finished.
 beforeEach(() => {
   globalThis.history.replaceState(null, '', '/')
 })
 
-/**
- * A stand-in for `navigator.serviceWorker`, which happy-dom does not provide.
- *
- * An `EventTarget` rather than a spy: the point is that a real `message` event
- * arriving moves the app, so the test dispatches one and looks at the page.
- */
 const aWorker = () => {
   const target = new EventTarget()
-  // Counted rather than inferred. Dispatching after an unmount proves nothing about
-  // the cleanup — `route` on an unmounted tree is a silent no-op, so the test passes
-  // against an implementation that never unsubscribes. Measured, not assumed.
   const listening = new Set<(event: MessageEvent) => void>()
 
   return {
@@ -62,9 +51,6 @@ const renderApp = (from: MessageSource) =>
 
 describe('being asked to move by the worker', () => {
   it('goes to the page a tapped notification named', async () => {
-    // Without this the worker's only options are navigating the window — a full page
-    // load, which discards a half-typed markdown field — or opening a second one,
-    // which on a phone is a browser tab beside the app rather than the app (#279).
     const worker = aWorker()
     renderApp(worker.source)
 
@@ -75,8 +61,6 @@ describe('being asked to move by the worker', () => {
   })
 
   it('stays put for a message that is not the worker asking', async () => {
-    // The channel is shared with anything else that ever posts to a page. Moving
-    // somebody because a message arrived at all would be worse than not listening.
     const worker = aWorker()
     renderApp(worker.source)
 
@@ -100,7 +84,6 @@ describe('being asked to move by the worker', () => {
   })
 
   it('does nothing at all where there is no worker to listen to', () => {
-    // `null`, not `undefined` — the prop's own doc says why.
     expect(() =>
       render(
         <LocationProvider>

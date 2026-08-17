@@ -52,14 +52,6 @@ const renderPage = (api: EventsApi) =>
     </ViewerProvider>,
   )
 
-/**
- * A stub that answers as a server does: the write lands in a list the next read sees.
- *
- * Every write on this page re-reads rather than patching what is on screen, so a stub
- * whose `getEvents` always answers the same thing can only ever show a page that never
- * caught up. The ordering is the server's too — it returns them start-date first, and
- * the page used to splice a new one into place by hand.
- */
 const serverHolding = (...rows: Event[]) => {
   let held = [...rows]
 
@@ -101,9 +93,6 @@ describe('AdminEvents', () => {
   })
 
   it('lets the hours the burn is open be set', async () => {
-    // The grid runs between these, so they are on the create form rather than
-    // hidden behind an edit — an admin who has to find them later gets a
-    // schedule covering three whole days for a burn that is two half ones.
     const created: Event = { ...summer, id: 'e-3', slug: 'winter-2026' }
     const createEvent = vi.fn(() => Promise.resolve({ event: created }))
     renderPage(stub({ createEvent }))
@@ -151,9 +140,6 @@ describe('AdminEvents', () => {
         location: '',
         welcome_markdown: '',
         payment_info_markdown: '',
-        // No `transfer_info_markdown`: its schema default is a real sentence, and
-        // sending '' would override it. Pinned as an exact body, so adding the key
-        // back fails here rather than quietly blanking every new burn.
         member_cap: 42,
       })
     })
@@ -161,7 +147,6 @@ describe('AdminEvents', () => {
   })
 
   it('explains a taken slug rather than showing the raw error', async () => {
-    // 409 is the one failure an admin can act on unaided.
     renderPage(
       stub({ createEvent: () => Promise.reject(apiError(409, 'conflict', 'Request failed (409).')) }),
     )
@@ -177,9 +162,6 @@ describe('AdminEvents', () => {
   })
 
   it('keeps a newly created event in start-date order', async () => {
-    // The list comes back ordered by start date, and the page shows the server's
-    // order rather than splicing a new row into place itself — which is where a
-    // winter burn used to appear above a summer one.
     const winter: Event = {
       ...summer,
       id: 'e-0',
@@ -212,8 +194,6 @@ describe('AdminEvents', () => {
   })
 
   it('previews the welcome markdown as it is typed', async () => {
-    // The reason the preview exists: otherwise the way to see a heading render
-    // is to publish it to the public homepage.
     renderPage(stub())
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text')
@@ -222,8 +202,6 @@ describe('AdminEvents', () => {
     fireEvent.click(screen.getAllByRole('tab', { name: 'Preview' })[0] as HTMLElement)
 
     await waitFor(() => {
-      // Level 2, matching what the public page renders — the preview is only
-      // useful if it shows the same thing.
       expect(screen.getByRole('heading', { name: 'Bring water', level: 2 })).toBeTruthy()
     })
   })
@@ -264,9 +242,6 @@ describe('AdminEvents', () => {
   })
 
   it('edits the hours and the cap of a burn that already exists', async () => {
-    // There was no way to change either after creation — the edit form offered
-    // the welcome text and nothing else, so a burn created with the default
-    // 00:00–23:59 was stuck with a schedule covering whole days.
     const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
     renderPage(stub({ updateEvent }))
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
@@ -317,8 +292,6 @@ describe('AdminEvents', () => {
   })
 
   it('shows the row the server returned, not the draft that was sent', async () => {
-    // The server trims and may adjust; echoing the draft would draw a save that
-    // did not happen the way it is shown.
     const trimmed = { ...summer, name: 'Trimmed By Server' }
     const server = serverHolding(summer)
     const updateEvent = vi.fn(() => {
@@ -336,9 +309,6 @@ describe('AdminEvents', () => {
   })
 
   it('does not resync a response that arrives after the form moved to another event', async () => {
-    // Clicking Edit on a second event while the first save is in flight: the
-    // response must not land in the form now showing someone else's burn, nor
-    // report "Saved." under fields nobody sent.
     let settle: (value: { event: Event }) => void = () => undefined
     const winterBurn: Event = { ...summer, id: 'e-2', name: 'Winter Burn', slug: 'winter-2026' }
     const server = serverHolding(summer, winterBurn)
@@ -364,8 +334,6 @@ describe('AdminEvents', () => {
   })
 
   it('resyncs the open form from the server, not only the list', async () => {
-    // Otherwise the header shows what was stored and the inputs still show what
-    // was typed, which is the same inconsistency one level in.
     const updateEvent = vi.fn(() => Promise.resolve({ event: { ...summer, name: 'Trimmed By Server' } }))
     renderPage(stub({ updateEvent }))
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
@@ -378,7 +346,6 @@ describe('AdminEvents', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Name of summer-2026')).toHaveProperty('value', 'Trimmed By Server'),
     )
-    // Bound separately from the rest, so it needs resyncing on its own.
     expect(screen.getByLabelText('Welcome text')).toHaveProperty('value', '# Hello')
   })
 
@@ -394,16 +361,6 @@ describe('AdminEvents', () => {
     await waitFor(() => {
       expect(updateEvent).toHaveBeenCalledWith('e-1', { welcome_markdown: '# New words' })
     })
-    // Pinned in full, because this one sentence has been wrong three times
-    // running: it over-promised, then hedged with an issue number that went
-    // stale, then over-promised again for a new reason — the list offers "Edit
-    // welcome text" on every event, while only the soonest-ending unfinished
-    // one reaches the homepage. So an admin editing last year's burn was
-    // told the homepage shows text it does not and never will.
-    //
-    // The wording is conditional, which makes it true for every event rather
-    // than for the one the previous versions assumed. Pinning it whole means
-    // the next rewrite has to be a decision.
     expect((await screen.findByRole('status')).textContent).toBe(
       'Saved. It appears on the homepage while this is the current burn.',
     )

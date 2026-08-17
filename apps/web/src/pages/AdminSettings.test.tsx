@@ -27,8 +27,6 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
         social_logins: [],
       },
     }),
-  // The mail form mounted here has its own tests; this keeps it from reaching the API
-  // when the page under test is about the title.
   getMapLink: () => Promise.resolve({ map: { url: null } }),
   setMapLink: () => Promise.reject(new Error('setMapLink is not stubbed here')),
   getMailSettings: () => Promise.resolve({ mail: null }),
@@ -54,13 +52,6 @@ const renderPage = (api: AdminSettingsApi, viewer: Viewer = ADMIN) =>
     </ViewerProvider>,
   )
 
-/**
- * The title form, and only it.
- *
- * Scoped because the mail form mounted below has a Save of its own and several text
- * boxes. A bare `findByRole('textbox')` passed only by racing that form's load, which
- * a change in how this page fetches was enough to lose.
- */
 const titleForm = async () => {
   const form = (await screen.findByText('What these burns are called')).closest('form')
   if (form === null) throw new Error('the title field has no form around it')
@@ -79,10 +70,6 @@ describe('AdminSettings', () => {
   })
 
   it('carries nothing personal: this page is the installation’s settings', async () => {
-    // The push toggle was here as well as on Your details. Two switches for one
-    // subscription is the worse problem — which of them is on is a question neither page
-    // can answer, and it reads as two different settings. This is what keeps the copy from
-    // coming back unnoticed, since the page composes its sections from imports.
     renderPage(stub())
     await titleField()
 
@@ -90,10 +77,6 @@ describe('AdminSettings', () => {
   })
 
   it('leaves signing out to the page that holds the rest of the account', async () => {
-    // #195 put a second Log out button here because Your details was `require="member"`
-    // and turned an `admin`-without-`member` account away. That page is `approved` now
-    // (#396), so this is one control in two places again — which is what the push toggle
-    // was moved off this page for.
     renderPage(stub())
     await titleField()
 
@@ -101,9 +84,6 @@ describe('AdminSettings', () => {
   })
 
   it('is where both pictures are chosen — the home screen’s and a shared link’s', async () => {
-    // Two uploads on one page, and neither is inside the form that saves the title:
-    // they save on choosing a file, and a file input in that form would be two ways
-    // to save one page.
     renderPage(stub())
 
     expect(await screen.findByLabelText('The icon on a home screen')).toBeTruthy()
@@ -152,8 +132,6 @@ describe('AdminSettings', () => {
   })
 
   it('refuses a blank name here rather than letting the server say no', async () => {
-    // `aria-required` rather than `required`, so the browser does not block the
-    // submit before this message can be shown. The page is the only authority.
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
       Promise.resolve({
         installation: {
@@ -175,9 +153,6 @@ describe('AdminSettings', () => {
   })
 
   it('renames the header in the same moment, without a reload', async () => {
-    // The header is `Layout`, several levels up and mounted once. Without the
-    // shared setter a save leaves it saying the old name until the page is
-    // reloaded, which reads as the save not having worked.
     const Header = () => <output aria-label="brand">{useInstallationTitle() ?? '-'}</output>
     render(
       <ViewerProvider viewer={ADMIN}>
@@ -228,9 +203,6 @@ describe('AdminSettings', () => {
   })
 
   it('sends a signed-out visitor to log in, rather than telling them to ask an admin', async () => {
-    // This page was one of the five that showed a signed-out visitor "ask someone
-    // who already has admin" — advice for somebody already signed in. #145 fixed it
-    // once, in `GuardedPage`, rather than five times.
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
       Promise.resolve({
         installation: {

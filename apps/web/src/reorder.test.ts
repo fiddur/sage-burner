@@ -11,8 +11,6 @@ describe('swap', () => {
   })
 
   it('does nothing at either end, rather than wrapping or throwing', () => {
-    // Pressing ArrowUp on the first row is an ordinary thing to try. The caller
-    // sends nothing, so this must be distinguishable from a real move.
     expect(swap(IDS, 0, -1)).toBeUndefined()
     expect(swap(IDS, IDS.length - 1, 1)).toBeUndefined()
   })
@@ -52,8 +50,6 @@ describe('moveTo', () => {
   })
 
   it('leaves the list it was given alone', () => {
-    // `splice` mutates, so this is the one that would have gone wrong quietly:
-    // the caller renders from the same array it passed in.
     const original = [...IDS]
     moveTo(original, 0, 3)
 

@@ -9,16 +9,6 @@ import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, installation, INSTALLATION_ID, pushSubscription } from '../db/schema.ts'
 import { forgetSubscription, notifyAccount, rememberSubscription, vapidKeysFor } from './push.ts'
 
-/**
- * Browser push, with the push service replaced by a spy.
- *
- * Delivery itself cannot be exercised here — it needs a real browser to produce a
- * subscription and a real push service to accept one — so `deliver` is injected and
- * what these tests pin is everything around it: who gets sent to, that the payload
- * is the same for all of them, and that a subscription the service reports gone is
- * deleted rather than retried forever.
- */
-
 const NOW = '2026-08-03T00:00:00.000Z'
 
 let handle: DbHandle | undefined
@@ -38,7 +28,6 @@ const KEYS = { publicKey: 'pub-key', privateKey: 'priv-key' }
 
 const build = async (deliver: Delivery = () => Promise.resolve('sent')): Promise<PushDeps> => {
   handle = createDb({ url: ':memory:' })
-  // The migrations seed the one `installation` row, so there is nothing to insert.
   runMigrations(handle)
 
   return { db: handle.db, deliver, now: () => new Date(NOW), mintKeys: () => KEYS }
@@ -60,8 +49,6 @@ const stored = async () => db().select().from(pushSubscription)
 
 describe('the VAPID pair', () => {
   it('is minted on first use and kept', async () => {
-    // Kept rather than derived: the public half is baked into every subscription a
-    // browser has already made, so a fresh pair would orphan all of them.
     const deps = await build()
 
     const first = await vapidKeysFor(deps)
@@ -94,8 +81,6 @@ describe('remembering a browser', () => {
   })
 
   it('refreshes rather than duplicates when the same browser subscribes again', async () => {
-    // A reload re-subscribes, and a browser may rotate its keys without changing
-    // the endpoint. Two rows for one browser would mean two notifications.
     const deps = await build()
     const admin = await givenAccount(['admin'])
 
@@ -112,9 +97,6 @@ describe('remembering a browser', () => {
   })
 
   it('moves a browser to whoever last signed in on it', async () => {
-    // A shared laptop. The endpoint belongs to the browser, not the person, so the
-    // row follows the account that subscribed last rather than notifying the one
-    // who used it first.
     const deps = await build()
     const first = await givenAccount(['admin'])
     const second = await givenAccount(['admin'])
@@ -171,8 +153,6 @@ describe('notifying one person', () => {
   })
 
   it('asks no role of them, so a demoted account still hears what happened to it', async () => {
-    // A subscription only exists because that person asked for it, and what is pushed
-    // is something that happened to them.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const deps = await build(deliver)
     const roleless = await givenAccount([])
@@ -182,8 +162,6 @@ describe('notifying one person', () => {
   })
 
   it('cleans up the gone ones even when another delivery rejects outright', async () => {
-    // `Delivery` may reject — the type permits it — and with `Promise.all` one
-    // rejection skipped the cleanup for every other row in the batch.
     const deps = await build((subscription) => {
       if (subscription.endpoint.endsWith('/throws')) return Promise.reject(new Error('boom'))
       return Promise.resolve(subscription.endpoint.endsWith('/dead') ? 'gone' : 'sent')
@@ -203,8 +181,6 @@ describe('notifying one person', () => {
   })
 
   it('deletes a subscription the push service says is gone', async () => {
-    // 404 or 410 means the browser threw it away. Keeping it would retry a dead
-    // endpoint on every application, forever.
     const deps = await build((subscription) =>
       Promise.resolve(subscription.endpoint.endsWith('/dead') ? 'gone' : 'sent'),
     )
@@ -218,8 +194,6 @@ describe('notifying one person', () => {
   })
 
   it('keeps a subscription that merely failed', async () => {
-    // The passing sibling of the case above, and the distinction that matters: a
-    // 500 from a push service is not a reason to forget someone's phone.
     const deps = await build(() => Promise.resolve('failed'))
     const admin = await givenAccount(['admin'])
     await rememberSubscription(deps, admin, aSubscription('https://push.example/flaky'))
@@ -236,8 +210,6 @@ describe('notifying one person', () => {
 
     expect((await notifyAccount(deps, admin, 'x')).sent).toBe(0)
     expect(deliver).not.toHaveBeenCalled()
-    // And no key: an installation nobody has opted into should not acquire one
-    // because a stranger applied.
     const [row] = await db().select().from(installation).where(eq(installation.id, INSTALLATION_ID))
     expect(row?.vapid_public_key).toBeNull()
   })

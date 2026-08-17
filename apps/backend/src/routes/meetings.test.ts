@@ -432,9 +432,6 @@ describe('the meetings themselves', () => {
   })
 
   it('gets one from the backfill when it was in the diary before cards existed', async () => {
-    // The other half of `20260813180000_meeting_cards` (#616): what it writes is what the
-    // feed reads. Staged by hand and swept by the shipped SQL, since the migration has
-    // long run by the time this suite can write a meeting.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -463,8 +460,6 @@ describe('the meetings themselves', () => {
     expect(card.entries.map((entry) => [entry.kind, entry.body])).toEqual([
       ['scheduled', 'put it in the diary'],
     ])
-    // Dated by the planning rather than by the meeting, which is months of difference on
-    // something scheduled early.
     expect(card.last_at).toBe('2026-07-01T09:00:00.000Z')
   })
 
@@ -500,7 +495,6 @@ describe('the meetings themselves', () => {
       },
     })
 
-    // One entry, not two: the `scheduled` kind coalesces.
     const card = await cardFor(server, ada.cookie, id)
     expect(card.entries.map((entry) => entry.body)).toEqual(['moved it'])
   })

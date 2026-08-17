@@ -10,7 +10,6 @@ import {
   watchInstalls,
 } from './install.ts'
 
-/** A page that records what it was asked to listen for, and can fire it. */
 const aPage = () => {
   const handlers = new Map<string, (event: Event) => void>()
 
@@ -24,7 +23,6 @@ const aPage = () => {
   }
 }
 
-/** What Chromium hands over, minus everything this app does not touch. */
 const anEvent = () => {
   const calls: string[] = []
 
@@ -50,8 +48,6 @@ describe('reading the browser’s offer', () => {
   })
 
   it('calls it on the event, not detached from it', async () => {
-    // `prompt()` is a method on the event; Chrome throws an illegal invocation if it
-    // is pulled off and called on its own.
     const seen: unknown[] = []
     const event = {
       marker: 'the event',
@@ -90,13 +86,10 @@ describe('watching for an install offer', () => {
     page.fire('beforeinstallprompt', event)
 
     expect(watch.offer()).toBeTruthy()
-    // Without this Chrome shows its own bar as well, saying the same thing twice.
     expect(calls).toEqual(['prevented'])
   })
 
   it('tells whoever is watching, so a strip that already rendered appears', () => {
-    // The whole reason this is an object watched from before the first render: the
-    // event fires once, and a component mounting later would never hear it.
     const page = aPage()
     const watch = watchInstalls({ listen: page.listen, installed: () => false })
     const heard = vi.fn()
@@ -139,8 +132,6 @@ describe('watching for an install offer', () => {
   })
 
   it('does not listen at all when the app is already the installed copy', () => {
-    // The browser would not fire it anyway; not asking spares a listener that could
-    // never be useful, and says so where somebody reads the code.
     const page = aPage()
 
     watchInstalls({ listen: page.listen, installed: () => true })
@@ -149,7 +140,6 @@ describe('watching for an install offer', () => {
   })
 
   it('listens for both halves when it is not', () => {
-    // The passing sibling: never listening would satisfy the test above.
     const page = aPage()
 
     watchInstalls({ listen: page.listen, installed: () => false })
@@ -178,8 +168,6 @@ describe('watching for an install offer', () => {
 
 describe('telling a browser with the offer API from one without', () => {
   it('is whether the window carries the property, present or null either way', () => {
-    // Chromium sets it to `null` until a handler is assigned, so presence is the test and a
-    // truthiness check would read every Chromium visitor as a Safari one.
     expect(hasInstallOffer({ onbeforeinstallprompt: null })).toBe(true)
     expect(hasInstallOffer({ onbeforeinstallprompt: () => undefined })).toBe(true)
     expect(hasInstallOffer({})).toBe(false)
@@ -199,8 +187,6 @@ describe('telling the installed copy from a browser tab', () => {
   })
 
   it('takes the legacy flag as well, which is all older iOS answers', () => {
-    // Home screen apps on iOS before 16.4 report nothing for `display-mode`, so without
-    // this they read as a browser tab and get nagged to install what they have installed.
     const media = withMatchMedia(false)
     Object.defineProperty(globalThis.navigator, 'standalone', { value: true, configurable: true })
 
@@ -243,10 +229,6 @@ describe('remembering a no', () => {
   })
 
   it('says no rather than throwing when reading the property itself throws', () => {
-    // Chromium with site data blocked for the origin, and Brave's "block all
-    // cookies": `globalThis.localStorage` is a *getter* that throws `SecurityError`.
-    // This is read during `InstallApp`'s render, and there is no error boundary, so a
-    // throw here paints nothing at all.
     const store = vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(() => {
       throw new Error('SecurityError')
     })
@@ -267,8 +249,6 @@ describe('remembering a no', () => {
   })
 
   it('says no rather than throwing where storage is blocked', () => {
-    // Safari in private mode and anything with site data turned off. A page that will
-    // not render is a worse answer than a nudge dismissed twice.
     const blocked = {
       getItem: () => {
         throw new Error('denied')

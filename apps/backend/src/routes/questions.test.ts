@@ -15,14 +15,6 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, formQuestion } from '../db/schema.ts'
 
-/**
- * The application form's questions.
- *
- * The property that matters most is the one #12 exists for: the questions are
- * data, so an admin changes them without a deploy and the public form
- * reflects it. Everything here is written against that.
- */
-
 const SECRET = 's'.repeat(40)
 
 let handle: DbHandle | undefined
@@ -88,7 +80,6 @@ const labelsOf = (response: { json: () => { questions: FormQuestion[] } }) =>
 
 describe('the public question list', () => {
   it('is readable signed out', async () => {
-    // The application form is public, so its questions are.
     const server = await build()
     const cookie = await givenAdmin()
     await add(server, cookie, question)
@@ -106,7 +97,6 @@ describe('the public question list', () => {
   })
 
   it('shows a question added through the admin API, with no deploy', async () => {
-    // #12's acceptance, stated as a test: questions are rows, not code.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -144,9 +134,6 @@ describe('adding a question', () => {
   })
 
   it('refuses a client-supplied order rather than silently dropping it', async () => {
-    // `order` is the server's to assign. It used to be stripped, which answered
-    // 201 for a request that did not do what it asked — the same silent success
-    // `.strict()` was added to the event schemas to kill.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -164,9 +151,6 @@ describe('adding a question', () => {
   })
 
   it('accepts a create body that omits help_text and options', async () => {
-    // `.nullable()` does not make a key optional, so omitting either was a bare
-    // `bad_request` naming no field — and `options` is a column nothing consumes
-    // yet.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -181,9 +165,6 @@ describe('adding a question', () => {
   })
 
   it('refuses an agreement question that is not required', async () => {
-    // The type exists because submission is blocked when it is unticked, so
-    // `{ type: 'agreement', required: false }` contradicts itself. Rejected while
-    // there are no rows, rather than leaving #14 to pick a half to believe.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -198,9 +179,6 @@ describe('adding a question', () => {
   })
 
   it('refuses a required checkbox, which is an agreement by another name', async () => {
-    // A checkbox always has an answer, so "must be present" is vacuous and "must
-    // be ticked" is what `agreement` means. Refusing the second spelling is what
-    // stops #14 having to pick a reading.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -261,12 +239,6 @@ describe('editing a question', () => {
   })
 
   it('does not wipe the help text when only the label is edited', async () => {
-    // This was live, not hypothetical. `formQuestionFields` gives `help_text` and
-    // `options` a `.default(null)`, and `.partial()` does *not* suppress a default
-    // in Zod 4 — so `{ label: 'New' }` parsed to
-    // `{ label: 'New', help_text: null, options: null }` and every label edit
-    // silently cleared the help text. The update schema is derived without the
-    // defaults now: on a PATCH, absent means "leave it alone".
     const server = await build()
     const cookie = await givenAdmin()
     const created = await add(server, cookie, {
@@ -288,8 +260,6 @@ describe('editing a question', () => {
   })
 
   it('still clears the help text when null is sent deliberately', async () => {
-    // The other half: "absent means leave alone" must not become "you can never
-    // clear it".
     const server = await build()
     const cookie = await givenAdmin()
     const created = await add(server, cookie, { ...question, help_text: 'remove me' })
@@ -307,20 +277,6 @@ describe('editing a question', () => {
   })
 
   it('treats a body with no recognised keys as a no-op rather than a 500', async () => {
-    // Same trap as the event PATCH: `set({})` is not valid SQL, so a typo'd
-    // field name would answer `internal_error`.
-    //
-    // The row is read back, because the status alone does not test the "no-op"
-    // half of the name. `{}` stays `{}` because the update schema carries no
-    // defaults at all — it is built from the plain `formQuestionSchema`, not from
-    // `formQuestionFields`, whose `.default(null)` on `help_text` and `options`
-    // survives `.partial()` in Zod 4.
-    //
-    // Rebuilt from `formQuestionFields`, a `{}` body would parse to
-    // `{ help_text: null, options: null }`: non-empty, so this guard is skipped,
-    // `set()` is valid SQL, the response is still 200 — and every PATCH silently
-    // wipes the help text. That is not hypothetical; it is the bug this test was
-    // written for, and the read-back below is what catches it.
     const server = await build()
     const cookie = await givenAdmin()
     const created = await add(server, cookie, {
@@ -338,8 +294,6 @@ describe('editing a question', () => {
     })
     expect(noOp.statusCode).toBe(200)
 
-    // A typo is a 400 now, not a 200 that wrote nothing — `.strict()`, same as the
-    // event schemas. Silent success is worse to diagnose than a refusal.
     const typo = await server.inject({
       method: 'PATCH',
       url: `/api/admin/questions/${id}`,
@@ -353,8 +307,6 @@ describe('editing a question', () => {
   })
 
   it('refuses a patch that would make an agreement optional', async () => {
-    // One field is enough to break the rule, and the schema only sees the body —
-    // so the merged row is what has to hold. Both directions.
     const server = await build()
     const cookie = await givenAdmin()
     const agreement = await add(server, cookie, {
@@ -387,10 +339,6 @@ describe('editing a question', () => {
   })
 
   it('refuses a patch that would make a checkbox required', async () => {
-    // The other type, both directions. These reached the database CHECK and
-    // answered 500 while the merged-row check covered only `agreement` — the
-    // schema refine cannot catch them, since a body naming one of the two keys is
-    // not decidable on its own.
     const server = await build()
     const cookie = await givenAdmin()
     const requiredText = await add(server, cookie, {
@@ -426,14 +374,9 @@ describe('editing a question', () => {
   })
 
   it('allows the tick-box changes that are legitimate, in all three shapes', async () => {
-    // The passing siblings. Every PATCH here carrying `type` or `required` asserted
-    // a 400, so none of `tickBoxCondition`'s three returns had a success case — the
-    // same gap that hid two defects in the event date ordering, and the reason
-    // AGENTS.md now says a rejecting test needs a passing one.
     const server = await build()
     const cookie = await givenAdmin()
 
-    // type-only, condition satisfied: a required `text` may become an `agreement`.
     const toAgreement = await add(server, cookie, { ...question, type: 'text', required: true })
     const agreed = await server.inject({
       method: 'PATCH',
@@ -444,7 +387,6 @@ describe('editing a question', () => {
     expect(agreed.statusCode).toBe(200)
     expect(agreed.json().question).toMatchObject({ type: 'agreement', required: true })
 
-    // required-only, satisfied: a `text` question may become optional.
     const toOptional = await add(server, cookie, { ...question, type: 'text', required: true })
     const optional = await server.inject({
       method: 'PATCH',
@@ -455,7 +397,6 @@ describe('editing a question', () => {
     expect(optional.statusCode).toBe(200)
     expect(optional.json().question).toMatchObject({ type: 'text', required: false })
 
-    // both keys, consistent: the third return, where the body settles it alone.
     const toCheckbox = await add(server, cookie, { ...question, type: 'text', required: true })
     const both = await server.inject({
       method: 'PATCH',
@@ -468,14 +409,6 @@ describe('editing a question', () => {
   })
 
   it('applies the tick-box rule to every type the vocabulary defines', async () => {
-    // Driven by `formQuestionTypes` rather than naming the two types, so a third
-    // one is covered the day it is added instead of needing a new test.
-    //
-    // Honest about its limits: this cannot discriminate the hardcoded version of
-    // `tickBoxCondition`'s `required`-only branch, because hardcoding "true
-    // conflicts with checkbox, false with agreement" *is* correct while those are
-    // the only two tick-box types. Deriving from `tickBoxRequired` is future-proofing,
-    // and no test today can prove it — this covers the surface it applies to.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -483,7 +416,6 @@ describe('editing a question', () => {
       const must = tickBoxRequired(type)
       if (must === undefined) continue
 
-      // create with the wrong value for the type
       const created = await add(server, cookie, {
         ...question,
         type,
@@ -492,7 +424,6 @@ describe('editing a question', () => {
       })
       expect(created.statusCode, `create ${type} required=${String(!must)}`).toBe(400)
 
-      // PATCH the type onto a row whose `required` is wrong for it
       const seed = await add(server, cookie, {
         ...question,
         type: 'text',
@@ -507,7 +438,6 @@ describe('editing a question', () => {
       })
       expect(retyped.statusCode, `patch type to ${type}`).toBe(400)
 
-      // PATCH `required` to the wrong value on a row already of that type
       const typed = await add(server, cookie, {
         ...question,
         type,
@@ -525,7 +455,6 @@ describe('editing a question', () => {
   })
 
   it('refuses an anonymous patch', async () => {
-    // POST, DELETE and the reorder each had one; PATCH was the odd one out.
     const server = await build()
     const cookie = await givenAdmin()
     const created = await add(server, cookie, question)
@@ -557,9 +486,6 @@ describe('editing a question', () => {
 
 describe('deleting a question', () => {
   it('answers 404 for a question that does not exist', async () => {
-    // The delete's 404 comes from the write itself now (`.returning()`), and
-    // nothing covered it: removing that branch left every test green, so a delete
-    // of a missing question would have answered 204 as though it had done something.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -613,8 +539,6 @@ describe('reordering questions', () => {
   }
 
   it('rejects an unrecognised key in the reorder body', async () => {
-    // `.strict()`, same as create and update: `{ ids: [...], oder: [...] }` would
-    // otherwise strip the typo and reorder by whatever `ids` happened to hold.
     const server = await build()
     const cookie = await givenAdmin()
     const [a, b, c] = await threeQuestions(server, cookie)
@@ -631,7 +555,6 @@ describe('reordering questions', () => {
   })
 
   it('changes the order on the public form', async () => {
-    // #12's other acceptance criterion, end to end.
     const server = await build()
     const cookie = await givenAdmin()
     const [a, b, c] = await threeQuestions(server, cookie)
@@ -643,8 +566,6 @@ describe('reordering questions', () => {
   })
 
   it('rejects a partial list rather than renumbering some rows', async () => {
-    // Half a reorder is an order nobody chose: the named rows move and the rest
-    // keep stale positions.
     const server = await build()
     const cookie = await givenAdmin()
     const [a, b] = await threeQuestions(server, cookie)
@@ -656,10 +577,6 @@ describe('reordering questions', () => {
   })
 
   it('rejects a duplicate id, by way of the set check', async () => {
-    // `[a, a, a]` against `{a, b, c}` is refused because `b` and `c` are missing,
-    // not by a distinctness test — there is none, because with the lengths equal
-    // and every existing id required, a duplicate cannot fit. Named so the next
-    // reader does not go looking for the check this asserts the effect of.
     const server = await build()
     const cookie = await givenAdmin()
     const [a] = await threeQuestions(server, cookie)

@@ -66,7 +66,6 @@ export const applicationMessagesResponseSchema = z.object({
 })
 export type ApplicationMessagesResponse = z.infer<typeof applicationMessagesResponseSchema>
 
-/** What somebody with no roles yet sees of their own: their standing, and who to ask about it. */
 export const myApplicationSchema = z.object({
   application: applicationSchema.nullable(),
   messages: z.array(applicationMessageSchema),

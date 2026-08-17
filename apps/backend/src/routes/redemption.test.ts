@@ -30,14 +30,6 @@ import {
   threadEntry,
 } from '../db/schema.ts'
 
-/**
- * Redeeming an invite: the single funnel both membership paths converge on.
- *
- * Unauthenticated, and the token is the only credential — so the properties worth
- * proving are that it cannot be spent twice, that a spent or lapsed one says so
- * rather than 404ing, and that a failure anywhere leaves the token still usable.
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 
@@ -70,7 +62,6 @@ const build = async (
   return app
 }
 
-/** Stands in for scrypt at a known, small cost, so a wait can be asserted. */
 const slowHash = (ms: number) =>
   vi.fn(async (password: string) => {
     await new Promise((resolve) => setTimeout(resolve, ms))
@@ -150,7 +141,6 @@ const givenBurn = async (over: { end_date?: string; start_date?: string } = {}) 
   return id
 }
 
-/** Somebody already at the burn, who has asked to hear about the category under test. */
 const givenMemberComing = async (eventId: string, category: 'member_joined') => {
   const id = randomUUID()
   await db()
@@ -250,7 +240,6 @@ describe('a group link, which many people come in on', () => {
   })
 
   it('refuses a burst that fills the cap while somebody’s password is being hashed (#524)', async () => {
-    // `hash` is where the other arrival is simulated; nothing else can reach that branch.
     let filled = false
     const server = await build(undefined, async (password) => {
       if (!filled) {
@@ -319,8 +308,6 @@ describe('a group link, which many people come in on', () => {
 
 describe('how often one client may try a token', () => {
   it('refuses past its allowance, and says how long to wait', async () => {
-    // An unguessable token is only unguessable if you cannot try quickly (#57), and every try
-    // costs a gated scrypt whether the token is real or not.
     const server = await build(undefined, undefined, undefined, {
       redeem: { attempts: 2, windowMs: 60_000 },
     })
@@ -365,8 +352,6 @@ describe('looking at an invite before redeeming it', () => {
   })
 
   it('says unknown for a token nobody minted, without saying which', async () => {
-    // Same 200 and the same shape as the others: a different status code or body
-    // for "no such token" would let someone probe for valid ones.
     const server = await build()
 
     const response = await look(server, 'not-a-real-token')
@@ -376,9 +361,6 @@ describe('looking at an invite before redeeming it', () => {
   })
 
   it('never echoes the token, and says nothing the applicant did not write', async () => {
-    // An invite link is unguessable but forwardable, so whoever holds it is a
-    // stranger until they redeem. What comes back is what that applicant typed on
-    // their own application — see "what an invite carries" below for the trade.
     const server = await build()
     const token = await givenInvite({ applicantName: 'Ada' })
 
@@ -407,8 +389,6 @@ describe('redeeming', () => {
   })
 
   it('gives the new account its login address as a way to be reached', async () => {
-    // Everybody has one, and a list that starts empty is a list nobody fills in (#388).
-    // Written in the account's own transaction, so nobody exists without it.
     const server = await build()
     const token = await givenInvite()
 
@@ -425,9 +405,6 @@ describe('redeeming', () => {
   })
 
   it('falls back to the email when the body carries no contact', async () => {
-    // The join form stopped asking how to reach someone once it had taken their
-    // email — asking twice on one page was the reported confusion. The column
-    // stays non-null, so the answer they already gave fills it.
     const server = await build()
     const token = await givenInvite()
     const { contact: _omitted, ...noContact } = applicant
@@ -450,11 +427,6 @@ describe('redeeming', () => {
   })
 
   it('lets exactly one of two concurrent redemptions through', async () => {
-    // The real race, not a simulation of one: both requests read the invite as
-    // outstanding, then both await `hashPassword` (~230ms) before writing, so
-    // they genuinely interleave. Only the conditional `used_at IS NULL` on the
-    // stamp separates them — a plain `WHERE id = ?` lets both in and creates two
-    // accounts from one invite.
     const server = await build()
     const token = await givenInvite()
 
@@ -464,17 +436,10 @@ describe('redeeming', () => {
     ])
 
     expect([first.statusCode, second.statusCode].toSorted()).toEqual([201, 409])
-    // The admin from `givenInvite`, plus exactly one redeemer.
     expect(await db().select().from(account)).toHaveLength(2)
   })
 
   it('leaves the token unspent when the account cannot be written', async () => {
-    // Two invites, one email. Both requests pass the email pre-check before
-    // either writes, so the loser's insert meets the UNIQUE and the whole
-    // transaction rolls back — including its stamp. Without the transaction its
-    // token is spent with no account behind it, and the link they were sent
-    // cannot be re-sent — someone with admin has to notice and mint a fresh
-    // invite by hand (#91).
     const server = await build()
     const [tokenA, tokenB] = [await givenInvite(), await givenInvite()]
 
@@ -483,8 +448,6 @@ describe('redeeming', () => {
       redeem(server, tokenB, { ...applicant, email: 'same@example.org' }),
     ])
 
-    // 409, not "some error": losing a UNIQUE race is a conflict, and a 500 would
-    // tell the caller to report a bug rather than to use a different email.
     expect([first.statusCode, second.statusCode].toSorted()).toEqual([201, 409])
 
     const invites = await db().select().from(inviteToken)
@@ -525,11 +488,6 @@ describe('redeeming', () => {
   })
 
   it('answers a token nobody minted exactly as it answers a spent one', async () => {
-    // Both are 409, not to hide which it is — the GET answers that plainly, and
-    // there is nothing to enumerate anyway with a 256-bit token — but because the
-    // caller has nothing to do with the difference here. By the time the page
-    // POSTs it has read the status, and all three mean the same thing: this link
-    // cannot be spent.
     const server = await build()
     const spent = await givenInvite({ used_at: NOW })
 
@@ -542,14 +500,6 @@ describe('redeeming', () => {
   })
 
   it('spends the hash before deciding the address is taken', async () => {
-    // The oracle this closes: the 409 for a taken address used to return before
-    // scrypt ran, while a success spent ~230ms in it. Anyone holding one unspent
-    // invite could then ask "is this person a member?" for any address they
-    // liked, repeatedly — the 409 does not spend the token — and read the answer
-    // off the latency. Membership is the private fact this app holds.
-    //
-    // Asserted as a wait rather than a call count: a hash started and not waited
-    // for would be called and still answer fast.
     const hash = slowHash(60)
     const server = await build(() => new Date(NOW), hash)
     const token = await givenInvite()
@@ -566,10 +516,6 @@ describe('redeeming', () => {
   })
 
   it('hashes for real when nothing is injected', async () => {
-    // The seam above is only honest if the default is the actual scrypt, so this
-    // verifies the stored hash against the password that was sent rather than
-    // reading its shape. The negative case matters as much: a hash that accepts
-    // anything would pass a prefix check just as well.
     const server = await build()
     const token = await givenInvite()
 
@@ -581,10 +527,6 @@ describe('redeeming', () => {
   })
 
   it('sheds rather than queueing unbounded scrypt for one replayed invite', async () => {
-    // The cost of making the refusal equal-time: a taken address does not spend
-    // the token, so a held invite can be replayed at this hash for as long as it
-    // lives. One gate covers this and login together, because what is bounded is
-    // libuv's threadpool rather than either route.
     const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
     const server = await build(() => new Date(NOW), slowHash(60), gate)
     const first = await givenInvite()
@@ -599,14 +541,6 @@ describe('redeeming', () => {
   })
 
   it('tells a caller who waited the whole window to wait longer', async () => {
-    // The `timed-out` branch, which nothing reached before the gate was
-    // injectable — and the only thing distinguishing its `Retry-After` from
-    // `queue-full`'s. Sending a client that already waited the window straight
-    // back turns a polite `Retry-After` into a hot loop against the flood the
-    // gate exists to damp.
-    // Over a second, deliberately: `retryAfter` rounds up to whole seconds, so a
-    // shorter window makes `timed-out` and `queue-full` both `'1'` and the
-    // assertion below cannot tell them — or a hardcoded number — apart.
     const gate = createGate({ slots: 1, queue: 1, timeoutMs: 1200 })
     const server = await build(() => new Date(NOW), slowHash(1400), gate)
     const first = await givenInvite()
@@ -617,16 +551,12 @@ describe('redeeming', () => {
     const waited = await redeem(server, second, { ...applicant, email: 'other@example.org' })
 
     expect(waited.statusCode).toBe(429)
-    // '2' here, against `queue-full`'s '1'. Asked of the gate rather than written
-    // out so the two stay tied to the window; `gate.test.ts` pins the derivation.
     expect(waited.headers['retry-after']).toBe(gate.retryAfter('timed-out'))
     expect(gate.retryAfter('timed-out')).not.toBe(gate.retryAfter('queue-full'))
     expect((await holding).statusCode).toBe(201)
   })
 
   it('gives the slot back, so one redemption does not wedge the next', async () => {
-    // A leaked slot holds until the process restarts. With one slot, a second
-    // request through the same app is the shortest thing that notices.
     const gate = createGate({ slots: 1, queue: 4, timeoutMs: 5000 })
     const server = await build(() => new Date(NOW), slowHash(5), gate)
     const first = await givenInvite()
@@ -639,7 +569,6 @@ describe('redeeming', () => {
   })
 
   it('lets a redemption through when the gate is not saturated', async () => {
-    // The passing sibling: shedding everything would satisfy the test above.
     const gate = createGate({ slots: 1, queue: 4, timeoutMs: 5000 })
     const server = await build(() => new Date(NOW), undefined, gate)
     const token = await givenInvite()
@@ -648,15 +577,6 @@ describe('redeeming', () => {
   })
 
   it('still answers "is this address a member?" for as long as the invite lives', async () => {
-    // The residual, pinned rather than described. The status codes differ — 409
-    // for an address that has an account, 201 for one that does not — and the
-    // 409 does not spend the token, so one holder can ask about as many
-    // addresses as they like. What the equal-cost ordering removed was the
-    // *latency* copy of that answer, which was redundant beside the status line.
-    // What bounds this is cost (a gated scrypt per probe) and #57.
-    //
-    // If someone later spends the token on the taken-address refusal, this test
-    // fails and the paragraph it belongs to has to be rewritten with it.
     const server = await build()
     const token = await givenInvite()
     await db()
@@ -672,15 +592,6 @@ describe('redeeming', () => {
   })
 
   it('takes no slot for a caller holding no live invite', async () => {
-    // Load-bearing ordering: the gate is taken *after* the invite check, so a
-    // caller with any old string is answered 409 without queueing behind the
-    // hashing. Taking the slot first would let anyone, with no invite at all,
-    // hold the same two slots logins need — a denial of service open to the
-    // public rather than to invite holders.
-    //
-    // Asserted on the slot rather than on the hash: a gate entered above the
-    // lookup still would not *hash* for a bad token, so counting hashes cannot
-    // tell the two orderings apart.
     const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
     const server = await build(() => new Date(NOW), slowHash(120), gate)
     const held = redeem(server, await givenInvite())
@@ -693,9 +604,6 @@ describe('redeeming', () => {
   })
 
   it('shares one gate with login, rather than two that spend the pool between them', async () => {
-    // The bound is on libuv's four threads, so two gates of two slots would
-    // spend all four. Held from the redemption side and asserted from the login
-    // side: if they ever drift back to separate gates, the login gets in.
     const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
     const server = await build(() => new Date(NOW), slowHash(120), gate)
     const token = await givenInvite()
@@ -713,8 +621,6 @@ describe('redeeming', () => {
   })
 
   it('refuses an email that already has an account, without spending the token', async () => {
-    // Otherwise the token is gone and the person is told a name is taken, with no
-    // way to try again.
     const server = await build()
     const token = await givenInvite()
     await db()
@@ -796,10 +702,6 @@ describe('redeeming', () => {
   })
 })
 
-/**
- * #224. Almost everybody spending an invite is joining the burn that is coming, so
- * the form offers it — and the redemption may not be put at risk by the offer.
- */
 describe('joining the ticked burn while redeeming', () => {
   it('puts them on the list for it, and says so', async () => {
     const server = await build()
@@ -814,7 +716,6 @@ describe('joining the ticked burn while redeeming', () => {
   })
 
   it('books the whole burn, the same as the button on the details page', async () => {
-    // One helper behind both doors, so the two cannot write differently shaped rows.
     const server = await build()
     const burn = await givenBurn()
     const token = await givenInvite()
@@ -828,9 +729,6 @@ describe('joining the ticked burn while redeeming', () => {
   })
 
   it('opens their card on the feed, which the join button has always done', async () => {
-    // The machinery was never missing: `attendance.ts` writes the card and rings the bell on an
-    // ordinary join, and redemption called `joinBurn` straight past it — so the one arrival that
-    // most deserves a card, a brand new member's, was the silent one (#478).
     const server = await build()
     const burn = await givenBurn()
     const token = await givenInvite()
@@ -860,9 +758,6 @@ describe('joining the ticked burn while redeeming', () => {
   })
 
   it('still makes the account when the burn ended while the form was open', async () => {
-    // The token is spent and cannot be spent again, so refusing here would strand
-    // somebody with no way to finish. The account is made, the join is skipped, and
-    // `attendance: null` is what the page reads to say which happened.
     const server = await build()
     const over = await givenBurn({ start_date: '2026-06-01', end_date: '2026-06-03' })
     const token = await givenInvite()
@@ -876,10 +771,6 @@ describe('joining the ticked burn while redeeming', () => {
   })
 
   it('still makes the account when joining fails for a reason nobody planned for', async () => {
-    // #230. The two failures above are `joinBurn` answering `undefined`; this is it
-    // throwing. By this point the account, the `member` role, the spent token and the
-    // cookie are all committed, so letting the throw out turns a redemption that
-    // worked into a 500 and an error page — with no way to try again.
     const server = await build()
     const burn = await givenBurn()
     const token = await givenInvite()
@@ -941,9 +832,6 @@ describe('what an invite carries', () => {
   })
 
   it('stops naming them once the link is spent or expired', async () => {
-    // The trade this makes is a forwarded *live* link telling its holder whose it
-    // was. A spent one has no form to fill, so naming them then would be disclosure
-    // bought for nothing.
     const server = await build()
     const used = await givenInvite({ applicantName: 'Ada', used_at: '2026-07-01T00:00:00.000Z' })
     const expired = await givenInvite({ applicantName: 'Ada', expires_at: '2026-06-01T00:00:00.000Z' })
@@ -963,10 +851,6 @@ describe('what an invite carries', () => {
   })
 
   it('gives back the address the invite was posted to, so the form need not ask either', async () => {
-    // Reversed by #30: the invite now *arrives* at this address, and asking somebody
-    // for the address the message they are reading came to is worse than not
-    // listening. Not an enumeration oracle — nothing here takes an address and says
-    // whether it has an application; it takes a token nobody can guess.
     const server = await build()
     const token = await givenInvite({ applicantName: 'Ada', applicantEmail: 'ada@example.org' })
 
@@ -983,11 +867,6 @@ describe('what an invite carries', () => {
 
 describe('the viewer a redemption answers with', () => {
   it('carries the whole thing, not two of its four fields', async () => {
-    // It carried `account_id` and `roles` and nothing else, so a freshly redeemed
-    // member's in-memory viewer had `name: undefined` and `avatar: undefined` — which
-    // is not `null`, and the details page compares against `null`. Their first visit
-    // offered "Change it" and "Back to initials" over a broken image, for a picture
-    // they had never uploaded.
     const server = await build()
     const token = await givenInvite()
 

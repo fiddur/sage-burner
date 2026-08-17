@@ -108,8 +108,6 @@ describe('a group link', () => {
     const refused = await createGroup(server, cookie, payload)
 
     expect(refused.statusCode).toBe(400)
-    // The admin's message names the date, so a refusal about the label or the cap must not
-    // carry this code.
     expect(refused.json().error).toBe('expired')
   })
 
@@ -188,17 +186,12 @@ describe('direct invites', () => {
   })
 
   it('refuses a misspelt key rather than minting the default behind it', async () => {
-    // What `.strict()` is for here, spelled out because the failure is quiet:
-    // without it `expiers_at` is stripped, the body becomes `{}`, and the route
-    // answers 201 with a 30-day invite while the caller believes it set 8 days.
     const server = await build()
     const { cookie } = await givenAdmin()
 
     const response = await create(server, cookie, { expiers_at: '2026-07-10T00:00:00.000Z' })
 
     expect(response.statusCode).toBe(400)
-    // The half the status code does not pin: nothing was minted behind the
-    // refusal. The past-expiry sibling below asserts the same thing.
     expect(await db().select().from(inviteToken)).toHaveLength(0)
   })
 
@@ -266,8 +259,6 @@ describe('listing invites', () => {
   })
 
   it('calls a redeemed invite used even after it lapses', async () => {
-    // Spent beats lapsed: "expired" would invite re-issuing a link to someone
-    // who is already in.
     const server = await build()
     const { id: adminId, cookie } = await givenAdmin()
     await db().insert(inviteToken).values({
@@ -336,8 +327,6 @@ describe('revoking an invite', () => {
   })
 
   it('refuses to revoke a redeemed invite', async () => {
-    // The row is what records that this person was let in, and `account`
-    // references it — deleting it would rewrite how the group formed.
     const server = await build()
     const { id: adminId, cookie } = await givenAdmin()
     const id = randomUUID()
@@ -355,11 +344,6 @@ describe('revoking an invite', () => {
   })
 
   it('refuses to revoke an application invite, which is the only one it will have', async () => {
-    // Deleting it leaves that application with nothing to redeem: re-approving
-    // matches nothing on `status = 'pending'`, and the unique index refuses a
-    // second invite for the same application. A direct invite still gets the
-    // person in; the tie back to what they wrote is what is lost, and #91 owns
-    // re-issuing against the application itself.
     const server = await build()
     const { id: adminId, cookie } = await givenAdmin()
     const applicationId = randomUUID()

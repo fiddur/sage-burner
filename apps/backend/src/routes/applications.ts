@@ -117,18 +117,12 @@ export const registerApplicationRoutes = (
       mine: {
         application: mine ?? null,
         messages: mine === undefined ? [] : await messagesOn(db, mine.id, viewer),
-        // Only where the answer was no. Sign-up is open, so anybody at all can reach this route,
-        // and the admins' contact details are a members-only read everywhere else — the recourse
-        // this exists for belongs to somebody who has been turned down, not to a fresh account.
         organisers: mine?.status === 'rejected' ? await organisersFor(db) : [],
       },
     } satisfies MyApplicationResponse
   })
 
-  /**
-   * The applicant's own end of the thread. Theirs alone, and only on the application that is
-   * theirs — an id in the path would be a way to ask about somebody else's.
-   */
+  /** No id in the path: one would be a way to ask about somebody else’s application. */
   app.post(
     apiRoutes.sendMyApplicationMessage.fastify,
     { preHandler: requireSignedIn },
@@ -225,9 +219,6 @@ export const registerApplicationRoutes = (
       throw error
     }
 
-    // The account carries the person, and a provider that answered no name leaves one without.
-    // The form has just asked for it, and nothing else will: `updateMyProfile` is behind
-    // `requireApproved`, so an applicant cannot fill it in while they wait.
     await db
       .update(account)
       .set({ name: body.applicant_name })

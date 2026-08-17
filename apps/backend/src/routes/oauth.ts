@@ -262,14 +262,6 @@ export const registerOauthRoutes = (
       .run()
   }
 
-  /**
-   * An identity nobody has yet is a new account, not a dead end (#476): sign-up and sign-in
-   * converge here, since asking somebody to pick which they are doing is asking them to know.
-   *
-   * The address has to come from the provider, because it is what an account is keyed by, and it
-   * has to be one nobody else holds — linking a stranger's identity onto an existing account by
-   * matching addresses is account takeover if the provider ever hands over an unverified one.
-   */
   const signUpThrough = async (
     request: FastifyRequest,
     reply: FastifyReply,
@@ -277,9 +269,6 @@ export const registerOauthRoutes = (
     profile: ProviderProfile,
     inviteHash: string | null = null,
   ) => {
-    // Through the same schema every other way in uses: `account.email` carries a lowercase CHECK,
-    // so `Wren@Example.org` taken as given would miss the row it collides with and then fail the
-    // write — reporting an address conflict to somebody who has no account.
     const parsed = emailSchema.safeParse(profile.email)
     if (!parsed.success) return back(reply, applyPage('no-address'))
 

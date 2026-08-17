@@ -76,8 +76,6 @@ const stub = (
   ...over,
 })
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets the
-// default, so "no burn" written that way silently renders the usual one.
 const renderPage = (api: BringApi, viewer: Viewer = ADA, burn: MyBurn | null = BURN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -209,8 +207,6 @@ describe('the bring list', () => {
   })
 
   it('refuses to add it while a picture is still going up', async () => {
-    // The placeholder would be stored as the comment, and the form blanks on save, so the
-    // finished upload has nothing left to rewrite.
     renderPage(stub())
 
     fireEvent.input(await screen.findByRole('textbox', { name: 'What is it?' }), {

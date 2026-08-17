@@ -39,12 +39,6 @@ export const useAway = <T extends HTMLElement>(
   return wrap
 }
 
-/**
- * A dropdown hangs below what opened it unless that puts it somewhere nobody can reach and
- * above would hold the whole of it. Room to spare is not the test: overflow past the bottom of
- * a scroller can be scrolled to and overflow past its top cannot, so a side that merely has
- * more of the menu on screen is worse than the side that can be reached at all.
- */
 export const flipsUp = (menu: number, above: number, below: number): boolean => menu > below && above >= menu
 
 const clipping = (from: HTMLElement): HTMLElement | undefined => {
@@ -56,10 +50,6 @@ const clipping = (from: HTMLElement): HTMLElement | undefined => {
   return undefined
 }
 
-/**
- * Where the panel this hangs in scrolls, its own `overflow` is what the menu is drawn outside of
- * (#699) — so the edge to measure against is that ancestor's, not the window's.
- */
 export const useFlipUp = <T extends HTMLElement>(open: boolean): { menu: RefObject<T>; up: boolean } => {
   const menu = useRef<T>(null)
   const [up, setUp] = useState(false)

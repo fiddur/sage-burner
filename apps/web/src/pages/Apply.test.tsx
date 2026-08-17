@@ -14,8 +14,6 @@ import { BurnProvider } from '../burn.tsx'
 import { InstallationProvider } from '../installation.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 
-// Counts calls while still rendering for real, so the markdown assertions below
-// stay assertions about markdown.
 const renderMarkdown = vi.hoisted(() => vi.fn())
 vi.mock('../markdown.ts', async (importOriginal) => {
   const actual: { renderMarkdown: typeof realRenderMarkdown } = await importOriginal()
@@ -24,15 +22,6 @@ vi.mock('../markdown.ts', async (importOriginal) => {
   return { renderMarkdown }
 })
 import { Apply } from './Apply.tsx'
-
-/**
- * The public application form.
- *
- * The property #14 exists for is that nothing about the questions is hardcoded:
- * an admin adds one in the admin UI and it appears here with no deploy. So
- * these tests never name a field the way the app would — they assert that
- * whatever the API returns is what gets rendered and sent.
- */
 
 afterEach(cleanup)
 
@@ -60,7 +49,6 @@ const stub = (over: Partial<ApplyApi> = {}): ApplyApi => ({
   ...over,
 })
 
-/** Somebody who has signed up and not yet applied, which is who the form is for since #476. */
 const APPLICANT: Viewer = {
   status: 'signed-in',
   account: { id: 'a-1', name: 'Fredrik', avatar: null, roles: [] },
@@ -108,25 +96,13 @@ const aBurn = (name: string, joined: boolean): MyBurn => ({
     : null,
 })
 
-/**
- * Fields are found by label prefix, because a required question's accessible
- * name carries the visible "· required" marker with it.
- */
 const labelled = (label: string) => screen.getByLabelText(label, { exact: false })
 
-/**
- * The submit button is disabled until the questions arrive, so a test that
- * submits has to wait for them — otherwise it clicks a dead button and the
- * assertion times out somewhere far less obvious.
- */
 const ready = () =>
   waitFor(() =>
     expect(screen.getByRole('button', { name: 'Send application' })).toHaveProperty('disabled', false),
   )
 
-// `fireEvent.input` with a target, matching `Login.test.tsx` — assigning `.value`
-// by hand and dispatching does not survive Preact's reconciliation of a
-// controlled input.
 const fill = (label: string, value: string) => {
   fireEvent.input(labelled(label), { target: { value } })
 }
@@ -134,10 +110,6 @@ const fill = (label: string, value: string) => {
 const tick = (label: string) => {
   const box = labelled(label)
   if (!(box instanceof HTMLInputElement)) throw new Error(`${label} is not a checkbox`)
-  // `fireEvent.click`, not `box.click()`: happy-dom does not raise the `change`
-  // that a browser fires as the click's default action, so a bare click leaves
-  // the component never hearing about it — which passed the "refuses to send"
-  // tests for the wrong reason until this one caught it.
   fireEvent.click(box)
 }
 
@@ -148,7 +120,6 @@ const identify = () => {
 
 const send = () => screen.getByRole('button', { name: 'Send application' }).click()
 
-/** The form's own checks, past the ones a browser makes on `type="email"` — which happy-dom makes too. */
 const submitPastTheFields = () => {
   const form = document.querySelector('form')
   if (form === null) throw new Error('there is no form on the page')
@@ -175,9 +146,6 @@ describe('Apply', () => {
   })
 
   it('renders the questions in the order the API serves them', async () => {
-    // Not re-sorted here: `GET /api/questions` already serves display order, and
-    // a second ordering rule on this side is one that can disagree with the one
-    // the stored answers use. The backend test pins the order itself.
     renderPage(
       stub({
         getQuestions: () =>
@@ -190,8 +158,6 @@ describe('Apply', () => {
       }),
     )
 
-    // Arrival order deliberately contradicts `order`: a fixture where the two
-    // agree cannot tell a re-added client sort from leaving the list alone.
     await screen.findByLabelText('Second')
     expect(screen.getAllByRole('textbox').map((field) => field.getAttribute('name'))).toEqual([
       'applicant_name',
@@ -217,8 +183,6 @@ describe('Apply', () => {
   })
 
   it('renders help text as markdown, so a list of principles reads as a list', async () => {
-    // The 10+1 principles are a list, and an applicant should see one rather
-    // than a run of literal dashes.
     renderPage(
       stub({
         getQuestions: () =>
@@ -244,8 +208,6 @@ describe('Apply', () => {
   })
 
   it("renders each question's markdown once, not once per keystroke", async () => {
-    // `answer()` sets `answers`, so this component re-renders on every character
-    // typed, and the help text is the longest thing on the form.
     renderMarkdown.mockClear()
     renderPage(
       stub({
@@ -298,9 +260,6 @@ describe('Apply', () => {
   })
 
   it('names every question it showed, including the ones left blank', async () => {
-    // What the server stores an entry for. An optional question the applicant
-    // skipped was still asked, and has to be told apart from one added after this
-    // page loaded — which they never saw.
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
     renderPage(
       stub({
@@ -380,9 +339,6 @@ describe('Apply', () => {
   })
 
   it('names email as a way of hearing only where the installation posts', async () => {
-    // The copy has to be true either way: with no mail server nothing arrives, and saying
-    // otherwise is a promise the installation cannot keep (#30). It promised an invite until
-    // #476 — there is no invite now, only the answer.
     render(
       <InstallationProvider sendsEmail>
         <ViewerProvider viewer={APPLICANT}>
@@ -443,8 +399,6 @@ describe('Apply', () => {
   })
 
   it('links the privacy policy beside the button', async () => {
-    // The one page where somebody hands over contact details before having an account, so
-    // it is where the policy has to be reachable before the click rather than after it.
     renderPage(stub())
 
     await ready()
@@ -465,16 +419,6 @@ describe('Apply', () => {
   })
 
   it('caps every text control at the length the API accepts', async () => {
-    // The API caps an answer at MAX_ANSWER_LENGTH and the identity fields at
-    // their own limits. Without `maxLength` an applicant could write past them
-    // and be told "the questions changed, reload" — discarding a very long
-    // answer they had just written, and failing identically on the retry.
-    //
-    // Asserted as attributes because that is where the fix lives: the browser
-    // enforces them while typing *and* on paste, so the over-length state is
-    // never reached rather than being caught afterwards. `answerProblems` also
-    // carries a `too_long` rule, which keeps the two sides agreeing if a
-    // submission ever arrives from somewhere other than this form.
     renderPage(
       stub({
         getQuestions: () =>
@@ -600,9 +544,6 @@ describe('Apply', () => {
   })
 
   it('tells the applicant to reload when the server rejects, not to try again', async () => {
-    // A 400 means the questions changed since the page loaded, so both sides ran
-    // the same rules against different lists. "Try again" is false advice there:
-    // the identical body fails identically.
     renderPage(stub({ submitApplication: () => Promise.reject(apiError(400, 'bad_request', 'nope')) }))
 
     await ready()
@@ -843,8 +784,6 @@ describe('where an application already stands', () => {
   })
 
   it('says neither sentence while the burns are still loading', async () => {
-    // `joined` is `undefined` both for "on no burn" and for "not answered yet", so without
-    // the gate the page reads the between-burns sentence and then swaps it.
     renderPage(
       stub({
         getMyApplication: () =>
@@ -879,8 +818,6 @@ describe('where an application already stands', () => {
   })
 
   it('says who to ask once it has not been', async () => {
-    // A rejection with no recourse is a door closing in silence, so the page names the
-    // organisers and how to reach them.
     renderPage(
       stub({
         getMyApplication: () =>

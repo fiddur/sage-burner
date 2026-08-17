@@ -4,13 +4,6 @@ import type { ShareEvent, ShareSubject } from './share.ts'
 
 import { plainFromMarkdown, shareHead, truncate } from './share.ts'
 
-/**
- * The card, as a string in and a string out (#306).
- *
- * What reaches a crawler is asserted where it is served, in `app.test.ts` — both
- * places the shell goes out from. This file is about what the tags say.
- */
-
 const BURN: ShareEvent = {
   name: 'Autumn Burn',
   start_date: '2026-10-02',
@@ -34,7 +27,6 @@ const subject = (overrides: Partial<ShareSubject> = {}): ShareSubject => ({
   ...overrides,
 })
 
-/** The `content` of one tag, or undefined when it is absent. */
 const content = (head: string, name: string): string | undefined =>
   new RegExp(`<meta (?:name|property)="${name}" content="([^"]*)" />`).exec(head)?.[1]
 
@@ -59,15 +51,11 @@ describe('the share card', () => {
 
     expect(head).toContain('<title>The Burning Sage</title>')
     expect(content(head, 'og:type')).toBe('website')
-    // A deployment between burns has nothing to describe, and the sentence about the
-    // software this replaces is the thing #306 set out to remove.
     expect(content(head, 'og:description')).toBeUndefined()
     expect(content(head, 'description')).toBeUndefined()
   })
 
   it('puts the dates and the place in front of the welcome text', () => {
-    // Where a human actually reads them: Facebook renders no type it has not
-    // graduated, so `og:type: event` alone shows nothing.
     const description = content(shareHead(subject()), 'og:description')
 
     expect(description).toBe(
@@ -121,8 +109,6 @@ describe('the card image', () => {
   })
 
   it('asks for the small card when the picture is the square icon', () => {
-    // The fallback when nobody has uploaded a banner. Claiming the large card gets one
-    // that reserves space for a wide picture and letterboxes a logo into it.
     const head = shareHead(
       subject({ image: { path: '/api/installation/icon?v=1', type: 'image/png', width: 512, height: 512 } }),
     )
@@ -142,8 +128,6 @@ describe('the card image', () => {
   })
 
   it('leaves out the absolute tags when the request did not say where it arrived', () => {
-    // A relative `og:image` is not a smaller version of the feature; it is a crawler
-    // fetching nothing.
     const head = shareHead(subject({ origin: undefined }))
 
     expect(content(head, 'og:image')).toBeUndefined()
@@ -152,8 +136,6 @@ describe('the card image', () => {
   })
 
   it('points og:url at the origin rather than at the page that was shared', () => {
-    // One canonical for every share, and no path echoed back — `/invite/<token>` is a
-    // client-side route, and the shell is what answers it.
     expect(content(shareHead(subject()), 'og:url')).toBe('https://burn.example.org')
   })
 })
@@ -186,8 +168,6 @@ describe('the structured data', () => {
     const attack = { ...BURN, name: 'Autumn </script><script>alert(1)</script>' }
     const head = shareHead(subject({ event: attack }))
 
-    // The JSON escape, not the HTML one: inside a script element the parser looks for
-    // `</script` and nothing else, so `&lt;` would be printed rather than obeyed.
     expect(head).toContain('\\u003c/script>')
     expect(head).not.toContain('</script><script>alert(1)')
     expect(jsonLd(head)['name']).toBe(attack.name)

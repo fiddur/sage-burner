@@ -5,13 +5,6 @@ import type { AppApi } from './app.tsx'
 
 import { FetchedViewerProvider, isAdmin, isMember, useViewer, ViewerProvider } from './viewer.tsx'
 
-/**
- * The provider the real app uses, against an injected client.
- *
- * `app.test.tsx` always passes an explicit viewer so no render there touches
- * the network; this is the file that covers what happens when it does.
- */
-
 afterEach(cleanup)
 
 const Probe = () => {
@@ -35,9 +28,6 @@ const state = () => screen.getByRole('status').textContent
 
 describe('FetchedViewerProvider', () => {
   it('starts in loading rather than signed-out', () => {
-    // Rendering a signed-out header and swapping it a moment later is the
-    // flicker this state exists to avoid — and, once there are guarded routes,
-    // the reason a member is not bounced to the login page on first paint.
     renderWith(vi.fn<AppApi['getMe']>(() => new Promise(() => undefined)))
 
     expect(state()).toBe('loading:-')
@@ -62,16 +52,12 @@ describe('FetchedViewerProvider', () => {
   })
 
   it('treats a failed request as signed-out rather than an error', async () => {
-    // What an offline first paint looks like. An error banner on the public
-    // homepage would be worse than the signed-out nav.
     renderWith(vi.fn<AppApi['getMe']>(() => Promise.reject(new TypeError('Failed to fetch'))))
 
     await waitFor(() => expect(state()).toBe('signed-out:-'))
   })
 
   it('aborts the request when unmounted', async () => {
-    // Otherwise a member who navigates away during the first paint gets a state
-    // update on an unmounted tree.
     const signals: AbortSignal[] = []
     const getMe = vi.fn<AppApi['getMe']>((signal) => {
       if (signal !== undefined) signals.push(signal)
@@ -94,10 +80,6 @@ describe('ViewerProvider', () => {
   }
 
   it('keeps the prop live rather than seeding it once', () => {
-    // `useState(viewer)` makes the prop an initial value only, which silently
-    // breaks the seam a test uses to say who is looking: re-rendering with a
-    // different viewer does nothing, and a test written that way passes against
-    // genuinely broken code.
     const { rerender } = render(
       <ViewerProvider viewer={{ status: 'loading' }}>
         <StatusProbe />
@@ -128,7 +110,6 @@ describe('role helpers', () => {
   })
 
   it('is false for a signed-out or loading viewer', () => {
-    // An admin route must not open during the loading frame.
     for (const status of ['signed-out', 'loading'] as const) {
       expect(isAdmin({ status })).toBe(false)
       expect(isMember({ status })).toBe(false)

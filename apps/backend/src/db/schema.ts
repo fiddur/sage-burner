@@ -312,11 +312,7 @@ export const application = sqliteTable(
   ],
 )
 
-/**
- * Not the feed's thread machinery, deliberately (#477): a feed thread is member-visible by design
- * and this is the one conversation that must not be — it is the applicant and the admins, before
- * there is a membership at all.
- */
+/** Not the feed's thread machinery, deliberately: a feed thread is member-visible and this must not be. */
 export const applicationMessage = sqliteTable(
   'application_message',
   {
@@ -751,9 +747,8 @@ export const notificationSetting = sqliteTable(
   ],
 )
 
-// No CHECK on `category`, unlike its three neighbours: this is a record of what was posted, not
-// a table anybody writes into, and a vocabulary that has moved on must not be able to fail the
-// write that says a notification went out. `docs/accounts.md` has the rest.
+// No CHECK on `category`, unlike its three neighbours: a vocabulary that has moved on must not
+// fail the write that says a notification went out.
 export const notificationBatch = sqliteTable(
   'notification_batch',
   {
@@ -772,8 +767,7 @@ export const notificationBatch = sqliteTable(
   (table) => [primaryKey({ columns: [table.id] }), index('notification_batch_idx').on(table.created_at)],
 )
 
-// `event_id` is nullable for the songbook, whose threads belong to no burn and so outlive
-// every one of them — `docs/the-app.md` has why the book is global.
+// Nullable `event_id`: the songbook belongs to no burn, so its threads outlive every one of them.
 export const thread = sqliteTable(
   'thread',
   {

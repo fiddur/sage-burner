@@ -12,12 +12,6 @@ import type { Ceremony, PasskeyApi } from './passkey.ts'
 import { apiError } from './api/client.ts'
 import { addPasskey, messageForCeremony, signInWithPasskey } from './passkey.ts'
 
-/**
- * The two ceremonies as three steps each, with the middle one — the browser's —
- * injected. `navigator.credentials` does not exist under happy-dom, so a test
- * driving the real one would only ever exercise the failure branch.
- */
-
 const REGISTRATION: RegistrationResponseJSON = {
   id: 'cred-1',
   rawId: 'cred-1',
@@ -62,8 +56,6 @@ const apiOf = (over: Partial<PasskeyApi> = {}): PasskeyApi => ({
 
 describe('addPasskey', () => {
   it('hands the server’s options to the browser and its answer back', async () => {
-    // The whole value of the module: neither end invents an option object, so a
-    // ceremony cannot be started against a challenge the server never minted.
     const register = vi.fn(() => Promise.resolve(REGISTRATION))
     const add = vi.fn(() => Promise.resolve({ passkeys: [] }))
 
@@ -101,8 +93,6 @@ describe('signInWithPasskey', () => {
 
 describe('messageForCeremony', () => {
   it('says nothing when the member closed the dialog', () => {
-    // By far the most common outcome, and not a failure worth an alarming
-    // sentence — the form is still there and so is the button.
     const failure = new Error('The operation either timed out or was not allowed.')
     failure.name = 'NotAllowedError'
 
@@ -110,8 +100,6 @@ describe('messageForCeremony', () => {
   })
 
   it('says nothing for the wrapper the library raises for the same thing', () => {
-    // `@simplewebauthn` renames it, and only for errors it recognises — which is
-    // why the underlying name is checked as well.
     expect(
       messageForCeremony(Object.assign(new Error('aborted'), { code: 'ERROR_CEREMONY_ABORTED' }), 'fallback'),
     ).toBeUndefined()
@@ -124,7 +112,6 @@ describe('messageForCeremony', () => {
   })
 
   it('falls back for anything the browser says in its own words', () => {
-    // The browser's text names internals a member has no use for.
     expect(messageForCeremony(new Error('NotSupportedError: no algorithms'), 'fallback')).toBe('fallback')
   })
 })

@@ -5,13 +5,6 @@ import type { AppApi } from './app.tsx'
 
 import { FetchedInstallationProvider, InstallationProvider, useInstallationTitle } from './installation.tsx'
 
-/**
- * The provider the real app uses, against an injected client.
- *
- * `app.test.tsx` always passes an explicit title so no render there touches the
- * network; this is the file that covers what happens when it does.
- */
-
 const SHELL_TITLE = 'Sage Burner'
 
 beforeEach(() => {
@@ -33,8 +26,6 @@ const shown = () => screen.getByRole('status').textContent
 
 describe('FetchedInstallationProvider', () => {
   it('shows nothing until the answer arrives', async () => {
-    // Not the software's name: on an installation called something else, the
-    // header would say the wrong thing and then correct itself.
     renderWith(vi.fn<AppApi['getInstallation']>(() => new Promise(() => undefined)))
 
     expect(shown()).toBe('-')
@@ -78,8 +69,6 @@ describe('FetchedInstallationProvider', () => {
   })
 
   it('leaves the shell title alone when the request fails', async () => {
-    // What an offline first paint looks like. There is nothing to report and
-    // nowhere on the public homepage to report it.
     renderWith(vi.fn<AppApi['getInstallation']>(() => Promise.reject(new TypeError('Failed to fetch'))))
 
     await waitFor(() => expect(shown()).toBe('-'))

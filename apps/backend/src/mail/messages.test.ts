@@ -8,9 +8,6 @@ describe('an absolute link', () => {
   })
 
   it('is nothing at all where this app does not know its own address', () => {
-    // An email is read outside the app, so a relative path is no use — and a
-    // notification is posted from wherever a role was handed out, with no request to
-    // read `Host` from. Better to say what happened and stop there.
     expect(absolute(undefined, '/meals')).toBeUndefined()
   })
 })
@@ -41,8 +38,6 @@ describe('the invite', () => {
   })
 
   it('keeps the link on a line of its own, and every line short', () => {
-    // Quoted-printable soft-wraps past 76 columns. Decoders put it back, but not in
-    // the middle of the one line that has to survive being clicked.
     expect(invite.text.split('\n')).toContain('https://burn.example.org/invite/a-token')
     for (const line of invite.text.split('\n')) expect(line.length).toBeLessThanOrEqual(76)
   })
@@ -78,8 +73,6 @@ describe('a notification', () => {
   })
 
   it('leaves out the link rather than writing a relative one', () => {
-    // A path in an inbox is not a link. Where the origin is unknown the message says
-    // what happened and stops.
     const message = notificationMessage({
       installation: 'The Burning Sage',
       to: 'ada@example.org',
@@ -123,8 +116,6 @@ describe('the digest', () => {
   })
 
   it('still says where they are when there is no link to give', () => {
-    // The passing sibling: dropping the words from the sentence would satisfy the test above
-    // while leaving an installation without PUBLIC_ORIGIN saying nothing about the off switch.
     const digest = digestMessage({
       installation: 'The Burning Sage',
       to: 'ada@example.org',

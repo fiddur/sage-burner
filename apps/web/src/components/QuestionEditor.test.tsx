@@ -40,13 +40,6 @@ describe('QuestionEditor', () => {
   })
 
   it('lists the questions in the order the API returned', async () => {
-    // Server order, not a local sort — `order` is the server's to assign.
-    //
-    // The array deliberately disagrees with the `order` values: `First` carries
-    // order 2 and arrives first. A component sorting locally by `order` would
-    // render `Second` first and fail. With a pre-sorted fixture (0, 1, 2) a local
-    // sort passed identically, so the comment claimed something the test could
-    // not see.
     renderEditor(
       stub({
         getQuestions: () =>
@@ -57,8 +50,6 @@ describe('QuestionEditor', () => {
     await waitFor(() => {
       expect(screen.getAllByRole('listitem')).toHaveLength(3)
     })
-    // By the label element rather than the row's text: the row leads with the three
-    // reorder controls, so `startsWith` here answered the wrong question.
     expect([...document.querySelectorAll('.question-label')].map((node) => node.textContent)).toEqual([
       'First',
       'Second',
@@ -67,7 +58,6 @@ describe('QuestionEditor', () => {
   })
 
   it('adds a question, sending null for an empty help text', async () => {
-    // "Not set" has exactly one representation; an empty box must not become ''.
     const addQuestion = vi.fn(() => Promise.resolve({ question: q('n', 'New one', 0) }))
     renderEditor(stub({ addQuestion }))
     await screen.findByText(/No questions yet/)
@@ -76,10 +66,6 @@ describe('QuestionEditor', () => {
     screen.getByRole('button', { name: 'Add question' }).click()
 
     await waitFor(() => {
-      // No `options` key: it is optional in the request shape now. Sending an
-      // explicit `null` for a column no question type consumes was ceremony, and
-      // the update path never sent it — so the two halves of this editor
-      // disagreed about whether it is a field you send.
       expect(addQuestion).toHaveBeenCalledWith({
         label: 'New one',
         type: 'textarea',
@@ -104,9 +90,6 @@ describe('QuestionEditor', () => {
   })
 
   it('reports a saved question whose list reload failed as saved', async () => {
-    // The inverse of the failure this component otherwise guards: the write
-    // succeeded, so "Could not add the question." would send an admin to add
-    // it a second time.
     let calls = 0
     const getQuestions = vi.fn(() => {
       calls += 1
@@ -124,8 +107,6 @@ describe('QuestionEditor', () => {
   })
 
   it('will not let an agreement be optional', async () => {
-    // The API refuses the combination; this makes the rule visible rather than
-    // turning a tick into a 400.
     renderEditor(stub())
     await screen.findByText(/No questions yet/)
 
@@ -137,9 +118,6 @@ describe('QuestionEditor', () => {
   })
 
   it('will not add a question whose label is only whitespace', async () => {
-    // `required` passes `'   '`, so without the disabled guard the form submits
-    // and `nonEmptyText(500)` trims it to `''` server-side — an unmapped 400 for
-    // input the browser could have refused.
     const addQuestion = vi.fn(() => Promise.resolve({ question: q('n', 'x', 0) }))
     renderEditor(stub({ addQuestion }))
     await screen.findByText(/No questions yet/)
@@ -151,10 +129,6 @@ describe('QuestionEditor', () => {
   })
 
   it('will not let a checkbox be required', async () => {
-    // The other half of the same rule: a checkbox always has an answer, so
-    // "required" can only mean "must be ticked" — which is what `agreement` is.
-    // The API and the database both refuse it, so the control says so rather than
-    // turning a tick into a 400.
     renderEditor(stub())
     await screen.findByText(/No questions yet/)
 
@@ -166,8 +140,6 @@ describe('QuestionEditor', () => {
   })
 
   it('re-reads after a change rather than patching local state', async () => {
-    // What is on screen has to be what the public form will render, including
-    // the `order` the server assigned.
     const getQuestions = vi.fn(() => Promise.resolve({ questions: [q('a', 'Only', 0)] }))
     renderEditor(stub({ getQuestions, deleteQuestion: () => Promise.resolve(undefined) }))
     await screen.findByText('Only')
@@ -181,8 +153,6 @@ describe('QuestionEditor', () => {
   })
 
   it('sends the whole id list when moving a question down', async () => {
-    // A partial list is rejected by the API — moving one question renumbers
-    // several, and half a reorder is an order nobody chose.
     const reorderQuestions = vi.fn(() => Promise.resolve({ questions: [] }))
     renderEditor(
       stub({
@@ -251,10 +221,6 @@ describe('QuestionEditor', () => {
   })
 
   it('re-reads after a failure so the editor can recover', async () => {
-    // The dead end this closes: another admin adds a question, this list is
-    // stale, every reorder rebuilds the same short id list and the API answers
-    // 400 forever. Without a re-read the only way out was reloading the page,
-    // and the message did not say so.
     const getQuestions = vi.fn(() => Promise.resolve({ questions: [q('a', 'Only', 0), q('b', 'Two', 1)] }))
     renderEditor(
       stub({
@@ -273,12 +239,6 @@ describe('QuestionEditor', () => {
   })
 
   it('will not save a question with an empty label', async () => {
-    // `QuestionFields` is a div, not a form, and Save is type="button", so there
-    // is no constraint validation — without this the request goes out, the shared
-    // schema rejects it, and the admin reads an unmapped "Request failed
-    // (400)". The add form is disabled on the same input, which is what makes the
-    // two halves behave alike; `required` alone would not, since `'   '` passes
-    // browser validation.
     const updateQuestion = vi.fn(() => Promise.resolve({ question: q('a', 'x', 0) }))
     renderEditor(
       stub({ getQuestions: () => Promise.resolve({ questions: [q('a', 'Original', 0)] }), updateQuestion }),

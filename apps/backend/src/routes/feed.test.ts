@@ -29,17 +29,6 @@ import {
 import { sendGuarded } from '../if-match.testing.ts'
 import { CARD_ENTRIES, FEED_LIMIT } from './feed.ts'
 
-/**
- * What everyone has been doing (#303), and what they are talking about (#375).
- *
- * The point of the page is that these are there whether or not anybody switched the
- * matching notification on — so no test here turns one on, and the burn-wide writes
- * still fill the feed.
- *
- * **Everything on it is a card** (#610): one shape, carrying its whole history and the
- * talk under it, whether it is a dream, a person at a burn, an announcement or a lead role.
- */
-
 const SECRET = 'v'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 const BURN = 'e0000000-0000-4000-8000-000000000001'
@@ -47,7 +36,6 @@ const OTHER_BURN = 'e0000000-0000-4000-8000-000000000002'
 
 let handle: DbHandle | undefined
 let app: FastifyInstance | undefined
-/** The app's clock, so the few tests about order can move it between writes. */
 let stamp = NOW
 
 afterEach(async () => {
@@ -117,7 +105,6 @@ const feed = (server: FastifyInstance, cookie?: string, kinds: readonly FeedKind
     ...(cookie === undefined ? {} : { headers: { cookie } }),
   })
 
-/** A card written straight in, for the cases a frozen clock cannot stage. */
 const givenDreamCard = async (
   title: string,
   created_at: string,
@@ -211,8 +198,6 @@ const moveTo = (server: FastifyInstance, cookie: string, dream: string, hour: st
 
 describe('the feed', () => {
   it('carries a card for a dream nobody asked to hear about', async () => {
-    // The whole reason the page exists: `dream_offered` is off by default, so before it
-    // the ordinary way to learn somebody offered one was to go looking at the schedule.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -225,14 +210,10 @@ describe('the feed', () => {
     expect(card?.entries.map((entry) => [entry.author?.name, entry.kind, entry.body])).toEqual([
       ['Ada', 'offered', 'offered this dream'],
     ])
-    // And nothing beside it: one offer is one thing on the page, not two.
     expect(await cards(server, ada.cookie)).toHaveLength(1)
   })
 
   it('shows it to the person who did it, unlike the notification', async () => {
-    // Never notifying somebody about their own click is #247's rule about the bell. The
-    // feed is a page somebody chose to open, so leaving their own card out would make
-    // it read as though nothing happened.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -244,9 +225,6 @@ describe('the feed', () => {
   })
 
   it('heads a card with what the dream is called now, not what it was called then', async () => {
-    // The bug this fixes. A line freezing the title into a sentence went on offering
-    // "Sauna at dawn" after it had been renamed; a card carries the thread's own title
-    // and the rename keeps it in step.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -280,8 +258,6 @@ describe('the feed', () => {
   })
 
   it('keeps the conversation the withdrawal ended, which the thread still answers', async () => {
-    // The soft withdrawal is still soft: what people said to each other is what
-    // `thread.entity_id` carries no key for. It is off the feed, not deleted.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -358,9 +334,6 @@ describe('the feed', () => {
   })
 
   it('is newest first', async () => {
-    // Written straight in, with two stamps: the app's clock is frozen in this suite, so
-    // two writes through the routes would share a millisecond and the order would come
-    // down to the tie-break below rather than to the time.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -372,11 +345,6 @@ describe('the feed', () => {
   })
 
   it('puts the higher id first where two cards share a stamp, so two reads cannot disagree', async () => {
-    // A copied register writes several rows a millisecond apart, and nothing promises
-    // that — an order that changed between two reads of the same rows would read as
-    // though something had happened again. This pins the order `recentThreads` asks for;
-    // it does not prove the tie-break, since SQLite answers this group-by the same way
-    // with and without it, which was measured rather than reasoned out.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -389,8 +357,6 @@ describe('the feed', () => {
   })
 
   it('stops at the limit rather than answering the whole table', async () => {
-    // A page, not an audit log. The other half of the retention rule, and the reason
-    // `FEED_LIMIT` is a named export rather than a literal in the query.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -401,7 +367,6 @@ describe('the feed', () => {
 
     const rows = await titles(server, ada.cookie)
     expect(rows).toHaveLength(FEED_LIMIT)
-    // And it is the newest that survive the cut, not the first written.
     expect(rows[0]).toBe(`Card ${FEED_LIMIT}`)
   })
 
@@ -414,8 +379,6 @@ describe('the feed', () => {
   })
 
   it('lets an admin who is coming to nothing read it', async () => {
-    // The roles are independent, and somebody organising but not attending is who most
-    // wants to know whether anything is happening.
     const server = await build()
     await givenBurn()
     const organiser = await givenAccount('Cai', ['admin'])
@@ -424,8 +387,6 @@ describe('the feed', () => {
   })
 
   it('goes with the burn, which is the whole retention rule', async () => {
-    // Asserted against the table, not the route: the route's `innerJoin event` hides an
-    // orphan either way, so reading through it would pass with the cascade removed.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -436,16 +397,12 @@ describe('the feed', () => {
 
     await db().delete(event).where(eq(event.id, BURN))
 
-    // The thread goes with the burn, and the entries with the thread — a conversation
-    // outlives its dream, not the burn it was at.
     expect(await db().select().from(thread)).toEqual([])
     expect(await db().select().from(threadEntry)).toEqual([])
     expect(await cards(server, ada.cookie)).toEqual([])
   })
 
   it('holds nothing but what a card is made of', async () => {
-    // The disclosure argument, as an assertion: `readThreads` names every column it
-    // answers with, so a payment date or an address cannot reach the page through it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -475,9 +432,6 @@ describe('the feed', () => {
   })
 
   it('folds an afternoon of dragging into one line', async () => {
-    // Coalescing on the write: same kind, same person, nothing in between. Without it a
-    // grid session writes a line per drag and the thread is unreadable — and the card
-    // would show four moves and none of the talk.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -529,8 +483,6 @@ describe('the feed', () => {
   })
 
   it('keeps a rename and a move apart', async () => {
-    // Why these are three kinds rather than one `edited`: coalescing is per aspect, so a
-    // later move must not overwrite the rename that came before it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -545,8 +497,6 @@ describe('the feed', () => {
   })
 
   it('shows the end of the conversation, and says how much more there is', async () => {
-    // What bounds the page, and with it what the installed app keeps on disk: a card
-    // carries a few lines whatever the thread holds.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -564,9 +514,6 @@ describe('the feed', () => {
   })
 
   it('rises when somebody says something', async () => {
-    // What the page is for: a dream offered a week ago that is being talked about this
-    // morning belongs at the top, and the sort key is the newest entry rather than the
-    // thread's own age.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -593,7 +540,6 @@ describe('the feed', () => {
   })
 
   it('leaves the ones nobody took back where they were', async () => {
-    // The passing sibling: what goes is the withdrawn one, not the page around it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -618,8 +564,6 @@ describe('the feed', () => {
   })
 
   it('does not bring one back when somebody says something on it', async () => {
-    // #611's fix left a taken-back card in place and let a comment lift it; the card is
-    // off the page now, so there is nothing for the comment to lift.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -642,8 +586,6 @@ describe('the feed', () => {
   })
 
   it('takes an announcement off the page when it is taken back', async () => {
-    // Four routes write a `withdrawn` entry — this is the one whose bin is on the feed
-    // itself, so the card goes from under the press that removed it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -666,8 +608,6 @@ describe('the feed', () => {
   })
 
   it('cuts the page against everything on it, whatever kind each one is', async () => {
-    // Fifty things, not fifty of each: a burn full of talk must not push the rest off
-    // the page, and a quiet one must not leave it half empty.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -676,7 +616,6 @@ describe('the feed', () => {
       await givenDreamCard(`Card ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
     }
 
-    // Newer than every one of them, so it takes the last place and one card loses it.
     stamp = '2026-07-03T00:00:00.000Z'
     await addLeadRole(server, ada.cookie, 'Firewood')
 
@@ -698,8 +637,6 @@ describe('the feed', () => {
     await feed(server, ada.cookie)
 
     expect(await db().select().from(threadEntry)).toHaveLength(2)
-    // And no bell row for the reader: the two surfaces are separate, and reading one
-    // must not fill the other.
     const bell = await server.inject({
       method: 'GET',
       url: '/api/me/notifications',
@@ -737,8 +674,6 @@ describe('somebody’s own card', () => {
   })
 
   it('links a dream card at the dream, with the burn it belongs to', async () => {
-    // The other half: building the link moved from the web to `readThreads`, and the test moved
-    // with it for the person's card only (#449).
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -777,9 +712,6 @@ describe('somebody’s own card', () => {
   })
 
   it('carries the whole introduction, because that card is the person’s presentation', async () => {
-    // It was cut at 280 characters with an ellipsis (#478). The excerpt rules exist to stop a
-    // post or a dream swallowing the feed, not to truncate the one thing whose whole job is to
-    // be read — and `MAX_INTRODUCTION` already bounds it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -833,8 +765,6 @@ describe('somebody’s own card', () => {
       url: `/api/threads/${before?.id ?? ''}`,
       headers: { cookie: bea.cookie },
     })
-    // Still their name and still their page: the stay is what has gone, not the person, and
-    // the card is found by the person now (#449).
     expect(answered.json().thread.gone).toBe(true)
     expect(answered.json().thread.link).toBe(`/members/${ada.id}`)
     expect(answered.json().thread.title).toBe('Ada')
@@ -870,9 +800,6 @@ describe('somebody’s own card', () => {
 
 describe('a lead role added before roles had cards', () => {
   it('gets one from the backfill, dated from when the role appeared', async () => {
-    // The other half of `20260815100100_role_cards` (#610): what it writes is what the feed
-    // reads. Staged by hand and swept by the shipped SQL, since the migration has long run by
-    // the time this suite can add a role.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -902,8 +829,6 @@ describe('a lead role added before roles had cards', () => {
     expect(card?.entries.map((entry) => [entry.author, entry.kind, entry.body])).toEqual([
       [null, 'added', 'added this lead role'],
     ])
-    // Dated by the adding rather than by the deploy, so an old role does not arrive at the
-    // top of the feed as though it were news.
     expect(card?.last_at).toBe('2026-07-01T09:00:00.000Z')
   })
 
@@ -980,7 +905,6 @@ describe('the kinds a viewer asks for', () => {
   })
 
   it('loses a person’s card behind a run of dreams when nothing is filtered', async () => {
-    // The premise the filter exists for, and it has to hold for the next test to say anything.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -1005,8 +929,6 @@ describe('the kinds a viewer asks for', () => {
   })
 
   it('ignores a kind it does not know, rather than failing the read', async () => {
-    // A stale link shows more than asked for and never an error page — `feedKindsFrom`'s rule,
-    // asserted through the route because that is where a rejected query would show.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')

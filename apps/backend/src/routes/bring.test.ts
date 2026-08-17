@@ -13,6 +13,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event, notificationBatch } from '../db/schema.ts'
+import { bell, cardOf, setOn } from './thread-testing.ts'
 
 const SECRET = 'p'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -101,22 +102,6 @@ const handDown = (server: FastifyInstance, cookie: string, id: string, accountId
 
 const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
   (await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })).json().threads
-
-/** Read by id, which is how a card taken back is read at all: the feed drops it (#617). */
-const cardOf = async (server: FastifyInstance, cookie: string, threadId: string): Promise<Thread> =>
-  (await server.inject({ method: 'GET', url: `/api/threads/${threadId}`, headers: { cookie } })).json().thread
-
-const bell = async (server: FastifyInstance, cookie: string): Promise<{ category: string; body: string }[]> =>
-  (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
-    .notifications
-
-const setOn = (server: FastifyInstance, cookie: string, on: string[]) =>
-  server.inject({
-    method: 'PUT',
-    url: '/api/me/notification-settings',
-    headers: { cookie },
-    payload: { on, email: [], digest: 'daily' },
-  })
 
 const say = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
   server.inject({

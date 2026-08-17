@@ -45,10 +45,10 @@ version of that rule read `!viewerAttending && candidates.length > 0`, which con
 different empties: a spot the page deliberately closed — a chore's lead, which nobody may take
 — and a burn nobody has joined yet, where `getEventAttendees` answers nothing. The second is
 every burn on the day it opens, and it is the state #503 is most about, so the person the nudge
-is for saw no hand at all on exactly the burn they were looking at. `shut` is now a prop the
-chore sites pass, it suppresses the hand and the appoint control together, and an empty
-`candidates` list means only
-what it says: nobody to appoint. Joining is what opens the rest, which is what the nudge says.
+is for saw no hand at all on exactly the burn they were looking at. `shut` is now a prop the chore
+sites pass, it suppresses the hand and the appoint control together, and an empty `candidates` list
+means only what it says: nobody to appoint. Joining is what opens the rest, which is what the nudge
+says.
 
 **`viewerAttending` went with it.** Eight call sites passed the same
 `attendees.some((who) => who.account_id === viewerId)` while also passing `everyone={attendees}`,
@@ -60,8 +60,8 @@ the one place that needs it.
 meal dialog — where it is most likely pressed — produced "You need to join this burn" with
 nowhere to go. One `ErrorText`, in the component both surfaces share.
 
-It is hidden when there is nothing to choose between — one burn is the ordinary
-case and a select with a single option is furniture.
+**The burn selector is hidden when there is nothing to choose between** — one burn is the
+ordinary case and a select with a single option is furniture.
 
 **Every burn-scoped page says the same thing when it has no burn**, through `NoBurn`.
 Now that both personas are offered every coming burn, an empty list means the same thing
@@ -209,8 +209,8 @@ against that wrapper instead of the viewport — which is `.bottom-bar` and `.be
 and exactly the class of bug #344 and #348 were. The z-index scale gains two: bar 20,
 popdown 30, the push nudge 32, the drawer's backdrop 34, the drawer 35, modal 40 — the
 backdrop one rung under what it sits behind rather than a round number of its own, and the
-nudge above the popdown because a popdown is what raises it (#589). `styles.test.ts` holds
-that order, the stylesheet being the only place it is written down.
+nudge above the popdown because a popdown is what raises it (#589). `styles.test.ts` holds the
+whole of that order, the stylesheet being the only place it is written down.
 
 It is **rendered only while open** rather than hidden with CSS, so its links are out of
 the tab order the rest of the time with no `inert` to keep in step with an animation.
@@ -314,11 +314,11 @@ layout viewport on mobile, the fixed bottom bar went with it, too wide to fit an
 the visible area until the page was scrolled to its end. `styles.test.ts` asserts the
 rule, because happy-dom applies no CSS and nothing else in the suite can see it.
 
-**Three things float over a page**, and they share one stacking context — `.layout`
-creates none — so source order decides ties. The scale is written down because it was
-discovered rather than chosen: bar 20, the bell's popdown 30, a modal 40. At the same
-`20` the nav painted over a dream's backdrop on a phone, with its links still tappable
-through an overlay meant to be modal (#344).
+**Things that float over a page** share one stacking context — `.layout` creates none — so
+source order decides ties. The scale is written down because it was discovered rather than
+chosen, and **☰, at the leading edge of the bar** above is where the whole of it is written: at the
+same `20` the nav painted over a dream's backdrop on a phone, with its links still tappable through
+an overlay meant to be modal (#344).
 
 ### Wide things, and large text
 
@@ -906,7 +906,7 @@ the participants rule above decides; `enabled` puts somebody in the reply audien
 having spoken; disabled takes them out of it though they would otherwise be in — which is the
 escape hatch for a commenter drowning in a lively thread, and falls out of the same column for
 free. `tellAbout`'s audience becomes (participants ∪ followers) − muted − author, and the wider
-`_any` audience is **muted − author** as well (#487). It was not, and a mute was then a downgrade
+`_any` audience has **muted** subtracted from it as well (#487). It was not, and a mute was then a downgrade
 rather than a silence: subtracting muters from the participants made them newly eligible for the
 `_any` bucket, so somebody who had turned on `dream_comment_any` and then muted one thread heard
 about every reply to it under the other category, while the box read unchecked. A mute is the one
@@ -1733,9 +1733,9 @@ The one place the stack overrides a modifier is `.dream-supporter .dream-facilit
 which zeroes the chip's leading gap so the faces actually overlap.
 
 `HelperStrip` takes the burn's attendees as `everyone` for this, separately from
-`candidates`: candidates is filtered — a chore offers nobody, a dream's helpers
-exclude its facilitator — so anybody already on the list is by definition absent from
-it, and looking there would draw initials for exactly the people who have a picture.
+`candidates`: a dream's candidates exclude its facilitator, so anybody already on the
+list is by definition absent from it, and looking there would draw initials for exactly
+the people who have a picture. A chore passes every attendee and sets `shut` instead.
 It is required rather than optional so a call site cannot quietly forget it.
 
 **A `<select>` keeps a bare name.** An `<option>` cannot hold an image, so the badge

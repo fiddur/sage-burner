@@ -4,16 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { MarkdownField } from './MarkdownField.tsx'
 
-// The resize is a canvas round-trip and happy-dom has no canvas that draws, so it is
-// stubbed here and tested for what it can be tested for in `image.test.ts`. What is under
-// test is everything after it: the placeholder, the swap, and what a refusal leaves behind.
 vi.mock('../image.ts', () => ({ resizedImage: (file: Blob) => Promise.resolve(file) }))
 
 afterEach(cleanup)
 
 const aPicture = (name = 'sauna.jpg') => new File([new Uint8Array([1, 2, 3])], name, { type: 'image/jpeg' })
 
-/** The field is controlled, so the test has to hold the value the way a page would. */
 const Field = ({
   upload,
   maxLength = 2000,
@@ -75,9 +71,6 @@ describe('putting a picture in a markdown field', () => {
   })
 
   it('says why an SVG will not do, rather than failing at the decode', async () => {
-    // The server refuses the type outright. Left to `resizedImage` it fails at
-    // `createImageBitmap` and reads as "could not read that picture", which sends
-    // somebody with a perfectly good logo off to re-export it (#392).
     const upload = vi.fn(() => Promise.resolve({ id: 'img-1' }))
     render(<Field upload={upload} />)
 
@@ -89,8 +82,6 @@ describe('putting a picture in a markdown field', () => {
   })
 
   it('still takes the raster pictures pasted alongside one', async () => {
-    // The passing sibling: refusing the whole paste would satisfy the test above while
-    // losing the photograph somebody meant to send.
     render(<Field upload={() => Promise.resolve({ id: 'img-1' })} />)
 
     paste([new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }), aPicture()])
@@ -139,8 +130,6 @@ describe('putting a picture in a markdown field', () => {
   })
 
   it('keeps what was typed while the picture was in flight', async () => {
-    // #205's rule, and this is the field every comment box shares: a picture arriving
-    // must not throw away the sentence somebody wrote while waiting for it.
     let finish = (_: { id: string }) => undefined as void
     render(<Field upload={() => new Promise<{ id: string }>((resolve) => (finish = resolve))} />)
 
@@ -211,10 +200,6 @@ describe('putting a picture in a markdown field', () => {
   })
 
   it('counts the room the finished markdown needs, not the shorter placeholder', async () => {
-    // `![Uploading a.jpg…]()` is 21 characters and `![](/api/images/<uuid>)` is 53, so a
-    // field with room for the first and not the second used to take the picture and
-    // overflow on the swap — and `maxLength` does not truncate a value set from code, so
-    // nothing caught it until the save came back refused.
     render(<Field upload={() => Promise.resolve({ id: 'x'.repeat(36) })} maxLength={60} start="0123456789" />)
 
     paste([aPicture('a.jpg')])
@@ -224,8 +209,6 @@ describe('putting a picture in a markdown field', () => {
   })
 
   it('still takes one when the finished markdown does fit', async () => {
-    // The passing sibling: a guard that refused everything would satisfy the test above
-    // while making a picture impossible to add to any bounded field.
     render(<Field upload={() => Promise.resolve({ id: 'x'.repeat(36) })} maxLength={64} start="0123456789" />)
 
     paste([aPicture('a.jpg')])

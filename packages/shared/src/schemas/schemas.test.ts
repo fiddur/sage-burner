@@ -102,8 +102,6 @@ describe('eventSchema', () => {
   })
 
   it('accepts an end time earlier in the clock than the start, across days', () => {
-    // The ordinary case, and the reason the times only decide it when the days
-    // are equal: 15:00 Friday to 12:00 Sunday is a normal burn.
     expect(eventSchema.safeParse(anEvent).success).toBe(true)
   })
 
@@ -198,9 +196,6 @@ describe('applicationSchema', () => {
   })
 
   it('requires the wording, not just a reference', () => {
-    // The whole reason answers are stored as a snapshot: an application that kept
-    // only `question_id` stops being readable the moment a question is edited or
-    // deleted, and that is not recoverable afterwards.
     const { label: _label, ...withoutLabel } = anAnswer
     expect(applicationSchema.safeParse({ ...anApplication, answers: [withoutLabel] }).success).toBe(false)
   })
@@ -229,24 +224,15 @@ describe('applicationCreateSchema', () => {
   })
 
   it('requires the list of questions the form showed', () => {
-    // Not optional: absent, the route would have to fall back to the current
-    // question list, which is the assumption that stored a question against
-    // someone who never saw it.
     const { asked: _omitted, ...without } = aSubmission
     expect(applicationCreateSchema.safeParse(without).success).toBe(false)
   })
 
   it('accepts a form that showed a question nobody answered', () => {
-    // The passing sibling to the case above: `asked` is required, and an empty
-    // `answers` beside a non-empty one is still a valid body. Nothing here
-    // relates the two — no schema rule could — so that a question shown and left
-    // blank is *stored* as asked is `applications.test.ts`'s to prove.
     expect(applicationCreateSchema.safeParse({ ...aSubmission, answers: {} }).success).toBe(true)
   })
 
   it('caps how many questions a submission may claim it was shown', () => {
-    // Both boundaries, like `MAX_ANSWER_LENGTH` has: without them a `.max()`
-    // dropped, or written as `.min()`, fails nothing.
     const ids = (count: number) => Array.from({ length: count }, () => OTHER_ID)
 
     expect(
@@ -263,19 +249,10 @@ describe('applicationCreateSchema', () => {
   })
 
   it('rejects a submitter who names their own status', () => {
-    // `.strict()`, so this is a 400 rather than a dropped key — otherwise the
-    // request that approves its own application looks like it succeeded.
     expect(applicationCreateSchema.safeParse({ ...aSubmission, status: 'approved' }).success).toBe(false)
   })
 
   it('rejects a submitter who supplies the wording', () => {
-    // The label is the server's, read from the question rows. Accepting it here
-    // would let an application record a question that was never asked.
-    //
-    // Written in the record shape this schema does take, so the refusal comes
-    // from `answerValueSchema` rejecting an object where a string or boolean
-    // belongs. An array would be refused too, but for the wrong reason — it would
-    // fail identically for `[1, 2, 3]`, which proves nothing about labels.
     const answers = { [OTHER_ID]: { label: 'Something else entirely', value: 'x' } }
     expect(applicationCreateSchema.safeParse({ ...aSubmission, answers }).success).toBe(false)
   })
@@ -352,9 +329,6 @@ describe('attendanceSchema', () => {
   })
 
   it('takes lodging as a reference and refuses anything that is not one', () => {
-    // Free text until the per-event lists existed. The point of the reference is
-    // that an admin can count who is sleeping where, which a typed-in string
-    // cannot support — so an id is the only thing that parses.
     expect(attendanceSchema.safeParse({ ...aMember, lodging_option_id: null }).success).toBe(true)
     expect(attendanceSchema.safeParse({ ...aMember, lodging_option_id: 'Hammock' }).success).toBe(false)
   })
@@ -424,8 +398,6 @@ describe('sessionSchema', () => {
     time_slot_start: '2026-10-03T09:00:00Z',
     time_slot_end: '2026-10-03T10:30:00Z',
     place_id: OTHER_ID,
-    // Read-only, and not columns on `session` — which is why the create and update
-    // bodies derive from `sessionFields` rather than from `sessionSchema`.
     helpers: [{ account_id: ID, name: 'Ada' }],
     supporters: [{ account_id: ID, name: 'Ada', avatar: null }],
     support_count: 3,
@@ -434,16 +406,11 @@ describe('sessionSchema', () => {
   }
 
   it('lets a partial edit carry one end of the slot, which only the row can judge', () => {
-    // An absent key is not a null one. Conflating them made every single-ended
-    // PATCH a 400 before the stored row was ever consulted. `sessions.ts` merges
-    // the update onto the row and runs `hasValidTimeSlot` on the result.
     expect(sessionUpdateSchema.safeParse({ time_slot_end: '2026-10-03T10:30:00Z' }).success).toBe(true)
     expect(sessionUpdateSchema.safeParse({ time_slot_start: null }).success).toBe(true)
   })
 
   it('still refuses half a slot when the edit carries both keys', () => {
-    // The passing sibling: deferring the lone-key case must not disarm the rule
-    // where it is decidable.
     expect(
       sessionUpdateSchema.safeParse({ time_slot_start: '2026-10-03T09:00:00Z', time_slot_end: null }).success,
     ).toBe(false)
@@ -478,9 +445,6 @@ describe('sessionSchema', () => {
   })
 
   it('rejects a backwards slot even when the two ends differ in precision', () => {
-    // Lexicographically '…T09:00:00.500Z' < '…T09:00:00Z' ('.' sorts before
-    // 'Z'), so a string comparison would wave this through despite the slot
-    // ending half a second before it starts.
     const mixedPrecision = {
       ...aSession,
       time_slot_start: '2026-10-03T09:00:00.500Z',
@@ -501,12 +465,6 @@ describe('sessionSchema', () => {
 })
 
 describe('deriving schemas', () => {
-  // The write path is the one that matters. Deriving from the unrefined
-  // `*Fields` objects is what makes create/update bodies possible at all, but
-  // it drops the cross-field refinements unless they are re-applied — so each
-  // case below checks the derived schema still rejects, not merely that the
-  // derivation succeeded.
-
   it('derives an event create body that still enforces the date order', () => {
     const createEvent = withEventDateOrder(eventFields.omit({ id: true, created_at: true }))
     const valid = { ...anEvent, id: undefined, created_at: undefined }
@@ -514,13 +472,10 @@ describe('deriving schemas', () => {
 
     const backwards = { ...valid, start_date: '2026-10-04', end_date: '2026-10-02' }
     expect(createEvent.safeParse(backwards).success).toBe(false)
-    // Without the wrapper the invariant is silently gone — this is the trap.
     expect(eventFields.omit({ id: true, created_at: true }).safeParse(backwards).success).toBe(true)
   })
 
   it('defaults the transfer text so a new burn already has something to say when full', () => {
-    // Keys deleted rather than set undefined: the create schema is `.strict()`, so
-    // an `id: undefined` is an unknown key and the parse fails for the wrong reason.
     const { id: _id, created_at: _created, transfer_info_markdown: _text, ...body } = anEvent
 
     const parsed = eventCreateSchema.safeParse(body)
@@ -529,7 +484,6 @@ describe('deriving schemas', () => {
   })
 
   it('keeps what an admin wrote over the default', () => {
-    // The passing sibling: always answering the default would satisfy the test above.
     const { id: _id, created_at: _created, ...body } = anEvent
 
     const parsed = eventCreateSchema.safeParse({ ...body, transfer_info_markdown: 'Ask Ada.' })
@@ -628,11 +582,6 @@ describe('publicMeetingSchema', () => {
 
 describe('publicSessionSchema', () => {
   it('exposes exactly these fields and nothing else', () => {
-    // An allowlist, deliberately, not a denylist of known-sensitive names.
-    // This schema is the guard rail for an unauthenticated endpoint, so adding
-    // a field must fail this test until someone consciously widens it — a
-    // denylist only catches leaks that were thought of in advance, and
-    // `host_name` is exactly the field most likely to get added here.
     expect(Object.keys(publicSessionFields.shape).sort()).toEqual([
       'color',
       'description',
@@ -681,24 +630,6 @@ describe('publicSessionSchema', () => {
 })
 
 describe('the named length limits', () => {
-  /**
-   * Each bound, at the limit and one past it.
-   *
-   * The point of `limits.ts` is that the schema and the form share one number, and
-   * the failure it prevents is silent: tighten a bound and a form still carrying the
-   * old literal lets people type past it, so a friendly stop at the keyboard becomes
-   * a blank 400 on submit.
-   *
-   * What these catch is a **schema drifting off the constant** — someone writing
-   * `nonEmptyText(150)` again. They deliberately do not catch a change to the
-   * constant itself: the schema and the assertion read the same number, so moving
-   * it moves both. That half is not testable from here and does not need to be —
-   * moving the constant is the intended way to change a bound, and every form
-   * follows it because they read it too.
-   */
-  // Local fixtures: the ones above are scoped to their own describes, and a bound
-  // is worth checking against a minimal valid row rather than a shared one that
-  // might be edited for another reason.
   const aProfile = {
     account_id: ID,
     email: 'someone@example.org',
@@ -749,8 +680,6 @@ describe('the named length limits', () => {
   }
 
   it('keeps a slug bounded where `slugSchema` says, not where a projection guesses', () => {
-    // `rosterResponseSchema`'s event projection used to bound this at 120 while
-    // `slugSchema` bounded it at 64 — one fact spelled two ways.
     expect(slugSchema.safeParse('a'.repeat(MAX_SLUG)).success).toBe(true)
     expect(slugSchema.safeParse('a'.repeat(MAX_SLUG + 1)).success).toBe(false)
   })
@@ -773,11 +702,6 @@ describe('the summaries derived from `eventFields`', () => {
   }
 
   it('holds a summarised slug to the same rule as a real one', () => {
-    // The divergence this replaced: written out by hand, the summary bounded `slug`
-    // as plain text, so it accepted `Not A Slug!` where `slugSchema` — the thing it
-    // claims to summarise — accepts only lowercase hyphenated words. The summary
-    // moved to `myBurnSchema` when the routes stopped being scoped to "active"; the
-    // rule it has to keep did not.
     const withSlug = (slug: string) =>
       myBurnSchema.safeParse({
         event: {

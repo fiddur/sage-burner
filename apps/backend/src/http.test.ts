@@ -10,14 +10,6 @@ import { createConfig } from './config.ts'
 import { createDb, runMigrations } from './db/index.ts'
 import { bodyOf, sendError } from './http.ts'
 
-/**
- * The two openings every route now shares (#138).
- *
- * `sendError` is exercised through a real app rather than a stub reply, because what
- * it promises is a *pairing* — a status and the slug that belongs to it — and only a
- * response that came out of Fastify proves the pair survived serialisation.
- */
-
 let handle: DbHandle | undefined
 let app: FastifyInstance | undefined
 
@@ -36,8 +28,6 @@ const build = async () => {
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: 's'.repeat(40) }),
   })
 
-  // A route per status, registered on the real instance so the envelope goes through
-  // the same serialisation as every other refusal.
   for (const status of [400, 401, 403, 404, 409, 415, 429] as const) {
     app.get(`/test/${status}`, (_request, reply) => sendError(reply, status))
   }
@@ -86,8 +76,6 @@ describe('reading a body', () => {
   })
 
   it('applies the schema defaults, like the safeParse it replaces', () => {
-    // Several routes lean on this — `sessionCreateSchema` defaults five fields — so
-    // returning the *input* rather than the parsed output would quietly drop them.
     const withDefault = z.object({ name: z.string(), note: z.string().default('') })
 
     expect(bodyOf(withDefault, { body: { name: 'Ada' } })).toEqual({

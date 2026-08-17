@@ -33,10 +33,6 @@ describe('the timetable rows', () => {
   })
 
   it('does not repeat an hour on the day the clocks go forward', () => {
-    // 2026-03-29 in Europe/Stockholm, which the suite is pinned to: 02:00 does
-    // not exist. Stepping the wall clock crosses the gap once, so no row repeats
-    // and none is invented. Setting hours on a date instead lands on 03:00 twice,
-    // which is what makes this worth asserting.
     const rows = hoursOf('2026-03-29', '2026-03-29')
 
     expect(rows).toEqual([...new Set(rows)])
@@ -44,7 +40,6 @@ describe('the timetable rows', () => {
   })
 
   it('is 49 rows for midday Friday to midday Sunday, the figure docs/schedule.md quotes', () => {
-    // A number in prose goes stale silently, so it is asserted here.
     expect(hoursOf('2026-08-01', '2026-08-03', '12:00', '12:00')).toHaveLength(49)
   })
 
@@ -56,8 +51,6 @@ describe('the timetable rows', () => {
   })
 
   it('runs past midnight when the burn does, without an extra day of empties', () => {
-    // What `dayAfter` used to guess at. The admin says 04:00 on the 3rd and
-    // gets exactly that.
     const rows = hoursOf('2026-08-01', '2026-08-03', '18:00', '04:00')
 
     expect(rows[0]).toBe('2026-08-01T18:00')
@@ -65,11 +58,6 @@ describe('the timetable rows', () => {
   })
 
   it('does not repeat an hour on the day the clocks go back', () => {
-    // The other direction, and the one the removed deduplication also covered.
-    // 2026-10-25 has 25 real hours in Europe/Stockholm, two of them 02:00.
-    // Stepping the wall clock gives one row per label, so nothing collides as a
-    // key — checked rather than assumed, since the answer depends on how
-    // `setHours` resolves an ambiguous local time.
     const rows = hoursOf('2026-10-25', '2026-10-25')
 
     expect(rows).toEqual([...new Set(rows)])
@@ -85,8 +73,6 @@ describe('the timetable rows', () => {
 
 describe('placing a dream in a row', () => {
   it('finds the row for an instant, in local time', () => {
-    // Pinned to Europe/Stockholm by `vite.config.ts`: 18:00Z in August is 20:00
-    // local, so the dream belongs in the 20:00 row and not the 18:00 one.
     expect(hourOf('2026-08-02T18:00:00.000Z')).toBe('2026-08-02T20:00')
   })
 
@@ -108,7 +94,6 @@ const placed = (id: string, start: string, end: string) => ({
   time_slot_end: end,
 })
 
-// 08:00Z is 10:00 local in August; the suite is pinned to Europe/Stockholm.
 const at = (hourUtc: number) => `2026-08-01T${String(hourUtc).padStart(2, '0')}:00:00.000Z`
 
 describe('how many rows a dream covers', () => {
@@ -158,8 +143,6 @@ describe('a lane as table cells', () => {
   })
 
   it('keeps a dream that starts inside another, rather than dropping it', () => {
-    // An overlap in one lane is an admin's mistake to see. The covered rows
-    // render no cell of their own, so the only place left is the block above.
     const cells = laneCells(ROWS, [placed('long', at(8), at(11)), placed('inside', at(9), at(10))])
     const anchor = cells[ROWS.indexOf('2026-08-01T10:00')]
 
@@ -170,8 +153,6 @@ describe('a lane as table cells', () => {
     const cells = laneCells(ROWS, [placed('long', at(8), at(10)), placed('later', at(9), at(13))])
     const anchor = cells[ROWS.indexOf('2026-08-01T10:00')]
 
-    // 10:00 through 15:00 exclusive is five rows, not four: the block has to
-    // reach the end of the dream that joined it.
     expect(anchor).toMatchObject({ kind: 'anchor', span: 5 })
     expect(kinds(cells).slice(ROWS.indexOf('2026-08-01T10:00'), ROWS.indexOf('2026-08-01T16:00'))).toEqual([
       'anchor',
@@ -184,8 +165,6 @@ describe('a lane as table cells', () => {
   })
 
   it('emits exactly one cell per row once covered rows are dropped', () => {
-    // The invariant `rowSpan` depends on: anchors plus their spans must account
-    // for every row, or the column shifts sideways.
     const cells = laneCells(ROWS, [placed('a', at(8), at(11)), placed('b', at(14), at(15))])
     const rendered = cells.reduce((total, cell) => total + (cell.kind === 'covered' ? 0 : 1), 0)
     const spanned = cells.reduce(
@@ -211,13 +190,10 @@ describe('pulling a dream’s bottom edge', () => {
 
   it('makes it shorter, down to the hour a row is worth', () => {
     expect(resizedEnd(twoHours, -1)).toBe('2026-08-01T19:00:00.000Z')
-    // Not zero, and not backwards: a dream still has to occupy the row it starts in.
     expect(resizedEnd(twoHours, -5)).toBe('2026-08-01T19:00:00.000Z')
   })
 
   it('answers null when nothing would change', () => {
-    // The caller sends no PATCH for these. A drag that never crossed a boundary is
-    // the common one — a few pixels of hand tremor is not a resize.
     expect(resizedEnd(twoHours, 0)).toBeNull()
     expect(
       resizedEnd(
@@ -233,8 +209,6 @@ describe('pulling a dream’s bottom edge', () => {
   })
 
   it('snaps an odd length onto the hour it is nearest', () => {
-    // The grid cannot show 20:40, so a resize done in it must not set one. The
-    // Dreams form is where a minute-precision end is typed.
     const ninety = {
       time_slot_start: '2026-08-01T18:00:00.000Z',
       time_slot_end: '2026-08-01T19:30:00.000Z',
@@ -253,9 +227,6 @@ describe('how far a pointer dragged, in rows', () => {
   })
 
   it('says nothing moved when the row has no height to divide by', () => {
-    // Which is every row under happy-dom: it computes no layout, so the pointer
-    // half of this gesture wants a click-through in a browser. Guarded rather than
-    // left to produce Infinity and a resize to the end of time.
     expect(rowsDragged(120, 0)).toBe(0)
   })
 })
@@ -264,7 +235,6 @@ describe('the blocks a meal draws', () => {
   const dinner = { id: 'm-1', date: '2026-08-01', at: '18:00', label: 'Dinner', kind: 'meal' as const }
 
   it('cooks for two hours, eats for one and washes up for one', () => {
-    // Pinned to Europe/Stockholm: 18:00 local in August is 16:00Z.
     expect(mealBlocks(dinner)).toEqual([
       {
         id: 'm-1:cook',
@@ -307,14 +277,12 @@ describe('the blocks a meal draws', () => {
 
 describe('dropping one of a meal’s blocks', () => {
   it('puts the block where it landed, and the meal follows', () => {
-    // Cooking is the two hours before, so dropping it on 12:00 is a 14:00 meal.
     expect(mealMovedTo('cook', '2026-08-02T12:00')).toEqual({ date: '2026-08-02', at: '14:00' })
     expect(mealMovedTo('serve', '2026-08-02T14:00')).toEqual({ date: '2026-08-02', at: '14:00' })
     expect(mealMovedTo('clean', '2026-08-02T15:00')).toEqual({ date: '2026-08-02', at: '14:00' })
   })
 
   it('carries the meal onto another day when the offset crosses midnight', () => {
-    // Dropping the cleanup block on 00:00 means a meal at 23:00 the night before.
     expect(mealMovedTo('clean', '2026-08-03T00:00')).toEqual({ date: '2026-08-02', at: '23:00' })
   })
 

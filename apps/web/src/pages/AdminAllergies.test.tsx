@@ -71,9 +71,6 @@ describe('AdminAllergies', () => {
   })
 
   it('says who is holding an item that cannot be removed, and what to do instead', async () => {
-    // The refusal is the feature: a label going must not take part of somebody's
-    // record with it. A generic "could not remove that" would send an admin
-    // retrying forever.
     renderPage(stub({ deleteAllergyItem: () => Promise.reject(apiError(409, 'conflict', 'nope')) }))
 
     fireEvent.click(await screen.findByLabelText('Remove Vegan'))
@@ -83,8 +80,6 @@ describe('AdminAllergies', () => {
   })
 
   it('reports an ordinary removal failure plainly', async () => {
-    // The passing sibling: showing the ticked-by-somebody message for every failure
-    // would satisfy the test above while misdescribing a network drop.
     renderPage(stub({ deleteAllergyItem: () => Promise.reject(apiError(500, 'unknown', 'boom')) }))
 
     fireEvent.click(await screen.findByLabelText('Remove Vegan'))

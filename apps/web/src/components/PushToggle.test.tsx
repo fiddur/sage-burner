@@ -12,29 +12,18 @@ import { PushToggle } from './PushToggle.tsx'
 
 afterEach(cleanup)
 
-/** A subscription shaped the way a real `PushSubscription` serialises. */
 const aSubscription = (endpoint = 'https://push.example/one') => ({
   endpoint,
   unsubscribe: () => Promise.resolve(true),
   toJSON: () => ({ endpoint, keys: { p256dh: 'a-public-key', auth: 'a-secret' } }),
 })
 
-/**
- * A browser that remembers, the way a real one does.
- *
- * `getSubscription()` keeps answering until the subscription is released, which is
- * the behaviour that makes forgetting to release it a visible bug rather than a
- * tidiness point.
- */
 const rememberingBrowser = (over: Partial<PushBrowser> = {}) => {
   let held: ReturnType<typeof aSubscription> | null = aSubscription('https://push.example/mine')
   const unsubscribe = vi.fn(() => {
     held = null
     return Promise.resolve(true)
   })
-  // Spied so a test can wait for the mount effect to have consulted it. Asserting
-  // the button's label without that passes on the initial state, before the effect
-  // has said anything.
   const getSubscription = vi.fn(() => Promise.resolve(held === null ? null : { ...held, unsubscribe }))
 
   const browser = aBrowser({
@@ -43,8 +32,6 @@ const rememberingBrowser = (over: Partial<PushBrowser> = {}) => {
         getSubscription,
         subscribe: () => {
           held = aSubscription('https://push.example/mine')
-          // The spy on both paths, so releasing a just-made subscription is
-          // observable too — not only releasing one that was found.
           return Promise.resolve({ ...held, unsubscribe })
         },
       }),
@@ -65,7 +52,6 @@ const aBrowser = (over: Partial<PushBrowser> = {}): PushBrowser => ({
   ...over,
 })
 
-/** The one call whose arguments a test needs to inspect. */
 type Subscribe = Awaited<ReturnType<PushBrowser['register']>>['subscribe']
 
 const stub = (over: Partial<PushToggleApi> = {}): PushToggleApi => ({
@@ -80,9 +66,6 @@ const stub = (over: Partial<PushToggleApi> = {}): PushToggleApi => ({
 
 describe('decodeVapidKey', () => {
   it('reads the URL-safe alphabet the server hands out', () => {
-    // `atob` only knows `+` and `/`. A key containing `-` or `_` decoded without
-    // translating them is silently the wrong bytes, and Chrome then refuses the
-    // subscription with a message that says nothing about base64.
     const standard = decodeVapidKey('++//')
     const urlSafe = decodeVapidKey('--__')
 
@@ -90,8 +73,6 @@ describe('decodeVapidKey', () => {
   })
 
   it('puts the padding back', () => {
-    // The server's key is unpadded. `atob` throws on a length that is not a
-    // multiple of four.
     expect(() => decodeVapidKey('QUJD')).not.toThrow()
     expect([...decodeVapidKey('QUJD')]).toEqual([65, 66, 67])
     expect([...decodeVapidKey('QUJDRA')]).toEqual([65, 66, 67, 68])
@@ -108,8 +89,6 @@ describe('subscriptionBody', () => {
   })
 
   it('gives up rather than throwing on a shape it does not recognise', () => {
-    // A browser handing back something else should surface as "cannot use this",
-    // not a stack trace out of a click handler.
     expect(subscriptionBody({ endpoint: 'e', toJSON: () => null })).toBeUndefined()
     expect(subscriptionBody({ endpoint: 'e', toJSON: () => ({ keys: {} }) })).toBeUndefined()
     expect(
@@ -155,8 +134,6 @@ describe('PushToggle', () => {
   })
 
   it('says the browser cannot do it at all once it is the installed copy', () => {
-    // Installed and still unsupported means installing is not the answer, so pointing at it
-    // again would send somebody in a circle.
     const media = vi.spyOn(globalThis, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
     try {
       render(<PushToggle api={stub()} browser={undefined} />)
@@ -169,8 +146,6 @@ describe('PushToggle', () => {
   })
 
   it('offers no button when permission was already refused', async () => {
-    // Nothing this page does can undo `denied`; the fix is in browser settings, so
-    // a button that cannot work would be the wrong affordance.
     render(<PushToggle api={stub()} browser={aBrowser({ permission: () => 'denied' })} />)
 
     expect(await screen.findByText(/blocking notifications/)).toBeTruthy()
@@ -178,7 +153,6 @@ describe('PushToggle', () => {
   })
 
   it('shows it as already on when this browser has a subscription', async () => {
-    // Permission persists, so a reload must not ask again or claim it is off.
     render(
       <PushToggle
         api={stub()}
@@ -196,10 +170,6 @@ describe('PushToggle', () => {
   })
 
   it('re-asserts an existing subscription on mount, so a lost row heals', async () => {
-    // The one drift the page cannot see by reading the browser: the row gone while
-    // the browser keeps its subscription — a restored volume, or a role removed and
-    // given back. Without this the toggle says "on" and nothing arrives, fixable
-    // only by pressing Stop and then Start.
     const subscribeToPush = vi.fn<PushToggleApi['subscribeToPush']>(() => Promise.resolve(undefined))
     const { browser } = rememberingBrowser()
     render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
@@ -225,8 +195,6 @@ describe('PushToggle', () => {
   })
 
   it('still shows on when the re-assertion is refused', async () => {
-    // Repair, not something the admin asked for: a failure leaves exactly the state
-    // they already had rather than an error they cannot act on.
     const { browser } = rememberingBrowser()
     render(
       <PushToggle
@@ -271,8 +239,6 @@ describe('PushToggle', () => {
     await waitFor(() => expect(subscribe).toHaveBeenCalled())
     const options = subscribe.mock.calls[0]?.[0]
     expect(options?.userVisibleOnly).toBe(true)
-    // Narrowed rather than cast: `applicationServerKey` is a union in the DOM
-    // types, and asserting the bytes is the whole point of the test.
     const key = options?.applicationServerKey
     expect(key instanceof Uint8Array).toBe(true)
     expect(key instanceof Uint8Array ? Array.from(key) : []).toEqual([65, 66, 67])
@@ -325,10 +291,6 @@ describe('PushToggle', () => {
   })
 
   it('releases the browser subscription when the server refuses to store it', async () => {
-    // The mirror of the turn-off defect: `subscribe()` has already succeeded by the
-    // time the API call fails, so leaving it would give a browser subscribed with
-    // no row behind it — and the next mount reads "on" from `getSubscription()`
-    // while nothing can ever arrive.
     const { browser, unsubscribe } = rememberingBrowser()
     render(
       <PushToggle
@@ -337,8 +299,6 @@ describe('PushToggle', () => {
       />,
     )
 
-    // This fake starts subscribed; turn it off first so the button offers to
-    // subscribe, which is the path under test.
     fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Notify me here' }))
 
@@ -368,9 +328,6 @@ describe('PushToggle', () => {
   })
 
   it('releases the browser subscription as well as the server row', async () => {
-    // Without this the browser keeps a live `PushSubscription`, `getSubscription()`
-    // keeps answering, and the toggle reads "on" with nothing subscribed — and the
-    // 'on' branch only offers to turn it off, so there is no way back.
     const { browser, unsubscribe } = rememberingBrowser()
     const unsubscribeFromPush = vi.fn<PushToggleApi['unsubscribeFromPush']>(() => Promise.resolve(undefined))
     render(<PushToggle api={stub({ unsubscribeFromPush })} browser={browser} />)
@@ -405,8 +362,6 @@ describe('PushToggle', () => {
   })
 
   it('can be turned back on after being turned off', async () => {
-    // The consequence of the bug above, from the outside: the state the page
-    // derives on mount has to agree with what the server was told.
     const { browser, getSubscription } = rememberingBrowser()
     const subscribeToPush = vi.fn<PushToggleApi['subscribeToPush']>(() => Promise.resolve(undefined))
     render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
@@ -414,15 +369,10 @@ describe('PushToggle', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
     expect(await screen.findByRole('button', { name: 'Notify me here' })).toBeTruthy()
 
-    // A reload, which is a fresh mount: `rerender` keeps the instance and its
-    // state, so the effect would not re-run and this would assert nothing.
     cleanup()
     const before = getSubscription.mock.calls.length
     render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
 
-    // Waited for, not assumed: the effect settles asynchronously, and the initial
-    // state is 'off' — so checking the label first passes whether or not the
-    // subscription was released.
     await waitFor(() => expect(getSubscription.mock.calls.length).toBeGreaterThan(before))
     expect(screen.getByRole('button', { name: 'Notify me here' })).toBeTruthy()
 
@@ -431,10 +381,6 @@ describe('PushToggle', () => {
   })
 
   it('leaves the row rather than the browser when only one can be released', async () => {
-    // Order matters, and this is which way. A leftover row heals itself — the next
-    // application sends to a released endpoint, the push service answers 410 and
-    // `notifyAdmins` deletes it — whereas a leftover browser subscription shows
-    // "on" with nothing behind it and no way back.
     const { browser, unsubscribe } = rememberingBrowser()
     const unsubscribeFromPush = vi.fn<PushToggleApi['unsubscribeFromPush']>(() =>
       Promise.reject(apiError(500, 'internal', 'Server fell over.')),
@@ -444,14 +390,10 @@ describe('PushToggle', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Server fell over.')
-    // The browser was released first, so the half that cannot heal itself is done.
     await waitFor(() => expect(unsubscribe).toHaveBeenCalled())
   })
 
   it('stays off when the browser was released but the server call failed', async () => {
-    // Once the browser has let go, nothing can arrive whatever the server thinks.
-    // Saying "on" would offer a Stop button that hits the same failure forever,
-    // over a row that deletes itself at the next 410.
     const { browser } = rememberingBrowser()
     render(
       <PushToggle
@@ -467,10 +409,6 @@ describe('PushToggle', () => {
   })
 
   it('goes back to on when nothing was released at all', async () => {
-    // The passing sibling: a failure *before* the browser let go leaves it
-    // subscribed, so 'on' is the truthful state. Driven by a browser that
-    // registers for the mount effect and then stops, since a register that fails
-    // on mount is the unsupported branch instead.
     const subscription = { ...aSubscription('https://push.example/mine'), unsubscribe: vi.fn() }
     let registrations = 0
     const browser = aBrowser({
@@ -494,7 +432,6 @@ describe('PushToggle', () => {
   })
 
   it('treats a browser whose service worker will not register as unsupported', async () => {
-    // iOS Safari outside an installed web app, and any plain-HTTP deployment.
     render(
       <PushToggle api={stub()} browser={aBrowser({ register: () => Promise.reject(new Error('nope')) })} />,
     )
@@ -504,7 +441,6 @@ describe('PushToggle', () => {
 })
 
 describe('the two edges before the browser has answered', () => {
-  /** A `register()` the test decides when to settle, so the mount effect can be caught mid-flight. */
   const suspendingBrowser = () => {
     let settle = (): void => undefined
     const browser = aBrowser({
@@ -522,8 +458,6 @@ describe('the two edges before the browser has answered', () => {
   }
 
   it('offers nothing to press until it knows what this browser already has', async () => {
-    // Live from the initial state, `turnOn` could finish and then be overwritten by
-    // the effect's own answer — leaving the button saying the opposite of what it did.
     const { browser, settle } = suspendingBrowser()
     render(<PushToggle api={stub()} browser={browser} />)
 
@@ -535,8 +469,6 @@ describe('the two edges before the browser has answered', () => {
   })
 
   it('gives up on a worker that never activates, rather than waiting for one forever', async () => {
-    // `navigator.serviceWorker.ready` never rejects: if activation does not happen it
-    // simply never settles, and the toggle would sit on its initial state for good.
     vi.useFakeTimers()
     try {
       render(<PushToggle api={stub()} browser={aBrowser({ register: () => new Promise(() => undefined) })} />)
@@ -564,7 +496,6 @@ describe('the two edges before the browser has answered', () => {
   })
 
   it('waits out a worker that is merely slow', async () => {
-    // The passing sibling: a deadline of zero would satisfy the test above.
     vi.useFakeTimers()
     try {
       const { browser, settle } = suspendingBrowser()

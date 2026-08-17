@@ -76,7 +76,7 @@ nothing beside it, which would put one thing on the feed twice. The eighth was t
 The entry kind is `scheduled`, which already existed for a dream being put in the timetable and
 already coalesces — so a meeting moved three times is one line saying it moved, not four. Moving it
 bumps the card; rewording the note does not, because a time that has changed is the half worth
-hearing. Renaming it renames the thread, so the card cannot go on showing the old title.
+hearing. Renaming it renames the thread, so a tombstone left after the meeting is gone carries the new title.
 
 `meeting.author_account_id` was added for this: a card says whose it is, and `participantsOf` needs
 somebody to tell when a reply lands. Rows written before it keep a null one, exactly as a post whose

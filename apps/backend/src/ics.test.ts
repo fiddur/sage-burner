@@ -13,13 +13,6 @@ describe('escaping', () => {
   })
 
   it('escapes the backslash first, so its own escape is not escaped again', () => {
-    // Order matters: `\` → `\\` must run before `;` → `\;`, or the backslash the
-    // second rule adds gets doubled by the first and the value arrives corrupted.
-    //
-    // Written with `String.fromCharCode(92)` rather than literals on purpose:
-    // `'\;'` in TypeScript is simply `';'`, so a literal-heavy test of escaping
-    // can spell the escape wrong in both the implementation and the expectation
-    // and pass on the two mistakes cancelling.
     expect(escapeText(BACKSLASH + ';')).toBe(BACKSLASH + BACKSLASH + BACKSLASH + ';')
   })
 
@@ -42,8 +35,6 @@ describe('folding', () => {
   })
 
   it('counts octets rather than characters', () => {
-    // 40 four-byte emoji is 160 octets but only 40 characters, so a
-    // character-counted fold would emit one over-long line and call it done.
     const folded = fold(`LOCATION:${'🛕'.repeat(40)}`)
 
     for (const line of folded.split('\r\n')) expect(Buffer.byteLength(line, 'utf8')).toBeLessThanOrEqual(75)
@@ -52,7 +43,6 @@ describe('folding', () => {
   it('never splits a character in half', () => {
     const folded = fold(`LOCATION:${'🛕'.repeat(40)}`)
 
-    // A split multi-byte sequence decodes to U+FFFD; round-tripping catches it.
     expect(folded.replaceAll('\r\n ', '')).toBe(`LOCATION:${'🛕'.repeat(40)}`)
     expect(folded).not.toContain('�')
   })
@@ -64,8 +54,6 @@ describe('timestamps', () => {
   })
 
   it('is the same instant whether or not the reader is in summer time', () => {
-    // The suite's own timezone must not reach the output. Europe/Stockholm is
-    // +02:00 in August and +01:00 in January; both render as the UTC time given.
     expect(toIcsInstant('2026-08-02T18:00:00.000Z')).toBe('20260802T180000Z')
     expect(toIcsInstant('2026-01-02T18:00:00.000Z')).toBe('20260102T180000Z')
   })
@@ -113,7 +101,6 @@ describe('the calendar', () => {
   })
 
   it('separates every line with CRLF, never a bare newline', () => {
-    // A bare LF is the single most common reason a feed will not parse.
     expect(aCalendar([anEvent]).replaceAll('\r\n', '')).not.toContain('\n')
   })
 
@@ -132,8 +119,6 @@ describe('the calendar', () => {
   })
 
   it('leaves out a description and a place it does not have', () => {
-    // An empty DESCRIPTION line is not the same as none, and some clients render
-    // it as a blank note.
     const ics = aCalendar([{ ...anEvent, description: '', location: null, color: null }])
 
     expect(ics).not.toContain('DESCRIPTION')
@@ -162,9 +147,6 @@ describe('the calendar', () => {
   })
 
   it('emits no SEQUENCE, which subscription feeds do not use', () => {
-    // Deliberate: SEQUENCE is for emailed invitations. A subscribed feed is
-    // refetched whole and replaced by UID, and there is no version column to
-    // derive an honest number from. Always-`0` would look like handling.
     expect(aCalendar([anEvent])).not.toContain('SEQUENCE')
   })
 })

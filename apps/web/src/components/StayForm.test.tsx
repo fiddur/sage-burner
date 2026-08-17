@@ -50,8 +50,6 @@ const saveIt = () => screen.getByRole('button', { name: 'Save these details' }).
 
 describe('StayForm', () => {
   it('binds each end of the stay to the other, so the picker cannot invert it', () => {
-    // A hint, not the rule — the server refuses an inverted pair either way. What
-    // this removes is the ordinary way to produce one.
     render(
       <StayForm
         eventId="e-1"
@@ -66,8 +64,6 @@ describe('StayForm', () => {
   })
 
   it('leaves the other end unbounded while it is empty', () => {
-    // `max=""` on a date input is not reliably "no maximum", so an unset partner
-    // has to mean the attribute is absent.
     render(
       <StayForm
         eventId="e-1"
@@ -94,7 +90,6 @@ describe('StayForm', () => {
     )
 
     expect(screen.getByRole('option', { name: 'Temple mattress — 5 left' })).toBeTruthy()
-    // No limit, so no count to offer.
     expect(screen.getByRole('option', { name: 'Own tent' })).toBeTruthy()
   })
 
@@ -117,9 +112,6 @@ describe('StayForm', () => {
   })
 
   it('leaves the option they are already in selectable, even when it is full', () => {
-    // Their own place counts towards the total, so it always reads as full to
-    // them. Disabling it would make the select fall back to "not decided" and
-    // quietly give up their bed on the next save.
     render(
       <StayForm
         eventId="e-1"
@@ -136,9 +128,6 @@ describe('StayForm', () => {
   })
 
   it('keeps their own full option reselectable after clicking away from it', async () => {
-    // Against the live value this reads as "not theirs" the moment they pick
-    // something else, and a native select will not let you choose a disabled
-    // option — so they could not go back without reloading.
     render(
       <StayForm
         eventId="e-1"
@@ -242,8 +231,6 @@ describe('StayForm', () => {
   })
 
   it('still offers the write-in when the list is empty', () => {
-    // A burn whose admin has not set the list up yet still lets someone say
-    // what they are up for.
     render(
       <StayForm
         eventId="e-1"
@@ -273,7 +260,6 @@ describe('StayForm', () => {
   })
 
   it('sends nulls for the fields left blank', async () => {
-    // "Not said" has one representation; an empty string would read as an answer.
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
     render(<StayForm eventId="e-1" api={{ updateMyStay }} attendance={anAttendance()} onSaved={vi.fn()} />)
 
@@ -292,8 +278,6 @@ describe('StayForm', () => {
   })
 
   it('refuses a departure before the arrival, naming the problem', async () => {
-    // The API refuses it too; catching it here means the message says what is
-    // wrong rather than arriving as a bare 400.
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
     render(<StayForm eventId="e-1" api={{ updateMyStay }} attendance={anAttendance()} onSaved={vi.fn()} />)
 
@@ -339,7 +323,6 @@ describe('StayForm', () => {
   })
 
   it('offers no way to change the payment status', async () => {
-    // It is the admin's to set; a control here would always fail.
     render(
       <StayForm
         eventId="e-1"
@@ -353,8 +336,6 @@ describe('StayForm', () => {
   })
 
   it('offers the way to the rideshare board, beside the dates it is about', () => {
-    // Here and not on the invite page, which draws the same fields before the account
-    // exists — a link to a members-only page is one that cannot be followed (#26).
     render(
       <StayForm
         eventId="e-1"

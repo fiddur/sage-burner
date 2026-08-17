@@ -107,8 +107,6 @@ describe('the html part', () => {
   })
 
   it('spells its lengths the way a mail client reads them, not the way a browser does', () => {
-    // Outlook renders with Word, which ignores logical properties — a list would fall back
-    // to the default indent rather than the one asked for.
     const html = htmlFrom({ installation: 'X', blocks: [{ lines: [{ text: 'one' }] }] })
 
     expect(html).toContain('padding-left')

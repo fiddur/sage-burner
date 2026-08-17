@@ -45,7 +45,6 @@ describe('the pictures you have stored', () => {
     })
 
     expect(drawn.getAttribute('src')).toBe(apiRoutes.storedImage.path('img-1'))
-    // A phone's worth of photographs on one page, so nothing is fetched until it is near.
     expect(drawn.getAttribute('loading')).toBe('lazy')
   })
 
@@ -56,8 +55,6 @@ describe('the pictures you have stored', () => {
   })
 
   it('names each ✕ distinctly, since a paste session stores several on one day', async () => {
-    // The date alone collided for every picture added the same day, which is what a screen
-    // reader reads as one control repeated (#409).
     render(<PicturesField api={stub({}, [anImage({ id: 'img-1' }), anImage({ id: 'img-2' })])} />)
 
     expect(await screen.findByRole('button', { name: /^Take off picture 1 of 2/ })).toBeTruthy()
@@ -94,8 +91,6 @@ describe('the pictures you have stored', () => {
   })
 
   it('warns that a removal leaves a gap, since nothing here can find the reference', async () => {
-    // The markdown that points at a picture is in somebody's prose and no foreign key can
-    // see it, so this is the person's decision to make rather than one the app can make.
     render(<PicturesField api={stub()} />)
 
     expect(await screen.findByText(/leaves a gap wherever it was still being shown/)).toBeTruthy()
