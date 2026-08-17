@@ -1324,6 +1324,13 @@ counted rather than printed, since a 2000-character paragraph is not a digest. A
 only got comments is `title — +3 comments`, and the counts are **diffs** rather than totals,
 which is what makes a card bumped by one comment say so.
 
+**Each line says which burn it is about**, after the body and in the feed's own idiom —
+`Kitchen lead — Somebody is leading it · Boundary Burn`. Without it two same-titled lead roles
+on two different burns were byte-identical in the mail, text and link alike, since a card's
+body is a bare predicate and carries no burn (#669). `whereItBelongs` is the one spelling of
+that rule, in `packages/shared`, so the digest and `/feed` cannot answer it differently — and
+it is what names the songbook, a song belonging to no burn.
+
 The verbs collapse per actor — "Fredrik put it in the book, said whose song it is" — which
 is free rather than clever: `thread_entry.body` stores the bare predicate and the name is
 prepended when the line is read, so the collapse is a group-by and there is no name to strip.

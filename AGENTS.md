@@ -44,8 +44,9 @@ type definitions. All layers import from it — never duplicate a schema.
   `dates.ts` (`dayName`, which names a plain calendar day for the backend's meal cards
   and the web's day headings alike), `meetings.ts` (`meetingEnds` and `nextMeeting`,
   which decide what the banner shows), `songs.ts` (`isChordLine` and `transposeLine`,
-  which the songbook renders with) and `roster.ts` (`withPlaces`, which draws the line
-  between a place and the waiting list). Nothing under `schemas/`.
+  which the songbook renders with), `roster.ts` (`withPlaces`, which draws the line between a
+  place and the waiting list) and `cards.ts` (`whereItBelongs`, which names the burn a feed
+  card is about for the page and the digest alike). Nothing under `schemas/`.
 - **Every endpoint lives in `routes.ts` and nowhere else.** The client builds its
   path from it and the route file registers `fastify` from it, so the two spellings
   of one endpoint cannot drift; `routes.test.ts` checks that each built path routes

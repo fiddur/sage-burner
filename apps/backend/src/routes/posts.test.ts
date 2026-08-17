@@ -14,7 +14,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event, notificationBatch, post } from '../db/schema.ts'
-import { bell, cardOf, setOn } from './thread-testing.ts'
+import { bell, cardOf, setOn } from './threads.testing.ts'
 
 const SECRET = 'p'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
