@@ -142,7 +142,7 @@ describe('announcing something', () => {
     expect(feed.json().threads).toHaveLength(1)
   })
 
-  it('links nowhere, because the card is the announcement', async () => {
+  it('links to its burn’s slice of the feed, a post having no page of its own', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -150,7 +150,7 @@ describe('announcing something', () => {
 
     await announce(server, ada.cookie, { title: 'The planning call is Sunday', body: '' })
 
-    expect((await cards(server, ada.cookie))[0]?.link).toBeNull()
+    expect((await cards(server, ada.cookie))[0]?.link).toBe(`/feed?kinds=post&burn=${BURN}`)
   })
 
   it('tells the burn, and never the author', async () => {

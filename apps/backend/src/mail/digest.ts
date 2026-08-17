@@ -1,6 +1,12 @@
 import type { DigestChoice, FeedKind, Thread, ThreadEntry } from '@sage-burner/shared'
 
-import { DEFAULT_DIGEST, feedKindLabel, feedKinds, threadEntityTypes } from '@sage-burner/shared'
+import {
+  DEFAULT_DIGEST,
+  feedKindLabel,
+  feedKinds,
+  threadEntityTypes,
+  whereItBelongs,
+} from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
@@ -39,7 +45,7 @@ export interface DigestSection {
   kind: FeedKind
   label: string
   total: number
-  entries: { body: string; link: string | undefined }[]
+  entries: { body: string; burn: string | undefined; link: string | undefined }[]
 }
 
 const isRepeating = (choice: DigestChoice): choice is Repeating => choice !== 'off'
@@ -122,6 +128,7 @@ interface FeedLine {
   at: string
   kind: FeedKind
   body: string
+  burn: string | undefined
   link: string | null
 }
 
@@ -144,7 +151,7 @@ export const feedSince = async (
     const at = byId.get(card.id)
     if (body === undefined || at === undefined) return []
 
-    return [{ id: card.id, at, kind: card.entity_type, body, link: card.link }]
+    return [{ id: card.id, at, kind: card.entity_type, body, burn: whereItBelongs(card), link: card.link }]
   })
 
   const kept = said
@@ -164,6 +171,7 @@ export const feedSince = async (
         total: mine.length,
         entries: mine.slice(0, MOST_PER_SECTION).map((one) => ({
           body: one.body,
+          burn: one.burn,
           link: one.link === null ? undefined : absolute(origin, one.link),
         })),
       },

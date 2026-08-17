@@ -2,7 +2,7 @@ export type Block =
   | { paragraph: string }
   | { heading: string }
   | { action: { href: string; label: string } }
-  | { lines: readonly { text: string; href?: string }[] }
+  | { lines: readonly { text: string; href?: string; aside?: string }[] }
   | { note: string; link?: { href: string; label: string } }
 
 export const WRAP_AT = 76
@@ -56,11 +56,11 @@ export const textFrom = (blocks: readonly Block[]): string => {
     else if ('heading' in block) out.push(...wrapped(block.heading), '')
     else if ('action' in block) out.push(block.action.href, '')
     else if ('note' in block) {
-      out.push(...wrapped(block.note))
+      out.push(...wrapped(block.link === undefined ? block.note : `${block.note} ${block.link.label}`))
       if (block.link !== undefined) out.push(block.link.href)
     } else {
       for (const line of block.lines) {
-        out.push(...bulleted(line.text))
+        out.push(...bulleted(line.aside === undefined ? line.text : `${line.text} · ${line.aside}`))
         if (line.href !== undefined) out.push(`  ${line.href}`)
       }
       out.push('')
@@ -107,8 +107,12 @@ const htmlBlock = (block: Block): string => {
         line.href === undefined
           ? said
           : `<a href="${escapeHtml(line.href)}" style="color:${EMBER};">${said}</a>`
+      const where =
+        line.aside === undefined
+          ? ''
+          : ` <span style="font-family:${SANS};font-size:13px;color:${MUTED};">· ${escapeHtml(line.aside)}</span>`
 
-      return `<li style="margin:0 0 6px;">${shown}</li>`
+      return `<li style="margin:0 0 6px;">${shown}${where}</li>`
     })
     .join('')
 

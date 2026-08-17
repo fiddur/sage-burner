@@ -129,7 +129,7 @@ export const digestMessage = ({
     kind: FeedKind
     label: string
     total: number
-    entries: readonly { body: string; link: string | undefined }[]
+    entries: readonly { body: string; burn: string | undefined; link: string | undefined }[]
   }[]
   origin: string | undefined
 }): Message => {
@@ -152,6 +152,7 @@ export const digestMessage = ({
             lines: [
               ...section.entries.map((entry) => ({
                 text: entry.body,
+                ...(entry.burn === undefined ? {} : { aside: entry.burn }),
                 ...(entry.link === undefined ? {} : { href: entry.link }),
               })),
               ...(left === 0
