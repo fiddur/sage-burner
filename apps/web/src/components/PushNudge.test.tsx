@@ -209,9 +209,8 @@ describe('signing out', () => {
 })
 
 describe('where the refusal is kept', () => {
-  it('reads and writes the store it is given rather than the global one (#588)', async () => {
-    const held = new Map<string, string>()
-    const store = {
+  const aStore = (held = new Map<string, string>()) =>
+    ({
       getItem: (key: string) => held.get(key) ?? null,
       setItem: (key: string, value: string) => void held.set(key, value),
       removeItem: (key: string) => void held.delete(key),
@@ -220,7 +219,11 @@ describe('where the refusal is kept', () => {
       get length() {
         return held.size
       },
-    } satisfies Storage
+    }) satisfies Storage
+
+  it('reads and writes the store it is given rather than the global one (#588)', async () => {
+    const held = new Map<string, string>()
+    const store = aStore(held)
 
     app(stub(), aBrowser(false), undefined, { store })
     await tick()
@@ -231,7 +234,7 @@ describe('where the refusal is kept', () => {
   })
 
   it('stays away from the start where that store already holds a refusal', async () => {
-    const store = { ...globalThis.localStorage, getItem: () => 'yes' } satisfies Storage
+    const store = aStore(new Map([[NUDGE_DISMISSED_KEY, 'yes']]))
 
     app(stub(), aBrowser(false), undefined, { store })
     await tick()

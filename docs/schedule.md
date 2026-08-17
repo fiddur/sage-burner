@@ -51,7 +51,9 @@ routes that would lay it out are the ones being refused.
 listed with no clock, no bin, no add row and no **Fill the days in** — one note instead. Hiding a
 control is not access control and the routes above are what refuse the write; this is so an admin
 does not meet the refusal as a failure. The same `shut` vocabulary `HelperStrip` uses for a spot
-nobody may take.
+nobody may take. It reads the reader's own midnight (`todayForInput`) where the routes read UTC
+(`todayIso`), so east of Greenwich the editor closes a few hours before the routes do — the safe
+direction, and the asymmetry `AdminInvites` already has.
 
 **Which days a sitting falls on comes from the burn's hours, not its days.** A 13:00
 lunch on a day the gates open at 16:00 is not a meal anyone eats, and a day that ends

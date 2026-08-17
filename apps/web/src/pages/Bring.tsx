@@ -1,4 +1,5 @@
 import type { BringEntry, EventAttendeesResponse } from '@sage-burner/shared'
+import type { JSX } from 'preact'
 
 import { BRING_PARAM, MAX_NOTES, MAX_TITLE, profilePage } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
@@ -49,10 +50,22 @@ type Attendee = EventAttendeesResponse['attendees'][number]
 
 const BLANK = { title: '', comment: '', bringing: false }
 
-const asksNote = (items: readonly BringEntry[]) =>
-  items.length === 0
-    ? 'Nothing on the list yet — add the first thing below.'
-    : 'Everything asked for has somebody bringing it.'
+const Halves = ({ empty, asks, offers }: { empty: boolean; asks: JSX.Element; offers: JSX.Element }) =>
+  empty ? (
+    <p class="form-note">Nothing on the list yet — add the first thing below.</p>
+  ) : (
+    <>
+      <section>
+        <h2>Nobody is bringing these yet</h2>
+        {asks}
+      </section>
+
+      <section>
+        <h2>Somebody is bringing these</h2>
+        {offers}
+      </section>
+    </>
+  )
 
 export const Bring = ({ api }: { api: BringApi }) => {
   const viewer = useViewer()
@@ -183,15 +196,11 @@ export const Bring = ({ api }: { api: BringApi }) => {
 
       {loaded.status === 'ready' && burn !== undefined && (
         <>
-          <section>
-            <h2>Nobody is bringing these yet</h2>
-            {half(asks, asksNote(items))}
-          </section>
-
-          <section>
-            <h2>Somebody is bringing these</h2>
-            {half(offers, 'Nobody has said they are bringing anything yet.')}
-          </section>
+          <Halves
+            empty={items.length === 0}
+            asks={half(asks, 'Everything asked for has somebody bringing it.')}
+            offers={half(offers, 'Nobody has said they are bringing anything yet.')}
+          />
 
           <form
             class="form"

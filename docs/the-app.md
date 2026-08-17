@@ -188,6 +188,14 @@ same width, and the two would go out of step the first time either changed. The 
 itself is `sticky`, so it holds at the top of a long page without leaving the grid that
 gave it its column.
 
+**Its own scroll has to stop where the window does, not where the page does** (#721). The column
+is taller than a short viewport, so it scrolls — but it starts _below_ the header, and a
+`max-height` of the whole viewport therefore hung its last 65px past the fold, where the column's
+own scrollbar could never reach. It is `calc(100dvh - var(--header-height))` now. `--header-height`
+is the header's measured box in `rem`, so it grows with the reader's font size as the header does;
+no CSS expression can read that box, which makes it the one number in the stylesheet a test cannot
+hold — `docs/testing.md` carries the check instead.
+
 **Hiding it is a decision, so it is remembered.** ‹ at the top of the column takes it
 away and ☰ — the same control, back at the leading edge of the bar — brings it back, with
 the answer in `localStorage`. It is read in the state initialiser rather than an effect:
@@ -1207,11 +1215,12 @@ fact lived — one that could disagree with the hands the moment somebody put on
 page is two halves off `hands.length === 0`, asks first, because an ask nobody has answered
 is the only thing on the page anybody has to do something about.
 
-**An empty list is a third case, not an empty half** (#541). "Everything asked for has
-somebody bringing it" is true of a list whose asks are all answered and the opposite of true
-of a list with nothing on it — which is every burn on the day it opens. So the asks note is
-picked off `items.length`, not off the half, and an empty list says what to do instead: add
-the first thing.
+**An empty list is a third case, not an empty half** (#541), and it is one note rather than two
+(#544). "Everything asked for has somebody bringing it" is true of a list whose asks are all
+answered and the opposite of true of a list with nothing on it — which is every burn on the day it
+opens. So an empty list replaces both halves with one line saying what to do instead: add the first
+thing. Two notes under two headings each said something true about its own half and together read
+as two problems where there is one absence.
 
 **There is no wanted count.** "We could use three of these" is a sentence in the comment or
 in the thread. A number would want display rules, a notion of fulfilment and a policy for

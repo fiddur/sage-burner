@@ -143,7 +143,7 @@ export const MarkdownField = ({
         <a href={formattingPage()} target="_blank" rel="noreferrer">
           Markdown is supported
         </a>
-        {pictures.enabled && (
+        {pictures.enabled && !previewing && (
           <>
             {' · paste, drop or click '}
             <Icon name="picture" />

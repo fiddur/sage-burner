@@ -612,6 +612,12 @@ direction of it.
 
 **Lowering `member_cap` still moves it and tells nobody**, which is the one door left open.
 
+**The dedupe means a round trip is heard once.** Now that the line moves in both directions and
+carries three sentences rather than two, somebody told "You are in one for now" and later pushed off
+again will not hear the waiting-list sentence a second time if they have already had it — "told once
+per burn, per sentence" holds across the whole burn, not per crossing. Deliberate: the alternative is
+a bell that rings on every payment an admin records.
+
 **A burn that has ended tells nobody at all** (#648). `tellAboutTheWaitingList` reads `end_date`
 and returns early, in one place rather than at each caller: the member join route goes through
 `openEventNow`, but the admin-add and payment callers do not, so bookkeeping on last year's burn

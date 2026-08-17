@@ -393,6 +393,15 @@ signed-in viewer with no application row, and the route asked only for a session
 came in by invite could add noise to the queue. It answers 409 now, and the page says what to do
 instead: the second account is the trap, not the form.
 
+**The page reads off the roles, not off the decision** (#578). An `approved` application row is a
+record of what was decided, not of what is true now: a role can be taken off afterwards, on the
+organiser-approve path as much as on the group-link one. Keyed on the decision alone, `/apply` said
+"You are in — you are a member here now" beside a navigation with nothing in it but the bell, which
+is the mirror image of the contradiction #548 removed. So the page has three outcomes rather than
+two — in, let go, not accepted — and the middle one says the application was accepted and the
+membership is not current, with the organisers to ask. The waiting copy would have been wrong too:
+nobody is waiting on a decision that has been made.
+
 **The applicant's end of the thread is bounded** (#489), because each message rings every admin's
 bell through `notifyAdmins`. Ten in ten minutes per account, the same shape as the other routes a
 role-less account can reach.

@@ -112,6 +112,13 @@ describe('the stylesheet', () => {
     expect(sidebar?.body).toMatch(/max-height:/)
   })
 
+  it('takes the header off the sidebar’s own height, it starting below one (#721)', () => {
+    const sidebar = rules.find((rule) => rule.selector === '.sidebar')
+
+    expect(sidebar?.body).toMatch(/max-height:\s*calc\(100dvh\s*-\s*var\(--header-height\)\)/)
+    expect(sidebar?.body).toMatch(/top:\s*0/)
+  })
+
   it('positions every box that scrolls sideways', () => {
     const sideways = rules.filter((rule) => /overflow(-x)?:\s*(auto|scroll)/.test(rule.body))
 

@@ -157,6 +157,9 @@ const join = (server: FastifyInstance, cookie: string) =>
 const leave = (server: FastifyInstance, cookie: string) =>
   server.inject({ method: 'DELETE', url: `/api/events/${BURN}/attendance/me`, headers: { cookie } })
 
+const bodies = async (server: FastifyInstance, cookie: string): Promise<string[]> =>
+  (await list(server, cookie)).json().notifications.map((one: { body: string }) => one.body)
+
 const setPaid = (server: FastifyInstance, cookie: string, accountId: string) =>
   server.inject({
     method: 'PATCH',
@@ -609,9 +612,9 @@ describe('the waiting list', () => {
 
     await setPaid(server, admin.cookie, paid.id)
 
-    const [told] = (await list(server, unpaid.cookie)).json().notifications
-    expect(told.body).not.toContain('2 places left')
-    expect(told.body).toContain('You are in one for now')
+    const said = await bodies(server, unpaid.cookie)
+    expect(said).toContainEqual(expect.stringContaining('You are in one for now'))
+    expect(said).not.toContainEqual(expect.stringContaining('2 places left'))
   })
 
   it('tells the holder of an unpaid place that they hold it, not to go and win one (#726)', async () => {
@@ -631,9 +634,9 @@ describe('the waiting list', () => {
     })
     expect(gone.statusCode).toBe(204)
 
-    const [told] = (await list(server, unpaid.cookie)).json().notifications
-    expect(told.body).toContain('You are in one for now')
-    expect(told.body).not.toContain('place left')
+    const said = await bodies(server, unpaid.cookie)
+    expect(said).toContainEqual(expect.stringContaining('You are in one for now'))
+    expect(said).not.toContainEqual(expect.stringContaining('place left'))
   })
 
   it('lifts somebody off the waiting list when an unpaid member leaves (#726)', async () => {
@@ -647,14 +650,14 @@ describe('the waiting list', () => {
       await givenComing(who.id, false, joinedAt(at))
     }
     await setPaid(server, admin.cookie, paid.id)
-    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
-      'you are on the waiting list',
+    expect(await bodies(server, behind.cookie)).toContainEqual(
+      expect.stringContaining('you are on the waiting list'),
     )
 
     expect((await leave(server, going.cookie)).statusCode).toBe(204)
 
-    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
-      'You are in one for now',
+    expect(await bodies(server, behind.cookie)).toContainEqual(
+      expect.stringContaining('You are in one for now'),
     )
   })
 
@@ -677,8 +680,8 @@ describe('the waiting list', () => {
     })
     expect(gone.statusCode).toBe(204)
 
-    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
-      'You are in one for now',
+    expect(await bodies(server, behind.cookie)).toContainEqual(
+      expect.stringContaining('You are in one for now'),
     )
   })
 
@@ -693,8 +696,8 @@ describe('the waiting list', () => {
       await givenComing(who.id, false, joinedAt(at))
     }
     await setPaid(server, admin.cookie, giver.id)
-    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
-      'you are on the waiting list',
+    expect(await bodies(server, behind.cookie)).toContainEqual(
+      expect.stringContaining('you are on the waiting list'),
     )
 
     const handed = await server.inject({
@@ -705,8 +708,8 @@ describe('the waiting list', () => {
     })
     expect(handed.statusCode).toBe(204)
 
-    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
-      'You are in one for now',
+    expect(await bodies(server, behind.cookie)).toContainEqual(
+      expect.stringContaining('You are in one for now'),
     )
   })
 
@@ -741,11 +744,11 @@ describe('the waiting list', () => {
       .map((one: { account_id: string }) => one.account_id)
 
     expect(held).toEqual([holder.id])
-    expect((await list(server, holder.cookie)).json().notifications[0].body).toContain(
-      'You are in one for now',
+    expect(await bodies(server, holder.cookie)).toContainEqual(
+      expect.stringContaining('You are in one for now'),
     )
-    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
-      'you are on the waiting list',
+    expect(await bodies(server, behind.cookie)).toContainEqual(
+      expect.stringContaining('you are on the waiting list'),
     )
   })
 
@@ -973,7 +976,7 @@ describe('the waiting list', () => {
     expect(told.body).toContain('1 place left')
   })
 
-  it('says nothing to whoever is left when somebody leaves, an unpaid place never having been one', async () => {
+  it('repeats nothing to somebody whose own sentence has not changed when another leaves', async () => {
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])

@@ -54,6 +54,11 @@ const APPLICANT: Viewer = {
   account: { id: 'a-1', name: 'Fredrik', avatar: null, roles: [] },
 }
 
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: 'Fredrik', avatar: null, roles: ['member'] },
+}
+
 const renderPage = (
   api: ApplyApi,
   viewer: Viewer = APPLICANT,
@@ -759,7 +764,7 @@ describe('where an application already stands', () => {
         getMyApplication: () =>
           Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
       }),
-      APPLICANT,
+      MEMBER,
       [aBurn('Summer burn', true)],
     )
 
@@ -776,7 +781,7 @@ describe('where an application already stands', () => {
         getMyApplication: () =>
           Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
       }),
-      APPLICANT,
+      MEMBER,
       [aBurn('Summer burn', true)],
     )
 
@@ -789,7 +794,7 @@ describe('where an application already stands', () => {
         getMyApplication: () =>
           Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
       }),
-      APPLICANT,
+      MEMBER,
       [],
       'loading',
     )
@@ -806,7 +811,7 @@ describe('where an application already stands', () => {
         getMyApplication: () =>
           Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
       }),
-      APPLICANT,
+      MEMBER,
       [aBurn('Summer burn', false)],
     )
 
@@ -815,6 +820,29 @@ describe('where an application already stands', () => {
     expect(said).not.toContain('added to')
     expect(said).not.toContain('leave the burn')
     expect(said).toContain('join the one you are coming to')
+  })
+
+  it('says the membership is not current where the roles have been taken off again (#578)', async () => {
+    renderPage(
+      stub({
+        getMyApplication: () =>
+          Promise.resolve({
+            mine: {
+              application: anApplication('approved'),
+              messages: [],
+              organisers: [{ account_id: 'a-9', name: 'Bea', contact: 'bea@example.org' }],
+            },
+          }),
+      }),
+      APPLICANT,
+      [],
+    )
+
+    const said = (await screen.findByRole('status')).textContent
+    expect(said).not.toContain('You are a member here now')
+    expect(said).toContain('not a member here at the moment')
+    expect(screen.queryByRole('heading', { name: 'You are in' })).toBeNull()
+    expect(screen.getByText(/Bea/)).toBeTruthy()
   })
 
   it('says who to ask once it has not been', async () => {

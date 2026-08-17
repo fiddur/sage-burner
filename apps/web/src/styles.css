@@ -20,6 +20,12 @@
      if that ever changes size; `--column` is `rem` because a form is not text. */
   --measure: 45em;
   --column: 40rem;
+  /* `.site-header`'s measured height, in `rem` so it grows with the reader's font size as the
+     header does. No CSS expression can read the header's box, so this is the one number that
+     has to be checked in a browser rather than by a test — `docs/testing.md` has the check.
+     `.sidebar` starts below the header, so its own `max-height` must subtract this or its
+     last entry hangs past the fold where the column's own scrollbar cannot reach it (#721). */
+  --header-height: calc(4rem + 1px);
 
   color-scheme: light dark;
 }
@@ -360,7 +366,7 @@ a:hover {
   top: 0;
   align-self: start;
   display: flex;
-  max-height: 100vh;
+  max-height: calc(100dvh - var(--header-height));
   flex-direction: column;
   padding: 1rem 0;
   overflow-y: auto;

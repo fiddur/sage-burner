@@ -344,7 +344,7 @@ export const registerAttendanceRoutes = (
             eq(attendance.account_id, request.params.accountId),
           ),
         )
-        .returning({ id: attendance.id, payment_status: attendance.payment_status })
+        .returning({ id: attendance.id })
 
       if (removed.length === 0) return sendError(reply, 404)
 
