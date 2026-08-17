@@ -45,10 +45,10 @@ const stub = (over: Partial<EventsApi> = {}): EventsApi => ({
   ...over,
 })
 
-const renderPage = (api: EventsApi) =>
+const renderPage = (api: EventsApi, now?: () => Date) =>
   render(
     <ViewerProvider viewer={ADMIN}>
-      <AdminEvents api={api} />
+      {now === undefined ? <AdminEvents api={api} /> : <AdminEvents api={api} now={now} />}
     </ViewerProvider>,
   )
 
@@ -66,6 +66,36 @@ const serverHolding = (...rows: Event[]) => {
 
 const fill = (label: string, value: string) =>
   fireEvent.input(screen.getByLabelText(label), { target: { value } })
+
+describe('the meal times of a burn that has ended', () => {
+  const slots = {
+    slots: [{ id: 'ms-1', event_id: 'e-1', label: 'Lunch', at: '13:00', kind: 'meal' as const, order: 0 }],
+  }
+
+  it('can only be read, the routes refusing every write on it', async () => {
+    renderPage(stub({ getMealSlots: () => Promise.resolve(slots) }), () => new Date('2026-09-01T12:00:00Z'))
+
+    expect(await screen.findByText('This burn has ended, so its meal times can only be read.')).toBeTruthy()
+    expect(screen.queryByLabelText('Time of Lunch')).toBeNull()
+    expect(screen.queryByLabelText('New meal time name')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Fill the days in' })).toBeNull()
+  })
+
+  it('is the whole editor on a burn that has not ended, which is the ordinary case', async () => {
+    renderPage(stub({ getMealSlots: () => Promise.resolve(slots) }), () => new Date('2026-07-01T12:00:00Z'))
+
+    expect(await screen.findByLabelText('Time of Lunch')).toBeTruthy()
+    expect(screen.getByLabelText('New meal time name')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Fill the days in' })).toBeTruthy()
+    expect(screen.queryByText('This burn has ended, so its meal times can only be read.')).toBeNull()
+  })
+
+  it('is the whole editor on the last day of it, an ending burn still being open', async () => {
+    renderPage(stub({ getMealSlots: () => Promise.resolve(slots) }), () => new Date('2026-08-05T12:00:00Z'))
+
+    expect(await screen.findByLabelText('Time of Lunch')).toBeTruthy()
+  })
+})
 
 describe('AdminEvents', () => {
   it('lists the events', async () => {

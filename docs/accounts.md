@@ -1126,6 +1126,19 @@ the one under the settings table too, and state inside a component cannot say th
 somebody switching four kinds on in a sitting must be asked at most once, which is what the shared
 flag makes true.
 
+**Signing out takes it with it** (#588). The flag lives beside the viewer rather than only in the
+component, so `wanted` is false the moment nobody is signed in — a strip raised and not answered
+used to stay fixed over the signed-out homepage, where its button asked the browser for permission
+and then met a 401 from `getPushKey`. Not the same as refusing it: signing back in and ticking
+something raises it again.
+
+**It has no "not now", and that is the difference from the install strip.** `docs/the-app.md`
+reasons about the install offer that "a nudge with no 'not now' is a nudge for ever" — true of
+something raised on every visit, and this is raised by an action instead. Somebody who ticks
+nothing is never asked, so the only two answers worth having are the one they came for (turn it on)
+and the lasting one ("Do not ask me here"). A third button that means "ask me on the next tick"
+would be the nagging the action-triggered design already avoids.
+
 **The strip is fixed to the bottom of the window, and above the popdown that raised it** (#589).
 It answers a tick that can happen anywhere, and the settings table is three screens long while the
 feed is longer, so a notice in the flow at the top of the page would appear off-screen exactly when

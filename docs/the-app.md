@@ -361,6 +361,12 @@ ticked looked like a card with neither. Emoji carry the fill: 🔔 / 🔕 in the
 the heart. That also means the mark takes no `color`, so the top bell's quiet-until-something
 signal is opacity and its count badge rather than the ember a drawing could be given.
 
+**The fill is no use to a screen reader, so the name carries it too** (#675). 🔔 and 🔕 differ by
+one diagonal stroke and read as the same words, so a card bell's `aria-label` ends with `, on` or
+`, off` — the state belongs in the name because the control is a disclosure rather than a toggle,
+which rules `aria-pressed` out. The panel it opens keeps its own unchanging label; the switches
+inside carry their own state already.
+
 The drawings are [Lucide](https://lucide.dev)'s, pasted as path data into `Icon.tsx` exactly
 as #492 pasted Simple Icons' brand marks into `MusicIcon.tsx`, with the ISC notice in
 [THIRD-PARTY.md](../THIRD-PARTY.md). **Nothing ships that nothing draws, and `Icon.test.tsx`

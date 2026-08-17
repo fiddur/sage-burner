@@ -143,7 +143,7 @@ export const notificationCategoryInfo = {
   lead_role: { label: 'Given or taken off a lead role', on: true, about: 'you' },
   payment: { label: 'Your payment recorded', on: true, about: 'you' },
   waiting_list_near: {
-    label: 'The burn is nearly full and you have not paid',
+    label: 'Your place is not paid for and the burn is filling up',
     on: true,
     about: 'you',
   },

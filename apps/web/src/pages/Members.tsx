@@ -10,6 +10,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { PersonCell } from '../components/PersonCell.tsx'
+import { PlacesTaken } from '../components/PlacesTaken.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { Table } from '../components/Table.tsx'
 import { startsTheWaitingList, WaitingListLine } from '../components/WaitingListLine.tsx'
@@ -35,7 +36,6 @@ export const Members = ({ api }: { api: MembersApi }) => {
   )
 
   const roster = loaded.status === 'ready' ? loaded.data : undefined
-  const confirmed = roster?.entries.filter((entry) => !entry.waiting).length ?? 0
 
   return (
     <GuardedPage title="Members" require="approved">
@@ -53,8 +53,7 @@ export const Members = ({ api }: { api: MembersApi }) => {
         <>
           <h2>{roster.event.name}</h2>
           <p class="form-note">
-            {confirmed} of {roster.event.member_cap} places taken
-            {roster.entries.length > confirmed ? `, ${roster.entries.length - confirmed} waiting` : ''}.
+            <PlacesTaken entries={roster.entries} cap={roster.event.member_cap} />
           </p>
 
           <HowToPay event={roster.event} entries={roster.entries} me={viewer.account?.id} />

@@ -125,12 +125,25 @@ describe('Members', () => {
     renderPage(
       stub(
         aRoster({
+          event: {
+            id: 'e-1',
+            name: 'Summer burn',
+            member_cap: 1,
+            payment_info_markdown: '',
+            transfer_info_markdown: '',
+          },
           entries: [anEntry({ name: 'In' }), anEntry({ name: 'Out', waiting: true })],
         }),
       ),
     )
 
-    expect(await screen.findByText(/1 of 2 places taken, 1 waiting/)).toBeTruthy()
+    expect(await screen.findByText(/1 of 1 places taken, 1 waiting/)).toBeTruthy()
+  })
+
+  it('says nothing of a waiting list where nobody is on one', async () => {
+    renderPage(stub(aRoster({ entries: [anEntry({ name: 'In' })] })))
+
+    expect(await screen.findByText(/1 of 2 places taken\./)).toBeTruthy()
   })
 
   it('shows the face beside the name, which the roster now carries', async () => {

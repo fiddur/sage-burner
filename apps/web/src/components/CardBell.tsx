@@ -31,7 +31,7 @@ export const CardBell = ({
       <button
         type="button"
         class="card-bell-button"
-        aria-label={`Notification settings for ${what}`}
+        aria-label={`Notification settings for ${what}, ${on || following ? 'on' : 'off'}`}
         aria-controls={panelId}
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}

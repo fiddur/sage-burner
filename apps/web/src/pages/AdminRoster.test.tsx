@@ -82,13 +82,29 @@ describe('AdminRoster', () => {
       stub(
         {},
         aRoster({
+          event: { id: 'e-1', name: 'Summer burn', member_cap: 1 },
           entries: [anEntry({ name: 'In' }), anEntry({ name: 'Out', waiting: true })],
         }),
       ),
     )
 
-    expect((await screen.findByText(/places taken/)).textContent).toContain('1 of 2 places taken')
+    expect((await screen.findByText(/places taken/)).textContent).toContain('1 of 1 places taken')
     expect(screen.getByText(/places taken/).textContent).toContain('1 waiting')
+  })
+
+  it('counts a place taken by somebody who has not paid for it (#726)', async () => {
+    renderPage(
+      stub(
+        {},
+        aRoster({
+          event: { id: 'e-1', name: 'Summer burn', member_cap: 1 },
+          entries: [anEntry({ name: 'In', payment_status: 'unpaid' })],
+        }),
+      ),
+    )
+
+    expect((await screen.findByText(/places taken/)).textContent).toContain('1 of 1 places taken.')
+    expect(screen.getByText(/places taken/).textContent).not.toContain('1 waiting')
   })
 
   it('marks who is on the waiting list, in their own row', async () => {

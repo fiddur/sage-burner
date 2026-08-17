@@ -561,13 +561,13 @@ describe('the waiting list', () => {
     for (const who of [first, last]) {
       const theirs = (await list(server, who.cookie)).json().notifications
       expect(theirs.map((one: { category: string }) => one.category)).toEqual(['waiting_list_near'])
-      expect(theirs[0].body).toContain('3 places left')
+      expect(theirs[0].body).toContain('1 place left')
     }
   })
 
   it('says how many are left, and says one in the singular', async () => {
     const server = await build()
-    await givenBurn(2)
+    await givenBurn(3)
     const admin = await givenAccount(['admin'])
     const paid = await givenAccount()
     const unpaid = await givenAccount()
@@ -593,7 +593,160 @@ describe('the waiting list', () => {
     await setPaid(server, admin.cookie, paid.id)
 
     const [told] = (await list(server, unpaid.cookie)).json().notifications
-    expect(told.body).toContain('3 places left, and they go to whoever pays')
+    expect(told.body).toContain('2 places left, and they go to whoever pays')
+  })
+
+  it('counts the places nobody is standing in, not the ones nobody has paid for (#726)', async () => {
+    const server = await build()
+    await givenBurn(3)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const unpaid = await givenAccount()
+    const alsoUnpaid = await givenAccount()
+    for (const [at, who] of [paid, unpaid, alsoUnpaid].entries()) {
+      await givenComing(who.id, false, joinedAt(at))
+    }
+
+    await setPaid(server, admin.cookie, paid.id)
+
+    const [told] = (await list(server, unpaid.cookie)).json().notifications
+    expect(told.body).not.toContain('2 places left')
+    expect(told.body).toContain('You are in one for now')
+  })
+
+  it('tells the holder of an unpaid place that they hold it, not to go and win one (#726)', async () => {
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const unpaid = await givenAccount()
+    await givenComing(paid.id)
+    await givenComing(unpaid.id, false, joinedAt(1))
+    await setPaid(server, admin.cookie, paid.id)
+
+    const gone = await server.inject({
+      method: 'DELETE',
+      url: `/api/admin/events/${BURN}/attendance/${paid.id}`,
+      headers: { cookie: admin.cookie },
+    })
+    expect(gone.statusCode).toBe(204)
+
+    const [told] = (await list(server, unpaid.cookie)).json().notifications
+    expect(told.body).toContain('You are in one for now')
+    expect(told.body).not.toContain('place left')
+  })
+
+  it('lifts somebody off the waiting list when an unpaid member leaves (#726)', async () => {
+    const server = await build()
+    await givenBurn(2)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const going = await givenAccount()
+    const behind = await givenAccount()
+    for (const [at, who] of [paid, going, behind].entries()) {
+      await givenComing(who.id, false, joinedAt(at))
+    }
+    await setPaid(server, admin.cookie, paid.id)
+    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
+      'you are on the waiting list',
+    )
+
+    expect((await leave(server, going.cookie)).statusCode).toBe(204)
+
+    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
+      'You are in one for now',
+    )
+  })
+
+  it('does the same when an admin removes an unpaid member, a headcount being a headcount', async () => {
+    const server = await build()
+    await givenBurn(2)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const going = await givenAccount()
+    const behind = await givenAccount()
+    for (const [at, who] of [paid, going, behind].entries()) {
+      await givenComing(who.id, false, joinedAt(at))
+    }
+    await setPaid(server, admin.cookie, paid.id)
+
+    const gone = await server.inject({
+      method: 'DELETE',
+      url: `/api/admin/events/${BURN}/attendance/${going.id}`,
+      headers: { cookie: admin.cookie },
+    })
+    expect(gone.statusCode).toBe(204)
+
+    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
+      'You are in one for now',
+    )
+  })
+
+  it('does the same when a place is handed over, the giver’s row going with it', async () => {
+    const server = await build()
+    await givenBurn(2)
+    const admin = await givenAccount(['admin'])
+    const giver = await givenAccount()
+    const taker = await givenAccount()
+    const behind = await givenAccount()
+    for (const [at, who] of [giver, taker, behind].entries()) {
+      await givenComing(who.id, false, joinedAt(at))
+    }
+    await setPaid(server, admin.cookie, giver.id)
+    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
+      'you are on the waiting list',
+    )
+
+    const handed = await server.inject({
+      method: 'POST',
+      url: `/api/events/${BURN}/attendance/me/transfer`,
+      headers: { cookie: giver.cookie },
+      payload: { to_account_id: taker.id },
+    })
+    expect(handed.statusCode).toBe(204)
+
+    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
+      'You are in one for now',
+    )
+  })
+
+  it('agrees with the roster about who holds a place and who waits (#726)', async () => {
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const holder = await givenAccount()
+    const behind = await givenAccount()
+    await givenComing(holder.id, false, joinedAt(0))
+    await givenComing(behind.id, false, joinedAt(1))
+    const paid = await givenAccount()
+    await givenComing(paid.id, false, joinedAt(2))
+
+    await setPaid(server, admin.cookie, paid.id)
+
+    const gone = await server.inject({
+      method: 'DELETE',
+      url: `/api/admin/events/${BURN}/attendance/${paid.id}`,
+      headers: { cookie: admin.cookie },
+    })
+    expect(gone.statusCode).toBe(204)
+
+    const roster = await server.inject({
+      method: 'GET',
+      url: `/api/events/${BURN}/members`,
+      headers: { cookie: admin.cookie },
+    })
+    const held = roster
+      .json()
+      .entries.filter((one: { waiting: boolean }) => !one.waiting)
+      .map((one: { account_id: string }) => one.account_id)
+
+    expect(held).toEqual([holder.id])
+    expect((await list(server, holder.cookie)).json().notifications[0].body).toContain(
+      'You are in one for now',
+    )
+    expect((await list(server, behind.cookie)).json().notifications[0].body).toContain(
+      'you are on the waiting list',
+    )
   })
 
   it('tells every unpaid member it is full once the places are gone, wherever they joined', async () => {
@@ -721,22 +874,23 @@ describe('the waiting list', () => {
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])
-    const paid = await givenAccount()
-    const waiting = await givenAccount()
-    await givenComing(paid.id)
-    await givenComing(waiting.id, false, joinedAt(1))
-    await setPaid(server, admin.cookie, paid.id)
+    const first = await givenAccount()
+    const second = await givenAccount()
+    await givenComing(first.id, false, joinedAt(1))
+    await givenComing(second.id, false, joinedAt(0))
+    await setPaid(server, admin.cookie, first.id)
 
     const undone = await server.inject({
       method: 'PATCH',
-      url: `/api/admin/events/${BURN}/attendance/${paid.id}/payment`,
+      url: `/api/admin/events/${BURN}/attendance/${first.id}/payment`,
       headers: { cookie: admin.cookie },
       payload: { payment_status: 'unpaid' },
     })
     expect(undone.statusCode).toBe(200)
 
-    const theirs = (await list(server, waiting.cookie)).json().notifications
+    const theirs = (await list(server, second.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).toContain('waiting_list_near')
+    expect(theirs[0].body).toContain('You are in one for now')
   })
 
   it('says nothing about the waiting list of a burn that has ended', async () => {
@@ -806,7 +960,7 @@ describe('the waiting list', () => {
 
   it('tells the joiner the count the others were told', async () => {
     const server = await build()
-    await givenBurn(2)
+    await givenBurn(3)
     const admin = await givenAccount(['admin'])
     const paid = await givenAccount()
     await givenComing(paid.id)
