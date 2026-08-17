@@ -21,14 +21,6 @@ import {
   eventOption,
 } from '../db/schema.ts'
 
-/**
- * The admin's list of who is coming, and recording that they have paid.
- *
- * The ordering is the load-bearing part: it decides who has a place, so the
- * cases worth proving are that paying re-sorts the list and that the cut is
- * derived rather than stored.
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 
@@ -107,8 +99,6 @@ const givenComing = async (eventId: string, accountId: string, joined_at: string
       account_id: accountId,
       joined_at,
       payment_status: paid ? 'paid' : 'unpaid',
-      // A paid row carries a date, or "unmarking clears it" is asserted against a
-      // column that was already null and the test proves nothing.
       payment_date: paid ? '2026-06-30' : null,
     })
 }
@@ -139,8 +129,6 @@ const names = (response: LightMyRequestResponse) =>
 
 describe('the list of who is coming', () => {
   it('joins in the person details rather than duplicating them', async () => {
-    // Corrected on someone's own profile page, corrected here — which is the
-    // reason those fields live on the account.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent()
@@ -195,8 +183,6 @@ describe('the list of who is coming', () => {
   })
 
   it('re-sorts the moment someone pays, pushing an unpaid member out', async () => {
-    // The whole point of the rule, end to end: the third member does nothing but
-    // pay, and the second loses their place without acting at all.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent(2)
@@ -244,8 +230,6 @@ describe('the list of who is coming', () => {
 
 describe('recording a payment', () => {
   it('stamps the date from the clock, which the caller does not get a say in', async () => {
-    // Derived rather than accepted, the way `joined_at` already is. A date the
-    // caller supplies is a date that can disagree with the status it belongs to.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent()
@@ -263,10 +247,6 @@ describe('recording a payment', () => {
   })
 
   it('refuses a date from the caller rather than quietly preferring its own', async () => {
-    // `.strict()` is what makes the field gone rather than ignored: stripped, the
-    // admin would believe they had backdated a transfer that in fact reads as
-    // today. Backdating is a real need — it wants a deliberate design, not a
-    // field the server silently overrides.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent()
@@ -292,16 +272,12 @@ describe('recording a payment', () => {
 
     await setPayment(server, admin.cookie, eventId, who.id, { payment_status: 'unpaid' })
 
-    // The invariant `docs/burns.md` states: unmarking clears the date, so one never
-    // outlives the payment it recorded. Now a property of the write rather than
-    // of the one caller that remembered to send `null`.
     const [row] = await db().select().from(attendance).where(eq(attendance.account_id, who.id))
     expect(row?.payment_status).toBe('unpaid')
     expect(row?.payment_date).toBeNull()
   })
 
   it('refuses a status outside the vocabulary', async () => {
-    // `partial` is gone, and this is what keeps it gone.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent()
@@ -314,8 +290,6 @@ describe('recording a payment', () => {
   })
 
   it('refuses anything that is not payment', async () => {
-    // An admin recording a payment has no business rewriting someone's
-    // arrival date in the same request.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent()
@@ -328,8 +302,6 @@ describe('recording a payment', () => {
   })
 
   it('treats an empty body as a read rather than a 500', async () => {
-    // `set({})` is not valid SQL, so the branch exists; without a test it is the
-    // one path nothing walks.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent()
@@ -343,8 +315,6 @@ describe('recording a payment', () => {
   })
 
   it('answers 404 for an empty body against someone who is not coming', async () => {
-    // The passing sibling's opposite: the read-back path has to distinguish
-    // "nothing to change" from "no such row" just as the write path does.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent()
@@ -438,15 +408,11 @@ describe('what the roster says about helping out', () => {
 
     const entry = (await roster(server, admin.cookie, eventId)).json().entries[0]
 
-    // The admin's order, not the order they happened to be ticked in.
     expect(entry.helping).toBe('Sauna, Kitchen')
     expect([...entry.helping_option_ids].sort()).toEqual([sauna, kitchen].sort())
   })
 
   it('carries the ticks on a payment response too, which `Attendance` promises', async () => {
-    // Nothing reads them off this endpoint today. The type says every attendance
-    // carries them, and a route quietly answering a narrower shape is how that
-    // stops being true.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount('Ada', ['admin'])
@@ -503,8 +469,6 @@ describe('the same list as a member sees it', () => {
     })
 
   it('gives a member the details whoever is cooking needs', async () => {
-    // The reason allergies live on the account at all: somebody has to read them,
-    // and that somebody is not necessarily an admin.
     const server = await build()
     const eventId = await givenEvent()
     const ana = await givenAccount('Ana')
@@ -540,8 +504,6 @@ describe('the same list as a member sees it', () => {
   })
 
   it('keeps the date it landed and the login identity out of it', async () => {
-    // Named one at a time. A single `expect(entry).not.toMatchObject({…})` passes
-    // when any one of the two is absent, which is not the question being asked.
     const server = await build()
     const eventId = await givenEvent()
     const ana = await givenAccount('Ana')
@@ -589,9 +551,6 @@ describe('the same list as a member sees it', () => {
   })
 
   it('still says who has a place and who is waiting', async () => {
-    // Derived from payment, which is exactly why it is worth proving it survives
-    // the projection: dropping the column it comes from would be an easy way to
-    // lose it.
     const server = await build()
     const eventId = await givenEvent(1)
     const first = await givenAccount('First')
@@ -640,9 +599,6 @@ describe('the same list as a member sees it', () => {
   })
 
   it('is empty for a burn nobody has joined, rather than 404', async () => {
-    // A burn exists before anybody says they are coming to it, and the page for it
-    // should say so rather than look broken. There is no `active` variant: the
-    // selector names the burn, so the route never has to guess which one.
     const server = await build()
     const eventId = await givenEvent()
     const reader = await givenAccount('Reader')

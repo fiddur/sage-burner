@@ -42,7 +42,6 @@ const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   return app
 }
 
-/** One browser opted in, so there is somewhere for a notification to go. */
 const givenSubscribed = async (accountId: string) => {
   await db()
     .insert(pushSubscription)
@@ -56,7 +55,6 @@ const givenSubscribed = async (accountId: string) => {
     })
 }
 
-/** What was pushed, as the strings a person would read. */
 const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) =>
   deliver.mock.calls.map((call) => {
     const parsed: unknown = JSON.parse(String(call[1]))
@@ -80,11 +78,6 @@ const givenAccount = async (roles: ('admin' | 'member')[]) => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-/**
- * A fixed id, so the helpers below can name the burn without every test threading
- * one through. The routes take an event id since #184's selector — "the active
- * burn" is a rule the client no longer applies.
- */
 const OPEN_BURN = '9f1c2f2a-6f1a-4a2e-9c6d-2f0a1b3c4d5e'
 
 const givenEvent = async (over: { id?: string; start_date?: string; end_date?: string } = {}) => {
@@ -164,7 +157,6 @@ const givenAttending = async (eventId: string, roles: ('admin' | 'member')[] = [
   return who
 }
 
-/** `POST` or `DELETE` on `/api/sessions/:id/support/me`. A heart is always your own. */
 const selfService = (
   server: FastifyInstance,
   cookie: string | undefined,
@@ -178,10 +170,6 @@ const selfService = (
     headers: cookie === undefined ? {} : { cookie },
   })
 
-/**
- * Offering hands, or taking them back. `about` names somebody other than the
- * caller — which is the whole of what changed in #247.
- */
 const helping = (
   server: FastifyInstance,
   who: { cookie: string; id: string } | undefined,
@@ -212,7 +200,6 @@ describe('dreams', () => {
   })
 
   it('is empty rather than 404 when no burn is open', async () => {
-    // The ordinary state of a fresh deployment, not an error.
     const server = await build()
     const member = await givenAccount(['member'])
 
@@ -260,7 +247,6 @@ describe('dreams', () => {
     expect(taken.statusCode).toBe(201)
     expect(taken.json().session.facilitator_account_id).toBe(member.id)
 
-    // A 400 rather than a 404: the account exists, the pairing is what is wrong.
     const absent = await offer(server, member.cookie, {
       title: 'Cacao ceremony',
       facilitator_account_id: elsewhere.id,
@@ -345,10 +331,6 @@ describe('dreams', () => {
   })
 
   it('refuses a lane belonging to another burn', async () => {
-    // Since #156 a place belongs to one burn, and the foreign key cannot say which:
-    // it only knows the row exists. Without the check a dream could stand in a lane
-    // this burn's grid does not draw, so it would vanish from the page while still
-    // holding a row.
     const server = await build()
     const eventId = await givenEvent()
     const later = await givenEvent({
@@ -364,8 +346,6 @@ describe('dreams', () => {
     const id = (await offer(server, member.cookie, { title: 'y' })).json().session.id
     expect((await editDream(server, member.cookie, id, { place_id: elsewhere })).statusCode).toBe(400)
 
-    // The passing sibling: this burn's own lane is accepted, so the check refuses
-    // the pairing rather than every place.
     const ours = await givenPlace(eventId, 'Temple')
     expect((await editDream(server, member.cookie, id, { place_id: ours })).statusCode).toBe(200)
   })
@@ -406,9 +386,6 @@ describe('dreams', () => {
   })
 
   it('refuses a single end that would leave half a slot on the stored row', async () => {
-    // The case the schema cannot see: the body carries one end, and whether that
-    // is whole depends on the row. Composed into the WHERE rather than compared
-    // after a read.
     const server = await build()
     await givenEvent()
     const member = await givenAccount(['member'])
@@ -437,7 +414,6 @@ describe('dreams', () => {
   })
 
   it('accepts a single end that keeps the slot whole', async () => {
-    // The passing sibling: the condition must not refuse an ordinary reschedule.
     const server = await build()
     await givenEvent()
     const member = await givenAccount(['member'])
@@ -522,7 +498,6 @@ describe('dreams', () => {
   })
 
   it('lets any member arrange the schedule, not only whoever offered it', async () => {
-    // #20: the schedule belongs to the members, not to the dream's host.
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenAccount(['member'])
@@ -555,9 +530,6 @@ describe('dreams', () => {
   })
 
   it('leaves a finished burn\u2019s dreams alone, even to whoever noted the id', async () => {
-    // Every other member-facing route scopes to the burn that is open. A dream
-    // from a finished burn is history: still visible in a past-events view one
-    // day, not still editable by anyone who kept the URL.
     const server = await build()
     await givenEvent()
     const member = await givenAccount(['member'])
@@ -605,10 +577,6 @@ describe('dreams', () => {
   })
 
   it('lets an organiser holding admin alone arrange the burn they are setting up', async () => {
-    // #200: `getMyBurns` is `requireApproved`, so this account gets a working burn
-    // selector — and then every page it chose a burn for turned it away. The lanes,
-    // the register and the options were already open to them; the timetable is the
-    // same shared furniture.
     const server = await build()
     await givenEvent()
     const organiser = await givenAccount(['admin'])
@@ -651,8 +619,6 @@ describe('a place a dream is standing in', () => {
   })
 
   it('is deleted once nothing stands in it', async () => {
-    // The passing sibling: the refusal must be about the dream, not about
-    // deleting places at all.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin', 'member'])
@@ -670,9 +636,6 @@ describe('a dream belongs to the burn it names', () => {
   const ENDED = '3c8e0f51-2d4a-4e6b-9c7d-8f9a0b1c2d3e'
 
   it('is offered at the burn asked for, not whichever one is next', async () => {
-    // The selector offers every burn still to come, so a dream can be offered for
-    // the one after next. That could not be said at all while these routes were
-    // scoped to the soonest-ending burn.
     const server = await build()
     await givenEvent()
     await givenEvent({ id: LATER, start_date: '2026-12-01', end_date: '2026-12-05' })
@@ -687,8 +650,6 @@ describe('a dream belongs to the burn it names', () => {
   })
 
   it('can still be edited and withdrawn at a burn that is not the next one', async () => {
-    // The passing sibling for the refusal below: what the guard rejects is a burn
-    // that has *ended*, not every burn other than the soonest.
     const server = await build()
     await givenEvent()
     await givenEvent({ id: LATER, start_date: '2026-12-01', end_date: '2026-12-05' })
@@ -743,7 +704,6 @@ describe('helping with a dream', () => {
   })
 
   it('resolves the name at read time, so correcting it corrects the list', async () => {
-    // The account carries the person, so a name is corrected in one place.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
@@ -783,9 +743,6 @@ describe('helping with a dream', () => {
   })
 
   it('lets somebody organising but not coming put a pair of hands down (#350)', async () => {
-    // Arranging the burn is a job you can hold without attending it, and the lead-roles
-    // register has always let any approved account appoint. The 👉 on this strip used to
-    // be a button that always failed.
     const server = await build()
     const eventId = await givenEvent()
     const organiser = await givenAccount(['admin'])
@@ -805,8 +762,6 @@ describe('helping with a dream', () => {
   })
 
   it('lets a member who is not coming appoint too, not only an admin', async () => {
-    // The wider door #350 actually opened: `requireApproved`, not the admin role. A
-    // member who is not at this burn is still somebody the register would let appoint.
     const server = await build()
     const eventId = await givenEvent()
     const elsewhere = await givenAccount(['member'])
@@ -820,8 +775,6 @@ describe('helping with a dream', () => {
   })
 
   it('still refuses to put down somebody who is not coming', async () => {
-    // The other half of #350: the caller's attendance stopped mattering, the named
-    // person's did not — a dream is run by people who are there.
     const server = await build()
     const eventId = await givenEvent()
     const organiser = await givenAccount(['admin'])
@@ -834,8 +787,6 @@ describe('helping with a dream', () => {
   })
 
   it('refuses a heart from a member who is not coming to that burn', async () => {
-    // A 400, not a 403: they are a member in good standing; the pairing is wrong. A
-    // heart is keyed by the caller's own attendance, so unlike appointing it needs one.
     const server = await build()
     await givenEvent()
     const elsewhere = await givenAccount(['member'])
@@ -873,10 +824,6 @@ describe('helping with a dream', () => {
   })
 
   it('tells an organiser putting their own hand up that they are not coming, rather than refusing the role', async () => {
-    // The guard opens to `approved` (#200), and the named person's attendance still
-    // does its job — here the organiser names themselves, so a hand put up on a burn
-    // nobody said they were attending is the pairing being wrong, not the account
-    // being unwelcome. Naming somebody who *is* coming works, which is #350.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
@@ -949,8 +896,6 @@ describe('supporting a dream', () => {
   })
 
   it('names whoever gave one, so the page can show their faces', async () => {
-    // The count used to be all there was, and could be: a heart said nothing about
-    // who. The page says it now (#251), so the answer has to carry it.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
@@ -969,8 +914,6 @@ describe('supporting a dream', () => {
   })
 
   it('says whose heart it is, and only to them', async () => {
-    // Without the per-reader half everybody would see a filled heart the moment
-    // anybody gave one.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
@@ -1011,8 +954,6 @@ describe('supporting a dream', () => {
   })
 
   it('keeps the helpers and hearts across an ordinary edit', async () => {
-    // `.returning()` gives back a row rather than a dream, so the fields it does not
-    // know about have to be attached again or a save looks like everybody let go.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
@@ -1077,8 +1018,6 @@ describe('telling somebody a dream role moved', () => {
   })
 
   it('says nothing the second time somebody is put on', async () => {
-    // A repeated 👉, or a second tab. `.onConflictDoNothing()` makes the write
-    // idempotent; without `.returning()` the notification is not.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, ada, bea, id } = await setUp(deliver)
     await givenSubscribed(bea.id)
@@ -1105,8 +1044,6 @@ describe('telling somebody a dream role moved', () => {
   })
 
   it('says nothing when nobody was actually taken off', async () => {
-    // Bea was never on it. Without the guard she is told she has been dropped from
-    // something she never joined — which is what a second tab makes ordinary.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, ada, bea, id } = await setUp(deliver)
     await givenSubscribed(bea.id)
@@ -1135,7 +1072,6 @@ describe('telling somebody a dream role moved', () => {
   })
 
   it('announces nothing when the facilitator was not what changed', async () => {
-    // The field is set through the general PATCH, so a rename must stay silent.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, ada, bea, id } = await setUp(deliver)
     await givenSubscribed(bea.id)
@@ -1170,12 +1106,10 @@ describe('moving a dream somebody else has just moved', () => {
 
     expect((await move(server, ada.cookie, mine)).statusCode).toBe(428)
 
-    // Bea edits her own dream, which moves the pool Ada is holding a version of.
     expect((await editDream(server, bea.cookie, theirs, { title: 'Poi' })).statusCode).toBe(200)
 
     const refused = await move(server, ada.cookie, mine, asAdaSawIt)
     expect(refused.statusCode).toBe(412)
-    // Carrying the pool as it stands, so the page can say what changed.
     expect(refused.json().sessions.map((dream: { title: string }) => dream.title)).toContain('Poi')
   })
 

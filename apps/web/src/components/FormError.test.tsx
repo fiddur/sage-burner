@@ -19,9 +19,6 @@ describe('FormError', () => {
   })
 
   it('takes focus again when the complaint changes', () => {
-    // Two guards failing in turn is one message replacing another in a node that
-    // never unmounts. Without the message in the dependencies the second one
-    // renders unfocused, so someone who scrolled away never learns of it.
     const { rerender } = render(<FormError error={{ message: 'Please tell us your name.', attempt: 1 }} />)
     screen.getByRole('alert').blur()
 
@@ -31,8 +28,6 @@ describe('FormError', () => {
   })
 
   it('takes focus again on the same complaint, which is a different attempt', () => {
-    // The message is all the DOM has to go on and it is identical, so without the
-    // count there is nothing here to tell a second failure from a redraw.
     const { rerender } = render(<FormError error={{ message: 'Not that.', attempt: 1 }} />)
     screen.getByRole('alert').blur()
 
@@ -42,9 +37,6 @@ describe('FormError', () => {
   })
 
   it('leaves focus where it is on a render that is not an attempt', () => {
-    // The reason this is a count rather than "focus on every render": a keystroke
-    // in the field being corrected re-renders the form, and stealing the caret
-    // back to the message each time would make the form unusable.
     const { rerender } = render(<FormError error={{ message: 'Not that.', attempt: 1 }} />)
     const alert = screen.getByRole('alert')
     alert.blur()
@@ -56,7 +48,6 @@ describe('FormError', () => {
 })
 
 describe('useFormError', () => {
-  /** The shape every submit handler has: clear, then complain, in one tick. */
   const Form = ({ complaint }: { complaint: string }) => {
     const [error, setError] = useFormError()
 
@@ -75,8 +66,6 @@ describe('useFormError', () => {
   }
 
   it('counts an attempt that says exactly what the last one said', () => {
-    // Both calls resolve against the same pending value before anything commits,
-    // so the committed message never changes. The count is what survives that.
     render(<Form complaint="Not that." />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))

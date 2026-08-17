@@ -74,11 +74,8 @@ const stub = (
   ...over,
 })
 
-/** The selector's view of the same burn, so the two cannot describe different ones. */
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
-// the default, so "no burn" written that way silently rendered the usual one.
 const renderPage = (api: RolesApi, viewer: Viewer = ADA, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -105,8 +102,6 @@ describe('Roles', () => {
   })
 
   it('names the lead when somebody holds it, and offers only to take them off', async () => {
-    // A held spot shows its holder and ✕ and nothing else: handing over is unassign
-    // then assign, which is two gestures and two people told.
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna', lead: { account_id: 'a-2', name: 'Bea' } })]))
 
     expect(await screen.findByText('Bea')).toBeTruthy()
@@ -116,9 +111,6 @@ describe('Roles', () => {
   })
 
   it('shows how many the team wants without ever refusing another', async () => {
-    // Advisory, per #27: a full role still offers "join". The lodging list's rule —
-    // disable when full — is the one this must not copy, because a bed is finite and
-    // a pair of hands is not.
     const joinLeadRoleTeam = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Kitchen' }) }))
     renderPage(
       stub({ joinLeadRoleTeam }, [
@@ -131,9 +123,6 @@ describe('Roles', () => {
       ]),
     )
 
-    // The one wanted place is filled, so this row is the extra one — the offer that
-    // outlives the count, which is the whole of what this is about. It carries the
-    // buttons and *not* the word "wanted", since nothing more is asked for.
     const join = await screen.findByRole('button', { name: 'Take the spot on Kitchen' })
     expect(screen.queryByText('wanted')).toBeNull()
     expect(join.hasAttribute('disabled')).toBe(false)
@@ -146,8 +135,6 @@ describe('Roles', () => {
   })
 
   it('renders the purpose as markdown, not as raw html', async () => {
-    // Members author this, and `markdown.ts` escapes rather than filters — so a
-    // script tag typed into the purpose must come out as text.
     renderPage(
       stub({}, [aRole({ id: 'r-1', title: 'Sauna', purpose: '**Keep it hot**<script>alert(1)</script>' })]),
     )
@@ -158,8 +145,6 @@ describe('Roles', () => {
   })
 
   it('names all three effort answers separately, in one cell', async () => {
-    // One cell since #307, three icons wide — but each phase still says which it is
-    // and how much, because 🌱 is a guess until somebody tells you.
     renderPage(
       stub({}, [
         aRole({
@@ -172,8 +157,6 @@ describe('Roles', () => {
       ]),
     )
 
-    // In order, not `arrayContaining`: the three phases hold the same vocabulary, so
-    // a containment check passes just as well with before and after swapped.
     const row = (await screen.findByText('Build')).closest('tr')
     const efforts = [...(row?.querySelectorAll('.effort') ?? [])].map((one) => one.textContent)
 
@@ -181,8 +164,6 @@ describe('Roles', () => {
   })
 
   it('draws the level as a bar, and none as an empty one', async () => {
-    // "None" has to look like an answer somebody gave rather than a cell nobody
-    // filled in, which is why the unfilled segments stay drawn.
     renderPage(
       stub({}, [aRole({ id: 'r-1', title: 'Build', effort_before: 'medium', effort_after: 'none' })]),
     )
@@ -197,9 +178,6 @@ describe('Roles', () => {
   })
 
   it('says what the effort icons mean, in words, on the page', async () => {
-    // `title` needs a hover and `.visually-hidden` needs a screen reader, so a sighted
-    // touch user — the case #307 exists for — had three icons and a heading reading
-    // only "Effort" (#317).
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Build' })]))
 
     const legend = await screen.findByText(/^Effort: /)
@@ -209,9 +187,6 @@ describe('Roles', () => {
   })
 
   it('gives the body row a cell per heading, and the edit row the whole width', async () => {
-    // What the deleted `data-label` test did incidentally: nothing else notices a
-    // column added to the header and not to `RoleRow`, or a `colSpan` that stops
-    // covering the row (#317). The actions column has no heading text, hence the +1.
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Build' })]))
 
     await screen.findByText('Build')
@@ -227,9 +202,6 @@ describe('Roles', () => {
   })
 
   it('keeps the lead and the team apart inside the one column they share', async () => {
-    // They were a column each until #307. Merged, the header can no longer say which
-    // is which, so each half does — and the two are still two controls with two sets
-    // of buttons behind them.
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
     await screen.findByText('Sauna')
@@ -278,8 +250,6 @@ describe('Roles', () => {
       ]),
     )
 
-    // The two halves of the handover, each from its own render: the stub answers
-    // with the same list every time, so one render cannot show both states.
     fireEvent.click(await screen.findByRole('button', { name: 'Take Bea off Sauna lead' }))
     await waitFor(() => {
       expect(setLeadRoleLead).toHaveBeenCalledWith('r-1', null)
@@ -315,8 +285,6 @@ describe('Roles', () => {
   })
 
   it('lets a member remove a role somebody else leads', async () => {
-    // The deliberate divergence. A page that hid this button for anyone but the
-    // lead would be enforcing a rule the server does not have.
     const deleteLeadRole = vi.fn(() => Promise.resolve(undefined))
     renderPage(
       stub({ deleteLeadRole }, [
@@ -333,8 +301,6 @@ describe('Roles', () => {
   })
 
   it('sends only the fields the edit form changed', async () => {
-    // Several people share this page. Sending all seven would put back whatever
-    // somebody else edited between this form's mount and its save.
     const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(
       stub({ updateLeadRole }, [
@@ -352,8 +318,6 @@ describe('Roles', () => {
   })
 
   it('treats an emptied team size as unchanged rather than as nobody wanted', async () => {
-    // `Number('')` is 0, so clearing the box used to save "none asked for" — which
-    // the page then shows as a decision somebody made.
     const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ updateLeadRole }, [aRole({ id: 'r-1', title: 'Sauna', team_size_wanted: 3 })]))
 
@@ -368,7 +332,6 @@ describe('Roles', () => {
   })
 
   it('still saves a team size that was actually typed', async () => {
-    // The passing sibling: "empty means unchanged" must not swallow a real edit.
     const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ updateLeadRole }, [aRole({ id: 'r-1', title: 'Sauna', team_size_wanted: 3 })]))
 
@@ -423,8 +386,6 @@ describe('Roles', () => {
       stub({ copyLeadRoles, getLeadRoleSources: () => Promise.resolve(sources) }),
     )
 
-    // The note says what a copy leaves behind — it is not derivable from the button,
-    // and it was dropped once when this control was extracted.
     expect(await screen.findByText('The roles themselves, not who held them.')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy those roles' }))

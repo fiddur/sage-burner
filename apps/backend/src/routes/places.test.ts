@@ -162,19 +162,11 @@ const names = (server: FastifyInstance, eventId: string) =>
     response.json().places.map((entry: { name: string }) => entry.name),
   )
 
-/** A write that skips the API entirely, which is the only thing the CHECKs answer. */
 const directPlace = (eventId: string, name = 'Nowhere', emoji = '🛕', color = 'chartreuse') =>
   client()
     .prepare('insert into place (id, event_id, "order", name, emoji, color) values (?, ?, ?, ?, ?, ?)')
     .run(randomUUID(), eventId, 0, name, emoji, color)
 
-/**
- * A finished burn's grid, written straight to the database.
- *
- * The API refuses every write to a burn that has ended, so the copy tests — which
- * need a *previous* burn to copy from — arrange their source this way. `order` is
- * the argument order, which is also what a copy should preserve.
- */
 const givenLanes = (eventId: string, ...lanes: { name: string; emoji: string; color: string }[]) =>
   lanes.map((lane, index) => {
     const id = randomUUID()
@@ -231,8 +223,6 @@ describe('the places a dream can happen at', () => {
   })
 
   it('refuses an order the caller tried to choose', async () => {
-    // The server assigns it. Accepting one here would let two places claim the
-    // same lane.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -258,8 +248,6 @@ describe('the places a dream can happen at', () => {
   })
 
   it('refuses a colour outside the palette, a blank name and a blank emoji', async () => {
-    // The palette is fixed so the grid stays legible — a lane the admin
-    // picked `#fefefe` for is one nothing in the app could correct.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -297,7 +285,6 @@ describe('the places a dream can happen at', () => {
   })
 
   it('treats an empty edit as a read rather than a 500', async () => {
-    // `set({})` is not valid SQL.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -352,8 +339,6 @@ describe('the places a dream can happen at', () => {
   })
 
   it('refuses an ordering that does not name every place exactly once', async () => {
-    // A partial list would renumber some rows and leave the rest on stale
-    // positions, producing an order nobody chose.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -370,9 +355,6 @@ describe('the places a dream can happen at', () => {
   })
 
   it('lets any approved member write the lanes, admin or not', async () => {
-    // A shared spreadsheet everyone could edit is what this replaces. The admin
-    // case is not redundant: `admin` does not imply `member`, so an admin who
-    // is not attending holds one and not the other.
     const server = await build()
     const eventId = await givenEvent()
 
@@ -407,7 +389,6 @@ describe('the places a dream can happen at', () => {
   })
 
   it('refuses a colour outside the palette even from a write that skips the API', async () => {
-    // The CHECK exists for exactly the writes the Zod schema never sees.
     await build()
     const eventId = await givenEvent()
 
@@ -438,7 +419,6 @@ describe('the places a dream can happen at', () => {
 
 describe('one grid per burn', () => {
   it('keeps each burn to its own lanes', async () => {
-    // The point of #156: a summer-only spot must not be a lane in the winter grid.
     const server = await build()
     const summer = await givenEvent('Summer burn', '2026-08-01')
     const winter = await givenEvent('Winter burn', '2026-12-01')
@@ -477,10 +457,6 @@ describe('one grid per burn', () => {
   })
 })
 
-// `NOW` is 2026-07-02, so a burn ending 2025-08-01 is history and one ending
-// 2026-12-01 is still ahead — and, being later than the 2026-08-01 burn the rest of
-// this file uses, is *not* the active one. That difference is the whole point of the
-// last test here.
 describe('a burn that has ended', () => {
   it('refuses to rename or remove one of its lanes', async () => {
     const server = await build()
@@ -517,8 +493,6 @@ describe('a burn that has ended', () => {
   })
 
   it('is still readable, and still worth copying from', async () => {
-    // Closing the archive to writes is not closing it: reading a finished grid is
-    // public, and seeding the next burn from it is what #156 built the copy for.
     const server = await build()
     const gone = await givenEvent('Last summer', '2025-08-01')
     const next = await givenEvent('Next summer', '2026-08-01')
@@ -541,10 +515,6 @@ describe('a burn that has ended', () => {
   })
 
   it('leaves a burn that has not started alone, even when it is not the next one', async () => {
-    // The reason this is scoped on "has ended" rather than on the active burn:
-    // laying out a grid months ahead is exactly what the copy exists for, and
-    // `activeEvent` would name only the soonest-ending burn, so the winter grid
-    // could be created and then never corrected.
     const server = await build()
     await givenEvent('Next summer', '2026-08-01')
     const winter = await givenEvent('Next winter', '2026-12-01')
@@ -579,7 +549,6 @@ describe('seeding a burn’s grid from a previous one', () => {
       'Temple',
       'Sauna',
     ])
-    // New rows, not the same ones moved across.
     expect(copied.json().places.map((entry: { id: string }) => entry.id)).not.toContain(lawn)
     expect(await names(server, last)).toEqual(['Front Lawn', 'Temple', 'Sauna'])
   })
@@ -628,8 +597,6 @@ describe('seeding a burn’s grid from a previous one', () => {
   })
 
   it('answers 404 for a burn that does not exist even when the source is empty', async () => {
-    // The foreign key only fires when there is a row to insert, so this used to
-    // answer 201 with an empty grid.
     const server = await build()
     const last = await givenEvent('Last', '2025-08-01')
     const admin = await givenAccount(['admin'])
@@ -676,12 +643,6 @@ describe('seeding a burn’s grid from a previous one', () => {
   })
 })
 
-/**
- * The precondition every guarded write shares (#274), tested here in full.
- *
- * The other families get a shorter set: what differs between them is which
- * representation the tag is over, not what the guard does with it.
- */
 describe('writing over what somebody else changed', () => {
   const writeLane = (
     server: FastifyInstance,
@@ -705,8 +666,6 @@ describe('writing over what somebody else changed', () => {
     const before = await list(server, eventId)
     expect(before.headers.etag).toMatch(/^"[\w-]+"$/)
 
-    // Unchanged, the tag is unchanged: it is over the representation, so reading twice
-    // has to answer the same thing or every write would be refused.
     expect((await list(server, eventId)).headers.etag).toBe(before.headers.etag)
 
     const [temple] = await givenPlaces(server, admin.cookie, eventId)
@@ -725,8 +684,6 @@ describe('writing over what somebody else changed', () => {
 
     expect(response.statusCode).toBe(428)
     expect(response.json().error).toBe('precondition_required')
-    // Carried so the page can show what is actually there rather than only that it
-    // was refused.
     expect(response.json().places.map((lane: { name: string }) => lane.name)).toEqual([
       'Temple',
       'Sauna',
@@ -745,7 +702,6 @@ describe('writing over what somebody else changed', () => {
     const asAdaSawIt = (await list(server, eventId)).headers.etag
     expect(typeof asAdaSawIt).toBe('string')
 
-    // Bea renames a different lane. Ada's copy of the grid is now one edit old.
     expect((await edit(server, bea.cookie, temple ?? '', { name: 'The Temple' })).statusCode).toBe(200)
 
     const response = await writeLane(
@@ -767,8 +723,6 @@ describe('writing over what somebody else changed', () => {
   })
 
   it('takes one quoting the version it was given', async () => {
-    // The passing sibling: the guard has to let an ordinary edit through, or every
-    // test above would pass against a route that refused everything.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -808,10 +762,6 @@ describe('writing over what somebody else changed', () => {
   })
 
   it('answers a successful write with the tag the next one must quote', async () => {
-    // #277. These answered 200 with no `ETag`, so a client kept the tag it had just
-    // invalidated and its *second* edit refused itself with "somebody else changed
-    // this" — when the somebody was them. The tag is the collection's, not the row's,
-    // because that is what the precondition is over.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -826,7 +776,6 @@ describe('writing over what somebody else changed', () => {
     )
     expect(first.headers.etag).toBe((await list(server, eventId)).headers.etag)
 
-    // And the second edit goes through on it, which is the whole complaint.
     const second = await writeLane(
       server,
       admin.cookie,
@@ -856,8 +805,6 @@ describe('writing over what somebody else changed', () => {
   })
 
   it('leaves the writes that add or remove alone, which have nothing to overwrite', async () => {
-    // Creating and deleting are not lost updates: nobody's edit disappears into them,
-    // and a precondition on either would only be ceremony.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])

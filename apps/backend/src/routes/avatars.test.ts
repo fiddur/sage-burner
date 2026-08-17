@@ -55,7 +55,6 @@ const givenAccount = async (roles: ('admin' | 'member')[] = ['member']) => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-/** A tiny but real PNG, so the bytes stored are bytes that mean something. */
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
@@ -97,8 +96,6 @@ describe('a picture for the circle', () => {
   })
 
   it('refuses a type it will not serve back', async () => {
-    // The content type is whatever the caller claims and is echoed on the way out,
-    // so the list of what can be stored is the list of what can be served.
     const server = await build()
     const ada = await givenAccount()
 
@@ -107,8 +104,6 @@ describe('a picture for the circle', () => {
   })
 
   it('takes the other two formats a browser can produce', async () => {
-    // The passing sibling: a check that refused everything would satisfy the test
-    // above while making the feature impossible to use.
     const server = await build()
     const ada = await givenAccount()
 
@@ -181,8 +176,6 @@ describe('a picture for the circle', () => {
   })
 
   it('will not let a browser decide the bytes are something else', async () => {
-    // The type is what the uploader claimed and nothing here decodes the image, so
-    // sniffing is the one thing that could turn a stored file into a running one.
     const server = await build()
     const ada = await givenAccount()
     await upload(server, ada.cookie, PNG)

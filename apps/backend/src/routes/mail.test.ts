@@ -36,7 +36,6 @@ afterEach(async () => {
   handle = undefined
 })
 
-/** Every send in this file goes here. Nothing in the suite opens a socket. */
 const posted: { transport: Transport; message: Message }[] = []
 
 const build = async (
@@ -111,8 +110,6 @@ describe('the mail settings', () => {
   })
 
   it('come back after a save, without the password', async () => {
-    // `has_password` is what the form needs. The value itself is a password for
-    // somebody else's server and never leaves this process.
     const server = await build()
     const cookie = await givenAccount()
 
@@ -124,8 +121,6 @@ describe('the mail settings', () => {
   })
 
   it('keep the stored password when the save leaves it out', async () => {
-    // A form that had to re-type the password to change the port would end up with
-    // it in a text input on every visit.
     const server = await build()
     const cookie = await givenAccount()
     await write(server, cookie, SETTINGS)
@@ -139,7 +134,6 @@ describe('the mail settings', () => {
   })
 
   it('clear the password when the save says to, which an omission cannot', async () => {
-    // The passing sibling for the rule above: absent means keep, empty means clear.
     const server = await build()
     const cookie = await givenAccount()
     await write(server, cookie, SETTINGS)
@@ -210,8 +204,6 @@ describe('the mail settings', () => {
   })
 
   it('refuse a second row, whatever the caller', async () => {
-    // The CHECK, exercised by a write that skips the API — the API only ever writes
-    // the one id, so nothing above this could tell whether the constraint exists.
     await build()
 
     expect(() =>
@@ -225,7 +217,6 @@ describe('the mail settings', () => {
   })
 
   it('accept the one row the API writes, by the same path', async () => {
-    // The passing sibling: the statement above is refused for its id, not its shape.
     await build()
 
     expect(() =>
@@ -241,8 +232,6 @@ describe('the mail settings', () => {
 
 describe('the test message', () => {
   it('goes to the admin’s own address, not one they name', async () => {
-    // A send-to box on an admin page is an open relay with extra steps, and the
-    // question the button asks is answered just as well by a message to the asker.
     const server = await build()
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)
@@ -267,8 +256,6 @@ describe('the test message', () => {
   })
 
   it('passes the server’s own refusal through, since that is what names the problem', async () => {
-    // "535 authentication failed" and "connect ECONNREFUSED" want completely
-    // different fixes, and "could not send" sends somebody after the wrong one.
     const send = vi.fn<Send>(() => Promise.reject(new Error('535 5.7.8 Authentication failed')))
     const server = await build(send)
     const cookie = await givenAccount(['admin'], 'admin@example.org')

@@ -101,9 +101,6 @@ describe('the PNG it writes', () => {
   })
 
   it('paints the flame over a background rather than leaving it transparent', () => {
-    // iOS composites a transparent tile onto white, so the mark would float on a white
-    // square on a dark home screen — an opaque tile is one decision instead of the
-    // platform's.
     const size = 64
     const pixels = pixelsOf(encodePng(drawFlame(size), size), size)
 

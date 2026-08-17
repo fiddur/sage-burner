@@ -52,7 +52,6 @@ const aCard = (over: Partial<Thread> & Pick<Thread, 'id' | 'title'>): Thread => 
   ...over,
 })
 
-/** What the server sends somebody who has never touched the settings. */
 const DEFAULTS = [
   'meal_role',
   'dream_role',
@@ -122,12 +121,6 @@ const renderPage = (api: FeedApi, viewer: Viewer = ADA, burn: MyBurn | null = BU
     </ViewerProvider>,
   )
 
-/**
- * The same, under the router — which is where the chip row's filter is read from and
- * written to (#472).
- *
- * `LocationProvider` reads `location` on mount, so the address is set first.
- */
 const renderPageAt = (at: string, api: FeedApi) => {
   history.replaceState(null, '', at)
 
@@ -335,10 +328,6 @@ describe('switching a kind on from a card', () => {
     expect(await screen.findByText(NUDGE)).toBeTruthy()
   })
 
-  /**
-   * The strip renders nothing until it has asked the browser, so a switched-off case asserted
-   * against the strip passes while the answer is still outstanding. This reads the flag instead.
-   */
   const Probe = () => <p data-testid="asked">{usePushNudge().wanted ? 'yes' : 'no'}</p>
 
   const withProbe = (api: FeedApi) =>
@@ -740,9 +729,6 @@ describe('announcing something on the feed', () => {
   })
 
   it('offers no names on a card from another burn, since they could not be reached', async () => {
-    // The feed spans burns; the attendee list is the one in the bar. `namedBy` would drop a name
-    // from the wrong burn silently, so the menu must not offer it — `@everybody` still works,
-    // because the server resolves that from the card's own event.
     renderPage(stub({}, [aCard({ id: 'c-1', title: 'Sauna at dusk', event_id: 'e-2', burn: 'Autumn burn' })]))
 
     const box = await screen.findByLabelText('Say something about Sauna at dusk')
@@ -813,8 +799,6 @@ describe('announcing something on the feed', () => {
 
 describe('what everyone has been doing', () => {
   it('shows a card per thing, in the order the server sends them', async () => {
-    // One list, whatever each card is about: the order is the server's, by when each
-    // last moved, and the page does not sort it again.
     renderPage(
       stub({}, [
         aCard({ id: 'c-1', title: 'Sauna at dawn' }),
@@ -832,8 +816,6 @@ describe('what everyone has been doing', () => {
   })
 
   it('says nothing about when, on a card nothing has happened on', async () => {
-    // `new Date('')` is an Invalid Date, and the card drew it. Reachable by taking back
-    // the last comment on a thread from before #375, which has no other entry.
     renderPage(
       stub({}, [aCard({ id: 'c-1', title: 'Sauna at dawn', last_at: null, entry_count: 0, entries: [] })]),
     )
@@ -984,8 +966,6 @@ describe('what everyone has been doing', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
     await waitFor(() => expect(screen.getByText('Stale title')).toBeTruthy())
-    // Enabled, not merely present: a click on a disabled button is a no-op and the next
-    // `getByRole` would then fail on the form that never opened.
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Reword it' })).toHaveProperty('disabled', false),
     )
@@ -1267,7 +1247,6 @@ describe('what everyone has been doing', () => {
   })
 
   it('keeps the card and the ordinary wording where the failure is not a disappearance', async () => {
-    // The passing sibling: a 500 is something to try again, not something that has gone.
     const posted = vi.fn<FeedApi['postComment']>(() =>
       Promise.reject(apiError(500, 'internal_error', 'Something went wrong at our end.')),
     )
@@ -1286,8 +1265,6 @@ describe('what everyone has been doing', () => {
   })
 
   it('asks for the rest of a conversation only when there is more of it', async () => {
-    // The card carries the end of it, which is what bounds the page and what the
-    // installed app keeps on disk. The whole thread is a read of its own.
     const whole = vi.fn<FeedApi['getThread']>((id) =>
       Promise.resolve({
         thread: aCard({
@@ -1317,9 +1294,6 @@ describe('what everyone has been doing', () => {
   })
 
   it('offers the switch that would tell somebody about a card like this one', async () => {
-    // The menu names the top of the card, and only where a category exists to name: a
-    // dream being moved sends nothing, so a card whose latest news is a move offers
-    // following alone rather than a switch that would change nothing.
     renderPage(
       stub({}, [
         aCard({
@@ -1359,8 +1333,6 @@ describe('what everyone has been doing', () => {
   })
 
   it('offers to switch the category on, and says it is off', async () => {
-    // Half the point of the page: this is where somebody finds the setting, in the
-    // moment they have just found the thing interesting (#303).
     const update = vi.fn<FeedApi['updateMyNotificationSettings']>(() =>
       Promise.resolve({ on: [...DEFAULTS, 'dream_offered'], email: [], digest: 'daily' }),
     )
@@ -1378,8 +1350,6 @@ describe('what everyone has been doing', () => {
   })
 
   it('switches one off again, and keeps the email column alone', async () => {
-    // The passing sibling, and the reason the whole set goes on the wire: what is sent
-    // is what was held plus or minus one.
     const update = vi.fn<FeedApi['updateMyNotificationSettings']>(() =>
       Promise.resolve({ on: [], email: ['meal_role'], digest: 'daily' }),
     )

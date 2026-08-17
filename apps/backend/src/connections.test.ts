@@ -70,9 +70,6 @@ describe('the row a linked provider offers', () => {
   })
 
   it('is nothing for a kind that needs a label, which it has none to give', () => {
-    // `connectionCreateSchema` refuses `link` with an empty label, so a row written with one is a
-    // row the member could not save an edit to (#447). No provider answers `link` today; this is
-    // what makes that unreachable by construction rather than by which providers exist.
     expect(
       providerConnection('a-1', 'discord', { kind: 'link', value: 'https://wren.example' }, []),
     ).toBeUndefined()

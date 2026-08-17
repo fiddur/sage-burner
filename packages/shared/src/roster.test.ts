@@ -17,7 +17,6 @@ describe('withPlaces', () => {
   })
 
   it('puts anyone who has paid above everyone who has not', () => {
-    // The rule that makes paying secure a place: it beats joining first.
     expect(order([at('1st'), at('2nd', 'paid')], 10)).toEqual(['2nd', '1st'])
   })
 
@@ -32,8 +31,6 @@ describe('withPlaces', () => {
   })
 
   it('pushes an unpaid member onto the waiting list when someone else pays', () => {
-    // Nobody did anything to the second member, and they lost their place. That
-    // is intended, and it is why the list has to show where people stand.
     const before = [at('1st'), at('2nd'), at('3rd')]
     expect(order(before, 2)).toEqual(['1st', '2nd', '3rd (waiting)'])
 
@@ -42,8 +39,6 @@ describe('withPlaces', () => {
   })
 
   it('leaves the caller’s array alone', () => {
-    // The pages hold this list in state; sorting in place would reorder what they
-    // are already rendering.
     const entries = [at('2nd'), at('1st')]
     withPlaces(entries, 10)
 

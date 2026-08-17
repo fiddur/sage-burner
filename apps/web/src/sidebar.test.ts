@@ -42,9 +42,6 @@ describe('whether the sidebar was put away', () => {
   })
 
   it('says shown rather than throwing when reading the property itself throws', () => {
-    // Chromium with site data blocked for the origin, and Brave's "block all cookies":
-    // `globalThis.localStorage` is a *getter* that throws `SecurityError`. This is read in
-    // `useSidebar`'s state initialiser, during render, with no error boundary above it.
     vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(() => {
       throw new Error('SecurityError')
     })

@@ -33,11 +33,6 @@ import {
   webauthnChallenge,
 } from './schema.ts'
 
-/**
- * These run against a real SQLite database with the real migrations applied —
- * the constraints below are the point, and a mock would assert nothing.
- */
-
 const ids = {
   account: 'a0000000-0000-4000-8000-000000000001',
   otherAccount: 'a0000000-0000-4000-8000-000000000002',
@@ -162,9 +157,6 @@ describe('migrations', () => {
   })
 
   it('leaves each rebuilt table with the indexes it has now, not the ones it once had', () => {
-    // A rebuild recreates indexes by hand, so it is the one place a dropped index can come back:
-    // `thread_entry_recent_idx` went in `20260810220000_thread_subject` and a migration copied
-    // from an older one resurrected it, taking `thread_entry_seq_idx` with it.
     const indexes = (table: string): string[] =>
       handle.client
         .prepare("select name from sqlite_master where type = 'index' and tbl_name = ? and sql is not null")
@@ -177,8 +169,6 @@ describe('migrations', () => {
     expect(indexes('notification')).toEqual(['notification_account_idx'])
   })
 
-  // Only the orphan half of #608's sweep: the other half deleted `activity` rows, and #610
-  // dropped that table, so replaying the whole file against today's schema cannot run.
   const leftovers = () =>
     readFileSync(path.join(migrationsFolder, '20260813160000_meeting_leftovers', 'migration.sql'), 'utf8')
       .split('--> statement-breakpoint')
@@ -290,9 +280,6 @@ describe('migrations', () => {
   })
 
   it('restores foreign key enforcement afterwards', () => {
-    // It is switched off for the duration so a table-rebuild migration cannot
-    // cascade-delete children. Leaving it off would be far worse than never
-    // touching it.
     expect(handle.client.prepare('PRAGMA foreign_keys').get()?.foreign_keys).toBe(1)
   })
 
@@ -302,10 +289,6 @@ describe('migrations', () => {
   })
 
   it('refuses to migrate when foreign keys cannot be disabled', () => {
-    // The load-bearing branch: the docblock says turning foreign keys off *is*
-    // the whole protection against a table rebuild cascade-deleting children,
-    // and `PRAGMA foreign_keys` is a silent no-op inside a transaction. Drop
-    // the read-back and this file stays green while the cascade is re-armed.
     handle.client.exec('BEGIN')
     try {
       expect(() => runMigrations(handle)).toThrow(/disable foreign keys/i)
@@ -315,10 +298,6 @@ describe('migrations', () => {
   })
 
   it('refuses to finish if a migration left a dangling reference', () => {
-    // Simulates what a table rebuild does with foreign keys off: the parent
-    // goes, the children stay and point at nothing. Without the
-    // foreign_key_check this commits silently and an admin opens an empty
-    // member list; with it, the boot fails instead.
     seedInvite(ids.invite)
     seedAttendance(ids.attendance, ids.account)
 
@@ -389,7 +368,6 @@ describe('foreign keys', () => {
   })
 
   it('takes them with the person when they withdraw from the burn', () => {
-    // The reason both key on `attendance` rather than `account`.
     seedAttendance(ids.attendance, ids.account)
     handle.db
       .insert(session)
@@ -402,7 +380,6 @@ describe('foreign keys', () => {
 
     expect(handle.db.select().from(sessionHelper).all()).toHaveLength(0)
     expect(handle.db.select().from(sessionSupport).all()).toHaveLength(0)
-    // The dream itself stays: it is the burn's, not the helper's.
     expect(handle.db.select().from(session).all()).toHaveLength(1)
   })
 
@@ -440,9 +417,6 @@ describe('foreign keys', () => {
   })
 
   it('empties a dream’s facilitator spot when they leave the burn', () => {
-    // Leaving takes you off everything you signed up for there (#23). This was the
-    // one role that did not hold, because the column named an account; it names an
-    // attendance now, so the foreign key does it and no route can forget.
     seedAttendance(ids.attendance, ids.account)
     handle.db
       .insert(session)
@@ -461,8 +435,6 @@ describe('foreign keys', () => {
   })
 
   it('leaves the dream itself standing, vacant rather than deleted', () => {
-    // `set null` and not cascade: the dream outlives whoever was going to run it, and
-    // #247's control is what lets somebody else pick it up.
     seedAttendance(ids.attendance, ids.account)
     handle.db
       .insert(session)
@@ -481,8 +453,6 @@ describe('foreign keys', () => {
   })
 
   it('refuses a second heart from the same person, which is what makes the count sound', () => {
-    // The count is derived by reading rows, so "one each" has to hold against a write
-    // that skips the API as well as against `onConflictDoNothing`.
     seedAttendance(ids.attendance, ids.account)
     handle.db
       .insert(session)
@@ -500,10 +470,6 @@ describe('foreign keys', () => {
   })
 
   it('leaves the questions and the applications alone, since neither belongs to an event', () => {
-    // The inverse of the cascade above, and the reason both tables lost their
-    // `event_id`: you apply to the community, not to a burn. Approval admits you
-    // to any of them, so deleting last year's event must neither empty the form
-    // nor destroy the applications people sent.
     handle.db
       .insert(formQuestion)
       .values({ id: 'q1', order: 0, type: 'text', label: 'Why do you want to join?', required: true })
@@ -596,9 +562,6 @@ describe('uniqueness', () => {
   })
 
   it('allows only one invite per application, so one approval is one membership', () => {
-    // Without the partial unique index a double-clicked Approve mints two
-    // invites for the same application, and single use is keyed on the token —
-    // so each redeems into a separate account. One application, two humans.
     handle.db
       .insert(application)
       .values({
@@ -629,24 +592,16 @@ describe('uniqueness', () => {
   })
 
   it('still allows many direct admin invites, which carry no application', () => {
-    // The index must be partial: NULLs compare distinct in SQLite, but a
-    // non-partial unique index would still read as forbidding this.
     expect(() => seedInvite(ids.invite)).not.toThrow()
     expect(() => seedInvite(ids.otherInvite)).not.toThrow()
   })
 
   it('refuses a mixed-case email, so one human cannot become two accounts', () => {
-    // SQLite's UNIQUE on TEXT is BINARY, so without the lowercase CHECK the
-    // address below is simply a different account — with its own passkeys,
-    // roles and memberships, able to join the very same event.
     expect(() => seedAccount(ids.otherAccount, 'Admin@Example.org')).toThrow()
     expect(() => seedAccount(ids.otherAccount, 'someone.else@example.org')).not.toThrow()
   })
 
   it('refuses a digest choice the app has no word for', () => {
-    // The API never writes one — Zod is ahead of it — so a write that skips the API is the
-    // only thing that exercises this, and the column is nullable on purpose: absence is
-    // "has not said", and `DEFAULT_DIGEST` decides what that means.
     expect(() =>
       handle.client.prepare('update account set digest = ? where id = ?').run('hourly', ids.account),
     ).toThrow()
@@ -659,10 +614,6 @@ describe('uniqueness', () => {
   })
 
   it('makes an invite genuinely single-use, even by a different account', () => {
-    // Enforced on `account` now that redemption creates the person rather than a
-    // per-burn row. Without it a forwarded link lets a second person redeem the
-    // same invite — and `member_cap` is sized against invites issued, so the cap
-    // silently overruns too.
     seedInvite(ids.invite)
     seedAccount(ids.otherAccount, 'someone.else@example.org')
     handle.db.update(account).set({ invite_token_id: ids.invite }).where(eq(account.id, ids.account)).run()
@@ -677,9 +628,6 @@ describe('uniqueness', () => {
   })
 
   it('lets many accounts carry no invite, since the CLI creates them that way', () => {
-    // The index has to be partial: NULLs compare distinct in SQLite, but a
-    // non-partial unique index would still collapse them on some engines, and
-    // every bootstrap admin has none.
     seedAccount(ids.otherAccount, 'someone.else@example.org')
 
     expect(
@@ -692,9 +640,6 @@ describe('uniqueness', () => {
   })
 
   it('rejects a NULL primary key, which SQLite would otherwise allow', () => {
-    // Outside INTEGER PRIMARY KEY, SQLite permits NULL in a primary key column
-    // unless it is also NOT NULL — and NULLs compare distinct, so it permits
-    // several. Drizzle's types require an id, but a raw statement does not.
     expect(() =>
       handle.client
         .prepare(
@@ -852,8 +797,6 @@ describe('check constraints', () => {
   })
 
   it('rejects a malformed date, which the ordering checks depend on', () => {
-    // '2026-1-2' is not fixed width, so it sorts wrong — the ordering CHECKs
-    // compare these as strings and would silently accept a backwards range.
     expect(() =>
       handle.client
         .prepare(
@@ -886,10 +829,6 @@ describe('check constraints', () => {
   })
 
   it('rejects an agreement question that is not required', () => {
-    // The API refuses this too, but the constraint exists for writes that do not
-    // come through it — and `required` has `.default(false)`, so an insert that
-    // simply omits the column produces exactly the contradictory row. Both forms
-    // here, since the second is the one the API cannot see.
     expect(() =>
       handle.client
         .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
@@ -904,7 +843,6 @@ describe('check constraints', () => {
   })
 
   it('rejects a required checkbox question', () => {
-    // The other half of the tick-box rule, and the API cannot see a direct insert.
     expect(() =>
       handle.client
         .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
@@ -921,8 +859,6 @@ describe('check constraints', () => {
   })
 
   it('still accepts a required agreement question', () => {
-    // So the constraint is "agreement implies required" rather than
-    // "no agreements".
     expect(() =>
       handle.client
         .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
@@ -973,9 +909,6 @@ describe('passkeys', () => {
         )
         .run(`pk-${counter}`, ids.account, `cred-${counter}`, 'key', counter, 'Phone', NOW)
 
-    // The passing sibling, and it earns its place: the column list above is written
-    // out by hand, so a statement this rejects for naming no `label` would look
-    // exactly like one the CHECK refused.
     expect(() => insert(0)).not.toThrow()
     expect(() => insert(-1)).toThrow()
   })
@@ -1081,8 +1014,6 @@ describe('sessions', () => {
 
 describe('json columns', () => {
   it('round-trips application answers', () => {
-    // The stored shape is the snapshot, not a bare map: the wording as asked
-    // travels with the answer so it survives the question being edited or removed.
     const answers = [
       { question_id: 'q-1', label: 'Why do you want to come?', type: 'text', value: 'a written answer' },
       { question_id: 'q-2', label: 'I agree to the principles', type: 'agreement', value: true },
@@ -1109,9 +1040,6 @@ const LOGIN_ADDRESS = '20260809180000_connection_messenger_email'
 const FACILITATOR = '20260805040000_facilitator'
 const REPEATABLE = '20260805050000_repeatable_dream'
 
-// This drizzle version discovers migrations by listing the folder, and throws
-// outright if it finds a `meta/_journal.json` — so staging is a copy of the
-// directories whose timestamped names sort before the one under test.
 const stagedThrough = (exclude: string) => {
   const staged = mkdtempSync(path.join(tmpdir(), 'sage-migrations-'))
   const kept = readdirSync(migrationsFolder)
@@ -1129,8 +1057,6 @@ const beforeTheRebuild = () => {
   const fresh = createDb({ url: ':memory:' })
   const { staged, kept } = stagedThrough(REBUILD)
 
-  // Asserted: a mistyped tag would stage every migration, the rebuild included,
-  // and every test below would then pass while proving nothing about it.
   expect(kept).not.toContain(REBUILD)
   expect(kept.length).toBeGreaterThan(0)
 
@@ -1154,15 +1080,6 @@ const anEvent = (db: DbHandle, id: string, slug: string, created_at: string) =>
     .run(id, slug, slug, '2026-10-02', '2026-10-04', 42, created_at)
 
 describe('the places-per-burn migration', () => {
-  /**
-   * A data migration is only tested by running it over the old shape with rows in
-   * it. So these stage a folder holding every migration up to but excluding the
-   * rebuild, seed through the old table, and then run the full set.
-   *
-   * `runMigrations` on a fresh database would apply the rebuild before anything
-   * could be inserted, which is why the two-step staging is not ceremony.
-   */
-
   const oldPlace = (db: DbHandle, id: string, order: number, name: string) =>
     db.client
       .prepare('insert into place (id, "order", name, emoji, color) values (?, ?, ?, ?, ?)')
@@ -1173,8 +1090,6 @@ describe('the places-per-burn migration', () => {
     try {
       anEvent(fresh, 'e-first', 'first-burn', '2025-01-01T00:00:00Z')
       anEvent(fresh, 'e-last', 'last-burn', '2026-01-01T00:00:00Z')
-      // Deliberately not the last by start date, nor the last inserted: the rule is
-      // `created_at`, and a test where all three agree would not say which won.
       anEvent(fresh, 'e-middle', 'middle-burn', '2025-06-01T00:00:00Z')
       oldPlace(fresh, 'p-1', 0, 'Temple')
       oldPlace(fresh, 'p-2', 1, 'Sauna')
@@ -1194,8 +1109,6 @@ describe('the places-per-burn migration', () => {
   })
 
   it('drops the places when there is no event to give them to', () => {
-    // No event means no `session` rows either — they reference one — so the places
-    // are unreferenced decoration rather than a loss.
     const fresh = beforeTheRebuild()
     try {
       oldPlace(fresh, 'p-1', 0, 'Temple')
@@ -1218,9 +1131,6 @@ describe('the places-per-burn migration', () => {
         .run('a-1', 'host@example.org', NOW)
       oldPlace(fresh, 'p-1', 0, 'Temple')
       fresh.client
-        // `host_account_id`, deliberately: this writes against the schema as it was
-        // *before* the rebuild under test, and the rename to `facilitator_account_id`
-        // is a later migration than the one being replayed here.
         .prepare(
           'insert into session (id, event_id, host_account_id, title, description, place_id) values (?, ?, ?, ?, ?, ?)',
         )
@@ -1231,8 +1141,6 @@ describe('the places-per-burn migration', () => {
       expect(fresh.client.prepare('select place_id from session where id = ?').get('s-1')?.place_id).toBe(
         'p-1',
       )
-      // The runner refuses on a dangling child, so reaching here is itself the
-      // assertion that the rebuild did not orphan the reference.
       expect(fresh.client.prepare('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
       fresh.close()
@@ -1240,8 +1148,6 @@ describe('the places-per-burn migration', () => {
   })
 
   it('takes a burn’s places with it when the burn is deleted', () => {
-    // The rebuild is what gives the foreign key `on delete cascade`; the generated
-    // `ALTER TABLE` could not have.
     const fresh = createDb({ url: ':memory:' })
     try {
       runMigrations(fresh)
@@ -1261,13 +1167,9 @@ describe('the places-per-burn migration', () => {
 
 describe('the facilitator rename', () => {
   it('carries every host across as the facilitator, rather than dropping them', () => {
-    // The rename's whole claim: "every existing row keeps its value". Without this
-    // the backfill could select NULL and nothing in the suite would notice — which
-    // is exactly what a mutation found.
     const fresh = createDb({ url: ':memory:' })
     const { staged, kept } = stagedThrough(FACILITATOR)
 
-    // Asserted, or a mistyped tag stages everything and this proves nothing.
     expect(kept).not.toContain(FACILITATOR)
     expect(kept).toContain(REBUILD)
 
@@ -1285,9 +1187,6 @@ describe('the facilitator rename', () => {
         )
         .run('s-1', 'e-1', 'a-1', 'Sunrise yoga', '')
 
-      // Up to the attendance rebuild, not past it: that one turns this column into
-      // an `attendance` and would null a facilitator who never joined the burn,
-      // which is its rule and not this migration's to answer for.
       runMigrations(fresh, stagedThrough(FACILITATOR_ATTENDANCE).staged)
 
       expect(columnsOf(fresh, 'session')).not.toContain('host_account_id')
@@ -1302,8 +1201,6 @@ describe('the facilitator rename', () => {
   })
 
   it('lets a dream have no facilitator at all, which the old column refused', () => {
-    // The passing sibling: the column also stopped being NOT NULL, and a rebuild
-    // that only renamed would leave that half undone.
     const fresh = createDb({ url: ':memory:' })
     try {
       runMigrations(fresh)
@@ -1325,8 +1222,6 @@ describe('the facilitator rename', () => {
 
 describe('the repeatable-dream column', () => {
   it('leaves every dream that already existed a one-off', () => {
-    // The added column's only claim: without the `DEFAULT false` there is nothing to
-    // put in the column for rows that already exist.
     const fresh = createDb({ url: ':memory:' })
     const { staged, kept } = stagedThrough(REPEATABLE)
 
@@ -1362,16 +1257,10 @@ const SONG_LINK_URL_ONLY = '20260811140000_song_link_url_only'
 const JOINED_CARDS = '20260811180000_joined_cards'
 
 describe('the facilitator-is-an-attendance migration', () => {
-  /**
-   * Staged the same way as the places rebuild above, and for the same reason: this
-   * one carries a backfill, and a backfill is only tested by running it over the old
-   * shape with rows in it.
-   */
   const beforeTheFacilitatorRebuild = () => {
     const fresh = createDb({ url: ':memory:' })
     const { staged, kept } = stagedThrough(FACILITATOR_ATTENDANCE)
 
-    // Asserted, or a mistyped tag stages the rebuild too and these prove nothing.
     expect(kept).not.toContain(FACILITATOR_ATTENDANCE)
     expect(kept.length).toBeGreaterThan(0)
 
@@ -1383,8 +1272,6 @@ describe('the facilitator-is-an-attendance migration', () => {
 
   const seed = (db: DbHandle) => {
     anEvent(db, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
-    // A second burn, so that scoping the backfill to the dream's *own* event is
-    // load-bearing: `acc-away` attends this one and not the one their dream is at.
     anEvent(db, 'e-2', 'another-burn', '2026-02-01T00:00:00Z')
     const people: [string, string][] = [
       ['acc-coming', 'coming@example.org'],
@@ -1433,8 +1320,6 @@ describe('the facilitator-is-an-attendance migration', () => {
   })
 
   it('drops a facilitator who was never attending, which is the new rule applied', () => {
-    // Not data lost: the column now means "somebody coming who runs this", and an
-    // account that never joined the burn was never that.
     const fresh = beforeTheFacilitatorRebuild()
     try {
       seed(fresh)
@@ -1481,22 +1366,16 @@ describe('the allergy list', () => {
   })
 
   it('refuses to remove an item somebody has ticked', () => {
-    // These rows exist to keep people safe, so a label going must not take a
-    // person's record with it. `place` refuses the same way when a dream is in it.
     handle.db.insert(accountAllergy).values({ account_id: ids.account, item_id: LACTOSE }).run()
 
     expect(() => handle.db.delete(allergyItem).where(eq(allergyItem.id, LACTOSE)).run()).toThrow()
   })
 
   it('removes one nobody has ticked', () => {
-    // The passing sibling: refusing every deletion would satisfy the test above, and
-    // an admin must still be able to drop an item that turned out unwanted.
     expect(() => handle.db.delete(allergyItem).where(eq(allergyItem.id, LACTOSE)).run()).not.toThrow()
   })
 
   it('takes the ticks with the person when the account goes', () => {
-    // The other direction cascades: #35 owns account deletion, and a tick is part of
-    // the record being erased rather than something to keep.
     handle.db.insert(accountAllergy).values({ account_id: ids.account, item_id: LACTOSE }).run()
 
     handle.db.delete(account).where(eq(account.id, ids.account)).run()
@@ -1514,16 +1393,10 @@ describe('the allergy list', () => {
 })
 
 describe('the threads migration', () => {
-  /**
-   * Staged like the rebuilds above, and for the same reason: this one backfills a
-   * thread per dream already offered, and a backfill is only tested by running it over
-   * the old shape with rows in it.
-   */
   const beforeTheThreads = () => {
     const fresh = createDb({ url: ':memory:' })
     const { staged, kept } = stagedThrough(THREADS)
 
-    // Asserted, or a mistyped tag stages the migration too and these prove nothing.
     expect(kept).not.toContain(THREADS)
     expect(kept.length).toBeGreaterThan(0)
 
@@ -1557,9 +1430,6 @@ describe('the threads migration', () => {
         { entity_type: 'session', entity_id: 's-1', title: 'Sauna at dawn', event_id: 'e-1' },
         { entity_type: 'session', entity_id: 's-2', title: 'Cacao ceremony', event_id: 'e-1' },
       ])
-      // No entries are invented: the feed line a dream had then carried a sentence and a
-      // `/dreams` link rather than a session id, so nothing here can say who offered which
-      // dream or when. A thread with no entries draws no card until something happens.
       expect(fresh.client.prepare('select count(*) as n from thread_entry').get()?.n).toBe(0)
     } finally {
       fresh.close()
@@ -1567,9 +1437,6 @@ describe('the threads migration', () => {
   })
 
   it('gives each of them a distinct id', () => {
-    // The whole backfill is one INSERT ... SELECT, so a constant expression where the
-    // UUID should be would insert the same id for every row — which the primary key
-    // catches, but only for the second dream. Asserted rather than trusted.
     const fresh = beforeTheThreads()
 
     try {
@@ -1586,7 +1453,6 @@ describe('the threads migration', () => {
         .map((row) => String(row.id))
 
       expect(new Set(minted).size).toBe(3)
-      // And each is a UUID, because `idSchema` is what the wire bounds them by.
       for (const id of minted) {
         expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
       }
@@ -1596,9 +1462,6 @@ describe('the threads migration', () => {
   })
 
   it('keeps every notification already written while widening what one may be about', () => {
-    // Both tables that carry a CHECK listing the categories are rebuilt, SQLite being
-    // unable to alter one in place — and a rebuild that dropped the rows would be a
-    // silent emptying of somebody's bell.
     const fresh = beforeTheThreads()
 
     try {
@@ -1620,7 +1483,6 @@ describe('the threads migration', () => {
       expect(fresh.client.prepare('select count(*) as n from notification').get()?.n).toBe(1)
       expect(fresh.client.prepare('select count(*) as n from notification_setting').get()?.n).toBe(1)
 
-      // And the new categories are storable, which is what the rebuild was for.
       expect(() =>
         fresh.client
           .prepare(
@@ -1634,9 +1496,6 @@ describe('the threads migration', () => {
   })
 
   it('takes the feed’s one-line news away with its table, rows and all', () => {
-    // #610 drops `activity`, whose rows are on nobody's bell — every one of them was also a
-    // notification. The drop is the last statement of the rebuild, so this is what says
-    // `PRAGMA foreign_key_check` is happy with a child table going while `event` stays.
     const fresh = beforeTheThreads()
 
     try {
@@ -1659,9 +1518,6 @@ describe('the threads migration', () => {
 
 describe('the login-address backfill', () => {
   it('gives every account already here its login address as a way to be reached', () => {
-    // The backfill (#388's follow-up): everybody has an address, and a list that starts
-    // empty is a list nobody fills in. Last rather than first, so somebody who already
-    // put Discord at the top keeps it there — which is the whole point of the order.
     const fresh = createDb({ url: ':memory:' })
     const { staged, kept } = stagedThrough(LOGIN_ADDRESS)
 
@@ -1676,7 +1532,6 @@ describe('the login-address backfill', () => {
       insertAccount.run('a-2', 'bea@example.org', 'Bea', NOW)
       insertAccount.run('a-3', 'cai@example.org', 'Cai', NOW)
 
-      // Ada has a list already; Bea has an address of her own in it; Cai has nothing.
       fresh.client
         .prepare(
           'insert into account_connection (id, account_id, kind, value, label, "order") values (?, ?, ?, ?, ?, ?)',
@@ -1698,12 +1553,7 @@ describe('the login-address backfill', () => {
           .all(accountId)
           .map((row) => `${String(row.kind)}:${String(row.value)}@${String(row.order)}`)
 
-      // The position is asserted, not just the sequence: seeding at 0 alongside Ada's
-      // existing 0 leaves the order to SQLite's rowid tie-break, which happens to read the
-      // same — so a test comparing only the sequence passes against the bug it exists for.
       expect(listFor('a-1')).toEqual(['discord:ada@0', 'email:ada@example.org@1'])
-      // Bea already had an email row, so nothing is added — "already present" is satisfied
-      // by any of them, whatever the address.
       expect(listFor('a-2')).toEqual(['email:ada.at.work@example.org@0'])
       expect(listFor('a-3')).toEqual(['email:cai@example.org@0'])
     } finally {
@@ -1726,8 +1576,6 @@ describe('the one-card-per-person-per-burn backfill', () => {
         .run(id, email, name, NOW)
     }
 
-    // Only Bea and Cai are still coming: Ada's stay is gone, which is what left her card
-    // with nothing to resolve her from.
     for (const [id, accountId] of [
       ['att-bea-again', 'a-bea'],
       ['att-cai', 'a-cai'],
@@ -1746,9 +1594,6 @@ describe('the one-card-per-person-per-burn backfill', () => {
     aCard.run('t-cai', 'e-1', 'attendance', 'att-cai', 'a-cai', 'Cai')
     aCard.run('t-song', null, 'song', 'song-1', null, 'Fire in the sky')
     aCard.run('t-other-song', null, 'song', 'song-2', null, 'Dust in my boots')
-    // The card no person can be recovered for: its stay is gone and the app wrote its only
-    // entry, so there is no author to read a subject out of. It shares `(NULL, 'e-1')` with
-    // any other such card, which is the pair the unique index has to tolerate.
     aCard.run('t-unknown', 'e-1', 'attendance', 'att-unknown', null, 'Somebody')
     aCard.run('t-unknown-too', 'e-1', 'attendance', 'att-unknown-2', null, 'Somebody else')
 
@@ -1852,9 +1697,6 @@ describe('the one-card-per-person-per-burn backfill', () => {
   })
 
   it('leaves every thread that is nobody’s in particular, however many there are', () => {
-    // NULLs stay distinct in a SQLite unique index, which is what lets the songbook's threads
-    // coexist under it — and two cards at one burn that no person could be recovered for, which
-    // is the pair that shares `(NULL, 'e-1')`.
     const fresh = beforeTheUniqueIndex()
     try {
       seed(fresh)
@@ -1933,7 +1775,6 @@ describe('the cards a redeemed invite never opened', () => {
     aStay.run('att-bea', 'e-1', 'a-bea', '2026-07-02T10:00:00Z')
     aStay.run('att-nameless', 'e-1', 'a-nameless', '2026-07-03T10:00:00Z')
 
-    // Bea joined through the button, so her card is already there and must be left alone.
     db.client
       .prepare(
         'insert into thread (id, event_id, entity_type, entity_id, subject_account_id, title) values (?, ?, ?, ?, ?, ?)',
@@ -1992,7 +1833,6 @@ describe('the cards a redeemed invite never opened', () => {
   })
 
   it('gives it an id of the shape everything else on the wire has', () => {
-    // `thread.id` is read as `idSchema`, which is `z.uuid()`.
     const fresh = beforeTheBackfill()
     try {
       seed(fresh)

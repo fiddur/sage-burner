@@ -121,14 +121,10 @@ describe('the ways somebody can be reached', () => {
     const second = await add(server, ada.cookie, { kind: 'instagram', value: '@wren' })
 
     expect(second.json().connection.order).toBe(1)
-    // Numbered within the account: somebody's first way of being reached starts at zero
-    // rather than wherever the previous person stopped.
     expect((await add(server, bea.cookie, DISCORD)).json().connection.order).toBe(0)
   })
 
   it('stores the handle out of a pasted profile URL, whatever the caller sent', async () => {
-    // Not only the form's job: the value is stored as authored, and a URL kept whole
-    // builds `instagram.com/https://instagram.com/wren`.
     const server = await build()
     const ada = await givenAccount()
 
@@ -139,8 +135,6 @@ describe('the ways somebody can be reached', () => {
   })
 
   it('counts a pasted URL and its handle as the same one', async () => {
-    // Which is the other reason to normalise on the way in: `unique(account_id, kind,
-    // value)` would otherwise keep both.
     const server = await build()
     const ada = await givenAccount()
     await add(server, ada.cookie, { kind: 'instagram', value: '@wren' })
@@ -151,10 +145,6 @@ describe('the ways somebody can be reached', () => {
   })
 
   it('refuses a handle that is nothing once it is normalised', async () => {
-    // `@` passes the schema — one character, trimmed, non-empty — and is nothing at all
-    // once the leading `@` comes off. Left to the insert that is a CHECK violation and a
-    // 500 where a refusal belongs. Not reachable from the web app, which normalises before
-    // sending; reachable from anything else.
     const server = await build()
     const ada = await givenAccount()
 
@@ -179,13 +169,10 @@ describe('the ways somebody can be reached', () => {
     const refused = await add(server, ada.cookie, DISCORD)
 
     expect(refused.statusCode).toBe(409)
-    // The plain `conflict`, which is the other of the two 409s here — see the ceiling test.
     expect(refused.json().error).toBe('conflict')
   })
 
   it('lets two people list the same handle', async () => {
-    // The passing sibling: the uniqueness is per account, not global — two members can
-    // perfectly well name the same shared account.
     const server = await build()
     const ada = await givenAccount()
     const bea = await givenAccount()
@@ -195,8 +182,6 @@ describe('the ways somebody can be reached', () => {
   })
 
   it('refuses a link that is not somewhere a browser should be sent', async () => {
-    // The field exists to become an `href`, so this is the one kind whose value is
-    // checked rather than merely bounded.
     const server = await build()
     const ada = await givenAccount()
 
@@ -219,8 +204,6 @@ describe('the ways somebody can be reached', () => {
   })
 
   it('refuses a link with nothing to call it', async () => {
-    // Every other kind is labelled by its network. A nameless link renders as a bare URL
-    // nobody can tell the purpose of.
     const server = await build()
     const ada = await givenAccount()
 
@@ -253,7 +236,6 @@ describe('the ways somebody can be reached', () => {
     const refused = await add(server, ada.cookie, DISCORD)
 
     expect(refused.statusCode).toBe(409)
-    // Its own code, not the duplicate's — `errorCodes` has why (#409).
     expect(refused.json().error).toBe('list_full')
   })
 
@@ -279,8 +261,6 @@ describe('the ways somebody can be reached', () => {
   })
 
   it('will not change or delete somebody else’s', async () => {
-    // The account id is in the `WHERE`, so the id a caller supplies can only ever reach
-    // their own row — nobody edits anybody else's record here.
     const server = await build()
     const ada = await givenAccount()
     const bea = await givenAccount()
@@ -352,7 +332,6 @@ describe('the ways somebody can be reached', () => {
   })
 
   it('will not hold a kind or a blank value the route would refuse, written straight in', async () => {
-    // The CHECKs, which only a write skipping the API can exercise.
     await build()
     const ada = await givenAccount()
     const insert = client().prepare(

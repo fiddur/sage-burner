@@ -10,8 +10,6 @@ const PRINCIPLES = '- Radical inclusion\n- Leave no trace'
 
 describe('MarkdownField', () => {
   it('edits in a textarea, not a single-line input', () => {
-    // Help text carries things like the 10+1 principles, which cannot be written
-    // in an `<input>` however long its maxLength is.
     render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
 
     expect(screen.getByLabelText('Help text').tagName).toBe('TEXTAREA')
@@ -130,18 +128,11 @@ describe('MarkdownField', () => {
   })
 
   it('names the textarea with a real <label for>, not a duplicated aria-label', () => {
-    // The accessible name and the click target come from one place, which is
-    // what the `<label class="field">` this replaced already gave every other
-    // field.
     render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
 
     const field = screen.getByLabelText('Help text')
     expect(field.id).not.toBe('')
     expect(document.querySelector(`label[for="${field.id}"]`)?.textContent).toBe('Help text')
-    // The half of the name this test used to leave unpinned: re-adding
-    // `aria-label` beside the id satisfies every line above while quietly
-    // putting the accessible name back in two places, with `aria-label`
-    // winning over the `<label>`.
     expect(field.getAttribute('aria-label')).toBeNull()
   })
 
@@ -222,8 +213,6 @@ describe('MarkdownField', () => {
   })
 
   it('opens as tall as the text it holds', () => {
-    // The bug (#338): three lines whatever was in it, so editing a page of welcome
-    // text began by scrolling inside a sliver.
     const twenty = Array.from({ length: 20 }, (_unused, line) => `line ${line}`).join('\n')
     render(<MarkdownField label="Help text" value={twenty} maxLength={2000} onInput={vi.fn()} />)
     const tall = screen.getByLabelText('Help text').getAttribute('rows')
@@ -235,8 +224,6 @@ describe('MarkdownField', () => {
   })
 
   it("takes a caller's height as a floor rather than a size", () => {
-    // `rows` is what the burn's payment and transfer texts ask for. It says how tall
-    // an empty box opens, and must not shrink one that already holds more.
     render(<MarkdownField label="Help text" value="" maxLength={2000} rows={12} onInput={vi.fn()} />)
     expect(screen.getByLabelText('Help text').getAttribute('rows')).toBe('12')
 
@@ -316,8 +303,6 @@ describe('naming somebody in a markdown field', () => {
   })
 
   it('offers nobody whose token would not fit, rather than writing one the API refuses', () => {
-    // `maxlength` does not apply to a programmatic insert, so the menu could write a body over
-    // the limit and the save came back as a generic failure (#457).
     render(<Held people={[{ account_id: 'a-1', name: 'Ada' }]} maxLength={40} />)
 
     type(`${NEARLY} @`, NEARLY.length + 2)

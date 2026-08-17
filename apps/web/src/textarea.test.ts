@@ -13,7 +13,6 @@ describe('how tall a text box opens', () => {
   })
 
   it('opens as tall as the text it holds', () => {
-    // The bug, at the boundary it is about: twenty lines used to open at three.
     const twenty = Array.from({ length: 20 }, (_unused, line) => `line ${line}`).join('\n')
 
     expect(rowsFor(twenty)).toBe(20)
@@ -21,13 +20,10 @@ describe('how tall a text box opens', () => {
   })
 
   it('counts the line a trailing newline leaves', () => {
-    // Where the cursor actually is after pressing return at the end.
     expect(rowsFor(`${'x\n'.repeat(9)}`)).toBe(10)
   })
 
   it('counts a long paragraph as the lines it wraps to', () => {
-    // One logical line, several visual ones. Counting `\n` alone opened a page of
-    // unbroken prose at the floor, which is the same complaint in a different shape.
     const paragraph = 'x'.repeat(500)
 
     expect(rowsFor(paragraph)).toBeGreaterThan(MIN_ROWS)

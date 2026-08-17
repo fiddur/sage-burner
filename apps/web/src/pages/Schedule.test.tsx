@@ -76,8 +76,6 @@ const stub = (
     Promise.resolve({
       attendees: [
         { account_id: 'a-1', name: 'Ada Lovelace', avatar: null },
-        // A second, so a control offering everybody can be told from one offering only
-        // whoever is already on the sitting.
         { account_id: 'a-2', name: 'Bea', avatar: null },
       ],
     }),
@@ -95,11 +93,8 @@ const stub = (
   ...over,
 })
 
-/** The selector's view of the same burn, so the two cannot describe different ones. */
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
-// the default, so "no burn" written that way silently rendered the usual one.
 const renderPage = (api: ScheduleApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -111,14 +106,6 @@ const renderPage = (api: ScheduleApi, viewer: Viewer = MEMBER, burn: MyBurn | nu
     </ViewerProvider>,
   )
 
-/**
- * The cell for a given hour row and place column.
- *
- * `endsWith` rather than equality, because a row that starts a day carries the day
- * above the time — `Sat 1` then `00:00` — so its `textContent` is not the label
- * alone. Every label is a fixed-width `HH:MM`, so on a row without a day this is
- * still equality.
- */
 const cell = (rowLabel: string, column: number) => {
   const header = [...document.querySelectorAll('.schedule-grid th[scope="row"]')].find((node) =>
     node.textContent?.endsWith(rowLabel),
@@ -132,9 +119,6 @@ const cell = (rowLabel: string, column: number) => {
 
 describe('the time column', () => {
   it('names the day at the top and at each midnight, and nowhere else', async () => {
-    // The burn runs 2026-08-01 into 2026-08-02 — a Saturday into a Sunday. The label
-    // used to spell out `2026-08-01 00:00`, which is what made this column sixteen
-    // characters wide for the sake of two rows in forty-eight.
     renderPage(stub())
 
     await screen.findByRole('columnheader', { name: /Temple/ })
@@ -150,8 +134,6 @@ describe('the time column', () => {
     const headers = [...document.querySelectorAll('.schedule-grid th[scope="row"]')]
     const oneAm = headers.find((node) => node.textContent === '01:00')
 
-    // Exactly the time, with no day smuggled in: the passing sibling to the test
-    // above, and the one that would fail if every row claimed to start a day.
     expect(oneAm).toBeTruthy()
     expect(oneAm?.querySelector('.schedule-day')).toBeNull()
   })
@@ -163,8 +145,6 @@ describe('Schedule', () => {
 
     expect(await screen.findByRole('columnheader', { name: /Temple/ })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: /Sauna/ })).toBeTruthy()
-    // Two whole days, 24 rows each. The burn's own hours decide this now — an
-    // admin who says 12:00 to 12:00 gets a grid that starts and stops there.
     expect(document.querySelectorAll('.schedule-grid th[scope="row"]')).toHaveLength(48)
   })
 
@@ -178,7 +158,6 @@ describe('Schedule', () => {
   })
 
   it('counts a dream with a time but no place as unplaced', async () => {
-    // It cannot be drawn in a lane, so the pool is the only honest place for it.
     renderPage(
       stub({}, [
         aDream({
@@ -194,9 +173,6 @@ describe('Schedule', () => {
   })
 
   it('counts a dream with a place but no time as unplaced', async () => {
-    // The other half of the pair above: no row to draw it in, so the pool is
-    // where it belongs. Both halves are needed — either condition alone leaves
-    // the other kind stranded invisibly.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Timeless', place_id: 'p-1' })]))
 
     expect((await screen.findByRole('complementary')).textContent).toContain('Timeless')
@@ -204,7 +180,6 @@ describe('Schedule', () => {
   })
 
   it('draws a scheduled dream in its own lane and hour, in local time', async () => {
-    // Pinned to Europe/Stockholm: 08:00Z in August is the 10:00 row.
     renderPage(
       stub({}, [
         aDream({
@@ -225,9 +200,6 @@ describe('Schedule', () => {
   })
 
   it("keeps a dream scheduled outside the burn's hours visible", async () => {
-    // It has both a place and a time, so it is not \u201cunplaced\u201d; without a row
-    // for it, and without the pool being derived from what the grid draws, it
-    // would render nowhere at all.
     renderPage(
       stub({}, [
         aDream({
@@ -246,9 +218,6 @@ describe('Schedule', () => {
   })
 
   it('pools a dream timed outside the grid entirely, rather than losing it', async () => {
-    // It has a place and a time, so guessing \u201cunplaced means a null field\u201d would
-    // leave it in neither the grid nor the pool. The pool is derived from what
-    // the grid actually draws so that cannot happen, whatever the date.
     renderPage(
       stub({}, [
         aDream({
@@ -265,8 +234,6 @@ describe('Schedule', () => {
   })
 
   it('keeps the length of a dream that already had one when it is moved', async () => {
-    // Re-dragging a two-hour session into another lane must not silently make it
-    // an hour long.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -295,8 +262,6 @@ describe('Schedule', () => {
   })
 
   it('draws a three-hour dream across three rows, not one', async () => {
-    // The bug as reported: a dream edited to 18–21 still read as 18–19, because
-    // the cell was drawn in the start row and nothing spanned.
     renderPage(
       stub({}, [
         aDream({
@@ -317,8 +282,6 @@ describe('Schedule', () => {
   })
 
   it('renders no cell under a spanning dream, so the lane does not shift', async () => {
-    // `rowSpan` already occupies those rows; a cell of their own would push every
-    // later lane one column across.
     renderPage(
       stub({}, [
         aDream({
@@ -337,7 +300,6 @@ describe('Schedule', () => {
         (node) => node.textContent === labelText,
       )?.parentElement
 
-    // Two lanes: an ordinary row has two cells, a covered one only the Sauna lane.
     expect(rowOf('17:00')?.querySelectorAll('td')).toHaveLength(2)
     expect(rowOf('19:00')?.querySelectorAll('td')).toHaveLength(1)
     expect(rowOf('20:00')?.querySelectorAll('td')).toHaveLength(1)
@@ -409,8 +371,6 @@ describe('Schedule', () => {
   })
 
   it('moves an ordinary dream rather than copying it', async () => {
-    // The passing sibling. Without it, a `dropInto` that copied unconditionally
-    // would satisfy the test above and quietly duplicate every dream anyone moved.
     const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
       Promise.reject(new Error('an ordinary dream is moved, not copied')),
     )
@@ -509,15 +469,11 @@ describe('Schedule', () => {
 
     await screen.findByText('Cacao ceremony')
 
-    // The letters are `aria-hidden`; the name is what a screen reader gets, and the
-    // `title` is what a pointer gets. "AL" alone tells neither of them anything.
     expect(screen.getByText('AL')).toBeTruthy()
     expect(screen.getByText(/Facilitated by Ada Lovelace/)).toBeTruthy()
   })
 
   it('shows no circle at all when nobody is facilitating', async () => {
-    // The passing sibling, and the case a dream starts in: an empty circle would
-    // read as somebody whose name is missing.
     renderPage(
       stub({}, [
         aDream({
@@ -536,11 +492,6 @@ describe('Schedule', () => {
   })
 
   it('wraps a placed dream in the stack the height rule needs', async () => {
-    // The only half of this a suite can reach. happy-dom computes no layout, so
-    // nothing here can assert a rendered height — but the CSS that makes a block as
-    // tall as its hours hangs off this element being inside the spanning cell, and
-    // that is checkable. Without it a three-hour dream draws about an hour and a
-    // half, which is what #198 part 7 was.
     renderPage(
       stub({}, [
         aDream({
@@ -584,7 +535,6 @@ describe('Schedule', () => {
   })
 
   it('does not open the details on the click a drag leaves behind', async () => {
-    // Dragging a dream across the grid must not also open a panel over where it landed.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     const chip = await screen.findByLabelText('Move Cacao ceremony')
@@ -596,8 +546,6 @@ describe('Schedule', () => {
   })
 
   it('opens on the next ordinary click, so a drag suppresses one click and not all of them', async () => {
-    // The passing sibling. A flag set by the drag and never cleared would satisfy the
-    // test above by never opening the panel again at all.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     const chip = await screen.findByLabelText('Move Cacao ceremony')
@@ -630,7 +578,6 @@ describe('Schedule', () => {
     fireEvent.keyDown(await open(), { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
 
-    // Without the guard, reading the description would close the thing you opened.
     fireEvent.click(await open())
     expect(screen.queryByRole('dialog')).toBeTruthy()
 
@@ -695,10 +642,6 @@ describe('Schedule', () => {
   })
 
   it('closes on Escape after something in the panel has been clicked', async () => {
-    // The bug: the handler was on the panel and waited for the key to bubble from
-    // inside it. Clicking anything disables it for the length of the write, and a
-    // disabled button drops focus to `<body>` — so Escape stopped working the moment
-    // you did anything, which is when you most want it.
     const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -724,8 +667,6 @@ describe('Schedule', () => {
   })
 
   it('lets go of the chip when a resize pointer is cancelled', async () => {
-    // Without `onPointerCancel` the ref stays set and `onDragStart` goes on
-    // cancelling every drag of this chip, so it can never be moved again.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -772,8 +713,6 @@ describe('Schedule', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
     const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
 
-    // Named, not counted (#251): the number stays on the button, where a chip in the
-    // grid has no room for faces.
     expect(panel.textContent).toContain('Bea')
     expect(panel.textContent).toContain('Someone without a name yet')
     expect(panel.textContent).not.toContain('people want this')
@@ -784,8 +723,6 @@ describe('Schedule', () => {
   })
 
   it('says so when nobody has wanted it yet', async () => {
-    // The passing sibling: a stack of faces that is empty renders as nothing at all,
-    // which reads as the feature being broken rather than as nobody having clicked.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
@@ -801,7 +738,6 @@ describe('Schedule', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Cacao ceremony' }))
 
-    // The first click asks; nothing has gone yet.
     expect(withdrawSession).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Really withdraw Cacao ceremony' }))
@@ -851,7 +787,6 @@ describe('Schedule', () => {
         aDream({
           id: 's-1',
           title: 'Cacao ceremony',
-          // 'a-1' is the viewer, so the button is the other way round for them.
           helpers: [{ account_id: 'a-1', name: 'Ada Lovelace' }],
         }),
       ]),
@@ -860,15 +795,12 @@ describe('Schedule', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
     expect(screen.getByRole('dialog').textContent).toContain('Ada Lovelace')
 
-    // Their own chip's ✕, which is the same gesture as taking anybody else off.
     fireEvent.click(screen.getByRole('button', { name: 'Take Ada Lovelace off Cacao ceremony' }))
 
     await waitFor(() => expect(stopHelpingWithSession).toHaveBeenCalledWith('s-1', 'a-1'))
   })
 
   it('offers to help when somebody else is on the list, rather than reading the list as mine', async () => {
-    // The passing sibling for the button above. A `helpers.length > 0` test would
-    // satisfy that one and offer to *stop* helping to somebody who never started.
     renderPage(
       stub({}, [
         aDream({
@@ -885,9 +817,6 @@ describe('Schedule', () => {
   })
 
   it('lengthens and shortens a placed dream from the keyboard', async () => {
-    // The pointer half of the gesture cannot be tested here — happy-dom computes no
-    // layout, so every row is nought pixels tall. `rowsDragged` and `resizedEnd`
-    // carry that; this is the route somebody without a mouse takes.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -913,7 +842,6 @@ describe('Schedule', () => {
     updateSession.mockClear()
     fireEvent.keyDown(handle, { key: 'ArrowUp' })
 
-    // Already an hour, so shortening it changes nothing and sends nothing.
     await waitFor(() => expect(updateSession).not.toHaveBeenCalled())
   })
 
@@ -951,11 +879,6 @@ describe('Schedule', () => {
   })
 
   it('does not drag the dream away when the handle is what was grabbed', async () => {
-    // `draggable` is on the chip, so without the guard a resize would also pick the
-    // whole dream up and drop it in whatever lane the pointer ended over.
-    // Asserted through the drop rather than through `preventDefault`: the
-    // `dragstart` testing-library builds is not cancelable, so its return value says
-    // nothing here even though a browser's does.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -980,8 +903,6 @@ describe('Schedule', () => {
   })
 
   it('starts an ordinary drag when the handle was not grabbed', async () => {
-    // The passing sibling: a guard that always prevented the default would satisfy
-    // the test above and make the grid undraggable.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -1014,7 +935,6 @@ describe('Schedule', () => {
     fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    // Only what changed, the same rule the Dreams page follows.
     await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { title: 'Renamed' }))
   })
 
@@ -1042,8 +962,6 @@ describe('Schedule', () => {
   })
 
   it('offers a dream in the hour and the lane that were clicked', async () => {
-    // What a calendar does. The slot is prefilled from the cell, so the whole body
-    // is sent rather than a diff — a prefill diffed against itself is no change.
     const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-2', title: 'Sunrise yoga' }) }),
     )
@@ -1071,9 +989,6 @@ describe('Schedule', () => {
   })
 
   it('offers nothing on an hour a dream already fills', async () => {
-    // The passing sibling for the cell click, and the reason it tests `empty` rather
-    // than any cell: a chip's click bubbles to the cell it sits in, so without the
-    // check, opening a dream would also open the offer panel on top of it.
     const occupied = aDream({
       id: 's-1',
       title: 'Cacao ceremony',
@@ -1088,7 +1003,6 @@ describe('Schedule', () => {
 
     expect(screen.queryByLabelText('Title of the new dream')).toBeNull()
 
-    // …and the chip inside it still opens the dream itself.
     fireEvent.click(screen.getByRole('button', { name: 'Open Cacao ceremony' }))
 
     expect(await screen.findByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
@@ -1111,9 +1025,6 @@ describe('Schedule', () => {
   })
 
   it('keeps a refused offer on screen, with everything that was typed', async () => {
-    // The defect this replaced: the panel closed on the click, not on the write. A
-    // start with no end is half a slot and a 400 from the schema — an ordinary
-    // mistake, not a corner — and the title and description went with the panel.
     renderPage(
       stub({
         offerSession: () => Promise.reject(apiError(400, 'bad_request', 'That will not do.')),
@@ -1130,7 +1041,6 @@ describe('Schedule', () => {
   })
 
   it('closes the offer panel once the dream is actually offered', async () => {
-    // The passing sibling: a panel that never closed would satisfy the test above.
     const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-2', title: 'Check in' }) }),
     )
@@ -1144,9 +1054,6 @@ describe('Schedule', () => {
   })
 
   it('keeps the offer panel open on Escape and on the backdrop, unlike the details one', async () => {
-    // The most typing anywhere in the grid, and no dream behind it to fall back to —
-    // so a stray press would throw the lot away (#295). Cancel is the way out, and it
-    // is in the form. Deliberate, and asserted here rather than only described.
     renderPage(stub({}))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
@@ -1166,9 +1073,6 @@ describe('Schedule', () => {
   })
 
   it('stops asking to withdraw once you detour through edit', async () => {
-    // #208: `confirming` is local state and nothing reset it, so 🗑️ then ✏️ then
-    // Cancel came back to a "Withdraw it?" nobody was still asking — one click from
-    // taking a dream off the grid, with its helpers and hearts.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
@@ -1183,8 +1087,6 @@ describe('Schedule', () => {
   })
 
   it('still asks before withdrawing when nobody detoured anywhere', async () => {
-    // The passing sibling: resetting on every render would pass the test above and
-    // make the confirmation unreachable.
     const withdrawSession = vi.fn<ScheduleApi['withdrawSession']>(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
@@ -1212,8 +1114,6 @@ describe('Schedule', () => {
   })
 
   it('leaves the form once a save lands, and says the right thing when one does not', async () => {
-    // The passing sibling for the edit, and the message: a refused *edit* used to
-    // report "Could not move that dream", because it went through the drag path.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
     )
@@ -1244,7 +1144,6 @@ describe('Schedule', () => {
   })
 
   it('shows the failure inside the panel, which covers the page it would print on', async () => {
-    // `.dream-modal` is a fixed overlay, so the page-level error renders under it.
     renderPage(
       stub({ supportSession: () => Promise.reject(new Error('nope')) }, [
         aDream({ id: 's-1', title: 'Cacao ceremony' }),
@@ -1288,8 +1187,6 @@ describe('Schedule', () => {
   })
 
   it('tells an applicant to ask rather than to log in again', async () => {
-    // Signed in without a role. "Log in to see it" is advice they have already
-    // taken, which is the split `GuardedPage` makes on every other page.
     renderPage(stub(), {
       status: 'signed-in',
       account: { id: 'a-3', name: null, avatar: null, roles: [] },
@@ -1300,8 +1197,6 @@ describe('Schedule', () => {
   })
 
   it('opens to an organiser who holds admin alone', async () => {
-    // #200: the selector offers them every coming burn, and then the grid it is for
-    // turned them away. The lanes and the register beside it were already open.
     const getSessions = vi.fn<ScheduleApi['getSessions']>(() => Promise.resolve({ sessions: [] }))
     renderPage(stub({ getSessions }), {
       status: 'signed-in',
@@ -1340,7 +1235,6 @@ describe('the kitchen', () => {
   })
 
   it('draws the cooking, the eating and the washing up', async () => {
-    // 18:00 local in August is 16:00Z, so cooking runs 16:00–18:00 local.
     renderPage(withMeals([aMeal()]))
 
     expect(await screen.findByRole('columnheader', { name: /Kitchen/ })).toBeTruthy()
@@ -1366,7 +1260,6 @@ describe('the kitchen', () => {
   })
 
   it('moves the meal so the block lands where it was dropped', async () => {
-    // The cleanup block is the hour after, so dropping it on 15:00 is a 14:00 meal.
     const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
     renderPage(withMeals([aMeal()], { updateMeal }))
 
@@ -1377,8 +1270,6 @@ describe('the kitchen', () => {
   })
 
   it('will not take a dream into the kitchen', async () => {
-    // The kitchen is for cooking, fetching food and washing up, and that is the whole
-    // of it — so a dream dropped there must not land.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Sunrise yoga' }) }),
     )
@@ -1395,7 +1286,6 @@ describe('the kitchen', () => {
   })
 
   it('will not take a meal into a lane', async () => {
-    // The other way round, and the passing sibling: a meal belongs to the kitchen.
     const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
@@ -1437,12 +1327,6 @@ describe('a drag that was abandoned', () => {
       aDream({ id: 's-1', title: 'Sunrise yoga' }),
     ])
 
-  /**
-   * Dropping outside every target fires no `drop`, so an abandoned drag used to
-   * leave its id behind. The next drop of the *other* kind then found it: a meal
-   * dropped in a lane moved the abandoned dream instead, which is the kitchen's own
-   * rule failing on the second drag rather than the first.
-   */
   it('does not let an abandoned dream drag be moved by a later meal drop', async () => {
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
@@ -1488,8 +1372,6 @@ describe('a drag that was abandoned', () => {
   })
 
   it('still moves a dream on an ordinary drag and drop', async () => {
-    // The passing sibling for all three: clearing too eagerly would make the grid
-    // undraggable while satisfying every test above.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
     )
@@ -1527,8 +1409,6 @@ describe('a chore in the kitchen', () => {
   })
 
   it('asks for cleaners and nothing else', async () => {
-    // Nothing is cooked at a morning cleanup, so it has nobody leading the cooking
-    // and nobody helping with it. The API refuses both as well.
     renderPage(
       stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [aChore()] }) }),
     )
@@ -1542,7 +1422,6 @@ describe('a chore in the kitchen', () => {
   })
 
   it('still asks for all three on an ordinary meal', async () => {
-    // The passing sibling: hiding them everywhere would satisfy the test above.
     const meal: Meal = { ...aChore(), id: 'm-1', label: 'Dinner', at: '18:00', kind: 'meal' }
     renderPage(stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [meal] }) }))
 
@@ -1573,8 +1452,6 @@ describe('a chore’s lead, in the panel', () => {
     stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [meal] }) })
 
   it('names whoever is on it, and offers nobody else', async () => {
-    // The holder is read off the meal, so a chore — which may take no new lead — still
-    // shows who is on it and still offers the ✕ that gets them off.
     renderPage(withMeal(stranded({ account_id: 'a-1', name: 'Ada Lovelace' })))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
@@ -1608,8 +1485,6 @@ describe('a chore’s lead, in the panel', () => {
   })
 
   it('offers no lead at all on a chore nobody leads', async () => {
-    // The passing sibling: showing it whenever the kind is a chore would put back the
-    // control whose only affirmative action the API refuses.
     renderPage(withMeal(stranded(null)))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
@@ -1630,9 +1505,6 @@ describe('what a panel carries in from before it opened', () => {
     })
 
   it('does not greet a freshly opened dream with the last write’s failure', async () => {
-    // `useAction` holds its error until the next `run`, and the panel presents
-    // whatever it holds as its own `role="alert"`. So a drag that failed made every
-    // dream opened afterwards announce "Could not move that dream." about itself.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.reject(new Error('the server said no')),
     )
@@ -1650,8 +1522,6 @@ describe('what a panel carries in from before it opened', () => {
   })
 
   it('still shows a failure of its own, which is what the panel’s alert is for', async () => {
-    // The passing sibling. Clearing on open is only right if a write made *from* the
-    // panel still reports — that is the whole reason the alert moved in here.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.reject(new Error('the server said no')),
     )
@@ -1674,8 +1544,6 @@ describe('leaving a dream’s edit form', () => {
   }
 
   it('takes Escape as leaving the form, and only then as closing the panel', async () => {
-    // #205 stopped a *refused write* losing what somebody typed; Escape still did,
-    // silently. Two presses now: out of the form, then out of the panel.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     const panel = await open()
@@ -1708,8 +1576,6 @@ describe('leaving a dream’s edit form', () => {
   })
 
   it('closes on the first Escape when nothing is being edited', async () => {
-    // The passing sibling: swallowing every first Escape would make reading a dream
-    // and pressing it — the common case — do nothing at all.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     await open()
@@ -1770,8 +1636,6 @@ describe('facilitating a dream, in the panel', () => {
   })
 
   it('offers only ✕ once somebody has it, so a handover is two steps', async () => {
-    // One person facilitates, so a filled spot has no 🙋 and no 👉 — the same rule as
-    // a meal's lead (#247). Both ends of a handover then hear about it.
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() => Promise.resolve({ session: cacao() }))
     renderPage(stub({ updateSession }, [cacao({ facilitator_account_id: 'a-2' })]))
 
@@ -1791,8 +1655,6 @@ describe('facilitating a dream, in the panel', () => {
   })
 
   it('keeps the facilitator out of its own helpers', async () => {
-    // One half of a pair. Offering the same person both would undo the exclusion the
-    // helpers list has always had.
     renderPage(stub({}, [cacao({ facilitator_account_id: 'a-1' })]))
 
     const panel = await open()
@@ -1802,8 +1664,6 @@ describe('facilitating a dream, in the panel', () => {
   })
 
   it('keeps a helper out of the facilitator spot, which is the other half', async () => {
-    // Added with the strip and never covered (#311). Appointing a helper to facilitate
-    // would leave them holding both of a pair the strip below treats as exclusive.
     renderPage(stub({}, [cacao({ helpers: [{ account_id: 'a-1', name: 'Ada' }] })]))
 
     const panel = await open()
@@ -1858,15 +1718,10 @@ describe('pinching the grid', () => {
   })
 
   it('ignores one finger, which is how the grid is scrolled', async () => {
-    // The passing sibling for the two above, and the reason `touch-action` keeps
-    // `pan-x pan-y`: a one-finger drag is a scroll and must not resize anything.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
     await screen.findByText('Cacao ceremony')
     const wrap = gridWrap()
 
-    // Away from the origin on purpose: a lone finger at 0 has a gap of nought from
-    // it, and the zero-gap guard would hold the zoom still whatever the finger count
-    // check did — so the test would pass without the thing it names.
     fireEvent.touchStart(wrap, { touches: fingers(50) })
     fireEvent.touchMove(wrap, { touches: fingers(400) })
 
@@ -1889,8 +1744,6 @@ describe('pinching the grid', () => {
   })
 
   it('forgets a pinch that ended, so the next one does not jump', async () => {
-    // Without clearing on touchend the second pinch would be measured against the
-    // first one's gap, and the grid would leap the moment a finger touched down.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
     await screen.findByText('Cacao ceremony')
     const wrap = gridWrap()
@@ -1907,9 +1760,6 @@ describe('the calendar feed', () => {
   const feedLink = () => screen.findByRole('link', { name: /Add to calendar/ })
 
   it('offers the webcal scheme, which subscribes and which the router ignores', async () => {
-    // The `href`, not a click: nothing here renders it under a router and follows it.
-    // `CalendarFeed` says what the scheme buys — a subscription rather than a
-    // snapshot, and an origin `preact-iso` will not take over (#298).
     renderPage(stub())
 
     expect((await feedLink()).getAttribute('href')).toBe(
@@ -1918,8 +1768,6 @@ describe('the calendar feed', () => {
   })
 
   it('follows the burn in the selector rather than whichever is active', async () => {
-    // The token is fetched per burn, so the id being asked for is what decides the link —
-    // the address itself says nothing about which burn it is, which is the point (#408).
     const getCalendarToken = vi.fn((eventId: string) => Promise.resolve({ token: `token-for-${eventId}` }))
     renderPage(stub({ getCalendarToken }), MEMBER, { event: { ...BURN, id: 'e-2' }, attendance: null })
 
@@ -1927,17 +1775,12 @@ describe('the calendar feed', () => {
   })
 
   it('is keyed by nothing anybody can read off the public homepage', async () => {
-    // The bug (#408): keyed by `event.id`, and `/api/events/active` answers the whole row
-    // unguarded to every anonymous visit — so a stranger could build the active burn's feed
-    // URL from the front page.
     renderPage(stub())
 
     expect((await feedLink()).getAttribute('href')).not.toContain('e-1')
   })
 
   it('copies the https URL, which is what Google Calendar wants pasted', async () => {
-    // Not the `webcal` one: Android's Google Calendar does not take that scheme and
-    // asks for a URL under *Other calendars → From URL*.
     const writeText = vi.fn(() => Promise.resolve(undefined))
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
     renderPage(stub())

@@ -89,7 +89,6 @@ const restore = (server: FastifyInstance, cookie: string, id: string) =>
 const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
   (await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })).json().threads
 
-/** Read by id, which is how a card taken back is read at all: the feed drops it (#617). */
 const cardOf = async (server: FastifyInstance, cookie: string, threadId: string): Promise<Thread> =>
   (await server.inject({ method: 'GET', url: `/api/threads/${threadId}`, headers: { cookie } })).json().thread
 

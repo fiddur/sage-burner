@@ -12,14 +12,6 @@ import { NotificationSettingsField } from './NotificationSettingsField.tsx'
 
 afterEach(cleanup)
 
-/**
- * What the server sends an account that has never saved: the ones on by default.
- *
- * `application` is among them for everybody, admin or not — the settings are per
- * account and know nothing about roles, and only an admin is ever told (#326). So it
- * rides along in every save below, which is what stops a member unticking one row from
- * switching off a category they were never shown.
- */
 const DEFAULTS = [
   'meal_role',
   'dream_role',
@@ -30,7 +22,6 @@ const DEFAULTS = [
   'application',
 ] as const
 
-/** Signed in and holding `admin`, which is the only viewer offered the third table. */
 const asAdmin = (api: NotificationSettingsApi) => (
   <ViewerProvider
     viewer={{ status: 'signed-in', account: { id: 'a1', name: 'Ada', avatar: null, roles: ['admin'] } }}
@@ -45,7 +36,6 @@ const stub = (over: Partial<NotificationSettingsApi> = {}): NotificationSettings
   ...over,
 })
 
-/** A row has a box per channel now, so a label names both (#30). */
 const MEAL = 'Put on or taken off a meal — Here'
 const MEAL_EMAIL = 'Put on or taken off a meal — Email'
 const DREAM_OFFERED = 'Somebody offers a dream — Here'
@@ -60,7 +50,6 @@ const mixed = (label: string) => {
   return box instanceof HTMLInputElement && box.indeterminate
 }
 
-/** Sections start collapsed (#682), so a per-category row needs its section opened first. */
 const open = async (heading: string) => {
   fireEvent.click(await screen.findByRole('button', { name: heading }))
 }
@@ -73,8 +62,6 @@ describe('what to be told about', () => {
     expect(screen.getByText('What happens to you')).toBeTruthy()
     expect(screen.getByText('What others are doing')).toBeTruthy()
     expect(screen.getByText('A new version of the app is out')).toBeTruthy()
-    // Nobody but an admin is ever told an application arrived, and a switch that
-    // cannot do anything reads as a promise (#326).
     expect(screen.queryByText('What you look after')).toBeNull()
   })
 
@@ -91,7 +78,6 @@ describe('what to be told about', () => {
   })
 
   it('heads an open section with an empty corner and one cell per channel', async () => {
-    // A header row one cell short would put every switch column under the wrong heading.
     render(<NotificationSettingsField api={stub()} />)
 
     await open('What happens to you')
@@ -124,8 +110,6 @@ describe('what to be told about', () => {
   })
 
   it('ticks what happens to you and leaves the rest alone', async () => {
-    // The two halves default differently, which is the whole reason the wire carries
-    // what is on rather than what is off (#259).
     render(<NotificationSettingsField api={stub()} />)
 
     await open('What happens to you')
@@ -135,11 +119,6 @@ describe('what to be told about', () => {
   })
 
   it('draws no table at all when the read fails', async () => {
-    // Every save replaces the whole set, so an invented state is not a display bug —
-    // it is committed. An empty table is the worst of them: the first tick would send
-    // only that one and switch off the six this person never refused, losing payment
-    // and waiting-list notices silently. Drawing the defaults instead would be wrong
-    // for anybody who had saved settings. There is no state worth inventing.
     render(
       <NotificationSettingsField
         api={stub({
@@ -153,8 +132,6 @@ describe('what to be told about', () => {
   })
 
   it('cannot save anything after a failed read', async () => {
-    // The consequence, stated: with no boxes there is nothing to tick, so no save can
-    // be built out of a state nobody supplied.
     let saves = 0
     render(
       <NotificationSettingsField
@@ -190,10 +167,6 @@ describe('what to be told about', () => {
   })
 
   it('switches one on by ticking it', async () => {
-    // The passing sibling, and the case the old model could not express: this
-    // category is off until somebody asks for it. The payload carries `application`
-    // too, which a member is shown no row for — every save replaces the whole set, so
-    // a hidden category has to ride along or the first tick switches it off (#326).
     const update = vi.fn(() => Promise.resolve<NotificationSettings>({ on: [], email: [], digest: 'daily' }))
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
 
@@ -303,7 +276,6 @@ describe('what to be told about', () => {
   })
 
   it('offers no email column where the installation has no mail server', async () => {
-    // A switch that cannot do anything reads as a promise (#30).
     render(<NotificationSettingsField api={stub()} />)
 
     await open('What happens to you')
@@ -315,8 +287,6 @@ describe('what to be told about', () => {
     render(<NotificationSettingsField api={stub()} sendsEmail />)
 
     await open('What happens to you')
-    // Off even for the ones the bell has on: email is a channel of its own and is
-    // never switched on by anything but asking.
     expect(checked(MEAL)).toBe(true)
     expect(checked(MEAL_EMAIL)).toBe(false)
   })
@@ -336,7 +306,6 @@ describe('what to be told about', () => {
   })
 
   it('puts the box back when the save is refused', async () => {
-    // A box showing a setting the server refused is worse than one that did not move.
     render(
       <NotificationSettingsField
         api={stub({
@@ -357,7 +326,6 @@ describe('the digest of what you have missed', () => {
   const DIGEST = 'A summary by email when you have stayed away'
 
   it('is not offered where the installation has no mail server', async () => {
-    // The email column's rule: a switch that cannot do anything reads as a promise.
     render(<NotificationSettingsField api={stub()} />)
 
     await screen.findByText('What happens to you')

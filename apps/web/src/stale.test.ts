@@ -13,8 +13,6 @@ describe('isStale', () => {
   })
 
   it('leaves every other failure alone', () => {
-    // 409 in particular: the burn being full cannot be fixed by looking again, and
-    // reloading over it would replace a true message with a misleading one.
     expect(isStale(apiError(409, 'conflict', 'The burn is full.'))).toBe(false)
     expect(isStale(apiError(403, 'forbidden', 'No.'))).toBe(false)
     expect(isStale(new Error('something else'))).toBe(false)
@@ -31,8 +29,6 @@ describe('theirVersion', () => {
   })
 
   it('answers nothing rather than guessing, when the payload is not that shape', () => {
-    // Every one of these has been a real response at some point: a refusal with no
-    // body, an envelope from a proxy, a field that is a list rather than a string.
     expect(theirVersion(refused(undefined), ['event', 'welcome_markdown'])).toBeUndefined()
     expect(theirVersion(refused({ error: 'stale' }), ['event', 'welcome_markdown'])).toBeUndefined()
     expect(theirVersion(refused({ event: null }), ['event', 'welcome_markdown'])).toBeUndefined()
@@ -40,8 +36,6 @@ describe('theirVersion', () => {
   })
 
   it('answers nothing for a failure that is not a refusal at all', () => {
-    // The passing sibling above proves it reads the field; this proves it will not
-    // read one off a 500 that happened to carry a body of the same shape.
     const other = apiError(500, 'internal_error', 'Oh dear', { event: { welcome_markdown: 'theirs' } })
 
     expect(theirVersion(other, ['event', 'welcome_markdown'])).toBeUndefined()

@@ -61,7 +61,6 @@ const givenAccount = async (roles: ('admin' | 'member')[] = ['member']) => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-/** A tiny but real PNG, so the bytes stored are bytes that mean something. */
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
@@ -83,7 +82,6 @@ const upload = (
 const fetchImage = (server: FastifyInstance, cookie: string | undefined, id: string) =>
   server.inject({ method: 'GET', url: `/api/images/${id}`, headers: cookie === undefined ? {} : { cookie } })
 
-/** Rows straight into the table, to stand a member near their ceiling cheaply. */
 const givenStoredImages = async (accountId: string, howMany: number) => {
   for (let index = 0; index < howMany; index += 1) {
     await db().insert(image).values({
@@ -124,10 +122,6 @@ describe('a picture written into markdown', () => {
   })
 
   it('refuses a type it will not serve back', async () => {
-    // The content type is whatever the caller claims and is echoed on the way out, so
-    // the list of what can be stored is the list of what can be served. SVG is refused
-    // where the icon takes it: that one is served `default-src 'none'; sandbox`, and
-    // this one is not.
     const server = await build()
     const ada = await givenAccount()
 
@@ -136,8 +130,6 @@ describe('a picture written into markdown', () => {
   })
 
   it('takes the three formats a browser can produce', async () => {
-    // The passing sibling: a check that refused everything would satisfy the test above
-    // while making the feature impossible to use.
     const server = await build()
     const ada = await givenAccount()
 
@@ -297,8 +289,6 @@ describe('a picture written into markdown', () => {
   })
 
   it('frees a slot when one is taken off, so the ceiling is recoverable', async () => {
-    // The dead end this route exists for: the cap counts every row ever written, so an
-    // account at the ceiling could not upload again by any action the app offered.
     const server = await build()
     const ada = await givenAccount()
     await givenStoredImages(ada.id, MAX_IMAGES_PER_ACCOUNT - 1)
@@ -343,7 +333,6 @@ describe('a picture written into markdown', () => {
   })
 
   it('will not hold a type the route would refuse, even written straight to the table', async () => {
-    // The CHECK, which only a write skipping the API can exercise.
     await build()
     const ada = await givenAccount()
 

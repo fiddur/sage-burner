@@ -10,7 +10,6 @@ import { choosableBurns, FetchedBurnProvider, useBurns } from './burn.tsx'
 import { ViewerProvider } from './viewer.tsx'
 
 afterEach(cleanup)
-// The history outlives one test, and `LocationProvider` reads it on mount.
 afterEach(() => history.replaceState(null, '', '/'))
 
 const anAttendance = (): Attendance => ({
@@ -50,7 +49,6 @@ const ADMIN: Viewer = {
   account: { id: 'a-2', name: null, avatar: null, roles: ['admin'] },
 }
 
-/** Renders the choice as text, so a test can read it without a page. */
 const Shown = () => {
   const { status, burns, selected, reload } = useBurns()
 
@@ -79,12 +77,6 @@ const renderChoice = (coming: MyBurn[], viewer: Viewer = MEMBER) => {
   return getMyBurns
 }
 
-/**
- * The same, under the router — which is where a link naming a burn is read from.
- *
- * Bare above, because most of these are about what the fetch answers rather than about
- * the URL. `LocationProvider` reads `location` on mount, so the address is set first.
- */
 const renderChoiceAt = (at: string, coming: MyBurn[], viewer: Viewer = MEMBER) => {
   history.replaceState(null, '', at)
   const getMyBurns = vi.fn(() => Promise.resolve({ coming, past: [] }))
@@ -101,10 +93,8 @@ const renderChoiceAt = (at: string, coming: MyBurn[], viewer: Viewer = MEMBER) =
   return getMyBurns
 }
 
-/** The line `Shown` draws: status, every burn, and the one selected. */
 const shown = () => screen.getByText(/^ready:/).textContent
 
-/** `Shown`, plus the one thing only a router test can do: go somewhere else. */
 const Travelling = () => {
   const { route } = useLocation()
 
@@ -120,28 +110,18 @@ const Travelling = () => {
 
 describe('a link that names a burn', () => {
   it('chooses it, rather than leaving the selector where it was', async () => {
-    // The whole of #333: every burn-scoped page reads the selector, so the selector
-    // reading the URL is what makes one line's link land on the right page.
     renderChoiceAt('/dreams?burn=e-2', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
 
-    // The whole string, as the rest of this file asserts it. `toContain(':Summer')` is
-    // true of `ready:Summer,Winter:` whatever is selected, so the two siblings below
-    // would pass against no selection at all.
     await waitFor(() => expect(shown()).toBe('ready:Summer,Winter:Winter'))
   })
 
   it('leaves the default alone when it names one that is not on offer', async () => {
-    // A burn the viewer is not coming to, or one that has gone. Falling back to the
-    // soonest is what every other page already does with no selection at all.
     renderChoiceAt('/dreams?burn=e-9', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
 
     await waitFor(() => expect(shown()).toBe('ready:Summer,Winter:Summer'))
   })
 
   it('keeps the burn when the next page names none', async () => {
-    // Following a line lands on `/dreams?burn=e-2`, and everything reached from there
-    // is a page with no parameter at all. Reading the URL must not mean forgetting the
-    // burn the moment somebody moves off the page the link opened.
     history.replaceState(null, '', '/dreams?burn=e-2')
     render(
       <LocationProvider>
@@ -169,8 +149,6 @@ describe('a link that names a burn', () => {
   })
 
   it('leaves the default alone when there is no such parameter', async () => {
-    // The passing sibling: reading the URL must not disturb the ordinary case, which
-    // is every page reached from the bar.
     renderChoiceAt('/dreams', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
 
     await waitFor(() => expect(shown()).toBe('ready:Summer,Winter:Summer'))
@@ -237,11 +215,6 @@ describe('the burn choice', () => {
   })
 
   it('settles on failed rather than on ready with nothing, when the fetch fails', async () => {
-    // #193. It settled on `ready` with an empty list, which is indistinguishable from
-    // somebody who has joined no burn — so `NoBurn` told them "you are not coming to a
-    // burn yet", a claim about *them*, and pointed them at a page that would not help.
-    // Still settled rather than stuck: sitting on "loading" forever would leave every
-    // burn-scoped page saying nothing at all.
     render(
       <ViewerProvider viewer={MEMBER}>
         <FetchedBurnProvider api={{ getMyBurns: () => Promise.reject(new Error('nope')) }}>
@@ -254,8 +227,6 @@ describe('the burn choice', () => {
   })
 
   it('goes back to loading while a retry is in flight', async () => {
-    // #236. `reload` refetched without saying so, leaving "could not load your burns"
-    // on screen for the whole of the second attempt — so the button read as broken.
     let settle: (response: MyBurnsResponse) => void = () => undefined
     const getMyBurns = vi
       .fn<() => Promise<MyBurnsResponse>>()
@@ -280,7 +251,6 @@ describe('the burn choice', () => {
 
     expect(screen.getByText(/^loading:/)).toBeTruthy()
 
-    // The passing sibling: it must go back to `loading` and still arrive.
     settle({ coming: [aBurn('e-1', 'Summer', true)], past: [] })
     expect((await screen.findByText(/^ready:/)).textContent).toBe('ready:Summer:Summer')
   })

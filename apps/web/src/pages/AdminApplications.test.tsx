@@ -114,8 +114,6 @@ describe('AdminApplications', () => {
   })
 
   it('says the invite was emailed, and where to', async () => {
-    // The bug this fixed: the link was already in the applicant's inbox and the page
-    // said to send it, so they got it twice from two people (#327).
     const approveApplication = vi.fn(() =>
       Promise.resolve({
         application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
@@ -129,13 +127,10 @@ describe('AdminApplications', () => {
 
     const note = await screen.findByRole('status')
     expect(note.textContent).toContain('Emailed to fredrik@example.org')
-    // Still shown: a bounce is invisible to this app, and the admin may need it.
     expect(screen.getByText(/a-very-secret-token/)).toBeTruthy()
   })
 
   it('says why the invite was not emailed, and still asks for the link to be sent', async () => {
-    // The other direction, and how a real invite went missing: every send failed with a
-    // TLS record error and the page's answer was unchanged.
     renderPage(
       stub({
         approveApplication: () =>
@@ -145,8 +140,6 @@ describe('AdminApplications', () => {
             delivery: {
               sent: false,
               to: 'fredrik@example.org',
-              // A raw driver message, which is the one kind of reason that arrives
-              // without a full stop of its own.
               reason: 'wrong version number',
             },
           }),
@@ -162,8 +155,6 @@ describe('AdminApplications', () => {
   })
 
   it('does not double the full stop on a reason that is already a sentence', async () => {
-    // Every reason the server produces ends in one — `NOT_CONFIGURED` is "No mail server
-    // has been set up." — and appending another read as "up.. Send this link".
     renderPage(
       stub({
         approveApplication: () =>
@@ -183,9 +174,6 @@ describe('AdminApplications', () => {
   })
 
   it('does not say "Copied" when the copy failed', async () => {
-    // The token is shown once and cannot be shown again, so a false "Copied" is
-    // how an admin loses this applicant's invite — recoverable only by
-    // minting a direct one, which drops the tie to their application (#91).
     const writeText = vi.fn(() => Promise.reject(new Error('denied')))
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     renderPage(
@@ -207,7 +195,6 @@ describe('AdminApplications', () => {
   })
 
   it('survives a browser with no clipboard at all', async () => {
-    // `navigator.clipboard` is undefined on a non-secure origin.
     vi.stubGlobal('navigator', {})
     renderPage(
       stub({
@@ -227,10 +214,6 @@ describe('AdminApplications', () => {
   })
 
   it('stops offering a decision once one is made', async () => {
-    // The stub tracks the decision because the page re-reads rather than patching
-    // what is on screen: the server is what knows the status afterwards, and a stub
-    // that kept answering `pending` would be asserting the client-side patch this
-    // page deliberately does not do.
     let decided = false
     renderPage(
       stub({
@@ -289,7 +272,6 @@ describe('AdminApplications', () => {
     expect(screen.queryByRole('button', { name: 'Send a new link' })).toBeNull()
   })
 
-  /** An approved application, which is the only row that offers a new link. */
   const withReissue = (reissueInvite: ApplicationsApi['reissueInvite']) =>
     renderPage(
       stub({
@@ -302,8 +284,6 @@ describe('AdminApplications', () => {
     )
 
   it('says so when the invite has already been used', async () => {
-    // Worth saying rather than "please try again": they are already in, and trying
-    // again would fail the same way.
     withReissue(() => Promise.reject(apiError(409, 'invite_used', 'Request failed (409).')))
 
     ;(await screen.findByRole('button', { name: 'Send a new link' })).click()
@@ -312,7 +292,6 @@ describe('AdminApplications', () => {
   })
 
   it('says something else when the application was never approved', async () => {
-    // The same 409, told apart by the slug — see `errorCodes` (#178).
     withReissue(() => Promise.reject(apiError(409, 'not_approved', 'Request failed (409).')))
 
     ;(await screen.findByRole('button', { name: 'Send a new link' })).click()
@@ -347,8 +326,6 @@ describe('AdminApplications', () => {
   })
 
   it('says to reload when someone else decided first', async () => {
-    // A 409 means the list on screen is stale, so "try again" would send them
-    // round the same loop.
     renderPage(stub({ approveApplication: () => Promise.reject(apiError(409, 'conflict', 'nope')) }))
 
     ;(await screen.findByRole('button', { name: 'Approve' })).click()
@@ -377,8 +354,6 @@ describe('AdminApplications', () => {
   })
 
   it('does not fetch for someone without the role', async () => {
-    // The page hiding itself is not the access control — the API refuses a
-    // non-admin whatever this renders — but it should not ask either.
     const getApplications = vi.fn(() => Promise.resolve({ applications: [] }))
     renderPage(stub({ getApplications }), ['member'])
 

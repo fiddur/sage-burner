@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { createGate } from './gate.ts'
 
-/**
- * Timers are injected, so nothing here waits in real time — a suite that slept
- * for a two-second timeout would be a suite nobody runs.
- */
-
 const controllableTimers = () => {
   const pending: { fn: () => void; cleared: boolean }[] = []
 
@@ -20,7 +15,6 @@ const controllableTimers = () => {
         },
       }
     },
-    /** Fire every timer that has not been cleared. */
     expireAll: () => {
       for (const entry of pending) if (!entry.cleared) entry.fn()
     },
@@ -40,8 +34,6 @@ describe('createGate', () => {
   })
 
   it('queues the next caller rather than refusing it', async () => {
-    // The whole point. A hard cap would refuse here, which turns two sustained
-    // requests into a permanent outage of the only way into the app.
     const gate = gateWith()
     const first = await gate.enter()
     await gate.enter()
@@ -54,9 +46,6 @@ describe('createGate', () => {
   })
 
   it('serves waiters first in, first out', async () => {
-    // Fairness is what removes the cliff: a member arriving during a flood
-    // joins the line instead of being turned away, and a client holding
-    // requests open competes for places rather than owning them.
     const gate = gateWith({ slots: 1 })
     const held = await gate.enter()
 
@@ -68,21 +57,16 @@ describe('createGate', () => {
     await a
     expect(order).toEqual(['a'])
 
-    // `a` never released, so `b` is still waiting — releasing the slot `a` took
-    // is what lets it through.
     expect(gate.stats().waiting).toBe(1)
   })
 
   it('refuses once the queue is full, rather than growing without bound', async () => {
-    // The queue must not become the exhaustion it exists to prevent.
     const gate = gateWith({ slots: 1, queue: 2 })
     await gate.enter()
     void gate.enter()
     void gate.enter()
 
     expect(gate.stats()).toEqual({ active: 1, waiting: 2 })
-    // Named, not merely refused: a full queue clears shortly, so the caller is
-    // told to come back in a second rather than after the full window.
     expect(await gate.enter()).toEqual({ ok: false, reason: 'queue-full' })
   })
 
@@ -94,16 +78,11 @@ describe('createGate', () => {
     const queued = gate.enter()
     timers.expireAll()
 
-    // Distinguished from queue-full: this caller already waited the whole
-    // window against a saturated gate, so sending them straight back would be
-    // a hot retry loop under exactly the flood the gate damps.
     expect(await queued).toEqual({ ok: false, reason: 'timed-out' })
     expect(gate.stats().waiting).toBe(0)
   })
 
   it('does not admit a caller whose wait already timed out', async () => {
-    // Otherwise a release hands the slot to someone who has gone, and it is
-    // held until they release it — which they never will.
     const timers = controllableTimers()
     const gate = gateWith({ slots: 1, setTimer: timers.setTimer })
     const held = await gate.enter()
@@ -141,16 +120,11 @@ describe('createGate', () => {
 
   describe('what it tells a shed caller to wait', () => {
     it('derives the timed-out advice from its own window', () => {
-      // Written out as `'5'`, this went quietly wrong the day `timeoutMs` moved:
-      // a caller who waited eight seconds told to come back in five is the hot
-      // retry loop the number exists to prevent.
       expect(createGate({ slots: 1, queue: 1, timeoutMs: 8000 }).retryAfter('timed-out')).toBe('8')
       expect(createGate({ slots: 1, queue: 1, timeoutMs: 2500 }).retryAfter('timed-out')).toBe('3')
     })
 
     it('tells a queue-full caller one second, whatever the window is', () => {
-      // They waited for nothing — the work in flight is what clears, and that is
-      // a slot's worth away rather than a window's.
       expect(createGate({ slots: 1, queue: 1, timeoutMs: 8000 }).retryAfter('queue-full')).toBe('1')
     })
   })

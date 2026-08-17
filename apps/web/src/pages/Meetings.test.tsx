@@ -253,8 +253,6 @@ describe('the meetings page', () => {
     const named = (kind: RegExp) =>
       screen.getAllByRole('button', { name: kind }).map((one) => one.getAttribute('aria-label') ?? '')
 
-    // Each one carries the time, not merely a set of three distinct strings: leaving the
-    // banner's controls on the bare title keeps the set distinct and says nothing.
     for (const kind of [/^Edit Planning call/u, /^Take out of the diary Planning call/u]) {
       const labels = named(kind)
 
@@ -264,9 +262,6 @@ describe('the meetings page', () => {
   })
 
   it('changes one further down the diary too, not only the next one', async () => {
-    // #587: `MeetingFields` rendered from `NextMeeting` alone, so mistyping the time on
-    // anything but the imminent meeting left 🗑️ and scheduling it again as the way back —
-    // which re-tells everybody and drops the old UID out of every subscribed calendar.
     const updateMeeting = vi.fn<MeetingsApi['updateMeeting']>(() => Promise.resolve({ meeting: aMeeting() }))
     renderPage(
       stub({
@@ -424,7 +419,6 @@ describe('the meetings page', () => {
 
 describe('when a meeting is', () => {
   it('is read in the reader own timezone, the only one they can turn up in', () => {
-    // `vite.config.ts` pins TZ=Europe/Stockholm.
     expect(whenItIs(aMeeting({ starts_at: '2026-07-20T17:00:00.000Z' }), new Date('2026-07-01'))).toBe(
       'Mon 20 Jul 19:00',
     )

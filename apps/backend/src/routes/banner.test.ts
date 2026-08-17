@@ -60,7 +60,6 @@ const givenAccount = async (roles: ('admin' | 'member')[] = ['admin']) => {
   return `${SESSION_COOKIE}=${sessions.issue(id)}`
 }
 
-/** A tiny but real JPEG, so the bytes stored are bytes that mean something. */
 const JPEG = Buffer.from(
   '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkI' +
     'CQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/wAALCAABAAEBAREA/8QAFAABAAAAAAAA' +
@@ -89,9 +88,6 @@ const installation = (server: FastifyInstance) => server.inject({ method: 'GET',
 
 describe('the banner', () => {
   it('is 404 until somebody uploads one', async () => {
-    // Unlike the icon, which always answers: the manifest names that one
-    // unconditionally, and nothing asks for this until `/api/installation` says
-    // there is one.
     const server = await build()
 
     expect((await get(server)).statusCode).toBe(404)
@@ -152,8 +148,6 @@ describe('the banner', () => {
   })
 
   it('takes a JPEG and nothing else', async () => {
-    // A crawler draws no SVG, so accepting one would store a banner that looks right
-    // on the homepage and leaves the card blank — the very bug this fixes.
     const server = await build()
     const cookie = await givenAccount()
 
@@ -177,9 +171,6 @@ describe('the banner', () => {
   })
 
   it('cannot be made ambiguous by a second row', async () => {
-    // The CHECK, exercised by a write that skips the API — which is the only kind it
-    // exists for. Mutating `schema.ts` would fail nothing: the test database is built
-    // from the migration SQL.
     await build()
 
     expect(() =>
@@ -190,8 +181,6 @@ describe('the banner', () => {
   })
 
   it('takes the one row it does allow, by that same route', async () => {
-    // The passing sibling: a CHECK refusing everything would satisfy the test above
-    // while making the feature impossible to use.
     const server = await build()
 
     client()
@@ -202,8 +191,6 @@ describe('the banner', () => {
   })
 
   it('is the admin’s to change, and nobody else’s', async () => {
-    // Under `/api/admin/`, so the prefix hook is what refuses — there is no
-    // per-route opt-out to forget.
     const server = await build()
     const member = await givenAccount(['member'])
 

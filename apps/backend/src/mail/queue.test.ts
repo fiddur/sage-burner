@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { createEmailQueue, drainWithin } from './queue.ts'
 
-/** A promise somebody else settles, which is what a slow relay looks like from here. */
 const held = () => {
   let settle: () => void = () => undefined
   const promise = new Promise<void>((resolve) => (settle = resolve))
@@ -20,7 +19,6 @@ describe('the queue the email leg goes on', () => {
       return await Promise.resolve()
     })
 
-    // The whole point: the request that caused this has already answered.
     expect(ran).toBe(false)
   })
 
@@ -48,7 +46,6 @@ describe('the queue the email leg goes on', () => {
   })
 
   it('keeps going after one fails, and says which', async () => {
-    // A relay that refuses one message must not stop the rest of the burn's.
     const failures: unknown[] = []
     const queue = createEmailQueue((failure) => failures.push(failure))
     let after = false
@@ -66,8 +63,6 @@ describe('the queue the email leg goes on', () => {
   })
 
   it('drains work queued while it was already draining', async () => {
-    // A notification queued from inside another one's work would otherwise be missed
-    // by a shutdown that had already read the tail.
     const queue = createEmailQueue(() => undefined)
     let inner = false
 
@@ -92,9 +87,6 @@ describe('the queue the email leg goes on', () => {
 
 describe('draining on the way down', () => {
   it('gives up on a relay that never answers rather than holding the shutdown', async () => {
-    // `smtp.ts` waits up to fifteen seconds on a host that drops packets, so an
-    // unbounded drain outlasts a container's stop grace and is killed anyway — which
-    // is the case draining exists for.
     const queue = createEmailQueue(() => undefined)
     queue.defer(() => new Promise<void>(() => undefined))
 
@@ -102,9 +94,6 @@ describe('draining on the way down', () => {
   })
 
   it('returns as soon as the work is done rather than sitting out the deadline', async () => {
-    // The deadline is a minute and the work is a millisecond, so an implementation
-    // that waited it out would hang here rather than quietly pass — which is what a
-    // deadline generous enough to matter would do to every shutdown.
     const queue = createEmailQueue(() => undefined)
     let posted = false
     queue.defer(async () => {

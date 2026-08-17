@@ -95,7 +95,6 @@ describe('rendering a mention', () => {
     const prose = 'ada@example.org said `@[x](mention:y)` is the shape'
 
     expect(mentionsAsLinks('ada@example.org and @ada')).toBe('ada@example.org and @ada')
-    // Inside backticks is still rewritten: the renderer, not this, decides what is code.
     expect(mentionsAsLinks(prose)).toContain('[@x](/members/y)')
   })
 })

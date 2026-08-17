@@ -8,7 +8,6 @@ describe('the size a picture is drawn at', () => {
   })
 
   it('does not blow a small one up', () => {
-    // A screenshot pasted at 200 px would only get blurrier, and bigger in bytes for it.
     expect(scaledSize(200, 120, 1600)).toEqual({ width: 200, height: 120 })
   })
 
@@ -35,10 +34,6 @@ describe('reading the file', () => {
   })
 
   it('asks the browser to apply the rotation the camera recorded', async () => {
-    // The classic sideways-photo bug: a canvas round-trip drops the EXIF tag and keeps
-    // the pixels, so without this a picture that looked upright goes up on its side and
-    // stays that way. Asserted here because happy-dom has no canvas that draws — the
-    // call below gets no further than this, which is the whole of what is under test.
     const asked = vi.fn(() => Promise.reject(new Error('no decoder here')))
     Object.defineProperty(globalThis, 'createImageBitmap', { value: asked, configurable: true })
 

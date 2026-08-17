@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 import { admitsEnvelope, refuseEnvelopeStrippers } from './envelope.ts'
 
-/** A route whose only fault is what it declares, so the throw can only be the hook's. */
 const withSchema = (response: Record<string, unknown>) => {
   const app = Fastify({ logger: false })
   refuseEnvelopeStrippers(app)
@@ -21,8 +20,6 @@ describe('what a schema admits', () => {
   })
 
   it('does not, for an object that names nothing', () => {
-    // The case that produced `400 {}`: a serializer drops what it is not told about,
-    // and this is told about nothing.
     expect(admitsEnvelope({ type: 'object' })).toBe(false)
   })
 
@@ -45,8 +42,6 @@ describe('refusing a route that would strip its own errors', () => {
   })
 
   it('throws for the wildcard forms too, which behave the same way', () => {
-    // A foreign `4xx` strips exactly as a foreign `400` does, so the hook cannot
-    // check only the numbers.
     expect(withSchema({ '4xx': { type: 'object' } })).toThrow(/strip the error envelope/)
     expect(withSchema({ '5xx': { type: 'object' } })).toThrow(/strip the error envelope/)
   })
@@ -60,8 +55,6 @@ describe('refusing a route that would strip its own errors', () => {
   })
 
   it('allows a route that declares only a success, which is every route here', () => {
-    // The passing sibling that matters: this hook must not make ordinary route
-    // schemas illegal, or it would be paid for on every route rather than the few.
     expect(withSchema({ 200: { type: 'object', properties: { thing: { type: 'string' } } } })).not.toThrow()
   })
 

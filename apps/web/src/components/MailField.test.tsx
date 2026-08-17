@@ -59,8 +59,6 @@ describe('the mail settings form', () => {
   })
 
   it('leaves the password out of a save that did not touch it', async () => {
-    // Absent means "keep what is stored". Sending an empty string would clear it,
-    // which is not what typing nothing into a blank box means.
     const updateMailSettings = vi.fn<MailApi['updateMailSettings']>(() => Promise.resolve({ mail: STORED }))
     render(
       <MailField
@@ -77,7 +75,6 @@ describe('the mail settings form', () => {
   })
 
   it('sends the password when one has been typed', async () => {
-    // The passing sibling: the omission above is about a box nobody touched.
     const updateMailSettings = vi.fn<MailApi['updateMailSettings']>(() => Promise.resolve({ mail: STORED }))
     render(
       <MailField
@@ -108,8 +105,6 @@ describe('the mail settings form', () => {
   })
 
   it('says what the server said when a test does not get out', async () => {
-    // The reason names the problem and this app cannot: bad credentials and a
-    // refused connection want completely different fixes.
     render(
       <MailField
         api={stub({

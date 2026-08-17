@@ -9,16 +9,6 @@ import { createDb, runMigrations } from '../db/index.ts'
 import { account, INSTALLATION_ID, mailSetting } from '../db/schema.ts'
 import { emailChannel } from './channel.ts'
 
-/**
- * The email half of a notification, and the one promise the caller depends on: it
- * **never throws**.
- *
- * The queue it runs on reports a failure rather than rethrowing (#356), so a throw
- * here would be a message lost with only the queue's own line about it — where a
- * refused send carries the server's reason. What goes in a message is
- * `messages.test.ts`; this is about what happens when something underneath gives way.
- */
-
 const NOW = '2026-08-03T00:00:00.000Z'
 const TOLD: Told = { category: 'meal_role', body: 'You are on helper for Dinner', link: '/meals' }
 
@@ -97,10 +87,6 @@ describe('posting a notification by email', () => {
   })
 
   it('reports a database that has gone away rather than throwing it', async () => {
-    // The path `post` does not cover: the reads here are its own, and a rejection
-    // from one used to leave the caller's `.catch` to swallow it with nothing said
-    // (#357). On the bell path the insert reports the same failure a moment later;
-    // where the bell is off there is no insert behind it at all.
     const database = build()
     await givenMailServer()
     const accountId = await givenAccount()
@@ -116,8 +102,6 @@ describe('posting a notification by email', () => {
   })
 
   it('sends nothing at all where no mail server has been set up', async () => {
-    // The ordinary state, and the reason that check is first: the two reads after it
-    // would be building a message nothing can post.
     const database = build()
     const accountId = await givenAccount()
     const send = vi.fn(() => Promise.resolve())

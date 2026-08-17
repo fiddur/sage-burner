@@ -19,7 +19,6 @@ const ADA: Viewer = {
   account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] },
 }
 
-/** An account with no role yet: somebody waiting on their application. */
 const APPLICANT: Viewer = {
   status: 'signed-in',
   account: { id: 'a-2', name: 'Bea', avatar: null, roles: [] },
@@ -171,7 +170,6 @@ describe('what has happened to you', () => {
   })
 
   it('does not mark when there was nothing new', async () => {
-    // A write for no change on every visit to a page somebody may keep open.
     const markNotificationsSeen = vi.fn(() => Promise.resolve({ notifications: TWO, unseen: 0 }))
     renderPage(stub({ markNotificationsSeen }, TWO, 0))
 
@@ -181,9 +179,6 @@ describe('what has happened to you', () => {
   })
 
   it('keeps the new ones marked new while they are being read', async () => {
-    // Marking is for the next visit. Replacing the list with the reply — which has
-    // them all seen — would take the emphasis away in front of whoever came to look
-    // at it, which is the one thing the page is for.
     renderPage(
       stub({
         markNotificationsSeen: () =>
@@ -200,9 +195,6 @@ describe('what has happened to you', () => {
   })
 
   it('keeps it through the refetch that comes back with them all seen', async () => {
-    // The half the test above cannot show, and the one `live: true` broke: every
-    // refetch after the page has marked them answers with `seen_at` set, so without
-    // remembering what arrived new the bold vanished a minute in.
     const seen = TWO.map((item) => ({ ...item, seen_at: '2026-08-06T11:00:00.000Z' }))
     let asked = 0
     renderPage(
@@ -222,9 +214,6 @@ describe('what has happened to you', () => {
   })
 
   it('marks one that arrives while the page is open as new, and keeps it that way', async () => {
-    // The set grows rather than being seeded once (#352). Seeded once, an arrival
-    // during the visit was bold on the answer that brought it and plain on the next —
-    // the same disappearing act, narrowed to in-session arrivals.
     const later = one({ id: 'n-9', body: 'Bea is coming.' })
     let asked = 0
     renderPage(
@@ -233,9 +222,6 @@ describe('what has happened to you', () => {
           asked += 1
           if (asked === 1) return Promise.resolve({ notifications: [], unseen: 0 })
 
-          // The third answer carries a second line as well, so the assertion below has
-          // something rendered to wait on rather than a counter the fetch bumps before
-          // its answer has been applied.
           return Promise.resolve({
             notifications:
               asked === 2
@@ -259,9 +245,6 @@ describe('what has happened to you', () => {
   })
 
   it('is open to an account with no role, since it is told things too', async () => {
-    // An applicant hears when their application is decided. Telling them the page
-    // announcing it is for members would be the app refusing to show somebody a
-    // message it sent them.
     renderPage(
       stub({}, [one({ id: 'n-3', body: 'You are in.', category: 'application', link: null })]),
       APPLICANT,

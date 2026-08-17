@@ -53,8 +53,6 @@ const stub = (over: Partial<RidesApi> = {}, rides: RideEntry[] = []): RidesApi =
   ...over,
 })
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets the
-// default, so "no burn" written that way silently renders the usual one.
 const renderPage = (api: RidesApi, viewer: Viewer = ADA, burn: MyBurn | null = BURN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -82,11 +80,8 @@ describe('the rideshare board', () => {
   })
 
   it('shows the contact, which is the whole point of the page', async () => {
-    // Members-only, and inside it a phone number is what somebody came for — the
-    // spreadsheet had these in a publicly linked document.
     renderPage(stub({}, [aRide({ id: 'r-1', name: 'Ada Lovelace', contact: '070 111 22 33' })]))
 
-    // The name is a link to their page now (#389), so the two are separate nodes.
     expect(await screen.findByRole('link', { name: 'Ada Lovelace' })).toBeTruthy()
     expect(screen.getByText(/070 111 22 33/)).toBeTruthy()
   })
@@ -144,8 +139,6 @@ describe('the rideshare board', () => {
   })
 
   it('asks for seats only when there is a car', async () => {
-    // Zero on a request, where it would mean nothing — so the field is not there to
-    // be filled in wrongly.
     renderPage(stub())
     await screen.findByRole('textbox', { name: 'From where?' })
 
@@ -189,8 +182,6 @@ describe('the rideshare board', () => {
   })
 
   it('offers the pen and the bin on your own journey only', async () => {
-    // The lanes and the register are the burn's shared furniture and anyone may
-    // rearrange them. This is what somebody said about their own travel.
     renderPage(
       stub({}, [
         aRide({ id: 'r-1', account_id: 'a-1', from: 'Göteborg' }),
@@ -250,7 +241,6 @@ describe('the rideshare board', () => {
     renderPage(stub(), ADA, null)
 
     expect(await screen.findByText(/there is nowhere to travel to/)).toBeTruthy()
-    // And no form either: a journey needs a burn to be to.
     expect(screen.queryByRole('button', { name: 'Post it' })).toBeNull()
   })
 

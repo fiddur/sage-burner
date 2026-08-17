@@ -30,13 +30,6 @@ import {
 } from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 
-/**
- * Talking about a dream (#375).
- *
- * The thread is the dream's, and it outlives the dream — so these are keyed by thread id
- * throughout, which is the whole reason the routes are and not `/api/sessions/:id/…`.
- */
-
 const SECRET = 't'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 const AFTER_THE_BURN = '2026-09-01T00:00:00.000Z'
@@ -181,8 +174,6 @@ describe('a thread', () => {
   })
 
   it('names whoever wrote each line, from the account rather than the words', async () => {
-    // Why the author is a column and not baked into `body`: renaming yourself must not
-    // leave a thread attributing your own words to a name you no longer use.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -231,13 +222,10 @@ describe('a thread', () => {
 
     expect((await say(server, ada.cookie, id, '   ')).statusCode).toBe(400)
     expect((await say(server, ada.cookie, id, 'x'.repeat(MAX_COMMENT + 1))).statusCode).toBe(400)
-    // The passing sibling: the same route takes one of exactly the limit.
     expect((await say(server, ada.cookie, id, 'x'.repeat(MAX_COMMENT))).statusCode).toBe(200)
   })
 
   it('takes a comment on a burn that has ended, where every other write is refused', async () => {
-    // The one place a member-facing write is not scoped to an open burn. Talking about a
-    // burn is not arranging one, and "that was lovely" is posted on the way home.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -292,13 +280,10 @@ describe('a thread', () => {
     if (comment === undefined) throw new Error('no comment')
 
     expect((await rewrite(server, bea.cookie, comment.id, 'bring nothing')).statusCode).toBe(404)
-    // An admin may take a comment off but not put words in somebody's mouth: a deletion
-    // says who did it and an edit would not.
     expect((await rewrite(server, cai.cookie, comment.id, 'bring nothing')).statusCode).toBe(404)
   })
 
   it('refuses to rewrite or remove a line the app wrote', async () => {
-    // Only a comment is anybody's. A history that could be edited is not a history.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -337,8 +322,6 @@ describe('a thread', () => {
   })
 
   it('tells the people in the conversation, and nobody else', async () => {
-    // The split every pair here has: whoever is part of it is told by default, everybody
-    // else at the burn only if they asked. And never the person who just wrote it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -351,19 +334,12 @@ describe('a thread', () => {
 
     await say(server, bea.cookie, id, 'is one person enough to hold space?')
 
-    // Ada offered it, so she is in the conversation.
     expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['dream_comment'])
-    // Bea wrote it.
     expect(await bell(server, bea.cookie)).toEqual([])
-    // Dag is coming to the burn and has not asked about other people's dreams.
     expect(await bell(server, dag.cookie)).toEqual([])
   })
 
   it('does not enrol whoever moved a dream in the grid', async () => {
-    // Laying out the timetable is a dozen drags, each writing a quiet line. Enrolling
-    // their author would make `dream_comment` — on by default — fire for every comment
-    // on every dream they ever touched, which is the channel people learn to ignore.
-    // What counts is having spoken, plus the offer that started it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -388,9 +364,7 @@ describe('a thread', () => {
 
     await say(server, cai.cookie, id, 'is one person enough?')
 
-    // Ada offered it, so she is in the conversation.
     expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['dream_comment'])
-    // Bea only moved it, and has not asked for other people's dreams.
     expect(await bell(server, bea.cookie)).toEqual([])
   })
 
@@ -412,8 +386,6 @@ describe('a thread', () => {
   })
 
   it('tells somebody who was handed the dream without ever saying anything', async () => {
-    // The half `participantsOf` cannot get from the entries: appointing somebody writes a
-    // line authored by whoever appointed, so the facilitator has said nothing.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -531,8 +503,6 @@ describe('a thread', () => {
   })
 
   it('refuses a kind the vocabulary has never heard of, and a comment nobody wrote', async () => {
-    // The CHECKs, proved by writes that skip the API — the migration's, since the test
-    // database is built from the SQL rather than from `schema.ts`.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -548,13 +518,10 @@ describe('a thread', () => {
 
     expect(() => insert('gossip', ada.id)).toThrow()
     expect(() => insert('comment', null)).toThrow()
-    // The passing sibling, so the two above are rejecting the value rather than the row.
     expect(() => insert('comment', ada.id)).not.toThrow()
   })
 
   it('keeps one conversation per thing', async () => {
-    // The unique index is what makes the dream's own panel and the feed's card the same
-    // thread rather than two.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -569,10 +536,6 @@ describe('a thread', () => {
   })
 
   it('takes the words of an erased account with it', async () => {
-    // Erasure is where the cascade belongs (#35), and it takes the lines the person is
-    // behind — including a dream's opening one. Ada is not coming to the burn, because
-    // `attendance.account_id` is NO ACTION and nothing can delete an account that is:
-    // this pins the cascade #35 will lean on rather than claiming erasure works today.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -587,9 +550,6 @@ describe('a thread', () => {
   })
 
   it('says nothing has happened yet rather than answering an empty date', async () => {
-    // Every dream offered before #375 has a thread and no entries, which the migration
-    // wrote exactly like this. `last_at: ''` is not a datetime, and the feed drew it as
-    // "Invalid Date" for the card of a thread whose last comment had just been taken back.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -607,8 +567,6 @@ describe('a thread', () => {
   })
 
   it('keeps the conversation when the burn is deleted only until the burn is deleted', async () => {
-    // Retention is the burn, as it is for `activity`: the thread cascades with the event
-    // and the entries with the thread.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -789,7 +747,6 @@ describe('naming somebody in a comment', () => {
     await givenComing(ada.id)
     await givenComing(bea.id)
     const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
-    // Ada wants comments on her own dream and does not want to be named.
     await setOn(server, ada.cookie, ['dream_comment'])
 
     await say(server, bea.cookie, id, `what do you think ${mentionToken('Ada', ada.id)}?`)
@@ -833,7 +790,6 @@ describe('naming somebody in a comment', () => {
     )
 
     expect((await bell(server, dag.cookie)).map((one) => one.category)).toEqual(['mentioned'])
-    // Ada was named before the edit and must not hear about it twice.
     expect(await bell(server, ada.cookie)).toHaveLength(1)
   })
 
@@ -1103,8 +1059,6 @@ describe('the heart on a card', () => {
   })
 
   it('is the same heart a dream already had, not a second one beside it', async () => {
-    // Two like-buttons with different meanings on one dream would be worse than none, so a
-    // dream's card writes `session_support` — what its schedule chip reads.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -1325,7 +1279,6 @@ describe('following a card, and muting one', () => {
     await givenComing(ada.id)
     const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
 
-    // Ada offered it, so she is a participant and the box is ticked before she touches it.
     expect((await read(server, id, ada.cookie)).json().thread.followed_by_me).toBe(true)
     expect((await follow(server, ada.cookie, id, false)).json().thread.followed_by_me).toBe(false)
     expect((await follow(server, ada.cookie, id, true)).json().thread.followed_by_me).toBe(true)

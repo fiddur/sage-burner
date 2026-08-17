@@ -42,8 +42,6 @@ describe('choosing the picture a shared link shows', () => {
   })
 
   it('removes it, and the homepage stops drawing one without a reload', async () => {
-    // The context rather than local state: the banner is drawn on the homepage, which
-    // is one client-side navigation away and fetches nothing on the way there.
     let removed = false
     render(
       within(
@@ -77,8 +75,6 @@ describe('choosing the picture a shared link shows', () => {
   })
 
   it('says what a card does with a picture of the wrong shape', () => {
-    // The format is what decides whether a share is a big picture or a thumbnail, and
-    // finding that out from Facebook afterwards is the expensive way.
     render(within(null, <BannerField api={stub()} />))
 
     expect(screen.getByText(/1200 × 630/).textContent).toContain('600 × 315')

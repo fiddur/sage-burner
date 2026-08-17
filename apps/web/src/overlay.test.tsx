@@ -39,11 +39,6 @@ describe('an overlay while it is up', () => {
   })
 
   it('puts back whatever the page was already doing rather than clearing it', () => {
-    // Restoring to `''` would be right today and wrong the moment anything else sets
-    // it. Note what this does *not* buy: capture-and-restore only composes while
-    // mount and unmount are strictly LIFO, so two overlaps closing the other way
-    // round would release the lock early. Nothing can overlap today — the dream
-    // modal covers ☰ — and a counter is the shape to reach for when one can.
     document.body.style.overflow = 'clip'
     const { rerender } = render(<Page open={true} />)
 
@@ -102,10 +97,6 @@ describe('an overlay while it is up', () => {
   })
 
   it('leaves Tab to the browser when there is nothing to focus', () => {
-    // A panel whose every control is disabled mid-write, which is an ordinary moment.
-    // Asserted as `preventDefault` *not* called: `fireEvent.keyDown` never moves focus
-    // in happy-dom, so checking where focus ended up would pass against a hook that
-    // did nothing at all.
     render(<Overlay empty={true} />)
     screen.getByRole('button', { name: 'behind' }).focus()
 

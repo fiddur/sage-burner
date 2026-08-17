@@ -9,18 +9,6 @@ import { createDb } from './client.ts'
 import { runMigrations } from './migrate.ts'
 import { event } from './schema.ts'
 
-/**
- * Covers the file-backed branch of `createDb`.
- *
- * Every other test uses `:memory:`, which skips both the directory creation and
- * the WAL pragmas — i.e. exactly the half that runs in production, where a
- * regression would only surface against a fresh Docker volume.
- *
- * Note: the relative-path cases call `process.chdir`, which works under
- * vitest's default `forks` pool but throws under `threads`. If a
- * `vitest.config.ts` ever sets a pool, keep this file on `forks`.
- */
-
 let dir: string
 let handle: DbHandle | undefined
 
@@ -36,11 +24,6 @@ afterEach(() => {
 
 describe('createDb url validation', () => {
   it('refuses an empty url rather than opening a throwaway database', () => {
-    // `new DatabaseSync('')` succeeds and opens a private temporary database,
-    // so without this guard everything appears to work and the data is gone at
-    // shutdown. The cheapest possible test for the most expensive regression:
-    // a refactor dropping the guard, or reverting migrate-cli to `??`, would
-    // otherwise reintroduce silent data loss with a fully green suite.
     expect(() => createDb({ url: '' })).toThrow(/empty/i)
     expect(() => createDb({ url: '   ' })).toThrow(/empty/i)
   })
@@ -53,9 +36,6 @@ describe('createDb url validation', () => {
 
 describe('createDb against a file', () => {
   it('creates missing parent directories', () => {
-    // SQLite will not create them and fails with `unable to open database
-    // file`. The default path lives under a gitignored `data/`, so this is the
-    // normal case on a fresh checkout and on a fresh volume — not an edge case.
     const file = join(dir, 'nested', 'deeper', 'sage-burner.sqlite')
     expect(existsSync(file)).toBe(false)
 
@@ -78,10 +58,6 @@ describe('createDb against a file', () => {
   })
 
   it('handles a relative url, which is what the default DATABASE_URL is', () => {
-    // `./data/sage-burner.sqlite` is the default, so relative paths are the
-    // normal case rather than an edge one. Needs the process cwd moved, since
-    // that is what "relative" resolves against — restored immediately so a
-    // stray database cannot land in the repo.
     const cwd = process.cwd()
     try {
       process.chdir(dir)

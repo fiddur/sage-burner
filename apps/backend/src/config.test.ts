@@ -8,10 +8,6 @@ describe('createConfig', () => {
 
     expect(config.node_env).toBe('development')
     expect(config.port).toBe(3000)
-    // Loopback, not `0.0.0.0`. A bare `docker run` is unaffected — the image
-    // sets HOST itself — so the only runs this default reaches are the ones
-    // nobody documented, and those should not be on the LAN with the published
-    // development signing key.
     expect(config.host).toBe('127.0.0.1')
     expect(config.database_url).toBe('./data/sage-burner.sqlite')
     expect(config.build_sha).toBe('unknown')
@@ -48,17 +44,10 @@ describe('createConfig', () => {
 
   describe('SESSION_SECRET', () => {
     it('refuses to build a production config without one', () => {
-      // A random default generated at boot would look like it works and log
-      // every member out on each deploy — which, with watchtower redeploying on
-      // a tag move, is every few minutes after a merge.
       expect(() => createConfig({ NODE_ENV: 'production' })).toThrow(/SESSION_SECRET/)
     })
 
     it('refuses a blank one in production, which is what .env.example ships', () => {
-      // `.env.example` has `SESSION_SECRET=` with no value, so a copied file
-      // sends an empty string rather than nothing at all. That must be the same
-      // refusal, or the documented first step produces a running app with a
-      // development key.
       for (const value of ['', '   ']) {
         expect(() => createConfig({ NODE_ENV: 'production', SESSION_SECRET: value }), value).toThrow(
           /SESSION_SECRET/,
@@ -71,18 +60,10 @@ describe('createConfig', () => {
     })
 
     it('rejects one too short to sign with, in any environment', () => {
-      // The schema bound, not the production guard: a 12-character secret set
-      // in development would otherwise be accepted here and rejected by
-      // createSessions at request time.
       expect(() => createConfig({ SESSION_SECRET: 'too-short' })).toThrow(/SESSION_SECRET/)
     })
 
     it('refuses the development key on anything reachable, not just in production', () => {
-      // `NODE_ENV` cannot answer "is this reachable by anyone": it defaults to
-      // `development` when unset, so a bare `node src/server.ts`, a systemd
-      // unit, or a compose file that drops the image's environment would sign
-      // sessions with a key committed to a public repository — and omit
-      // `Secure` at the same time. `HOST` is the value that knows.
       expect(() => createConfig({ HOST: '0.0.0.0' })).toThrow(/SESSION_SECRET/)
       expect(() => createConfig({ HOST: '192.168.1.10' })).toThrow(/SESSION_SECRET/)
       expect(() => createConfig({ HOST: '::' })).toThrow(/SESSION_SECRET/)
@@ -95,44 +76,25 @@ describe('createConfig', () => {
     })
 
     it('refuses it in production even on loopback', () => {
-      // Production on loopback is still production — behind a proxy on the same
-      // host, which is exactly the documented deployment.
       expect(() => createConfig({ NODE_ENV: 'production', HOST: '127.0.0.1' })).toThrow(/SESSION_SECRET/)
     })
 
     it('names both values in the message, so the refusal is diagnosable', () => {
-      // Two conditions decide this, and an operator who reads only "required in
-      // production" while running development will not look at HOST.
       expect(() => createConfig({ HOST: '0.0.0.0' })).toThrow(/NODE_ENV=development.*HOST=0\.0\.0\.0/s)
     })
 
     it('requires a secret when WEB_ROOT is set, even on loopback outside production', () => {
-      // The hole the first two signals left, and it is the deployment this repo
-      // documents: a reverse proxy in front means the app binds *loopback*. So
-      // `pnpm start` behind docs/deploying.md's Apache vhost with NODE_ENV unset
-      // satisfied both "not production" and "loopback", and would have booted on
-      // the development key that is committed to this repository — serving a
-      // non-Secure cookie over Apache's TLS.
-      //
-      // Setting WEB_ROOT says "serve the built frontend", which is a deployment
-      // by definition: Vite serves it in development, so a dev run never sets it.
       expect(() => createConfig({ WEB_ROOT: '/usr/share/web' })).toThrow(/SESSION_SECRET/)
       expect(() => createConfig({ WEB_ROOT: '/usr/share/web', HOST: '127.0.0.1' })).toThrow(/SESSION_SECRET/)
     })
 
     it('marks cookies Secure when WEB_ROOT is set, on the same predicate', () => {
-      // One predicate for both, so the flag and the secret requirement cannot
-      // drift: the cookie would otherwise lack Secure on exactly the run above.
       const config = createConfig({ SESSION_SECRET: 's'.repeat(40), WEB_ROOT: '/usr/share/web' })
 
       expect(config.secure_cookies).toBe(true)
     })
 
     it('marks cookies Secure whenever the app is reachable beyond loopback', () => {
-      // Keyed off the same predicate as the secret guard, not off NODE_ENV.
-      // Before that, `SESSION_SECRET=… HOST=0.0.0.0 node src/server.ts` bound
-      // every interface and issued the cookie without Secure — and behind a
-      // proxy that also answers on :80 the browser sends it in cleartext.
       const secret = { SESSION_SECRET: 's'.repeat(40) }
 
       expect(createConfig({ ...secret, HOST: '0.0.0.0' }).secure_cookies).toBe(true)
@@ -141,8 +103,6 @@ describe('createConfig', () => {
     })
 
     it('leaves cookies unmarked only on loopback outside production', () => {
-      // Otherwise login silently fails on plain-HTTP `pnpm dev`: the browser
-      // discards a Secure cookie, the 200 says signed in, the next load says not.
       for (const host of ['127.0.0.1', 'localhost', '::1']) {
         expect(createConfig({ HOST: host }).secure_cookies, host).toBe(false)
       }
@@ -154,9 +114,6 @@ describe('createConfig', () => {
   })
 
   describe('empty values', () => {
-    // `DATABASE_URL: ${DATABASE_URL}` in a compose file with the variable unset
-    // expands to '' rather than to nothing, so every default here has to
-    // survive an empty string as well as an absent key.
     it('treats an empty string as absent rather than letting it win', () => {
       const config = createConfig({ DATABASE_URL: '', PORT: '', HOST: '', BUILD_SHA: '' })
 
@@ -176,24 +133,17 @@ describe('createConfig', () => {
   })
 
   describe('trimming', () => {
-    // Every string value, not just the ones that happened to get an ad-hoc
-    // .trim(): an env file can leave a trailing newline on any of them.
     it('trims a database url, which an env file can leave a newline on', () => {
       expect(createConfig({ DATABASE_URL: './data/burn.sqlite\n' }).database_url).toBe('./data/burn.sqlite')
     })
 
     it('trims the web root as well', () => {
-      // A secret because a set WEB_ROOT is deployment-shaped, which is what the
-      // `looksLikeDeployment` cases below cover.
       expect(createConfig({ SESSION_SECRET: 's'.repeat(40), WEB_ROOT: ' /usr/share/web \n' }).web_root).toBe(
         '/usr/share/web',
       )
     })
 
     it('trims the host, which would otherwise fail dns lookup at boot', () => {
-      // `z.string().min(1)` is perfectly happy with "127.0.0.1\n"; it reaches
-      // dns.lookup and the boot dies with an ENOTFOUND naming a host that
-      // looks entirely correct in the logs.
       expect(createConfig({ HOST: '127.0.0.1\n' }).host).toBe('127.0.0.1')
     })
 
@@ -210,8 +160,6 @@ describe('createConfig', () => {
     })
 
     it('takes a trailing slash off, which would otherwise build an unroutable path', () => {
-      // The share card concatenates onto this, so `https://burn.example.org//api/…`
-      // is what a slash produces — and `z.url()` accepts the value that made it.
       expect(createConfig({ PUBLIC_ORIGIN: 'https://burn.example.org/' }).public_origin).toBe(
         'https://burn.example.org',
       )
@@ -236,9 +184,6 @@ describe('createConfig', () => {
 
   describe('trust_proxy', () => {
     it('trusts nothing by default', () => {
-      // `true` would believe the whole X-Forwarded-For chain from whoever
-      // connects, making request.ip client-controlled. Nothing guarantees a
-      // header-stripping proxy is in front — the container runs one process.
       expect(createConfig({}).trust_proxy).toBe(false)
     })
 
@@ -263,9 +208,6 @@ describe('createConfig', () => {
     })
 
     it('reports a malformed value here rather than letting Fastify throw later', () => {
-      // Without validating, `TRUE` reaches proxy-addr.compile() from inside
-      // Fastify() and surfaces as a bare `invalid IP address: TRUE`, not the
-      // configuration block this module and docs/configuration.md promise.
       expect(() => createConfig({ TRUST_PROXY: 'TRUE' })).toThrow(/Invalid environment configuration/)
       expect(() => createConfig({ TRUST_PROXY: 'TRUE' })).toThrow(/TRUST_PROXY/)
       expect(() => createConfig({ TRUST_PROXY: '10.0.0.0/nonsense' })).toThrow(/TRUST_PROXY/)

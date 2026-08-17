@@ -37,13 +37,6 @@ const renderAdmin = (
 
 const roster = (accounts: AdminAccountsResponse['accounts']) => () => Promise.resolve({ accounts })
 
-/**
- * A roster that answers with whatever the last write set, the way the server does.
- *
- * The page re-reads after a change rather than patching what is on screen, so a stub
- * that kept answering the original roles would be asserting a client-side patch this
- * page deliberately does not do.
- */
 const livingRoster = (accounts: AdminAccountsResponse['accounts']) => {
   let current = accounts
   return {
@@ -87,9 +80,6 @@ describe('Admin', () => {
   })
 
   it('grants a role, sending the whole set rather than a delta', async () => {
-    // An account holding `admin` alone cannot reach their own profile until this
-    // adds `member`. `admin:create` grants both, so that is an account someone was
-    // given `admin` on, not the one the installation starts with.
     const accounts = livingRoster([
       { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
     ])
@@ -108,8 +98,6 @@ describe('Admin', () => {
     fireEvent.click(await screen.findByRole('checkbox', { name: 'member — ada@example.org' }))
 
     await waitFor(() => expect(setAccountRoles).toHaveBeenCalledWith('a-1', { roles: ['admin', 'member'] }))
-    // Waited for, not read once: the page re-reads after the write, so the box
-    // reflects the server a tick later rather than the moment the call was made.
     await waitFor(() =>
       expect(screen.getByRole('checkbox', { name: 'member — ada@example.org' })).toHaveProperty(
         'checked',
@@ -145,7 +133,6 @@ describe('Admin', () => {
   })
 
   it('explains a refused last-admin change rather than saying try again', async () => {
-    // A 409 means they are the only one left, and retrying cannot change that.
     renderAdmin(
       roster([
         { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
@@ -160,10 +147,6 @@ describe('Admin', () => {
   })
 
   it('refuses a member, whose two lists are reached from their own pages now', async () => {
-    // This page used to offer a member the places and lodging lists, because it was
-    // the only way to reach them. #184 gave each one a way in beside what it is for,
-    // so what is left here is admin's. Asking the API anyway would render an error
-    // where an explanation belongs.
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, MEMBER)
 
@@ -186,8 +169,6 @@ describe('Admin', () => {
   })
 
   it('points a signed-out visitor at the login form', async () => {
-    // Rather than "ask an existing admin", which sends someone to a person
-    // when the thing they need is the form.
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, { status: 'signed-out' })
 
@@ -196,9 +177,6 @@ describe('Admin', () => {
   })
 
   it('waits rather than refusing while the viewer is still loading', async () => {
-    // Rendering "this area is for admins" during the first `getMe` would
-    // tell an actual admin they are not one, for as long as the round trip
-    // takes.
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, { status: 'loading' })
 
@@ -218,10 +196,6 @@ describe('Admin', () => {
 
 describe('the window between a write and the re-read', () => {
   it('keeps the boxes disabled until the re-read has landed (#176)', async () => {
-    // `toggle` computes the new set from the row on screen. Between the write
-    // resolving and the re-read arriving, that row is the pre-write one — so a second
-    // box ticked in the window would send roles computed without the grant just made,
-    // writing it away. The boxes stay disabled across the whole of it.
     let answer: (value: AdminAccountsResponse) => void = () => undefined
     const getAdminAccounts = vi.fn(() => new Promise<AdminAccountsResponse>((resolve) => (answer = resolve)))
     const ada = {
@@ -309,10 +283,6 @@ describe('setting somebody’s password', () => {
   })
 
   it('keeps each row’s field to itself', async () => {
-    // A regression guard, not a proof: the state is per row because each row renders
-    // its own component, so no edit to a line makes this fail. It is here because
-    // hoisting it to the page is the obvious tidy-up, and it would put the password
-    // you typed for one person into the box beside everybody else's name.
     const second = { ...ONE, id: 'a-8', email: 'bea@example.org' }
     renderAdmin(roster([ONE, second]), ADMIN, undefined, () => Promise.resolve(undefined))
 

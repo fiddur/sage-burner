@@ -34,15 +34,12 @@ const fetchDocument = (server: FastifyInstance, url: string) => server.inject({ 
 
 describe('the served markdown files', () => {
   it('falls back to empty for a file that is not in the image', async () => {
-    // Each route's own empty case injects the string, so this is the only thing exercising
-    // the read itself.
     expect(readDocument('nope.md')).toBe('')
   })
 })
 
 describe('the privacy policy', () => {
   it('is readable by somebody who is not signed in', async () => {
-    // The requirement rather than a nicety — `privacyResponseSchema` carries why.
     const server = await build({ privacy: '# What we keep\n\nNot much.' })
 
     const got = await fetchDocument(server, '/api/privacy')
@@ -67,9 +64,6 @@ describe('the privacy policy', () => {
   })
 
   it('reads the repository’s own file by default', async () => {
-    // The one case that covers the default, as `app.test.ts` does for the changelog: a path
-    // resolved four levels up is exactly the kind that breaks between a checkout and the
-    // image, and nothing else here would notice.
     const held = readDocument('PRIVACY.md')
 
     expect(held).not.toBe('')
@@ -77,10 +71,6 @@ describe('the privacy policy', () => {
   })
 
   it('promises no deletion the app cannot perform', async () => {
-    // The invariant: no route deletes an account, and `db.integration.test.ts` asserts that
-    // SQLite refuses the delete for anybody who has ever said they were coming. A policy is
-    // the one document where a sentence that reads well and is false is a false statement
-    // about somebody's data. #35 is the gap.
     const held = readDocument('PRIVACY.md')
 
     expect(held).toMatch(/not something this app can do yet/i)
@@ -88,9 +78,6 @@ describe('the privacy policy', () => {
   })
 
   it('says the calendar feed is readable without signing in', async () => {
-    // `/calendar/:token/schedule.ics` is unauthenticated, and it carries session titles and
-    // descriptions that members write. "Visible to the other members — not to anybody
-    // outside" read as a promise the feed does not keep.
     const held = readDocument('PRIVACY.md')
 
     expect(held).toMatch(/calendar/i)
@@ -98,13 +85,8 @@ describe('the privacy policy', () => {
   })
 
   it('says the feed address is the calendar’s own, and can be taken back', async () => {
-    // It was the burn's id, which `/api/events/active` answers unguarded to every anonymous
-    // visit — so "published nowhere" was false for the burn being planned, and the policy
-    // said so plainly until #408 gave the feed a token of its own.
     const held = readDocument('PRIVACY.md')
 
-    // `\s+` between every word: the file is wrapped prose, so a reflow puts a newline
-    // wherever it likes and a literal space fails against a sentence that is still there.
     expect(held).toMatch(/unguessable\s+identifier\s+of\s+its\s+own/i)
     expect(held).toMatch(/give\s+the\s+calendar\s+a\s+new\s+address/i)
   })
@@ -123,9 +105,6 @@ describe('the privacy policy', () => {
   })
 
   it('says the things app review is checking the page against', async () => {
-    // Not a style assertion. A reviewer looks for what is collected, who sees it, and how to
-    // get rid of it; and the provider paragraph is the one they read most closely, since it
-    // is what their own login gives us.
     const held = readDocument('PRIVACY.md')
 
     expect(held).toMatch(/email/i)
@@ -151,9 +130,6 @@ describe('the privacy policy', () => {
   })
 
   it('is the deletion instructions Meta’s console is pointed at', async () => {
-    // This URL goes in Basic Settings as the data deletion instructions, so the steps have to
-    // be on the page rather than implied by it (#419). `messageForRemoval` is the 409 the last
-    // sentence describes, and `maybeAvatar` is why the picture needs its own.
     const held = readDocument('PRIVACY.md')
 
     expect(held).toMatch(/Other\s+ways\s+to\s+sign\s+in/i)
@@ -164,8 +140,6 @@ describe('the privacy policy', () => {
 
 describe('the terms of service', () => {
   it('is readable by somebody who is not signed in', async () => {
-    // The privacy policy's requirement and its reason: a reviewer at Meta opens this one as a
-    // stranger too, and it is the second URL Basic Settings asks for.
     const server = await build({ terms: '# Using this\n\nBe kind.' })
 
     const got = await fetchDocument(server, '/api/terms')
@@ -197,8 +171,6 @@ describe('the terms of service', () => {
   })
 
   it('says who the agreement is actually with', async () => {
-    // The one thing about a self-hosted gathering that is genuinely surprising, and the thing
-    // a reader would otherwise assume wrong: there is no company on the other side of this.
     const held = readDocument('TERMS.md')
 
     expect(held).toMatch(/agreement\s+with\s+them\s+and\s+with\s+nobody\s+else/i)
@@ -213,9 +185,6 @@ describe('the terms of service', () => {
   })
 
   it('promises no removal the privacy policy says is not there', async () => {
-    // The two documents describe one behaviour, so they are the pair most likely to drift:
-    // the app refuses to delete a member who has ever said they were coming, and terms
-    // offering a button would contradict a policy that says there is none.
     const held = readDocument('TERMS.md')
 
     expect(held).toMatch(/ask\s+an\s+organiser/i)

@@ -90,7 +90,6 @@ describe('somebody, as the rest of the community sees them', () => {
       avatar: null,
       contact: 'wren on discord',
       introduction: null,
-      // Built from the Messenger handle below, since that is a value they typed.
       facebook: 'https://facebook.com/wren',
       connections: [expect.objectContaining({ kind: 'messenger', value: 'wren' })],
     })
@@ -116,14 +115,6 @@ describe('somebody, as the rest of the community sees them', () => {
   })
 
   it('carries nothing else about them, whatever the account row holds', async () => {
-    // The projection is written out field by field, which is what keeps a column added to
-    // `account` from reaching every member's reading of every other member.
-    //
-    // `account.email` is the column that matters and this asserts the column: no
-    // member-facing read selects it (#159). It is *not* a claim that the address is unseen —
-    // every account is seeded with an `email` connection holding the same string, which this
-    // page shows on purpose. The two are different things, and the second is a row somebody
-    // can delete.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -140,15 +131,11 @@ describe('somebody, as the rest of the community sees them', () => {
       'introduction',
       'name',
     ])
-    // No address at all here, because this account has no `email` connection: the seeding
-    // happens on the paths that create an account, and these rows are inserted directly.
     expect(body.payload).not.toContain('@example.org')
     expect(body.payload).not.toContain('peanuts')
   })
 
   it('carries what somebody wrote about themselves, which is what the page is for', async () => {
-    // #390: the answer to "who is this", which is the question a name somebody has not met
-    // actually raises. Markdown, rendered by the page like every other field members write.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -163,8 +150,6 @@ describe('somebody, as the rest of the community sees them', () => {
   })
 
   it('answers null for somebody who has written none, so the page can say so', async () => {
-    // Distinct from an empty string on purpose: the page has different things to say to
-    // somebody who has not written one and to the person whose page it is.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -173,11 +158,6 @@ describe('somebody, as the rest of the community sees them', () => {
   })
 
   it('shows a Facebook page built from the handle they typed', async () => {
-    // **Not from the linked identity.** Facebook answers `public_profile` with an app-scoped
-    // id, which identifies nobody outside this installation's Meta app — a URL built from it
-    // would be a link to nobody on every member's profile, and "a dangling link is worse than
-    // a thin page" is this route's own rule. A value somebody typed is their real handle, or
-    // the number out of their own profile link.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -200,9 +180,6 @@ describe('somebody, as the rest of the community sees them', () => {
   })
 
   it('shows none for a linked identity that carries no profile URL', async () => {
-    // Which is every identity on an installation that never asked for `user_link`. The id it
-    // carries is app-scoped and could not build a link anyway — the URL, when there is one,
-    // is a URL Facebook answered rather than anything derived from the id.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -217,7 +194,6 @@ describe('somebody, as the rest of the community sees them', () => {
     const got = await fetchProfile(server, reader.cookie, wren.id)
 
     expect(got.json().person.facebook).toBeNull()
-    // And the app-scoped id is nowhere in the answer, which is what `schema.ts` promises.
     expect(got.payload).not.toContain('1234567890')
   })
 
@@ -241,9 +217,6 @@ describe('somebody, as the rest of the community sees them', () => {
   })
 
   it('prefers the typed handle over the one Facebook answered', async () => {
-    // Not arbitrary, and the reason is which link works: a handle builds `facebook.com/wren`,
-    // which resolves for anybody, while Facebook's own `link` opens only for a viewer already
-    // logged in *and* already a friend. So the answered URL is a fallback, never an upgrade.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -263,8 +236,6 @@ describe('somebody, as the rest of the community sees them', () => {
   })
 
   it('has a page for somebody who has filled in nothing', async () => {
-    // Half the community will have touched none of this, and a dangling link is worse than
-    // a thin page.
     const server = await build()
     const nobody = await givenAccount({ name: null, contact: null })
     const reader = await givenAccount()
@@ -276,8 +247,6 @@ describe('somebody, as the rest of the community sees them', () => {
   })
 
   it('has one for an organiser who is not coming', async () => {
-    // `admin` and `member` are independent, and somebody organising without attending is
-    // often the person most in need of reaching.
     const server = await build()
     const organiser = await givenAccount({ roles: ['admin'] })
     const reader = await givenAccount()

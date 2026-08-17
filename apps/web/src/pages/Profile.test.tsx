@@ -23,8 +23,6 @@ const aProfile = (over: Partial<Profile> = {}): Profile => ({
   ...over,
 })
 
-// The burns half of the page has its own file; here it resolves to nothing so the
-// details form is what these tests are looking at.
 const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi => ({
   getMyProfile: () => Promise.resolve({ profile }),
   getMyConnections: () => Promise.resolve({ connections: [] }),
@@ -49,16 +47,12 @@ const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi 
   transferMyPlace: () => Promise.reject(new Error('transferMyPlace is not stubbed here')),
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
   logout: () => Promise.reject(new Error('logout is not stubbed here')),
-  // The toggle renders "not supported" without a browser push API, which happy-dom
-  // has none of, so it never reaches these.
   getPushKey: () => Promise.reject(new Error('getPushKey is not stubbed here')),
   getMyNotificationSettings: () => Promise.resolve({ on: [], email: [], digest: 'daily' }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
-  // `PasskeysField` has its own file. It renders "this browser cannot use passkeys"
-  // under happy-dom, which has no `navigator.credentials`, so only the list is read.
   getMyPasskeys: () => Promise.resolve({ passkeys: [] }),
   startPasskeyRegistration: () => Promise.reject(new Error('startPasskeyRegistration is not stubbed here')),
   addPasskey: () => Promise.reject(new Error('addPasskey is not stubbed here')),
@@ -85,10 +79,6 @@ const fill = (label: string, value: string) => {
   fireEvent.input(screen.getByLabelText(label, { exact: false }), { target: { value } })
 }
 
-/**
- * The introduction's box, by its exact label. `fill`'s prefix match finds the toolbar buttons
- * too: `SyntaxToolbar` names each of them after the field.
- */
 const introduction = () => screen.getByLabelText<HTMLTextAreaElement>('A little about you', { exact: true })
 
 describe('ProfilePage', () => {
@@ -100,8 +90,6 @@ describe('ProfilePage', () => {
   })
 
   it('starts empty rather than blank-crashing on an account never filled in', async () => {
-    // The CLI bootstrap admin has no name or contact, and may hold the member
-    // role too, so null is a state this page must render.
     renderPage(stub({}, aProfile({ name: null, contact: null, allergies_notes: null })))
 
     expect(await screen.findByLabelText('Your name')).toHaveProperty('value', '')
@@ -120,8 +108,6 @@ describe('ProfilePage', () => {
         name: 'Fredrik L',
         contact: 'fredrik on discord',
         allergies_notes: 'peanuts',
-        // Sent every time, because the form shows every box: a delta would need the
-        // page to know what it had before in order to say what changed.
         allergy_item_ids: [],
         introduction: null,
       }),
@@ -130,8 +116,6 @@ describe('ProfilePage', () => {
   })
 
   it('saves what somebody wrote about themselves', async () => {
-    // #390. `MarkdownField`, so it takes a paste, a drop and a photograph from a phone the
-    // moment it is passed an uploader — nothing here has to know about pictures.
     const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
     renderPage(stub({ updateMyProfile }))
 
@@ -160,8 +144,6 @@ describe('ProfilePage', () => {
   })
 
   it('will not save while a picture is still going up', async () => {
-    // A profile stored mid-upload keeps the placeholder for good, and the picture that
-    // lands a moment later is written into a box that has already been saved (#379).
     renderPage(stub({}, aProfile({ introduction: 'look ![Uploading sauna.jpg…]()' })))
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toHaveProperty('disabled', true))
@@ -231,8 +213,6 @@ describe('the page for an account organising without attending', () => {
   }
 
   it('lets an admin who is not a member in, so notifications are reachable at all', async () => {
-    // The bug (#396): the page was `require="member"`, the push toggle had been taken off
-    // the admin page, and application notifications go precisely to admins.
     renderPage(stub(), ORGANISER)
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Your details' })).toBeTruthy()
@@ -240,9 +220,6 @@ describe('the page for an account organising without attending', () => {
   })
 
   it('offers the whole account half, including what #390 invites them to write', async () => {
-    // `getMyProfile` and `updateMyProfile` are `requireApproved` since #412: a name, a
-    // picture and an introduction belong to the account rather than to a stay, and the
-    // introduction's empty state on their own page actively asks for one.
     renderPage(stub(), ORGANISER)
 
     expect(await screen.findByLabelText('Your name')).toBeTruthy()
@@ -252,8 +229,6 @@ describe('the page for an account organising without attending', () => {
   })
 
   it('points them at where they would say they are coming, rather than at a section below', async () => {
-    // The member's line promises "each burn on its own, below" — there is none for this
-    // account, so it would be describing a page they are not looking at.
     renderPage(stub(), ORGANISER)
 
     expect(await screen.findByText(/Organise → Accounts/)).toBeTruthy()
@@ -261,7 +236,6 @@ describe('the page for an account organising without attending', () => {
   })
 
   it('offers no burn to join, which is the half that is a stay', async () => {
-    // `joinEvent` is `requireMember`, so the button would be one the API refuses.
     renderPage(stub(), ORGANISER)
 
     await screen.findByLabelText('Your name')
@@ -280,8 +254,6 @@ describe('the page for an account organising without attending', () => {
     renderPage(stub())
 
     expect(await screen.findByLabelText('Your name')).toBeTruthy()
-    // The discriminating half: both viewers now open "These follow you from burn to burn",
-    // and only a member has a burn section below for it to be pointing at.
     expect(screen.getByText(/Below them is each burn on its own/)).toBeTruthy()
   })
 })
@@ -336,23 +308,15 @@ describe('the allergy tick boxes', () => {
   })
 
   it('keeps the free text as the Other beside them', async () => {
-    // A vocabulary is never complete, and the cost of it being wrong here is
-    // somebody's dinner.
     renderPage(withItems())
 
     expect(await screen.findByLabelText('Anything else you cannot eat')).toBeTruthy()
   })
 
   it('asks the old way when the list could not be fetched', async () => {
-    // The passing sibling, and the reason the fetch has its own catch: the
-    // vocabulary is a nicety beside the free text, and not having it must not cost
-    // somebody the page their name is on.
     renderPage(stub({ getAllergyItems: () => Promise.reject(new Error('nope')) }))
     await screen.findByRole('button', { name: 'Save' })
 
-    // Settled, not merely first-seen: `findBy` returns on the first match, so a
-    // failure landing a microtask later would slip past it — which a mutation
-    // turning this catch into `setLoaded({ status: 'failed' })` proved it did.
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(screen.queryByRole('alert')).toBeNull()

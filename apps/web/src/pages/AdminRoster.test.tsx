@@ -46,9 +46,6 @@ const aRoster = (over: Partial<RosterResponse> = {}): RosterResponse => ({
 const stub = (over: Partial<RosterApi> = {}, roster = aRoster()): RosterApi => ({
   getActiveRoster: () => Promise.resolve(roster),
   setPayment: () => Promise.reject(new Error('setPayment is not stubbed here')),
-  // Resolved and empty, so the picker renders its "everybody is already on this
-  // burn" note and no select — which is what keeps the tests below about the roster
-  // rather than about who could be added to it.
   getAdminAccounts: () => Promise.resolve({ accounts: [] }),
   adminAddAttendance: () => Promise.reject(new Error('adminAddAttendance is not stubbed here')),
   ...over,
@@ -69,8 +66,6 @@ const renderPage = (
 
 describe('AdminRoster', () => {
   it('lists who is coming, in the order the API gives', async () => {
-    // The order decides who has a place, so the page must not re-sort it into
-    // something that disagrees with the member-facing list.
     renderPage(stub({}, aRoster({ entries: [anEntry({ name: 'Second' }), anEntry({ name: 'First' })] })))
 
     await screen.findByText('Second')
@@ -127,10 +122,6 @@ describe('AdminRoster', () => {
   })
 
   it('locks every box while one payment is being recorded, not just its own', async () => {
-    // A controlled checkbox that is clicked and refused keeps the tick the browser
-    // drew: `run` changes no state, and Preact restores nothing without a diff. Only
-    // the box that started the write was disabled, so the other row could be clicked
-    // and left showing a payment that was never recorded (#369).
     let settle: () => void = () => undefined
     const setPayment = vi.fn(
       (_eventId: string, _accountId: string, _body: PaymentUpdate) =>
@@ -162,10 +153,6 @@ describe('AdminRoster', () => {
   })
 
   it('sends the status alone, leaving the date to the server', async () => {
-    // The page used to send `payment_date: null` to clear it, which made the
-    // invariant a habit of this one caller. The date is derived from the status
-    // and the server's clock now — a browser's idea of today can be a day out —
-    // and the schema refuses the field, so sending it would be a 400.
     const setPayment = vi.fn((_eventId: string, _accountId: string, _body: PaymentUpdate) =>
       Promise.resolve({ attendance: {} as never }),
     )
@@ -265,8 +252,6 @@ describe('adding somebody to the burn', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add them' }))
 
     await waitFor(() => expect(adminAddAttendance).toHaveBeenCalledWith('e-1', { account_id: 'a-9' }))
-    // Reloaded rather than patched in: adding somebody can push another past the
-    // cap and onto the waiting list, which only the server's ordering knows.
     await waitFor(() => expect(getActiveRoster).toHaveBeenCalledTimes(2))
   })
 
@@ -285,9 +270,6 @@ describe('adding somebody to the burn', () => {
 
     await screen.findByLabelText('Who to add to this burn')
 
-    // The route is idempotent and would answer their existing stay, so this is not
-    // about correctness — offering a name that visibly does nothing reads as a
-    // broken button.
     expect(screen.queryByRole('option', { name: 'late@example.org' })).toBeTruthy()
     expect(screen.queryByRole('option', { name: 'here@example.org' })).toBeNull()
   })
@@ -305,8 +287,6 @@ describe('adding somebody to the burn', () => {
   })
 
   it('keeps the roster when the accounts cannot be loaded', async () => {
-    // The picker is the part that fails, not the page: an admin who came here
-    // to record a payment should still be able to.
     renderPage(
       stub(
         { getAdminAccounts: () => Promise.reject(new Error('nope')) },

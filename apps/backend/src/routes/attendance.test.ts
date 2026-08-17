@@ -15,15 +15,6 @@ import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event, notification, session } from '../db/schema.ts'
 import { handOverPlace, isAlreadyJoined } from './attendance.ts'
 
-/**
- * Saying you are coming to a burn.
- *
- * Being in the community and coming to a burn are separate acts, so the
- * properties worth proving are that a community member can say it for
- * themselves, that saying it twice changes nothing, that an admin can say it
- * for someone, and that a stranger cannot say it at all.
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 
@@ -98,7 +89,6 @@ const withdraw = (
 ): Promise<LightMyRequestResponse> =>
   server.inject({ method: 'DELETE', url: `/api/events/${eventId}/attendance/me`, headers: { cookie } })
 
-/** This account's stay at one burn, read back the way their own page reads it. */
 const stayAt = async (server: FastifyInstance, cookie: string, eventId: string) => {
   const body = (await myBurns(server, cookie)).json()
   const found = [...body.coming, ...body.past].find(
@@ -154,10 +144,6 @@ describe('a member saying they are coming', () => {
   })
 
   it('is still a no-op when the two requests are concurrent', async () => {
-    // The sequential test above passes even without a unique-constraint catch,
-    // because the first request has finished before the second reads. This is the
-    // case the comment in the route actually describes — a double click — and it
-    // is the one that reached the insert twice and answered 500.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenAccount(['member'])
@@ -172,9 +158,6 @@ describe('a member saying they are coming', () => {
   })
 
   it('is a no-op for two concurrent admin adds too', async () => {
-    // The admin route has the same check-then-insert, so it needs its own case:
-    // pairing it with a member's join does not reliably interleave, and passed
-    // whether or not the admin branch caught the violation.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -215,8 +198,6 @@ describe('a member saying they are coming', () => {
   })
 
   it('refuses to withdraw once something has been paid', async () => {
-    // What a refund means is a real decision, and #31 owns it. Deleting the row
-    // here would discard the record that money changed hands.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenAccount(['member'])
@@ -243,9 +224,6 @@ describe('a member saying they are coming', () => {
   })
 
   it('joins the burn it was told to, not whichever one is next', async () => {
-    // The whole reason these routes stopped being scoped to the active burn: the
-    // details page lists every burn still to come, and the second one on it is by
-    // definition not the soonest-ending.
     const server = await build()
     const sooner = await givenEvent({ end_date: '2026-08-05', slug: 'sooner' })
     const later = await givenEvent({ end_date: '2027-01-05', slug: 'later' })
@@ -257,8 +235,6 @@ describe('a member saying they are coming', () => {
   })
 
   it('refuses a burn that has ended, and one that never existed, alike', async () => {
-    // The same answer for both on purpose: telling them apart would confirm to an
-    // unrelated caller that an id is real.
     const server = await build()
     const gone = await givenEvent({ start_date: '2025-08-01', end_date: '2025-08-05', slug: 'gone' })
     const member = await givenAccount(['member'])
@@ -270,9 +246,6 @@ describe('a member saying they are coming', () => {
   })
 
   it('offers the burns to an account holding admin without member', async () => {
-    // What fills the selector. That account has no attendance anywhere, so under
-    // `requireMember` it got a 403 and faced an empty selector on the burn it was
-    // setting up — the one case `choosableBurns(true, …)` exists for.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -312,8 +285,6 @@ describe('a member saying they are coming', () => {
     const { coming, past } = (await myBurns(server, member.cookie)).json()
 
     expect(coming.map((burn: { event: { id: string } }) => burn.event.id)).toEqual([sooner, later])
-    // `missed` is a real burn and not on this list: nobody's history includes a
-    // burn they did not come to.
     expect(past.map((burn: { event: { id: string } }) => burn.event.id)).toEqual([gone])
     expect(missed).not.toBe(gone)
   })
@@ -335,8 +306,6 @@ describe('who may say it', () => {
   })
 
   it('refuses an account that is not a member of the community', async () => {
-    // An account with no roles exists — someone invited but not yet redeemed, or
-    // an admin-only bootstrap account. Being able to sign in is not being a member.
     const server = await build()
     const eventId = await givenEvent()
     const stranger = await givenAccount([])
@@ -346,8 +315,6 @@ describe('who may say it', () => {
   })
 
   it('refuses an admin who is not also a member', async () => {
-    // The two roles are separate rows, and redemption grants only `member`, so an
-    // admin is not automatically one.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -373,8 +340,6 @@ describe('an admin saying it for someone', () => {
     })
 
   it('adds an account that never opted in', async () => {
-    // People ask over Discord, and an admin should not have to talk them
-    // through a UI to say yes.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -398,8 +363,6 @@ describe('an admin saying it for someone', () => {
   })
 
   it('removes someone, even if they have paid', async () => {
-    // Unlike the member's own withdrawal: an admin undoing a mistaken add
-    // needs to be able to, and they are making the call deliberately.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -487,10 +450,6 @@ describe('one row per person per burn', () => {
 
 describe('isAlreadyJoined', () => {
   it('matches what the database actually throws, not what I assumed it throws', async () => {
-    // The regex is the fragile part: an index rename or a driver change alters
-    // the message and the catch silently stops catching, turning a double click
-    // back into a 500. So the error comes from a real violation rather than a
-    // string literal.
     await build()
     const eventId = await givenEvent()
     const member = await givenAccount(['member'])
@@ -557,8 +516,6 @@ describe('the dates a stay starts with', () => {
   })
 
   it('is still theirs to change afterwards', async () => {
-    // A default, not a decision. Someone arriving a day late must be able to say
-    // so, and the ordering rule still applies to what they say.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenAccount(['member'])
@@ -611,8 +568,6 @@ describe('who is coming, by name', () => {
   })
 
   it('carries no contact details, allergies or payment state', async () => {
-    // The member roster carries those; this list is two columns on purpose, so
-    // that widening one cannot widen the other.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenAccount(['member'], 'Ada')
@@ -623,9 +578,6 @@ describe('who is coming, by name', () => {
       .where(eq(account.id, member.id))
       .returning({ contact: account.contact, allergies: account.allergies_notes })
 
-    // Asserted, because a `set` naming a column that does not exist is a typecheck
-    // error and nothing else — the rest of this test would then look for strings
-    // that were never written and pass against any implementation.
     expect(stored).toEqual([{ contact: 'ada#1234', allergies: 'peanuts' }])
 
     const body = (await attendees(server, member.cookie, eventId)).body
@@ -681,7 +633,6 @@ describe('handing a paid place to somebody else', () => {
     return row
   }
 
-  /** A giver who has paid and a taker who has not, both coming to the same burn. */
   const twoMembers = async (server: FastifyInstance) => {
     const eventId = await givenEvent()
     const giver = await givenAccount(['member'], 'Ada')
@@ -785,8 +736,6 @@ describe('handing a paid place to somebody else', () => {
   })
 
   it('empties the dream the giver was going to facilitate', async () => {
-    // Leaving takes you off everything, and the facilitator column is the one that
-    // used to hold on. The dream stays; the spot is vacant for somebody to take.
     const server = await build()
     const { eventId, giver, taker } = await twoMembers(server)
     const mine = await rowFor(giver.id, eventId)
@@ -803,11 +752,6 @@ describe('handing a paid place to somebody else', () => {
 })
 
 describe('the hand-over’s own guard, under the checks that precede it', () => {
-  /**
-   * `handOverPlace` is called directly, like `writeStay`'s rollback test: the route
-   * has already checked both invariants by the time it runs, so the window this
-   * closes cannot be opened through `inject`, which serialises requests.
-   */
   const rowFor = async (accountId: string, eventId: string) => {
     const [row] = await db()
       .select()
@@ -837,7 +781,6 @@ describe('the hand-over’s own guard, under the checks that precede it', () => 
     const { eventId, giver, taker } = await twoStays(server)
     const mine = await rowFor(giver.id, eventId)
     const theirs = await rowFor(taker.id, eventId)
-    // What the route's pre-read could not have seen.
     await db()
       .update(attendance)
       .set({ payment_status: 'paid', payment_date: '2026-07-02' })
@@ -846,8 +789,6 @@ describe('the hand-over’s own guard, under the checks that precede it', () => 
     const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
 
     expect(moved).toBe(false)
-    // Neither half landed: the giver keeps their place rather than losing it to a
-    // taker who no longer needed it.
     expect(await rowFor(giver.id, eventId)).toBeDefined()
     expect((await rowFor(taker.id, eventId))?.payment_date).toBe('2026-07-02')
   })
@@ -870,7 +811,6 @@ describe('the hand-over’s own guard, under the checks that precede it', () => 
   })
 
   it('moves the place when both still hold', async () => {
-    // The passing sibling: refusing everything would satisfy the two above.
     const server = await build()
     const { eventId, giver, taker } = await twoStays(server)
     const mine = await rowFor(giver.id, eventId)

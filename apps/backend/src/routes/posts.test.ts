@@ -95,7 +95,6 @@ const withdraw = (server: FastifyInstance, cookie: string, id: string) =>
 const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
   (await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })).json().threads
 
-/** Read by id, which is how a card taken back is read at all: the feed drops it (#617). */
 const cardOf = async (server: FastifyInstance, cookie: string, threadId: string): Promise<Thread> =>
   (await server.inject({ method: 'GET', url: `/api/threads/${threadId}`, headers: { cookie } })).json().thread
 
@@ -161,7 +160,6 @@ describe('announcing something', () => {
     await givenComing(ada.id)
     await givenComing(bea.id)
     await setOn(server, bea.cookie, ['post_written'])
-    // Switched on for the author too, or "never the author" would pass on the default being off.
     await setOn(server, ada.cookie, ['post_written'])
 
     await announce(server, ada.cookie, { title: 'The planning call is Sunday', body: '' })
@@ -242,7 +240,6 @@ describe('naming somebody in an announcement', () => {
       body: `${everybodyToken()} please come`,
     })
 
-    // `post_written` is off and was never switched on; `mentioned` is on by default.
     expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual(['mentioned'])
   })
 
@@ -268,7 +265,6 @@ describe('naming somebody in an announcement', () => {
     const bea = await givenAccount('Bea')
     await givenComing(ada.id)
     await givenComing(bea.id)
-    // Bea wants announcements and does not want to be named in one.
     await setOn(server, bea.cookie, ['post_written'])
 
     await announce(server, ada.cookie, {
@@ -384,9 +380,6 @@ describe('rewording an announcement', () => {
   })
 
   it('says nothing for a save that reworded nothing, so the card is not re-topped', async () => {
-    // The web sends both fields whatever was typed, so `isEmptyPatch` never fires from the page:
-    // opening Reword it and pressing Save moved the announcement back to the top of everybody's
-    // feed for nothing (#455).
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -400,7 +393,6 @@ describe('rewording an announcement', () => {
   })
 
   it('takes a body of nothing but spaces as no body at all', async () => {
-    // The card drew an empty `markdown-preview` div for it (#455).
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')

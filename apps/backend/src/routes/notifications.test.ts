@@ -53,16 +53,8 @@ const client = () => {
   return found
 }
 
-/** Every send in this file lands here. Nothing in the suite opens a socket. */
 const posted: Message[] = []
 
-/**
- * The queue the email leg goes on, held so a test can wait for it (#356).
- *
- * A route answering no longer means the posting has happened. Without `settled()` the
- * assertions below would be racing the queue — and winning most of the time, which is
- * the worst of the three outcomes.
- */
 let emails = createEmailQueue(() => undefined)
 const settled = async () => await emails.drain()
 
@@ -86,7 +78,6 @@ const build = async (deliver: Delivery = () => Promise.resolve('sent'), env: Rec
   return app
 }
 
-/** An SMTP server, so a member who asks for email has somewhere to be posted from. */
 const givenMailServer = async () => {
   await db().insert(mailSetting).values({
     id: INSTALLATION_ID,
@@ -102,8 +93,6 @@ const givenMailServer = async () => {
 }
 
 const cookieFor = (id: string) => {
-  // The real clock, not the frozen one: `createApp` verifies sessions against the
-  // real one, so a token minted at `NOW` is already weeks expired.
   const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
   return `${SESSION_COOKIE}=${sessions.issue(id)}`
 }
@@ -178,7 +167,6 @@ const setPaid = (server: FastifyInstance, cookie: string, accountId: string) =>
 
 describe('the bell', () => {
   it('turns nobody away for having no role', async () => {
-    // These are somebody's own records; an applicant waiting on a decision has some.
     const server = await build()
     const nobody = await givenAccount([])
 
@@ -220,7 +208,6 @@ describe('the bell', () => {
     })
 
     expect(seen.json().unseen).toBe(0)
-    // The list stays: what the bubble counts is what is new, not what is outstanding.
     expect(seen.json().notifications).toHaveLength(1)
   })
 
@@ -296,14 +283,6 @@ describe('taking one off your own list', () => {
 })
 
 describe('what somebody has switched on', () => {
-  /**
-   * The ones that are on unless somebody says otherwise.
-   *
-   * `application` is among them for every account, admin or not — the settings are
-   * per account and know nothing about roles, and only an admin is ever *told*. The
-   * web hides the switch from anybody else rather than the wire pretending it is off
-   * (#326).
-   */
   const DEFAULTS = [
     'meal_role',
     'dream_role',
@@ -337,7 +316,6 @@ describe('what somebody has switched on', () => {
       payload: { on, email, digest: 'daily' },
     })
 
-  /** Everything on except the named ones — what unticking a box used to mean. */
   const mute = (server: FastifyInstance, cookie: string, muted: string[]) =>
     setOn(
       server,
@@ -346,8 +324,6 @@ describe('what somebody has switched on', () => {
     )
 
   it('records nothing at all for a category switched off', async () => {
-    // A bell filling with things somebody asked not to hear about is the same noise,
-    // quieter. Email is a switch of its own and is off here, as it is by default.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     await givenBurn()
@@ -364,7 +340,6 @@ describe('what somebody has switched on', () => {
   })
 
   it('still records one it has not switched off', async () => {
-    // The passing sibling: muting everything would satisfy the test above.
     const server = await build()
     await givenBurn()
     const admin = await givenAccount(['admin'])
@@ -496,8 +471,6 @@ describe('what somebody has switched on', () => {
   })
 
   it('has a meeting on to begin with, being the only burn news with a time to be at', async () => {
-    // The exception to the section's rule, worth its own assertion rather than a name
-    // buried in the list above: a dream offered can be read whenever you next look.
     const server = await build()
     const ada = await givenAccount()
 
@@ -512,8 +485,6 @@ describe('what somebody has switched on', () => {
   })
 
   it('leaves what is going on around you off until it is asked for', async () => {
-    // The half the old shape could not express: absence used to mean on, so a
-    // category that is off by default had nowhere to live (#259).
     const server = await build()
     const ada = await givenAccount()
 
@@ -546,8 +517,6 @@ describe('what somebody has switched on', () => {
 
 describe('the waiting list', () => {
   it('warns whoever has not paid when the burn is nearly full', async () => {
-    // The only notifications not caused by an action against the person told:
-    // somebody else pays, and an unpaid member's standing changes.
     const server = await build()
     await givenBurn(5)
     const admin = await givenAccount(['admin'])
@@ -646,7 +615,6 @@ describe('the waiting list', () => {
   })
 
   it('tells them it is full when an admin has recorded more payments than places', async () => {
-    // The old shape returned early past the cap and said nothing at all.
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])
@@ -810,8 +778,6 @@ describe('the waiting list', () => {
   })
 
   it('says nothing to somebody who joins a burn with room in it', async () => {
-    // The passing sibling: telling on every join would satisfy the one above while
-    // greeting every new member of every burn with a waiting-list warning.
     const server = await build()
     await givenBurn(20)
     const joiner = await givenAccount()
@@ -854,7 +820,6 @@ describe('the waiting list', () => {
   })
 
   it('says nothing to whoever is left when somebody leaves, an unpaid place never having been one', async () => {
-    // No fixture can reject a recompute here: leaving only removes an unpaid row (docs/burns.md).
     const server = await build()
     await givenBurn(1)
     const admin = await givenAccount(['admin'])
@@ -873,7 +838,6 @@ describe('the waiting list', () => {
   })
 
   it('says nothing at all while the burn is nowhere near full', async () => {
-    // The passing sibling: warning on every payment would satisfy the two above.
     const server = await build()
     await givenBurn(20)
     const admin = await givenAccount(['admin'])
@@ -940,8 +904,6 @@ describe('the waiting list', () => {
 
 describe('a payment recorded against oneself', () => {
   it('sends no receipt to the admin who recorded it', async () => {
-    // Every other category follows "never for your own click", and an admin ticking
-    // their own box already knows they ticked it.
     const server = await build()
     await givenBurn(20)
     const admin = await givenAccount(['admin', 'member'])
@@ -954,7 +916,6 @@ describe('a payment recorded against oneself', () => {
   })
 
   it('still sends one when the admin records somebody else’s', async () => {
-    // The passing sibling: suppressing every receipt would satisfy the test above.
     const server = await build()
     await givenBurn(20)
     const admin = await givenAccount(['admin'])
@@ -1126,8 +1087,6 @@ describe('the email channel', () => {
   }
 
   it('is off until somebody asks, so a member with a mail server hears nothing new', async () => {
-    // Absence is `false` for this one, unlike the bell — an upgrade must never be
-    // what starts posting to somebody's inbox (#30).
     const server = await build()
     await givenMailServer()
     await givenBurn()
@@ -1187,8 +1146,6 @@ describe('the email channel', () => {
   })
 
   it('writes no link at all unless the installation has named its own address', async () => {
-    // An email is read outside the app, and this runs from wherever a role was handed
-    // out — there is no request to read `Host` from.
     const server = await build()
     await givenMailServer()
     await givenBurn()
@@ -1219,11 +1176,6 @@ describe('the email channel', () => {
   })
 
   it('is queued rather than waited on, and posted once the route has answered', async () => {
-    // The property this reverses (#356): the send used to be awaited inside the
-    // request. Nothing on screen depends on it, and a relay that is down or capped was
-    // costing the member the wait. A `send` that does not resolve immediately is what
-    // makes the difference visible — left unawaited it would otherwise usually arrive
-    // before the assertion anyway.
     handle = createDb({ url: ':memory:' })
     runMigrations(handle)
     const slow: Message[] = []
@@ -1259,7 +1211,6 @@ describe('the email channel', () => {
   })
 
   it('still records the row when the mail server refuses', async () => {
-    // The write must not fail because a mail server did — the rule push follows.
     handle = createDb({ url: ':memory:' })
     runMigrations(handle)
     app = await createApp({

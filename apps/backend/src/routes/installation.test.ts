@@ -82,8 +82,6 @@ describe('what this installation calls itself', () => {
   })
 
   it('is the software name until an admin says otherwise', async () => {
-    // A fresh volume has to render something, and the migration seeds it rather
-    // than every read having to know a fallback.
     const server = await build()
 
     expect((await readTitle(server)).json().installation.title).toBe('Sage Burner')
@@ -135,7 +133,6 @@ describe('what this installation calls itself', () => {
   })
 
   it('treats an empty body as a read rather than a 500', async () => {
-    // `set({})` is not valid SQL.
     const server = await build()
     const admin = await givenAccount(['admin'])
 
@@ -155,9 +152,6 @@ describe('what this installation calls itself', () => {
   })
 
   it('cannot be blanked by a write that skips the API', async () => {
-    // The Zod schema refuses this at the boundary, so the CHECK only earns its
-    // place against everything that is not the boundary — a migration, a repair
-    // by hand, the next route someone adds.
     await build()
 
     expect(() =>
@@ -166,8 +160,6 @@ describe('what this installation calls itself', () => {
   })
 
   it('cannot be made ambiguous by a second row', async () => {
-    // The singleton is a CHECK rather than a convention, so a write that does
-    // not come through the API cannot create a second answer either.
     await build()
 
     expect(() =>

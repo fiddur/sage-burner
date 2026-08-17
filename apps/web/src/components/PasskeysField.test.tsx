@@ -70,8 +70,6 @@ describe('PasskeysField', () => {
   })
 
   it('says a failed load failed, rather than showing an empty list', async () => {
-    // "You have no passkeys yet" for a request that never answered invites somebody to
-    // register a device that is already here (#395).
     renderField(stub({ getMyPasskeys: () => Promise.reject(new Error('offline')) }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load your passkeys')
@@ -79,8 +77,6 @@ describe('PasskeysField', () => {
   })
 
   it('registers one and shows what came back', async () => {
-    // The stub keeps a list, because the field re-reads after a write rather than
-    // trusting the response — the pattern every page here follows.
     const held: Passkey[] = []
     const add = vi.fn(() => {
       held.push(aPasskey({ label: 'Work laptop' }))
@@ -109,8 +105,6 @@ describe('PasskeysField', () => {
   })
 
   it('says nothing when the member closes the dialog', async () => {
-    // Closing it is an ordinary thing to do. An error message there is the page
-    // telling somebody off for changing their mind.
     const aborted = new Error('cancelled')
     aborted.name = 'NotAllowedError'
     render(
@@ -152,8 +146,6 @@ describe('PasskeysField', () => {
   })
 
   it('explains a refusal to remove the last way in', async () => {
-    // The server answers 409 rather than locking somebody out. The generic
-    // "that did not work" would send them trying again forever.
     renderField(
       stub({
         getMyPasskeys: () => Promise.resolve({ passkeys: [aPasskey()] }),
@@ -168,8 +160,6 @@ describe('PasskeysField', () => {
   })
 
   it('offers nothing at all where passkeys cannot work', async () => {
-    // An old browser, or a page not on HTTPS. Offering a button that cannot work
-    // is the wrong affordance.
     renderField(stub(), false)
 
     expect(await screen.findByText(/cannot use passkeys/)).toBeTruthy()
