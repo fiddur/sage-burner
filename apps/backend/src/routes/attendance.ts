@@ -1,7 +1,7 @@
 import type { AttendanceResponse, EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, attendanceCreateSchema, placeTransferSchema } from '@sage-burner/shared'
+import { apiRoutes, attendanceCreateSchema, membersPage, placeTransferSchema } from '@sage-burner/shared'
 import { and, asc, eq, gte, isNotNull, ne, or, TransactionRollbackError } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -115,7 +115,7 @@ export const announceJoined = async (
     db,
     notify,
     joined.stay.event_id,
-    { category: 'member_joined', body: `${name} is coming.`, link: '/members' },
+    { category: 'member_joined', body: `${name} is coming.`, link: membersPage(joined.stay.event_id) },
     { except: [joined.account_id] },
   )
 }
@@ -256,7 +256,7 @@ export const registerAttendanceRoutes = (
       await notify(body.to_account_id, {
         category: 'payment',
         body: `Your place at ${open.name} is paid — somebody transferred theirs to you.`,
-        link: '/members',
+        link: membersPage(open.id),
       })
 
       return reply.code(204).send()

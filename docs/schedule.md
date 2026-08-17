@@ -46,6 +46,13 @@ the bare-id ones by reading the row's `event_id` first. Reading stays open, beca
 burn's meals are its record; the tests build that record by writing the rows directly, since the
 routes that would lay it out are the ones being refused.
 
+**And the editor says so rather than answering "Could not add that."** (#563). `MealSlots` takes
+`shut`, which `AdminEvents` sets from the burn's `end_date`, and on a finished burn the times are
+listed with no clock, no bin, no add row and no **Fill the days in** — one note instead. Hiding a
+control is not access control and the routes above are what refuse the write; this is so an admin
+does not meet the refusal as a failure. The same `shut` vocabulary `HelperStrip` uses for a spot
+nobody may take.
+
 **Which days a sitting falls on comes from the burn's hours, not its days.** A 13:00
 lunch on a day the gates open at 16:00 is not a meal anyone eats, and a day that ends
 at noon has no dinner — which is why the spreadsheet's own plan starts at a Sunday

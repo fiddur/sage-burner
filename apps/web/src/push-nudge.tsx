@@ -4,6 +4,7 @@ import { createContext } from 'preact'
 import { useContext, useMemo, useState } from 'preact/hooks'
 
 import { dismissedPushNudge, dismissPushNudge } from './push.ts'
+import { useViewer } from './viewer.tsx'
 
 export interface PushNudging {
   wanted: boolean
@@ -20,17 +21,18 @@ const PushNudgeContext = createContext<PushNudging>({
 export const PushNudgeProvider = ({ children, store }: { children: ComponentChildren; store?: Storage }) => {
   const [asked, setAsked] = useState(false)
   const [dropped, setDropped] = useState(() => dismissedPushNudge(store))
+  const signedIn = useViewer().status === 'signed-in'
 
   const value = useMemo(
     () => ({
-      wanted: asked && !dropped,
+      wanted: signedIn && asked && !dropped,
       askAbout: () => setAsked(true),
       dismiss: () => {
         dismissPushNudge(store)
         setDropped(true)
       },
     }),
-    [asked, dropped, store],
+    [asked, dropped, signedIn, store],
   )
 
   return <PushNudgeContext.Provider value={value}>{children}</PushNudgeContext.Provider>

@@ -148,10 +148,14 @@ phone" means 360px.
 - [ ] The member's own page shows payment status with no control to change it,
       and a member cannot record payment through the API either.
 - [ ] The admin records a payment: the list reorders paid-first and the
-      have-a-place line moves. Every member who has not paid is told the same
-      thing — how many places are left while some are, that it is full once none
-      are — whatever their position on the list. The notification opens that
-      burn's roster, and a second payment does not say "full" again.
+      have-a-place line moves. Every unpaid member with a place is told the same
+      thing, and everybody past the cap the same as each other — how many places
+      stand empty while any do, and once none do, whether this member is holding
+      one or on the waiting list. The notification opens that burn's roster, and a
+      second payment does not say "full" again.
+- [ ] On a burn with a cap of one and a single unpaid member, read that member's bell against the
+      roster: the page says "1 of 1 places taken" with them in it, and the bell says they are in
+      one for now — not that there is a place left to go and win (#726).
 - [ ] A paid member transfers their place to an unpaid one: the payment moves,
       the giver's stay is deleted, the taker is notified.
 - [ ] With every place paid for and somebody waiting, un-record one of those payments: the
@@ -159,6 +163,9 @@ phone" means 360px.
       the same.
 - [ ] Do either of those on a burn whose dates have passed: nothing is posted to anybody's
       bell about its waiting list.
+- [ ] ⚙️ → Events, on a burn whose dates have passed: **Meal times** lists the times with no
+      clock, no bin, no add row and no **Fill the days in**, and says the burn has ended. On an
+      open burn the whole editor is there.
 
 ## The programme
 
@@ -347,6 +354,9 @@ phone" means 360px.
 - [ ] Press "Do not ask me here". Tick another category, on either the feed or the details
       page: no strip, this time or after a reload. In a different browser, ticking one raises
       it again.
+- [ ] Raise the strip and then log out without answering it: it goes with the session rather than
+      standing over the signed-out homepage, where its button would ask the browser for permission
+      and then meet a 401 (#588).
 - [ ] In a browser with push off, open `/notifications`: a slim strip at the foot of the
       list offers **Turn on**, and pressing it subscribes from there. With push already on
       here, or with the browser blocking notifications, there is no strip.
@@ -440,6 +450,10 @@ phone" means 360px.
       marks on a feed card's entries and the before/during/after phases on Leads.
 - [ ] The top bell is 🔔, dim with nothing unseen and full-strength with a count on it when
       something is.
+- [ ] A card's bell says its position out loud as well as showing it: with a screen reader, or by
+      reading the `aria-label`, the button is "Notification settings for <what>, on" or "…, off"
+      (#675). 🔔 and 🔕 differ by one diagonal stroke, so the mark alone is no use to anybody who
+      cannot see it.
 - [ ] A card's bell is 🔔 where either of its switches is on and 🔕 where neither is — tick one
       and it lights without a reload.
 - [ ] Ticking a category on a card near the bottom of a phone screen raises the push strip

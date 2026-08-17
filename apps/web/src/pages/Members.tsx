@@ -1,5 +1,6 @@
 import type { MemberRosterEntry, MemberRosterResponse } from '@sage-burner/shared'
 
+import { placesIn } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
@@ -19,6 +20,17 @@ import { isApproved, useViewer } from '../viewer.tsx'
 
 export type MembersApi = Pick<ApiClient, 'getMembers'>
 
+const PlacesTaken = ({ entries, cap }: { entries: readonly MemberRosterEntry[]; cap: number }) => {
+  const places = placesIn(entries, cap)
+
+  return (
+    <p class="form-note">
+      {places.taken} of {cap} places taken
+      {places.waiting > 0 ? `, ${places.waiting} waiting` : ''}.
+    </p>
+  )
+}
+
 export const Members = ({ api }: { api: MembersApi }) => {
   const viewer = useViewer()
   const burn = useSelectedBurn()
@@ -35,7 +47,6 @@ export const Members = ({ api }: { api: MembersApi }) => {
   )
 
   const roster = loaded.status === 'ready' ? loaded.data : undefined
-  const confirmed = roster?.entries.filter((entry) => !entry.waiting).length ?? 0
 
   return (
     <GuardedPage title="Members" require="approved">
@@ -52,10 +63,7 @@ export const Members = ({ api }: { api: MembersApi }) => {
       {roster !== undefined && roster.event !== null && (
         <>
           <h2>{roster.event.name}</h2>
-          <p class="form-note">
-            {confirmed} of {roster.event.member_cap} places taken
-            {roster.entries.length > confirmed ? `, ${roster.entries.length - confirmed} waiting` : ''}.
-          </p>
+          <PlacesTaken entries={roster.entries} cap={roster.event.member_cap} />
 
           <HowToPay event={roster.event} entries={roster.entries} me={viewer.account?.id} />
 

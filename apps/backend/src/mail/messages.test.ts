@@ -171,8 +171,7 @@ describe('the digest', () => {
       origin: undefined,
     })
 
-    expect(digest.text).toContain('- Ada commented')
-    expect(digest.text).not.toContain('(Summer burn)')
+    expect(digest.text.split('\n')).toContain('- Ada commented')
   })
 
   it('still prints the remainder where there is no origin to build a link from', () => {

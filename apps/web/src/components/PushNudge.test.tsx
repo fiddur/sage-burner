@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { PushBrowser } from '../push.ts'
+import type { Viewer } from '../viewer.tsx'
 import type { PushToggleApi } from './PushToggle.tsx'
 
 import { PushNudgeProvider, usePushNudge } from '../push-nudge.tsx'
@@ -43,12 +44,20 @@ const stub = (over: Partial<PushToggleApi> = {}): PushToggleApi => ({
   ...over,
 })
 
-const app = (api: PushToggleApi, browser: PushBrowser, elsewhere?: ComponentChildren) =>
+const SIGNED_IN: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] },
+}
+
+const app = (
+  api: PushToggleApi,
+  browser: PushBrowser,
+  elsewhere?: ComponentChildren,
+  { viewer = SIGNED_IN, store }: { viewer?: Viewer; store?: Storage } = {},
+) =>
   render(
-    <ViewerProvider
-      viewer={{ status: 'signed-in', account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] } }}
-    >
-      <PushNudgeProvider>
+    <ViewerProvider viewer={viewer}>
+      <PushNudgeProvider store={store}>
         <PushToggle api={api} browser={browser} />
         {elsewhere}
         <PushNudge api={api} browser={browser} />
@@ -155,6 +164,62 @@ describe('the nudge', () => {
     await settled()
 
     expect(screen.queryByText(NUDGE)).toBeNull()
+  })
+})
+
+describe('signing out', () => {
+  it('takes the strip with it, rather than leaving it over the signed-out homepage (#588)', async () => {
+    const { rerender } = app(stub(), aBrowser(false))
+    await tick()
+    expect(await screen.findByText(NUDGE)).toBeTruthy()
+
+    rerender(
+      <ViewerProvider viewer={{ status: 'signed-out' }}>
+        <PushNudgeProvider>
+          <PushNudge api={stub()} browser={aBrowser(false)} />
+        </PushNudgeProvider>
+      </ViewerProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText(NUDGE)).toBeNull())
+  })
+
+  it('can be raised again after signing back in, the refusal not being what happened', async () => {
+    app(stub(), aBrowser(false), undefined, { viewer: { status: 'signed-out' } })
+
+    expect(screen.queryByText(NUDGE)).toBeNull()
+  })
+})
+
+describe('where the refusal is kept', () => {
+  it('reads and writes the store it is given rather than the global one (#588)', async () => {
+    const held = new Map<string, string>()
+    const store = {
+      getItem: (key: string) => held.get(key) ?? null,
+      setItem: (key: string, value: string) => void held.set(key, value),
+      removeItem: (key: string) => void held.delete(key),
+      clear: () => held.clear(),
+      key: () => null,
+      get length() {
+        return held.size
+      },
+    } satisfies Storage
+
+    app(stub(), aBrowser(false), undefined, { store })
+    await tick()
+    fireEvent.click(await screen.findByRole('button', { name: 'Do not ask me here' }))
+
+    await waitFor(() => expect(held.has(NUDGE_DISMISSED_KEY)).toBe(true))
+    expect(globalThis.localStorage.getItem(NUDGE_DISMISSED_KEY)).toBeNull()
+  })
+
+  it('stays away from the start where that store already holds a refusal', async () => {
+    const store = { ...globalThis.localStorage, getItem: () => 'yes' } satisfies Storage
+
+    app(stub(), aBrowser(false), undefined, { store })
+    await tick()
+
+    await waitFor(() => expect(screen.queryByText(NUDGE)).toBeNull())
   })
 })
 

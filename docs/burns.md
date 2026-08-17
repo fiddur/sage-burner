@@ -539,21 +539,36 @@ that it is _decided_. A burn that opens on a Sunday gives every `joined_at` the 
 without a last resort in the comparison, the line falls in a different place from one read to the
 next, and a member watching the page sees it move with nothing having changed.
 
-**The notification asks a plainer question than the line does** (#565): is there a place left to
-pay for? Among unpaid members the order decides nothing — the list is paid-first, so any of them can
-jump all the others by paying — so "unpaid, third, has a place" and "unpaid, fifth, waiting" are the
-same situation, and telling those two people different things implies a queue position no rule
-honours. Both messages therefore go to **every** unpaid member, and split on `member_cap - paid`:
+**The notification and the roster count places the same way** (#726), and they used not to. The
+notification asked "is there a place nobody has paid for?" (`member_cap - paid`) while the roster
+asked "who is inside the cap?" (`withPlaces`, paid first and then by joining) — so on a burn with a
+cap of one and a single unpaid member, the bell said _1 place left, and it goes to whoever pays_
+while the page said _1 of 1 places taken_ and put that very member in it. Told to go and win a place
+they were already holding.
 
-- places left, and few enough to be worth saying: _N places left, and they go to whoever pays._
-  One place is its own sentence — _1 place left, and it goes to whoever pays._
-- none left: _full — every place is held by somebody who has paid._
+`placesIn(entries, cap)` is now the one answer, and both surfaces read it: a place is **taken by
+whoever is standing in it**, paid or not, so `left` is `cap - entries.length` floored at zero and
+`waiting` is everybody past the cap. It is `withPlaces`' own arithmetic, and `roster.test.ts` holds
+the two against each other across every cap rather than trusting that they agree.
 
-`member_cap - paid` rather than #506's equality test, which told the person below the line nothing on
-an over-subscribed burn whose payments had not landed exactly on the cap, and silenced the message
-altogether for an admin who recorded more payments than places. #506's split of the audience goes with
-it, having said more than the data supports. The roster still draws the line, because for a **paid**
-member it is a real fact and the page is where somebody looks to see it.
+The three things an unpaid member can be told follow from it, and they are disjoint — nobody can be
+waiting while a place stands empty, since that needs more entries than the cap:
+
+- a place stands empty, and few enough to be worth saying: _N places left, and they go to whoever
+  pays._ One place is its own sentence — _1 place left, and it goes to whoever pays._
+- none stands empty and this member holds one: _full, and a place goes to whoever pays for it. You
+  are in one for now — your payment is not recorded yet._
+- none stands empty and this member is past the cap: _full and you are on the waiting list. A place
+  goes to whoever pays for it._
+
+That is #565's rule with the split moved rather than dropped. #565 sent one body to every unpaid
+member because "unpaid, third, has a place" and "unpaid, fifth, waiting" were the same situation and
+distinguishing them implied a queue position no rule honoured. It is not the same situation now: the
+roster ranks them, shows the rank on the page, and the two sentences say only what it already says.
+The counting is `member_cap - paid` no longer, and #506's equality test before that — which told
+the person below the line nothing on an over-subscribed burn whose payments had not landed exactly
+on the cap, and silenced the message altogether for an admin who recorded more payments than
+places.
 
 **Told once per burn, per sentence** — the query asks whether this account already has _this exact
 message_ about _this burn_, so recording the next payment says nothing to somebody already out, while

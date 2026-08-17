@@ -1,5 +1,6 @@
 import type { RosterEntry } from '@sage-burner/shared'
 
+import { placesIn } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 import { useState } from 'preact/hooks'
 
@@ -65,7 +66,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
   }
 
   const roster = loaded.status === 'ready' ? loaded.data : undefined
-  const confirmed = roster?.entries.filter((entry) => !entry.waiting).length ?? 0
+  const places = placesIn(roster?.entries ?? [], roster?.event?.member_cap ?? 0)
 
   return (
     <GuardedPage title="Who is coming" require="admin">
@@ -85,10 +86,10 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
         <>
           <h2>{roster.event.name}</h2>
           <p class="form-note">
-            {confirmed} of {roster.event.member_cap} places taken
-            {roster.entries.length > confirmed ? `, ${roster.entries.length - confirmed} waiting` : ''}. Paid
-            members come first, then in the order people said they were coming — so recording a payment can
-            move someone else onto the waiting list.
+            {places.taken} of {roster.event.member_cap} places taken
+            {places.waiting > 0 ? `, ${places.waiting} waiting` : ''}. Paid members come first, then in the
+            order people said they were coming — so recording a payment can move someone else onto the waiting
+            list.
           </p>
 
           <p class="row">
