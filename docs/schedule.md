@@ -96,11 +96,13 @@ card on the first entry, which is the first time there is anything to read.
 The card's title is the sitting's label and its body is the food idea, both read live through the
 join, so renaming a sitting cannot leave the old name on the feed.
 
-**Two categories, and the split is #259's.** `meal_role` is the personal one and unchanged — you
-were put on something, or taken off it. `meal_taken` is the burn-wide one, sent where a lead is
-taken and where a hand goes up for a crew, never to the two people in the exchange: the actor knows,
-and the taker already has the personal one. Off by default, like every "what somebody else did". **Deleting a sitting deletes its card**, in the
-transaction that deletes the row.
+**Two categories, and the split is #259's.** `meal_role` is the personal one — you were put on
+something, or taken off it. `meal_taken` is the burn-wide one, sent where a lead is taken and where
+a hand goes up for a crew, never to the two people in the exchange: the actor knows, and the taker
+already has the personal one. Off by default, like every "what somebody else did". Both link to the
+burn's own Meals page, `mealsPage(eventId)`.
+
+**Deleting a sitting deletes its card**, in the transaction that deletes the row.
 
 ### The kitchen is not a place
 
@@ -220,8 +222,8 @@ somebody there can carry the cushions, so a named person with no attendance is a
 **400** — not a 403: they may be a member in good standing, and the pairing is what is
 wrong. But arranging a burn is a job somebody can hold without attending it, and the
 lead-roles register has always let any approved account appoint, so the two used to
-disagree: an organiser saw the appoint control on this strip and clicking it through to a name always
-failed. The heart still needs the caller's own attendance, because the row is keyed by
+disagree: an organiser saw the appoint control on this strip and clicking it through to a name
+always failed. The heart still needs the caller's own attendance, because the row is keyed by
 it. A dream at a burn that has ended is a 404, like every other member-facing write
 here.
 

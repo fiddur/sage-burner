@@ -15,11 +15,6 @@ import { createConfig } from './config.ts'
 import { createDb, runMigrations } from './db/index.ts'
 import { event, INSTALLATION_ID, installationBanner } from './db/schema.ts'
 
-/**
- * Builds the real app in-process against an in-memory database and drives it
- * with `app.inject()` — no socket, no port, nothing to leak between tests.
- */
-
 let handle: DbHandle
 let app: FastifyInstance
 
@@ -28,9 +23,6 @@ const build = async (env: NodeJS.ProcessEnv = {}, changelog?: string) => {
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
-    // A secret because a test may set WEB_ROOT, which `looksLikeDeployment`
-    // counts as reachable — so the published development key is refused. Passed
-    // unconditionally rather than per-test so the reason lives in one place.
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: 't'.repeat(40), ...env }),
     ...(changelog === undefined ? {} : { changelog }),
   })
@@ -44,8 +36,6 @@ afterEach(async () => {
 
 describe('GET /api/changelog', () => {
   it('answers with the file as markdown, to anyone', async () => {
-    // Public, like the homepage: release notes for an app whose homepage is public, and
-    // the page the redeploy notice sends people to before they have reloaded (#325).
     await build({}, '# What is new\n\n## 2026-08-07\n\n- A Q&A per burn.\n')
 
     const response = await app.inject({ method: 'GET', url: '/api/changelog' })
@@ -55,8 +45,6 @@ describe('GET /api/changelog', () => {
   })
 
   it('revalidates rather than being cached as fresh', async () => {
-    // The notification that sends somebody here fires on a redeploy, so serving the
-    // previous build's changelog from a browser cache is the one thing this must not do.
     await build({}, '# What is new\n')
 
     const response = await app.inject({ method: 'GET', url: '/api/changelog' })
@@ -65,7 +53,6 @@ describe('GET /api/changelog', () => {
   })
 
   it('answers empty rather than 404 where the image has no changelog', async () => {
-    // The page says so. A 404 would be a notification landing on nothing.
     await build({}, '')
 
     const response = await app.inject({ method: 'GET', url: '/api/changelog' })
@@ -75,8 +62,6 @@ describe('GET /api/changelog', () => {
   })
 
   it("reads the repository's own file when nothing is injected", async () => {
-    // The default is `readDocument('CHANGELOG.md')`, resolved relative to the backend's
-    // source, so the checkout and the container find it in the same place.
     await build()
 
     expect((await app.inject({ method: 'GET', url: '/api/changelog' })).json().markdown).toContain(
@@ -105,8 +90,6 @@ describe('GET /api/version', () => {
   })
 
   it('exposes nothing beyond the build sha', async () => {
-    // Reachable by anything that can reach the container, so it must not leak
-    // the environment, the database path or dependency versions.
     await build({ DATABASE_URL: '/data/secret-location.sqlite' })
 
     const body = (await app.inject({ method: 'GET', url: '/api/version' })).json()
@@ -116,11 +99,6 @@ describe('GET /api/version', () => {
 })
 
 describe('the error envelope', () => {
-  // Without a setErrorHandler, Fastify answers a throw with
-  // `{ statusCode, error: 'Internal Server Error', message }` — which satisfies
-  // errorResponseSchema, since `error` is a string, while putting a sentence
-  // where the envelope promises a slug. A client branching on `code` would be
-  // branching on prose, and `message` can carry internals.
   it('maps a thrown error to the envelope, leaking nothing', async () => {
     await build()
     app.get('/api/boom', async () => {
@@ -151,11 +129,6 @@ describe('the error envelope', () => {
   })
 
   it('preserves the status the error chose, and names the codes a client acts on', async () => {
-    // 401 and 403 get their own codes rather than the generic `bad_request`,
-    // because a client should be able to act on them differently: 401 is the
-    // cue to send someone to login, 403 must not be — logging in again would
-    // change nothing. Other 4xx statuses stay `bad_request`; several tests
-    // below cover that.
     await build()
     app.get('/api/forbidden', async () => {
       throw Object.assign(new Error('nope'), { statusCode: 403 })
@@ -174,9 +147,6 @@ describe('the error envelope', () => {
   })
 
   it('refuses to answer 2xx with an error body', async () => {
-    // The one shape the envelope must never take: createApiClient checks
-    // `response.ok`, so a 200 carrying { error: … } skips the error path
-    // entirely and is handed to the caller as the payload.
     await build()
     app.get('/api/sneaky', async () => {
       throw Object.assign(new Error('nope'), { statusCode: 200 })
@@ -189,7 +159,6 @@ describe('the error envelope', () => {
   })
 
   it('keeps a status the route set on the reply before throwing', async () => {
-    // Fastify's default handler preserves this; replacing it would discard it.
     await build()
     app.get('/api/conflict', async (_request, reply) => {
       reply.code(409)
@@ -215,9 +184,6 @@ describe('the error envelope', () => {
   })
 
   it('carries a numeric Retry-After, which is how a thrown limit emits it', async () => {
-    // Filtering headers to strings would drop this silently, telling a client to back off
-    // without saying for how long. The app's own limiter sets the header on the reply as a
-    // string; this is the path an error carrying one takes.
     await build()
     app.get('/api/limited', async () => {
       throw Object.assign(new Error('slow down'), {
@@ -229,15 +195,10 @@ describe('the error envelope', () => {
     const response = await app.inject({ method: 'GET', url: '/api/limited' })
 
     expect(response.statusCode).toBe(429)
-    // Serialised on the wire, as all headers are — the point is that it is
-    // present at all, which a string-only filter would not have managed.
     expect(response.headers['retry-after']).toBe('30')
   })
 
   it('carries an array of set-cookie headers without collapsing them', async () => {
-    // The realistic producer of the array shape: `reply.header` accumulates
-    // set-cookie rather than overwriting. Dropping the array would log a
-    // member out on the way to being told why the request failed.
     await build()
     app.get('/api/stale-session', async () => {
       throw Object.assign(new Error('session expired'), {
@@ -253,9 +214,6 @@ describe('the error envelope', () => {
   })
 
   it('honours an error that declares `status` rather than `statusCode`', async () => {
-    // Fastify's own handler reads `status` first and some middleware sets only
-    // that; reading `statusCode` alone would answer 500 to an error that
-    // plainly said 403 — and log it as ours rather than the caller's.
     await build()
     app.get('/api/status-only', async () => {
       throw Object.assign(new Error('nope'), { status: 403 })
@@ -268,9 +226,6 @@ describe('the error envelope', () => {
   })
 
   it('ignores a declared status below 400 in favour of one the reply already set', async () => {
-    // `status: 200` is not a request to answer 200 with an error body. Fastify
-    // ignores sub-400 values on the error for the same reason, so the 409 the
-    // route set stands.
     await build()
     app.get('/api/mixed', async (_request, reply) => {
       reply.code(409)
@@ -281,9 +236,6 @@ describe('the error envelope', () => {
   })
 
   it('clamps a status reply.code would reject rather than throwing inside the handler', async () => {
-    // Unclamped, `reply.code(600)` throws FST_ERR_BAD_STATUS_CODE, Fastify
-    // catches it and re-sends through the root handler, and its prose envelope
-    // reaches the wire — so the body assertion is the real one here.
     await build()
     app.get('/api/absurd', async () => {
       throw Object.assign(new Error('nope'), { statusCode: 600 })
@@ -296,11 +248,6 @@ describe('the error envelope', () => {
   })
 
   it('drops a content-type from the error, which would break serialization', async () => {
-    // Fastify deletes content-type before calling a custom handler so
-    // serialization can be re-guessed. Copying the error's back makes
-    // `reply.send` skip serialization and hand `onSendEnd` an object, which
-    // fails into Fastify's prose envelope — the one thing this file exists to
-    // prevent — and loses the 400 along the way.
     await build()
     app.get('/api/mistyped', async () => {
       throw Object.assign(new Error('nope'), {
@@ -314,15 +261,10 @@ describe('the error envelope', () => {
     expect(response.statusCode).toBe(400)
     expect(response.json()).toEqual({ error: 'bad_request' })
     expect(response.headers['content-type']).toMatch(/application\/json/)
-    // The rest of the error's headers still come through.
     expect(response.headers['x-request-id']).toBe('abc')
   })
 
   it('drops an encoding the envelope is not encoded with', async () => {
-    // Same class as the content-type case: the envelope is plaintext JSON, so
-    // an inherited `gzip` leaves the client trying to gunzip something that was
-    // never compressed. No trigger in the tree today — the set is exhaustive
-    // about the class rather than about what currently emits it.
     await build()
     app.get('/api/encoded', async () => {
       throw Object.assign(new Error('nope'), {
@@ -345,12 +287,6 @@ describe('the error envelope', () => {
   })
 
   it('covers a bad url, which never reaches a route to throw from', async () => {
-    // find-my-way rejects the percent escape before routing, so
-    // `setErrorHandler` cannot see it. Without `frameworkErrors`, Fastify's
-    // `onBadUrl` writes `{"error":"Bad Request","code":…,"message":…}` straight
-    // to the socket — prose in the field the envelope promises is a slug, on a
-    // URL any caller can type, which the web client would surface as
-    // `code: 'Bad Request'`.
     await build()
 
     const response = await app.inject({ method: 'GET', url: '/api/%zz' })
@@ -360,8 +296,6 @@ describe('the error envelope', () => {
   })
 
   it('keeps the status a framework error asked for rather than flattening it', async () => {
-    // FST_ERR_MAX_PARAM_LENGTH is a 414, so the handler cannot hardcode the 400
-    // that the bad-url case suggests.
     await build()
     app.get('/api/thing/:id', async () => ({ ok: true }))
     await app.ready()
@@ -373,9 +307,6 @@ describe('the error envelope', () => {
   })
 
   it('survives a route that declares only a success schema', async () => {
-    // The realistic case, and the reason the serializer trap below is narrower
-    // than it first looks: a response schema for 200 alone does not touch the
-    // error path.
     await build()
     app.get(
       '/api/typed',
@@ -391,11 +322,6 @@ describe('the error envelope', () => {
   })
 
   it('survives a route that declares an error status, given the envelope schema', async () => {
-    // A schema for the error status itself runs the envelope through the route
-    // serializer, and anything it does not declare is stripped — a `{ detail }`
-    // 400 schema answers `400 {}` on the one path the handler exists to
-    // guarantee, with no test failing and a valid-looking body. This pins the
-    // remedy the docblock in errors.ts recommends, so the advice cannot rot.
     await build()
     app.get(
       '/api/detailed',
@@ -411,9 +337,6 @@ describe('the error envelope', () => {
   })
 
   it('maps a thrown 404 to not_found, not the generic 4xx code', async () => {
-    // The unmatched-route 404 comes from setNotFoundHandler and never reaches
-    // here, so nothing else exercises this branch — a route rejecting a missing
-    // record is what will.
     await build()
     app.get('/api/gone', async () => {
       throw Object.assign(new Error('no such member'), { statusCode: 404 })
@@ -427,15 +350,6 @@ describe('the error envelope', () => {
 })
 
 describe('trustProxy', () => {
-  // Nothing else pins this: delete `trustProxy` from the Fastify options and
-  // every other test in this file still passes while the spoof-resistance the
-  // docs/deploying.md argues for is silently gone. request.ip is what a rate limiter on
-  // invite redemption and an admin audit trail will key on.
-  //
-  // Verified by deleting the option: the `1` and `true` cases fail. The default
-  // case does *not*, because Fastify's own default is already `false` — so that
-  // one documents the intended behaviour rather than pinning our choice of it.
-  // Worth knowing before treating it as a guard.
   const whoami = async (env: NodeJS.ProcessEnv) => {
     await build(env)
     app.get('/api/whoami', async (request) => ({ ip: request.ip }))
@@ -443,7 +357,6 @@ describe('trustProxy', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/whoami',
-      // A client claiming 9.9.9.9, with Apache having appended what it saw.
       headers: { 'x-forwarded-for': '9.9.9.9, 203.0.113.7' },
       remoteAddress: '172.17.0.1',
     })
@@ -451,8 +364,6 @@ describe('trustProxy', () => {
   }
 
   it('trusts nothing by default, so a claimed address is ignored entirely', async () => {
-    // The more valuable half: an unconfigured deployment must not believe the
-    // header at all.
     expect(await whoami({})).toEqual({ ip: '172.17.0.1' })
   })
 
@@ -475,11 +386,6 @@ describe('without a web root', () => {
   })
 
   it('gives the API the same 404 body it gives when serving the web app', async () => {
-    // WEB_ROOT is unset in development and set in the container. If the body
-    // differed, frontend error handling written against one shape would meet
-    // the other in the environment it was never tested in — and Fastify's
-    // default also echoes the method and path back, which the terse body
-    // deliberately avoids.
     await build()
 
     const response = await app.inject({ method: 'GET', url: '/api/nope' })
@@ -489,13 +395,6 @@ describe('without a web root', () => {
   })
 })
 
-/**
- * A shell shaped like the one Vite emits.
- *
- * The `<head>` is load-bearing rather than decoration: the share card is injected
- * before `</head>` and the static `<title>` is taken out on the way (#306), so a
- * fixture without one would exercise neither.
- */
 const SHELL =
   '<!doctype html><html><head><title>Sage Burner</title>' +
   '<meta name="description" content="Membership and scheduling for a small co-created gathering." />' +
@@ -526,10 +425,6 @@ describe('with a web root', () => {
   })
 
   it('serves a nested asset, which is the shape every Vite build emits', async () => {
-    // Non-obvious property of `wildcard: false`: @fastify/static globs `**/**`
-    // at registration and registers a route per file, so subdirectories work.
-    // Without this test a regression breaking nested serving entirely would
-    // leave the file green, since only the negative cases cover subpaths.
     await build({ WEB_ROOT: webRoot })
 
     const response = await app.inject({ method: 'GET', url: '/assets/index-a1b2c3.js' })
@@ -539,9 +434,6 @@ describe('with a web root', () => {
   })
 
   it('caches hashed assets forever and the shell never', async () => {
-    // The shell points at the current hashes, so caching it is how a client
-    // gets pinned to a build that no longer exists — and Watchtower redeploys
-    // on its own schedule, so nobody is there to notice.
     await build({ WEB_ROOT: webRoot })
 
     const asset = await app.inject({ method: 'GET', url: '/assets/index-a1b2c3.js' })
@@ -552,9 +444,6 @@ describe('with a web root', () => {
   })
 
   it('does not cache the shell when an ancestor directory is named assets', async () => {
-    // A substring test against the absolute path would match here and hand the
-    // shell `immutable` — which no redeploy can bust, pinning every client
-    // that loaded it to a dead build for a year.
     const outer = mkdtempSync(join(tmpdir(), 'sage-burner-outer-'))
     const nested = join(outer, 'assets', 'app', 'dist')
     mkdirSync(nested, { recursive: true })
@@ -574,10 +463,6 @@ describe('with a web root', () => {
   })
 
   it('keeps the shell uncached on the SPA fallback path too', async () => {
-    // The path real navigations take, and one of the two places the shell goes out
-    // from — the not-found handler rather than a registered route. Both call the same
-    // handler, and this is what says the header is on that side of it too: caching
-    // the shell is what pins clients to a build that no longer exists.
     await build({ WEB_ROOT: webRoot })
 
     const response = await app.inject({ method: 'GET', url: '/schedule' })
@@ -614,8 +499,6 @@ describe('with a web root', () => {
   })
 
   it('404s an unknown API path instead of returning the SPA shell', async () => {
-    // Handing HTML to a fetch() expecting JSON turns a clear 404 into a
-    // confusing parse error at the caller.
     await build({ WEB_ROOT: webRoot })
 
     const response = await app.inject({ method: 'GET', url: '/api/nope' })
@@ -642,14 +525,8 @@ describe('with a web root', () => {
   })
 
   it('404s a missing asset instead of handing back the HTML shell', async () => {
-    // Vite emits content-hashed chunks and Watchtower swaps the image under
-    // live clients, so a page on the previous build asks for a chunk that no
-    // longer exists. Answering with the shell and a 200 produces "Expected a
-    // JavaScript module script but the server responded with a MIME type of
-    // text/html", which is far worse to debug than a 404.
     await build({ WEB_ROOT: webRoot })
 
-    // A hash from the *previous* build — the fixture only has index-a1b2c3.js.
     const response = await app.inject({ method: 'GET', url: '/assets/index-0ldbu1.js' })
 
     expect(response.statusCode).toBe(404)
@@ -674,8 +551,6 @@ describe('with a web root', () => {
   })
 
   it('404s an API path carrying a query string rather than serving the shell', async () => {
-    // request.url includes the query string, so matching on it raw would let
-    // `/api/nope?x=1` fall through to the SPA branch.
     await build({ WEB_ROOT: webRoot })
 
     const response = await app.inject({ method: 'GET', url: '/api/nope?x=1' })
@@ -685,8 +560,6 @@ describe('with a web root', () => {
   })
 
   it('404s a percent-encoded API path rather than serving the shell', async () => {
-    // `/%61pi/nope` is `/api/nope`. Matching the raw path would hand back HTML
-    // and make the "an API path is never the SPA shell" rule not quite true.
     await build({ WEB_ROOT: webRoot })
 
     const response = await app.inject({ method: 'GET', url: '/%61pi/nope' })
@@ -697,10 +570,6 @@ describe('with a web root', () => {
 })
 
 describe('the share card in the shell (#306)', () => {
-  // Social crawlers do not run JavaScript, so the burn's name has to be in the HTML
-  // before it is sent. The two-places trap is the point of most of this: the shell
-  // goes out from a registered route *and* from the not-found handler, and injecting
-  // into one of them makes sharing the bare domain work while a deep link does not.
   let webRoot: string
 
   beforeEach(() => {
@@ -746,8 +615,6 @@ describe('the share card in the shell (#306)', () => {
   })
 
   it('says the same on a client-side route as at the root', async () => {
-    // The trap: `/` comes from a registered route and `/apply` from the not-found
-    // handler. One `sendShell` is what makes these two assertions the same assertion.
     await build({ WEB_ROOT: webRoot })
     await givenBurn()
 
@@ -758,8 +625,6 @@ describe('the share card in the shell (#306)', () => {
   })
 
   it('leaves exactly one title and no description of the software', async () => {
-    // A second `<title>` leaves it to the browser which wins, and the shell's own
-    // description describes Sage Burner rather than this gathering.
     await build({ WEB_ROOT: webRoot })
     await givenBurn()
 
@@ -795,9 +660,6 @@ describe('the share card in the shell (#306)', () => {
   })
 
   it('falls back to the app icon, and to the small card with it', async () => {
-    // No icon has been uploaded here either, so the fallback is the default SVG and
-    // `summary` is chosen because that declares no size at all. The square-raster
-    // branch — where the size is known and still not wide — is in `share.test.ts`.
     await build({ WEB_ROOT: webRoot })
     await givenBurn()
 
@@ -826,8 +688,6 @@ describe('the share card in the shell (#306)', () => {
   })
 
   it('leaves the absolute tags out rather than believing a bent Host', async () => {
-    // The header is the client's. Escaped as well as shape-checked — but a card
-    // naming an origin nobody can fetch is worth nothing, so it is left off.
     await build({ WEB_ROOT: webRoot })
     await givenBurn()
 
@@ -863,10 +723,6 @@ describe('the share card in the shell (#306)', () => {
 })
 
 describe('a web root that cannot serve the app', () => {
-  // Setting WEB_ROOT states an intent to serve the frontend. Failing to do so
-  // must stop the boot: /api/version would keep answering, so the container
-  // healthcheck stays green while every page 404s — which is what a typo'd
-  // variable, an unmounted volume, or a missing web build all look like.
   let dir: string
 
   beforeEach(() => {
@@ -877,9 +733,6 @@ describe('a web root that cannot serve the app', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  // `handle` is the shared one, so the outer afterEach closes the database.
-  // No Fastify instance needs closing: createApp throws before returning, so
-  // there is nothing constructed to leak — that is the property under test.
   const buildWith = (webRoot: string) => {
     handle = createDb({ url: ':memory:' })
     runMigrations(handle)
@@ -905,9 +758,6 @@ describe('a web root that cannot serve the app', () => {
   })
 
   it('refuses to start on a shell it cannot put the share card into', async () => {
-    // Same argument as the three above: a container that will not start is easier to
-    // diagnose than one quietly serving the software's name to every crawler. Every
-    // other test in this file boots on a shell that does have a `</head>`.
     writeFileSync(join(dir, 'index.html'), '<!doctype html><div id="app"></div>')
 
     await expect(buildWith(dir)).rejects.toThrow(/<\/head>/i)

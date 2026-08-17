@@ -42,7 +42,6 @@ afterEach(async () => {
 
 const NOW = '2026-07-02T00:00:00.000Z'
 
-/** Every send in this file lands here. Nothing in the suite opens a socket. */
 const posted: Message[] = []
 
 const build = async (now: () => Date = () => new Date(NOW)) => {
@@ -61,7 +60,6 @@ const build = async (now: () => Date = () => new Date(NOW)) => {
   return app
 }
 
-/** An SMTP server, so approving somebody has somewhere to post the invite. */
 const givenMailServer = async () => {
   await db().insert(mailSetting).values({
     id: INSTALLATION_ID,
@@ -121,7 +119,6 @@ const givenApplication = async (name = 'Someone', account_id: string | null = nu
   return id
 }
 
-/** Somebody who signed up and applied, which is every application since #476. */
 const givenApplicant = async (name = 'Wren') => {
   const id = randomUUID()
   await db()
@@ -253,8 +250,6 @@ describe('reviewing applications', () => {
   })
 
   it('mints a different token every time', async () => {
-    // The one property that cannot be recovered if it is wrong: a predictable
-    // token is an open door, and nothing downstream would notice.
     const server = await build()
     const { cookie } = await givenAdmin()
 
@@ -328,9 +323,6 @@ describe('reviewing applications', () => {
   })
 
   it('gives the invite exactly the advertised 30 days', async () => {
-    // Against an injected clock, so this tests the window rather than the fact
-    // that today is later than the fixture. On the real clock any window from
-    // -29 days upward passed.
     const server = await build()
     const { cookie } = await givenAdmin()
     const id = await givenApplication()
@@ -358,7 +350,6 @@ describe('reviewing applications', () => {
   })
 
   it('refuses an anonymous caller on the routes that mint an invite', async () => {
-    // The list route is one thing; these grant membership.
     const server = await build()
     const id = await givenApplication()
 
@@ -373,12 +364,6 @@ describe('reviewing applications', () => {
   })
 
   it('leaves the application pending when the invite cannot be written', async () => {
-    // Half an approval is worse than none: approved with no invite cannot be
-    // recovered through the API, since re-approving matches nothing on
-    // `status = 'pending'` and the partial unique index refuses a second invite.
-    //
-    // Forced by planting an invite for this application first, which that index
-    // then refuses — the same failure a full disk or a busy database would give.
     const server = await build()
     const { id: adminId, cookie } = await givenAdmin()
     const id = await givenApplication()
@@ -391,8 +376,6 @@ describe('reviewing applications', () => {
       created_by: adminId,
     })
 
-    // A 500, not a rejection: fastify catches the failed write. The point is
-    // what the database looks like afterwards.
     expect((await decide(server, cookie, id, 'approve')).statusCode).toBe(500)
 
     const [row] = await db().select().from(application).where(eq(application.id, id))
@@ -412,9 +395,6 @@ describe('a fresh link when the first one was lost', () => {
   const digestOf = (token: string) => createHash('sha256').update(token).digest('hex')
 
   it('mints a new token and kills the old one, in the same row', async () => {
-    // The row is updated rather than replaced, so "one invite per application"
-    // stays the index's invariant — and rewriting the digest is what makes the lost
-    // link dead rather than merely superseded.
     const server = await build()
     const { cookie } = await givenAdmin()
     const id = await givenApplication()
@@ -433,8 +413,6 @@ describe('a fresh link when the first one was lost', () => {
   })
 
   it('leaves the lost link unredeemable', async () => {
-    // The point of the whole issue. Redeeming the old token must find nothing,
-    // rather than mint a second account for the same person.
     const server = await build()
     const { cookie } = await givenAdmin()
     const id = await givenApplication()
@@ -442,8 +420,6 @@ describe('a fresh link when the first one was lost', () => {
 
     await reissue(server, cookie, id)
 
-    // 200 with `unknown` rather than 404: the state route answers the same shape
-    // for all four cases, and `unknown` is what a digest matching nothing looks like.
     const state = await server.inject({
       method: 'GET',
       url: `/api/invites/${encodeURIComponent(lost)}`,
@@ -453,8 +429,6 @@ describe('a fresh link when the first one was lost', () => {
   })
 
   it('gives out a link that works', async () => {
-    // The passing sibling: the replacement must be redeemable, or "the old one is
-    // dead" would pass against a route that simply broke the invite.
     const server = await build()
     const { cookie } = await givenAdmin()
     const id = await givenApplication()
@@ -480,9 +454,6 @@ describe('a fresh link when the first one was lost', () => {
 
     const response = await reissue(server, cookie, id)
 
-    // Against the stale value and the app's own clock, not `Date.now()`: the server
-    // runs on the fixed `NOW` here, so a wall-clock comparison would be testing when
-    // the suite ran.
     const [row] = await db().select().from(inviteToken).where(eq(inviteToken.application_id, id))
     expect(Date.parse(response.json().invite.expires_at)).toBeGreaterThan(Date.parse(stale))
     expect(Date.parse(response.json().invite.expires_at)).toBeGreaterThan(Date.parse(NOW))
@@ -503,8 +474,6 @@ describe('a fresh link when the first one was lost', () => {
   })
 
   it('refuses once the invite has been used', async () => {
-    // They are already in. A fresh link then is a second account by another name —
-    // the same hole from the other end.
     const server = await build()
     const { cookie } = await givenAdmin()
     const id = await givenApplication()
@@ -514,7 +483,6 @@ describe('a fresh link when the first one was lost', () => {
     const response = await reissue(server, cookie, id)
 
     expect(response.statusCode).toBe(409)
-    // Its own slug, not the shared `conflict` — see `errorCodes` (#178).
     expect(response.json().error).toBe('invite_used')
   })
 
@@ -529,7 +497,6 @@ describe('a fresh link when the first one was lost', () => {
       const response = await reissue(server, cookie, id)
 
       expect(response.statusCode).toBe(409)
-      // The other slug, and the failing half of the pair.
       expect(response.json().error).toBe('not_approved')
     }
 
@@ -574,14 +541,10 @@ describe('the invite in the applicant’s inbox', () => {
     expect(posted).toHaveLength(1)
     expect(posted[0]?.to).toBe('someone@example.org')
     expect(posted[0]?.text).toContain(`http://burn.example.org/invite/${decided.json().invite.token}`)
-    // And the admin is told, which is what stops them sending the same link a second
-    // time (#327).
     expect(decided.json().delivery).toEqual({ sent: true, to: 'someone@example.org', reason: null })
   })
 
   it('is not sent when nobody has set a mail server up', async () => {
-    // The ordinary state, and the whole feature is optional: the admin still has the
-    // link in the response, which is how this worked before there was one.
     const server = await build()
     const { cookie } = await givenAdmin()
     const id = await givenApplication()
@@ -591,8 +554,6 @@ describe('the invite in the applicant’s inbox', () => {
     expect(decided.statusCode).toBe(200)
     expect(decided.json().invite.token).toBeTruthy()
     expect(posted).toHaveLength(0)
-    // A reason rather than silence: "nowhere to send it" and "the server refused" are
-    // different problems and the page words them differently (#327).
     expect(decided.json().delivery).toMatchObject({ sent: false, reason: NOT_CONFIGURED })
   })
 
@@ -608,8 +569,6 @@ describe('the invite in the applicant’s inbox', () => {
   })
 
   it('is skipped for a contact that is not an address', async () => {
-    // Rows written while this column was "how can we reach you" hold phone numbers
-    // and Discord handles, and posting to one of those is a bounce nobody reads.
     const server = await build()
     await givenMailServer()
     const { cookie } = await givenAdmin()
@@ -622,14 +581,10 @@ describe('the invite in the applicant’s inbox', () => {
     const decided = await approveAt(server, cookie, id)
 
     expect(posted).toHaveLength(0)
-    // Null, not a failure: nothing was attempted, and the present copy — "send this
-    // link" — is exactly right for an applicant who left a Discord handle.
     expect(decided.json().delivery).toBeNull()
   })
 
   it('still approves when the mail server refuses', async () => {
-    // The invite is committed before this runs, so a mail server that is down costs
-    // a message rather than an approval — and the admin has the link either way.
     handle = createDb({ url: ':memory:' })
     runMigrations(handle)
     app = await createApp({
@@ -646,8 +601,6 @@ describe('the invite in the applicant’s inbox', () => {
 
     expect(decided.statusCode).toBe(200)
     expect(decided.json().invite.token).toBeTruthy()
-    // What was missing: the send failed and the answer said nothing, so an invite went
-    // missing behind a TLS misconfiguration nobody could see (#327).
     expect(decided.json().delivery.sent).toBe(false)
     expect(decided.json().delivery.reason).toBeTruthy()
   })
@@ -669,9 +622,6 @@ describe('the invite in the applicant’s inbox', () => {
   })
 
   it('says so when this installation cannot say where it lives', async () => {
-    // Reachable only with a `Host` that is not hostname-shaped, since a link in an
-    // inbox has to be absolute. It was a bare `return` — the one path that skipped the
-    // send and did not even log (#327).
     const server = await build()
     await givenMailServer()
     const { cookie } = await givenAdmin()
@@ -708,7 +658,6 @@ describe('the invite in the applicant’s inbox', () => {
 
 describe('approving somebody who signed up first', () => {
   it('makes them a member, which is what approval now is', async () => {
-    // No token is minted: the account already exists, so there is nothing left to claim (#476).
     const server = await build()
     const approver = await givenAdmin()
     const wren = await givenApplicant()
@@ -723,7 +672,6 @@ describe('approving somebody who signed up first', () => {
   })
 
   it('puts them on the list for the burn that is coming', async () => {
-    // Applying means wanting to come; the member changes arrival and lodging on their next visit.
     const server = await build()
     const approver = await givenAdmin()
     const burn = await givenBurn()
@@ -794,7 +742,6 @@ describe('approving somebody who signed up first', () => {
   })
 
   it('still mints a token for an application from before there were accounts', async () => {
-    // The two outstanding ones keep working: the link is all such an application can offer.
     const server = await build()
     const approver = await givenAdmin()
     const old = await givenApplication()

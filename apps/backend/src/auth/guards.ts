@@ -26,11 +26,6 @@ export const createGuards = ({ db, sessions }: GuardDeps) => {
       return undefined
     }
 
-  /**
-   * Signed in at all, which is what an account with no roles yet is. Account-first sign-up (#476)
-   * makes that a state somebody lives in rather than a moment: their own application, and the push
-   * they turn on while waiting for it, are the whole of what it reaches.
-   */
   const requireSignedIn = async (request: FastifyRequest, reply: FastifyReply) => {
     const viewer = await viewerFor(request, { db, sessions })
 

@@ -66,11 +66,8 @@ const stub = (
   ...over,
 })
 
-/** The selector's view of the same burn, so the two cannot describe different ones. */
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
-// the default, so "no burn" written that way silently rendered the usual one.
 const renderPage = (api: OptionsApi, viewer: Viewer = ADMIN, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -160,10 +157,6 @@ describe('Options', () => {
   })
 
   it('leaves a bad number to the browser, which will not submit the form', async () => {
-    // `min="1"` and the implicit whole-number step make the form unsubmittable,
-    // so nothing here reaches the handler — which is why there is no JavaScript
-    // guard for it. Asserted rather than assumed: a JS guard *would* have been
-    // dead code, and this is what proves it.
     const addEventOption = vi.fn<OptionsApi['addEventOption']>(() => Promise.resolve({ option: TEMPLE }))
     renderPage(stub({ addEventOption }))
 
@@ -212,9 +205,6 @@ describe('Options', () => {
   })
 
   it('sends no capacity at all when editing a helping entry', async () => {
-    // The column exists for every row, but a helping entry has no spaces box —
-    // sending `capacity: null` from a form that never offered it would be the UI
-    // deciding something it was not asked about.
     const updateEventOption = vi.fn<OptionsApi['updateEventOption']>(() => Promise.resolve({ option: SAUNA }))
     renderPage(stub({ updateEventOption }))
 
@@ -271,10 +261,6 @@ describe('Options', () => {
   })
 
   it('sends a member to their own page rather than to a page they cannot use', async () => {
-    // Creating a burn is admin-only, so the link an admin gets here would answer
-    // "This is for admins." to a member — a dead end. And with the selector, a
-    // member seeing this usually has not joined a burn rather than there being none,
-    // so their own page is both the likelier fix and one they can do themselves.
     renderPage(
       stub({}, []),
       { status: 'signed-in', account: { id: 'a-2', name: null, avatar: null, roles: ['member'] } },
@@ -301,8 +287,6 @@ describe('Options', () => {
   })
 
   it('offers nothing to someone who does not have admin, and asks the API nothing', async () => {
-    // Asserted after a flush, not synchronously: the fetch is two awaits deep, so
-    // an immediate assertion passes whether or not the guard is there.
     const getEventOptions = vi.fn<OptionsApi['getEventOptions']>(() => Promise.resolve({ options: [] }))
     renderPage(stub({ getEventOptions }), { status: 'signed-out' })
 
@@ -311,7 +295,6 @@ describe('Options', () => {
   })
 
   it('offers the lists to a member who is not an admin', async () => {
-    // The point of #155: a member curates the lodging and helping lists.
     renderPage(stub(), {
       status: 'signed-in',
       account: { id: 'a-2', name: null, avatar: null, roles: ['member'] },

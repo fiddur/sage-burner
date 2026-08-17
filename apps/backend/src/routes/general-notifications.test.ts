@@ -12,17 +12,6 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event } from '../db/schema.ts'
 
-/**
- * What is going on around you, for whoever asked to hear it (#259).
- *
- * The burn-wide ones are **off** unless somebody switches them on, so each of those
- * tests turns the category on first. That is the behaviour, not test scaffolding: an
- * installation where nobody opens the settings sends none of them, which is the point.
- *
- * The exception is the admin one at the bottom — an application is on for whoever
- * reviews applications, and switching it on is what those tests never do (#326).
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 const BURN = 'e0000000-0000-4000-8000-000000000001'
@@ -96,12 +85,6 @@ const givenComing = async (accountId: string, eventId = BURN) => {
     .values({ id: randomUUID(), event_id: eventId, account_id: accountId, joined_at: NOW })
 }
 
-/**
- * Switch categories on for somebody, which is what makes any of these arrive.
- *
- * Replaces the whole set, which is what the route takes — so anything a test still
- * wants on has to be named here too.
- */
 const switchOn = (server: FastifyInstance, cookie: string, ...categories: string[]) =>
   server.inject({
     method: 'PUT',
@@ -152,8 +135,6 @@ describe('somebody offers a dream', () => {
   })
 
   it('reaches nobody who has not asked', async () => {
-    // The whole reason these default off: a burn where every dream pings forty-two
-    // people is a channel people learn to ignore.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -167,8 +148,6 @@ describe('somebody offers a dream', () => {
   })
 
   it('never tells the person who offered it', async () => {
-    // Being told you did the thing you just did is the fastest way to teach somebody
-    // that the bell is noise (#247's rule, and it applies harder here).
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -181,8 +160,6 @@ describe('somebody offers a dream', () => {
   })
 
   it('never tells somebody who is not coming to that burn', async () => {
-    // "Only for burns you are attending": attendance is the audience, whatever the
-    // switches say.
     const server = await build()
     await givenBurn()
     await givenBurn(OTHER_BURN, 'winter')
@@ -218,7 +195,6 @@ describe('somebody says they are coming', () => {
   })
 
   it('says nothing when somebody who is already coming says so again', async () => {
-    // A no-op write must not read as a second arrival.
     const server = await build()
     await givenBurn()
     const bea = await givenAccount('Bea')
@@ -276,9 +252,6 @@ describe('the lead-roles register filling up', () => {
   })
 
   it('does not tell the appointee about themselves twice', async () => {
-    // #270. Ada appoints Cai, so Cai gets the personal "You are now Kitchen lead" —
-    // and, with the burn-wide category on, used to get "Cai is now Kitchen lead."
-    // about themselves as well. Excluded like the actor is.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -286,8 +259,6 @@ describe('the lead-roles register filling up', () => {
     await givenComing(ada.id)
     await givenComing(cai.id)
     const role = (await addRole(server, ada.cookie, 'Kitchen')).json().role
-    // Both on: the personal one is what they *should* get, the burn-wide one is what
-    // they should not. With only the second, this would pass for the wrong reason.
     await switchOn(server, cai.cookie, 'lead_role', 'lead_role_filled')
 
     await server.inject({
@@ -301,7 +272,6 @@ describe('the lead-roles register filling up', () => {
   })
 
   it('still tells everybody else, which is what the category is for', async () => {
-    // The passing sibling: excluding the appointee must not silence the note.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -324,8 +294,6 @@ describe('the lead-roles register filling up', () => {
   })
 
   it('says nothing to the burn when a role falls vacant', async () => {
-    // Whoever lost it is told directly, by the personal `lead_role` notification.
-    // A vacancy is not news worth pushing to everybody.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -355,14 +323,6 @@ describe('the lead-roles register filling up', () => {
 })
 
 describe('somebody applies to join', () => {
-  /**
-   * The one notification that goes to admins rather than to a burn's attendees.
-   *
-   * On by default and switched on by nobody in these tests, which is the behaviour:
-   * an application stays open until somebody reviews it, so a push missed on a lock
-   * screen costs the applicant the wait. It pushed and wrote no row at all until
-   * #326 — an admin found an empty bell after being told.
-   */
   const apply = async (server: FastifyInstance) => {
     const wren = await givenAccount('Wren', [])
 
@@ -400,9 +360,6 @@ describe('somebody applies to join', () => {
   })
 
   it('says nothing about who applied', async () => {
-    // A notification is read on a lock screen, and the applicant's name is theirs
-    // until an admin opens the page. The bell row is a copy of the push, so the same
-    // holds of it.
     const server = await build()
     const ada = await givenAccount('Ada', ['admin'])
 
@@ -425,7 +382,6 @@ describe('somebody applies to join', () => {
   it('stops for an admin who switches it off', async () => {
     const server = await build()
     const ada = await givenAccount('Ada', ['admin'])
-    // Replaces the whole set, so naming nothing switches every category off.
     await switchOn(server, ada.cookie)
 
     await apply(server)
@@ -434,8 +390,6 @@ describe('somebody applies to join', () => {
   })
 
   it('tells an admin who also holds member exactly once', async () => {
-    // A cheap guard on the fan-out's shape: `(account_id, role)` is the primary key
-    // and the query filters on the role, so a duplicate is not expressible today.
     const server = await build()
     const ada = await givenAccount('Ada', ['admin', 'member'])
 
@@ -447,9 +401,6 @@ describe('somebody applies to join', () => {
 
 describe('the vocabulary the database will accept', () => {
   it('takes the categories #259 added', async () => {
-    // The rebuilt CHECK, proved by a write that skips the API. Without the rebuild
-    // this throws and every notification above would fail at the insert — so this is
-    // also what says the migration ran rather than the schema being read at runtime.
     const server = await build()
     const ada = await givenAccount('Ada')
 
@@ -459,9 +410,7 @@ describe('the vocabulary the database will accept', () => {
       'lead_role_added',
       'lead_role_filled',
       'new_version',
-      // #326's, and the reason the tables were rebuilt a second time.
       'application',
-      // #610's, which rebuilt them again when a lead role became something to talk about.
       'lead_role_comment',
       'lead_role_comment_any',
     ]) {

@@ -11,13 +11,6 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-/**
- * The bar that says this tab is running code the server no longer serves.
- *
- * The clock is faked rather than the watcher stubbed: `watchForNewVersion` polls on an
- * interval with a floor on how often it asks, and vitest's fake timers move `Date.now`
- * with the interval, so this exercises the real watcher the component wires up.
- */
 const changing = () => {
   const getVersion = vi
     .fn<VersionApi['getVersion']>()
@@ -39,8 +32,6 @@ describe('the redeploy bar', () => {
   })
 
   it('follows What’s new with a full load, so the bar is gone when it lands (#566)', async () => {
-    // The bar exists because this tab is running code the server no longer serves; a router push
-    // would land on the changelog still running it, which is what left the bar up.
     vi.useFakeTimers()
     const go = vi.fn()
     render(<NewVersion api={changing()} go={go} />)
@@ -85,8 +76,6 @@ describe('the redeploy bar', () => {
   })
 
   it('offers a reload and what changed, once the build moves', async () => {
-    // Both, not one: a reload throws away whatever is half-typed, and the changelog is
-    // the thing worth reading before deciding to lose it (#325).
     vi.useFakeTimers()
     render(<NewVersion api={changing()} />)
 

@@ -66,7 +66,6 @@ describe('what a round trip that came back says', () => {
 
 describe('the ways in on your own details page', () => {
   it('is not there at all where the installation has set none up', async () => {
-    // A button that cannot work reads as a promise — #30's rule about the email column.
     const { container } = show(stub(), [])
 
     await waitFor(() => expect(container.textContent).not.toContain('sign in'))
@@ -100,13 +99,10 @@ describe('the ways in on your own details page', () => {
     show(stub({}, [{ provider: 'discord', created_at: '2026-08-01T00:00:00.000Z' }]), ['discord', 'facebook'])
 
     expect(await screen.findByRole('button', { name: /Take Discord off/ })).toBeTruthy()
-    // Facebook is set up and not linked, so it offers the other thing.
     expect(screen.getByRole('link', { name: 'Link it' }).getAttribute('href')).toBe('/api/me/oauth/facebook')
   })
 
   it('takes one off', async () => {
-    // The stub keeps a list, because the field re-reads after a write rather than trusting
-    // its own idea of what is left.
     let held: Identity[] = [{ provider: 'discord', created_at: '2026-08-01T00:00:00.000Z' }]
     const removeMyIdentity = vi.fn((provider: string) => {
       held = held.filter((row) => row.provider !== provider)
@@ -136,10 +132,6 @@ describe('the ways in on your own details page', () => {
   })
 
   it('sends somebody to the handle box, which is the link that works for anybody', async () => {
-    // A Messenger row is still only ever built from a typed handle: Facebook's id is app-scoped
-    // and points at nobody outside this installation's Meta app. Linking may fill the profile
-    // page in (#405), and that link opens only for a viewer already logged in and already a
-    // friend — so the box is still where to go, and this says so rather than the reverse.
     show(stub(), ['facebook'])
 
     expect(await screen.findByText(/add\s+your Facebook name/)).toBeTruthy()
@@ -154,7 +146,6 @@ describe('the ways in on your own details page', () => {
   })
 
   it('says it is as well as a password, not instead of one', async () => {
-    // #9's rule, and the sentence somebody needs before they click: this adds a way in.
     show(stub(), ['discord'])
 
     expect(await screen.findByText(/As well as your password/)).toBeTruthy()
@@ -172,8 +163,6 @@ describe('what the page says when a provider refuses', () => {
   })
 
   it('tells somebody to try again when the provider could not be reached', () => {
-    // Distinct from the above on purpose: nothing an organiser changes fixes an outage, and
-    // "tell an organiser" for one teaches people to ignore that sentence.
     const said = outcomeMessage('unreachable', 'req-8s')
 
     expect(said).toContain('Try again in a moment')

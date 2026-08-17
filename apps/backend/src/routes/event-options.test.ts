@@ -172,7 +172,6 @@ describe('the lists a member picks from', () => {
   })
 
   it('leaves the capacity unset when there is no limit', async () => {
-    // "Own tent" fits as many as turn up, and so does every helping-out entry.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -184,8 +183,6 @@ describe('the lists a member picks from', () => {
   })
 
   it('numbers the two lists independently', async () => {
-    // They are shown as separate lists, so the first helping entry is the first
-    // of its own list rather than the third of a shared one.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -199,8 +196,6 @@ describe('the lists a member picks from', () => {
   })
 
   it('counts how many have taken each one, so a member can be told it is full', async () => {
-    // The only way to say "full" without a member-visible list of who is sleeping
-    // where. A count, not a roster.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -292,8 +287,6 @@ describe('the lists a member picks from', () => {
   })
 
   it('refuses to move an entry between the two lists', async () => {
-    // Moving one is deleting and adding: the orders are per kind, so a `kind`
-    // change would leave it numbered against the list it came from.
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -416,10 +409,6 @@ describe('the lists a member picks from', () => {
   })
 
   it('lets any approved member write these lists, admin or not', async () => {
-    // These replace a spreadsheet everyone could edit, so a member curates the
-    // lodging and helping lists. The admin case is not redundant: `admin` does not
-    // imply `member`, so somebody organising but not attending holds one and not the
-    // other.
     const server = await build()
     const eventId = await givenEvent()
 
@@ -459,7 +448,6 @@ describe('the lists a member picks from', () => {
   })
 
   it('keeps a nonsense row out of the database, whatever the caller is', async () => {
-    // The CHECKs earn their place against writes the Zod schema never sees.
     const server = await build()
     const eventId = await givenEvent()
     await server.inject({ method: 'GET', url: `/api/events/${eventId}/options` })
@@ -497,8 +485,6 @@ describe('renaming an option somebody else has just renamed', () => {
 
     expect((await rename(server, ada.cookie, mine)).statusCode).toBe(428)
 
-    // The other list moves the same tag: one representation covers both kinds, which
-    // is what `GET /options` answers with.
     expect(
       (await add(server, ada.cookie, eventId, { kind: 'helping', label: 'Washing up' })).statusCode,
     ).toBe(201)

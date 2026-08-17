@@ -11,7 +11,6 @@ import { NotificationBell } from './NotificationBell.tsx'
 
 afterEach(cleanup)
 afterEach(onADesktop)
-// The history outlives one test too, and the router pushes to it.
 afterEach(() => history.replaceState(null, '', '/'))
 
 const one = (over: Partial<Notification> = {}): Notification => ({
@@ -57,8 +56,6 @@ describe('the bell', () => {
   })
 
   it('leads to the page whatever the viewport', async () => {
-    // The href is the whole of #336's "one control rather than two": a push tap, a
-    // middle click and an open-in-new-tab all want the page, on any device.
     render(<NotificationBell api={stub()} />)
 
     expect((await screen.findByRole('link', { name: 'Notifications' })).getAttribute('href')).toBe(
@@ -109,14 +106,10 @@ describe('the bell', () => {
     fireEvent.click(await screen.findByRole('link', { name: 'Notifications, 1 new' }))
 
     expect(await screen.findByText('You are on helper for Dinner')).toBeTruthy()
-    // The bell itself is a link now, so the absence has to be named rather than
-    // counted: `queryByRole('link')` would find the bell and pass either way.
     expect(screen.queryByRole('link', { name: /Dinner/ })).toBeNull()
   })
 
   it('keeps the list after it has gone grey', async () => {
-    // What the bubble counts is what is new, not what is outstanding: a notification
-    // is a thing that happened, not a task to tick off.
     render(
       <NotificationBell
         api={stub({
@@ -131,13 +124,6 @@ describe('the bell', () => {
     expect(await screen.findByText('You are on helper for Dinner')).toBeTruthy()
   })
 
-  /**
-   * Opens the panel on a bell with nothing new, and answers with the line inside it.
-   *
-   * Nothing new on purpose: opening an unseen bell calls `markNotificationsSeen`,
-   * whose reply replaces the list — which for a test about dismissing the panel would
-   * empty it for a reason that has nothing to do with dismissal.
-   */
   const opened = async () => {
     render(
       <NotificationBell
@@ -150,9 +136,6 @@ describe('the bell', () => {
         })}
       />,
     )
-    // `fireEvent` rather than `.click()`, because it runs inside `act` — which is what
-    // flushes the effect that attaches the dismissal listeners. A bare `.click()`
-    // renders the panel but leaves them queued until some later frame.
     fireEvent.click(await screen.findByRole('link', { name: 'Notifications' }))
 
     return await screen.findByText('You are on helper for Dinner')
@@ -167,8 +150,6 @@ describe('the bell', () => {
   })
 
   it('stays open when the press lands inside it', async () => {
-    // The success path the outside-press test cannot show: the bell's own toggle is a
-    // press inside, so a listener that did not check would fight it.
     fireEvent.pointerDown(await opened())
 
     expect(screen.queryByText('You are on helper for Dinner')).toBeTruthy()
@@ -215,8 +196,6 @@ describe('the bell', () => {
   })
 
   it('says nothing at all when the server cannot be reached', async () => {
-    // A bell that cannot reach the server has nothing useful to say, and an error
-    // where a count goes would be worse than the absence of one.
     render(<NotificationBell api={stub({ getMyNotifications: () => Promise.reject(new Error('nope')) })} />)
 
     expect(await screen.findByRole('link', { name: 'Notifications' })).toBeTruthy()
@@ -240,9 +219,6 @@ describe('the bell', () => {
     }
 
     it('opens no panel on a phone, because the page is the whole answer there', async () => {
-      // The defect (#336): wrapped onto the header's second row the bell is far left,
-      // so a panel hung off it opened past the edge of the screen and could not be
-      // reached. There is nothing to misplace when there is no panel.
       onAPhone()
 
       fireEvent.click(await withOne())
@@ -251,22 +227,11 @@ describe('the bell', () => {
     })
 
     it('leaves a modified click to the browser', async () => {
-      // Open in a new tab: the reader is asking for the page, and a panel in the
-      // document they are leaving is not it.
       fireEvent.click(await withOne(), { metaKey: true })
 
       expect(screen.queryByText('You are on helper for Dinner')).toBeNull()
     })
 
-    /**
-     * The bell under the router that is actually around it in the app.
-     *
-     * The suite above renders it bare, which is where the defect hid: `preact-iso`
-     * listens for clicks on `window` and its handler does not look at
-     * `defaultPrevented` — so `preventDefault` alone stopped the browser navigating
-     * and did nothing at all about the router, which pushed `/notifications` anyway.
-     * A panel over a page nobody asked for, and `markNotificationsSeen` twice.
-     */
     const underTheRouter = async () => {
       const Where = () => <p data-testid="where">{useLocation().path}</p>
 
@@ -305,8 +270,6 @@ describe('the bell', () => {
     })
 
     it('says it expands only where it does', async () => {
-      // `aria-expanded` on a control that never expands is a promise to a screen
-      // reader that the page cannot keep.
       onAPhone()
 
       expect((await withOne()).hasAttribute('aria-expanded')).toBe(false)

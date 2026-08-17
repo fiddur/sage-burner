@@ -43,13 +43,11 @@ afterEach(async () => {
   identified = {}
 })
 
-/** A tiny but real PNG, so the bytes a provider "answers" mean something. */
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
 )
 
-/** What the fake provider answers next, which `signInThrough` sets. */
 let identified: { email?: string; name?: string } = {}
 
 const fakeOAuth = (over: Partial<OAuthCalls> = {}): OAuthCalls => ({
@@ -67,8 +65,6 @@ const build = async (oauth: OAuthCalls = fakeOAuth(), logged?: string[]) => {
   app = await createApp({
     db: handle.db,
     config: createConfig({
-      // `warn`, not `silent`, only where a test is reading the log: the refusal an admin
-      // diagnoses a provider from is written at that level (#430).
       LOG_LEVEL: logged === undefined ? 'silent' : 'warn',
       SESSION_SECRET: SECRET,
       PUBLIC_ORIGIN: 'https://burn.example',
@@ -133,11 +129,9 @@ const callback = (server: FastifyInstance, provider: string, query: string, cook
     headers: cookie === undefined ? {} : { cookie },
   })
 
-/** Every `set-cookie` on one response, as one string — the callback sets two. */
 const cookiesOn = (response: { headers: Record<string, unknown> }): string =>
   [response.headers['set-cookie'] ?? []].flat().join('\n')
 
-/** What the browser was told to keep, as it would send it back. */
 const nonceFrom = (response: { headers: Record<string, unknown> }): string => {
   const header = String(response.headers['set-cookie'] ?? '')
   const value = /sage_oauth=([^;]*)/u.exec(header)?.[1]
@@ -146,20 +140,12 @@ const nonceFrom = (response: { headers: Record<string, unknown> }): string => {
   return `sage_oauth=${value}`
 }
 
-/** The state the app just minted, which is the only way a test can hold one. */
 const mintedState = async () => {
   const [row] = await db().select().from(oauthState)
   if (row === undefined) throw new Error('no state was minted')
   return row.state
 }
 
-/**
- * What one captured log line is, narrowed rather than cast.
- *
- * `errors.test.ts` makes the argument a few files over: `JSON.parse` answers `any`, so a cast
- * asserts a shape pino is merely expected to produce and a line that did not match would read as
- * one that did.
- */
 type LogLine = {
   msg: string
   reqId?: unknown
@@ -318,8 +304,6 @@ describe('signing up from an invite link through a provider', () => {
   })
 
   it('lets one in where two arrive on the last place at once (#561)', async () => {
-    // Deterministic rather than lucky: both `openInvite` reads resolve before either
-    // synchronous transaction runs, so the second one's count is genuinely stale.
     let handed = 0
     const server = await build(
       fakeOAuth({
@@ -679,10 +663,6 @@ describe('leaving for a provider', () => {
   })
 
   it('asks for an address, which is what an account is keyed by', async () => {
-    // It deliberately asked for none until #476: nothing here matched on an address, so
-    // collecting one bought nothing. Signing up *is* signing in now, and an identity with no
-    // address to offer cannot make an account — so both providers are asked, and the sign-up
-    // page asks the person where the provider says nothing.
     const server = await build()
     await givenProvider('facebook')
 
@@ -692,9 +672,6 @@ describe('leaving for a provider', () => {
   })
 
   it('asks for the profile link only where the app has been approved for it', async () => {
-    // The pair, and the second half is the one that matters: an app that has not been through
-    // review for `user_link` must not be sent a scope naming it, because the authorize redirect
-    // has already left the browser by the time this process could recover (#405).
     const server = await build()
     await givenProvider('facebook', { ask_profile_link: true })
 
@@ -759,7 +736,6 @@ describe('leaving for a provider', () => {
   })
 
   it('sends somebody whose session has gone to the login page, not a JSON 401', async () => {
-    // Reached by a plain `<a href>`, so an error envelope would land on the screen as one.
     const server = await build()
     await givenProvider()
 
@@ -784,8 +760,6 @@ describe('leaving for a provider', () => {
   })
 
   it('starts a link for somebody with no role at all', async () => {
-    // #9's rule for passkeys: an account with no role yet still has to be able to add a way
-    // in and get back in with it.
     const server = await build()
     await givenProvider()
     const nobody = await givenAccount({ roles: [] })
@@ -814,9 +788,6 @@ describe('signing in from a provider', () => {
   })
 
   it('fills in a profile URL for somebody who linked before it was asked for', async () => {
-    // What makes this reach an existing member at all: their identity was written when nothing
-    // asked for `user_link`, so a link only ever stored at link time would leave them having to
-    // unlink and link again. A vanity name that changes lands here too.
     const server = await build(
       fakeOAuth({
         identify: () =>
@@ -843,8 +814,6 @@ describe('signing in from a provider', () => {
   })
 
   it('leaves the stored one alone when the provider answers none', async () => {
-    // The passing sibling, and the case an installation that turns the setting back off is in:
-    // nothing is asked for, so nothing overwrites what is there with null.
     const server = await build()
     await givenProvider('facebook')
     const wren = await givenAccount()
@@ -864,8 +833,6 @@ describe('signing in from a provider', () => {
   })
 
   it('makes an account for an identity nobody has yet, with no roles on it', async () => {
-    // Sign-up and sign-in converge here (#476): asking somebody to say which one they are doing
-    // is asking them to know. No roles is what "not a member yet" already means everywhere.
     const server = await build()
     await givenProvider()
 
@@ -900,8 +867,6 @@ describe('signing in from a provider', () => {
   })
 
   it('makes no account where the provider offers no address, and says where to go instead', async () => {
-    // An account is keyed by an address. Facebook often answers none, and Discord answers an
-    // unverified one as nothing — so the sign-up page asks the person.
     const server = await build()
     await givenProvider()
 
@@ -913,8 +878,6 @@ describe('signing in from a provider', () => {
   })
 
   it('takes the name the provider gives, since the account carries the person', async () => {
-    // Without one, `displayName` answers 'Somebody' — on the feed card, in the push to every
-    // attendee, and in the Members list, for every account that came in this way.
     const server = await build()
     await givenProvider()
 
@@ -925,8 +888,6 @@ describe('signing in from a provider', () => {
   })
 
   it('folds the case of the address, as every other way in does', async () => {
-    // `account.email` carries a lowercase CHECK, so an address taken as given would miss the row
-    // it collides with and then fail the write — reporting a conflict to somebody with no account.
     const server = await build()
     await givenProvider()
 
@@ -959,9 +920,6 @@ describe('signing in from a provider', () => {
   })
 
   it('refuses an address somebody already holds, rather than linking a stranger onto it', async () => {
-    // Matching accounts by address would be account takeover the moment a provider hands over
-    // one it has not verified. Signing in the other way and linking under Your details is the
-    // path, and it is the one this sentence points at.
     const server = await build()
     await givenProvider()
     const wren = await givenAccount()
@@ -1022,8 +980,6 @@ describe('signing in from a provider', () => {
   })
 
   it('refuses a callback carrying no code, without spending anything', async () => {
-    // A provider's own error redirect arrives without one; spending the state on it would
-    // make somebody start again for a refusal they can see.
     const server = await build()
     await givenProvider()
     await start(server, 'facebook')
@@ -1035,11 +991,6 @@ describe('signing in from a provider', () => {
   })
 
   it('refuses a callback that comes back to a different browser', async () => {
-    // The one the state alone does not cover: unguessable and single-use both say nothing
-    // about *who* finishes the trip. Without the nonce a member could run the flow, stop at
-    // their own callback URL and hand somebody else the `?code&state` — a top-level GET,
-    // which `SameSite=Lax` permits — and that browser would be issued a session for the
-    // member's account. RFC 6749 §10.12.
     const server = await build()
     await givenProvider()
     const wren = await givenAccount()
@@ -1053,7 +1004,6 @@ describe('signing in from a provider', () => {
     await start(server, 'facebook')
     const state = await mintedState()
 
-    // Everything the attacker can hand over, and nothing the browser was given.
     const back = await callback(server, 'facebook', `code=abc&state=${state}`)
 
     expect(back.headers.location).toBe('/login?from=refused')
@@ -1084,10 +1034,6 @@ describe('signing in from a provider', () => {
   })
 
   it('sweeps states nobody came back for', async () => {
-    // An abandoned consent screen is the ordinary case, and the route that makes these is
-    // unauthenticated — so nothing else would ever reclaim the row. `mintChallenge`'s
-    // argument: leaving is the only thing that makes them, so it is the only thing that can
-    // clear them.
     const server = await build()
     await givenProvider()
     await start(server, 'facebook')
@@ -1097,7 +1043,6 @@ describe('signing in from a provider', () => {
     clock = new Date(NOW.getTime() + (STATE_TTL_SECONDS + 1) * 1000)
     await start(server, 'facebook')
 
-    // The two stale ones are gone and only the one just minted is left.
     expect(await db().select().from(oauthState)).toHaveLength(1)
   })
 
@@ -1107,17 +1052,12 @@ describe('signing in from a provider', () => {
     )
     await givenProvider()
 
-    // Classified now rather than generic: a 400 at the token leg is a setting, not an outage.
     expect((await signInThrough(server)).headers.location).toContain('from=misconfigured')
   })
 })
 
 describe('why a link could not be made', () => {
   it('writes the provider’s reason to the log, where an admin can read it', async () => {
-    // The whole of #430. A wrong secret, a redirect URI registered differently, a scope the app
-    // was never approved for and a container with no outbound HTTPS all end at the same refusal;
-    // the log is the only thing that says which, and the person who configured the provider is
-    // the person running the installation.
     const logged: string[] = []
     const server = await build(
       fakeOAuth({
@@ -1133,7 +1073,6 @@ describe('why a link could not be made', () => {
 
     const back = await linkThrough(server, wren.cookie, 'facebook')
 
-    // The member is told the same as before — none of this is theirs, and none of it actionable.
     expect(back.headers.location).toContain('from=misconfigured')
 
     const line = lastLogLine(logged)
@@ -1145,8 +1084,6 @@ describe('why a link could not be made', () => {
   })
 
   it('tells the member it is misconfigured, with something to quote', async () => {
-    // A small group where the person who can fix it is somebody you know, so the page says which
-    // of the two it is rather than "that did not work". The ref is `reqId` on the log line above.
     const logged: string[] = []
     const server = await build(
       fakeOAuth({
@@ -1166,8 +1103,6 @@ describe('why a link could not be made', () => {
   })
 
   it('tells them to try again when nothing arrived', async () => {
-    // The other half: a provider that is down or unreachable is not something an organiser can
-    // fix by changing a setting, and "tell an organiser" for it teaches people to ignore that.
     const server = await build(
       fakeOAuth({ identify: () => Promise.resolve({ failed: { at: 'network' as const } }) }),
     )
@@ -1180,7 +1115,6 @@ describe('why a link could not be made', () => {
   })
 
   it('calls a provider having a bad day unreachable rather than misconfigured', async () => {
-    // A 5xx is the provider's problem, not the installation's.
     const server = await build(
       fakeOAuth({
         identify: () => Promise.resolve({ failed: { at: 'token' as const, status: 503 } }),
@@ -1222,8 +1156,6 @@ describe('why a link could not be made', () => {
   })
 
   it('writes nothing about somebody who was identified', async () => {
-    // The passing sibling. A warn on every round trip would bury the one that matters, and a
-    // test that only asserts a line appears is satisfied by logging unconditionally.
     const logged: string[] = []
     const server = await build(fakeOAuth(), logged)
     await givenProvider('facebook')
@@ -1248,8 +1180,6 @@ describe('linking a provider to an account', () => {
   })
 
   it('attaches the identity to whoever started the trip, not whoever finished it', async () => {
-    // The reason `oauth_state.account_id` exists: the account comes from the row, so a
-    // callback arriving with somebody else's session cannot hand them the identity (#401).
     const server = await build()
     await givenProvider()
     const wren = await givenAccount()
@@ -1294,10 +1224,6 @@ describe('linking a provider to an account', () => {
   })
 
   it('does not even ask for a picture when they have one', async () => {
-    // A provider's is a better start than initials and never better than one somebody
-    // picked. Asserted on the *fetch* rather than on the stored bytes: the avatar table's
-    // primary key would refuse the second write anyway, so a test that only checked the
-    // bytes passes with the guard deleted — which is what it was doing before this comment.
     const asked = vi.fn(() => Promise.resolve({ bytes: PNG, content_type: 'image/png' as const }))
     const server = await build(fakeOAuth({ picture: asked }))
     await givenProvider()
@@ -1318,8 +1244,6 @@ describe('linking a provider to an account', () => {
   })
 
   it('takes no picture where the provider offers none', async () => {
-    // Facebook's silhouette and Discord's default are both "not them", and replacing
-    // initials with a grey shape says less rather than more.
     const server = await build(
       fakeOAuth({ identify: () => Promise.resolve({ profile: { subject: 'provider-1' } }) }),
     )
@@ -1373,8 +1297,6 @@ describe('linking a provider to an account', () => {
   })
 
   it('keeps none where the provider was never asked for one', async () => {
-    // The ordinary case, and the one that has to keep working: an installation whose admin never
-    // went to app review for `user_link` gets exactly the link it had before.
     const server = await build()
     await givenProvider('facebook')
     const wren = await givenAccount()
@@ -1430,8 +1352,6 @@ describe('the ways in on an account', () => {
   })
 
   it('refuses to take away the only way in', async () => {
-    // `removePasskey`'s 409, generalised. Somebody who set no password and linked one
-    // provider has exactly one, and losing it locks them out of a burn they have paid for.
     const server = await build()
     await givenProvider()
     const wren = await givenAccount({ password: null })
@@ -1462,10 +1382,6 @@ describe('the ways in on an account', () => {
   })
 
   it('counts the other provider as another way in, which nothing else asserted', async () => {
-    // The third `exists` in `anotherWayInSurvives`, and the passing sibling the refusal
-    // tests do not give: a break that is too *permissive* is caught by "refuses to take
-    // away the only way in", but a too-restrictive one would silently stop an account with
-    // two providers and no password from unlinking either, and nothing would fail.
     const server = await build()
     await givenProvider('discord')
     await givenProvider('facebook')
@@ -1474,7 +1390,6 @@ describe('the ways in on an account', () => {
     await linkThrough(server, wren.cookie, 'facebook')
 
     expect((await forget(server, 'facebook', wren.cookie)).statusCode).toBe(204)
-    // And now it is the only one left, so it cannot go — the same guard, from the other side.
     expect((await forget(server, 'discord', wren.cookie)).statusCode).toBe(409)
   })
 
@@ -1498,8 +1413,6 @@ describe('setting a provider up', () => {
     server: FastifyInstance,
     provider: string,
     cookie: string,
-    // Concrete rather than `unknown`: `inject` resolves to its chainable type for a payload
-    // it cannot see the shape of, and then `await` gives back something with no `statusCode`.
     payload: { client_id: string; client_secret?: string },
   ) =>
     server.inject({
@@ -1510,10 +1423,6 @@ describe('setting a provider up', () => {
     })
 
   it('stores the secret without the whitespace a paste brings with it', async () => {
-    // #440. The id was trimmed and the secret was not, so a trailing newline off the developer
-    // portal survived into the token exchange — and only that leg, since authorize uses the id
-    // alone. Discord answers `401 invalid_client`, which is what a wrong secret looks like too,
-    // and re-copying it the same way pastes the same character.
     const server = await build()
     const boss = await givenAccount({ roles: ['admin'] })
 
@@ -1527,7 +1436,6 @@ describe('setting a provider up', () => {
   })
 
   it('leaves a secret with no whitespace exactly as it is', async () => {
-    // The passing sibling: trimming must not be reaching into the value itself.
     const server = await build()
     const boss = await givenAccount({ roles: ['admin'] })
 
@@ -1559,8 +1467,6 @@ describe('setting a provider up', () => {
   })
 
   it('keeps the stored secret when a save omits it', async () => {
-    // Otherwise correcting a typo in the id means typing the secret again, and a form that
-    // has to hold it keeps it in an input on every visit.
     const server = await build()
     const boss = await givenAccount({ roles: ['admin'] })
     await save(server, 'facebook', boss.cookie, { client_id: 'client-1', client_secret: 'hunter2' })
@@ -1619,8 +1525,6 @@ describe('setting a provider up', () => {
   })
 
   it('takes the button away again when the secret is cleared', async () => {
-    // The other direction, and the one that matters more: a provider that worked yesterday
-    // and whose secret was emptied today must stop offering a trip.
     const server = await build()
     const boss = await givenAccount({ roles: ['admin'] })
     await save(server, 'discord', boss.cookie, { client_id: 'client-1', client_secret: 'hunter2' })
@@ -1649,15 +1553,10 @@ describe('setting a provider up', () => {
 
 describe('the state row itself', () => {
   it('cannot say it is a link without an account to link to', async () => {
-    // The CHECK, which only a write skipping the API can exercise.
     await build()
     const client = handle?.client
     if (client === undefined) throw new Error('build() first')
 
-    // Every other column supplied, and asserted on the message: omitting `nonce` made this
-    // pass on NOT NULL instead, so the CHECK could have been deleted from the migration with
-    // the test still green — "a mutation that does not apply looks exactly like one that was
-    // caught".
     expect(() =>
       client
         .prepare(

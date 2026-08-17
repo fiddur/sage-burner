@@ -23,8 +23,6 @@ describe('saying what is on screen is old', () => {
   })
 
   it('says nothing before five minutes are up', () => {
-    // The boundary itself is fresh: the rule is "over five minutes", and a bar that
-    // appeared exactly on the tick would contradict the sentence it prints.
     expect(shownAt(FRESH_FOR_MS)).toBeNull()
   })
 
@@ -39,8 +37,6 @@ describe('saying what is on screen is old', () => {
   })
 
   it('says nothing at all before anything has loaded', () => {
-    // There is no age to report yet, and a warning on an empty page would be about
-    // the app starting up rather than about anything a member should act on.
     expect(shownAt(undefined)).toBeNull()
   })
 

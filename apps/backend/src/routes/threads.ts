@@ -283,11 +283,6 @@ const heartsBy = (rows: readonly HeartRow[]): Hearts => {
   return held
 }
 
-/**
- * The face of everybody behind one heart, keyed by whatever the support table hangs off.
- * `thread_support` and `entry_support` are the same table twice over, and the order is the
- * order the faces come out in on both pages — so it is written once.
- */
 const heartRows = async (
   db: Database,
   support:
@@ -848,10 +843,6 @@ const cardAuthor = {
 const wroteIt = async (db: Database, found: Whose): Promise<string | null> =>
   await cardAuthor[found.entity_type](db, found)
 
-/**
- * A dream's heart has two doors — the card on the feed and the panel on Dreams and Schedule —
- * and they write the same `session_support` row, so they have to say the same thing (#706).
- */
 export const tellHeartedDream = async (
   db: Database,
   notify: Notifier,
@@ -1378,8 +1369,6 @@ export const registerThreadRoutes = (
     await Promise.all(named.map(async (accountId) => await notify(accountId, said)))
   }
 
-  // Whom "anybody commented" reaches: the burn's attendance, and every approved account for a
-  // thread that belongs to no burn — #259's rule read for something global.
   const audienceFor = async (eventId: string | null, author: string): Promise<string[]> =>
     eventId === null
       ? (await approvedAccounts(db)).filter((accountId) => accountId !== author)

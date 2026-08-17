@@ -53,7 +53,6 @@ const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   return app
 }
 
-/** One browser opted in, so there is somewhere for a notification to go. */
 const givenSubscribed = async (accountId: string) => {
   await db()
     .insert(pushSubscription)
@@ -67,7 +66,6 @@ const givenSubscribed = async (accountId: string) => {
     })
 }
 
-/** What was pushed, as the strings a person would read. */
 const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) =>
   deliver.mock.calls.map((call) => {
     const parsed: unknown = JSON.parse(String(call[1]))
@@ -160,9 +158,6 @@ describe('which days a sitting falls on', () => {
   }
 
   it('skips the ends the burn is not open for', () => {
-    // The spreadsheet's own plan starts at a Sunday dinner and ends at a Sunday lunch
-    // for this reason: nobody eats a lunch on a day they arrive at four, nor on a day
-    // everybody has gone by noon. This burn is open for a 13:00 sitting on one day.
     expect(sittingDates({ ...burn }, '13:00')).toEqual(['2026-08-02'])
   })
 
@@ -171,8 +166,6 @@ describe('which days a sitting falls on', () => {
   })
 
   it('keeps every day when the hours are wide enough for it', () => {
-    // The passing sibling. A filter that dropped the first and last day outright
-    // would satisfy both tests above while losing meals people do eat.
     expect(sittingDates({ ...burn, start_time: '10:00', end_time: '20:00' }, '13:00')).toEqual([
       '2026-08-01',
       '2026-08-02',
@@ -231,8 +224,6 @@ describe('meal slots', () => {
   })
 
   it('says a burn that does not exist does not, rather than answering with no slots', async () => {
-    // It selected by `event_id` and answered 200 for any id at all, while its
-    // siblings looked the burn up and 404'd (#217).
     const server = await build()
     await givenBurn()
     const admin = await givenAccount(['admin'])
@@ -273,13 +264,7 @@ describe('generating the sittings', () => {
     expect(response.statusCode).toBe(201)
     expect(
       response.json().meals.map((meal: { date: string; label: string }) => `${meal.date} ${meal.label}`),
-    ).toEqual([
-      // The 1st opens at 16:00, so no lunch there; the 3rd closes at 12:00, so
-      // neither a 13:00 lunch nor an 18:00 dinner survives on it.
-      '2026-08-01 Dinner',
-      '2026-08-02 Lunch',
-      '2026-08-02 Dinner',
-    ])
+    ).toEqual(['2026-08-01 Dinner', '2026-08-02 Lunch', '2026-08-02 Dinner'])
   })
 
   it('adds only what is missing when it runs again', async () => {
@@ -298,8 +283,6 @@ describe('generating the sittings', () => {
   })
 
   it('leaves a sitting that has been moved where it was put', async () => {
-    // The point of rows over a rule. A regeneration that rewrote times would undo
-    // every deliberate change an admin had made.
     const server = await build()
     await givenBurn()
     const admin = await givenAccount(['admin'])
@@ -316,11 +299,6 @@ describe('generating the sittings', () => {
   })
 
   it('makes a new one for the day a sitting was moved off, because the slot still says so', async () => {
-    // The limit of "a moved sitting stays moved" (#216): a sitting is recognised by
-    // its day and name, so moving one to another *day* leaves its old day without
-    // one — and the slot still says that day has a dinner. The 3rd closes at 12:00,
-    // so it is the one day generating never put a dinner on, which is what makes it
-    // free to be moved onto.
     const server = await build()
     await givenBurn({ end_time: '12:00' })
     const admin = await givenAccount(['admin'])
@@ -334,17 +312,14 @@ describe('generating the sittings', () => {
 
     const after = (await listMeals(server, admin.cookie)).meals
     expect(after.map((meal: { date: string }) => meal.date)).toEqual([
-      // Remade, because the slot still wants one here.
       '2026-08-01',
       '2026-08-02',
-      // Where it was dragged, and generating leaves it alone.
       '2026-08-03',
     ])
     expect(after.find((meal: { id: string }) => meal.id === first.id).date).toBe('2026-08-03')
   })
 
   it('never removes one, however the slots change', async () => {
-    // Somebody may already have signed up to cook it.
     const server = await build()
     await givenBurn()
     const admin = await givenAccount(['admin'])
@@ -525,8 +500,6 @@ describe('the plan itself', () => {
   })
 
   it('refuses moving one onto a day that already has one by that name', async () => {
-    // The burn runs the whole clock, so generating gave every one of its three days a
-    // Dinner. Moving the first onto the second's day is the collision.
     const { server, meal } = await setUp()
     const ada = await givenAttending()
 
@@ -538,9 +511,6 @@ describe('the plan itself', () => {
   })
 
   it('refuses moving one off the days the burn covers', async () => {
-    // It would vanish from the schedule, whose rows span the burn's own hours, while
-    // still showing on the Meals page — the two views disagreeing about whether it
-    // exists at all (#221).
     const { server, meal } = await setUp()
     const ada = await givenAttending()
 
@@ -553,13 +523,6 @@ describe('the plan itself', () => {
   })
 
   it('tells a duplicate from anything else, which is what the 409 rests on', async () => {
-    // Pinned against a real violation, like `isForeignKeyViolation` and
-    // `isCheckViolation`: the predicate is a string match on a driver's message, so a
-    // driver rewording it should fail the suite rather than turn a 409 into a 500.
-    //
-    // The route's own catch cannot be tested both ways — a transient database error
-    // is not something this suite can provoke mid-UPDATE — so the narrowing is
-    // pinned here, on the predicate the catch asks.
     const { server, admin, meal } = await setUp()
     await send(server, 'GET', `/api/events/${BURN}/meals`, admin.cookie)
 
@@ -586,16 +549,11 @@ describe('the plan itself', () => {
     expect(isForeignKeyViolation(orphan)).toBe(true)
     expect(isUniqueViolation(new Error('disk I/O error'))).toBe(false)
 
-    // The targeted form, which three routes now ask in (#142). Without the column
-    // doing anything, every one of them would answer 409 to any duplicate — telling
-    // a caller "there is already one of those" about a row they never touched.
     expect(isUniqueViolation(duplicate, 'meal.event_id')).toBe(true)
     expect(isUniqueViolation(duplicate, 'account.email')).toBe(false)
   })
 
   it('allows moving one to another day inside the burn', async () => {
-    // The passing sibling the refusals need: three tests saying no, and none saying
-    // an ordinary move still works, is where the gap lands.
     const { server, admin } = await setUp()
     const supper = (
       await send(server, 'POST', `/api/admin/events/${BURN}/meals`, admin.cookie, {
@@ -649,12 +607,6 @@ describe('the plan itself', () => {
 })
 
 describe('a burn that has ended', () => {
-  /**
-   * The rule every bare-id route here follows: the burn is resolved from the row and
-   * refused if it is over. Without it a dream in a past burn could not be moved while
-   * the meal block beside it on the same grid could, and anybody could rewrite who
-   * cooked last summer.
-   */
   const ENDED = 'b1b2b3b4-0000-4000-8000-00000000dead'
 
   const setUp = async () => {
@@ -760,8 +712,6 @@ describe('a burn that has ended', () => {
   })
 
   it('lays no new sittings into a burn that is over, which is a record now', async () => {
-    // A second slot with nothing in the record answering it, so `generate` has three sittings to
-    // add: without the guard the count goes to six, which is what the refusal has to prevent.
     const { server, admin } = await setUp()
     await db()
       .insert(mealSlot)
@@ -814,8 +764,6 @@ describe('a burn that has ended', () => {
   })
 
   it('still takes every one of those writes on a burn that has not ended', async () => {
-    // The passing sibling for all six: a guard that refused unconditionally would
-    // satisfy the test above while making the feature useless.
     const server = await build()
     await givenBurn()
     const admin = await givenAccount(['admin'])
@@ -853,11 +801,6 @@ describe('a burn that has ended', () => {
 })
 
 describe('a chore', () => {
-  /**
-   * Nothing is cooked at a morning cleanup, so it has nobody leading the cooking and
-   * nobody helping with it — only cleaners. Refused rather than only hidden: the page
-   * not offering a control is not the rule.
-   */
   const setUp = async () => {
     const server = await build()
     await givenBurn()
@@ -904,8 +847,6 @@ describe('a chore', () => {
   })
 
   it('leaves an ordinary meal alone', async () => {
-    // The passing sibling for all three: a rule applied to every sitting would
-    // satisfy them while making the feature useless.
     const { server, ada, meal } = await setUp()
 
     expect(
@@ -919,8 +860,6 @@ describe('a chore', () => {
   })
 
   it('lets somebody stand down from helping even after the slot became a chore', async () => {
-    // Only joining is refused. A sitting changed to a chore under somebody who had
-    // already put their name to it must not trap them there.
     const { server, ada, meal } = await setUp()
     await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
     await db().update(mealTable).set({ kind: 'chore' }).where(eq(mealTable.id, meal.id))
@@ -934,8 +873,6 @@ describe('a chore', () => {
 
 describe('a lead stranded by a slot becoming a chore', () => {
   it('can still be vacated, though nobody new may be handed it', async () => {
-    // The same escape hatch standing down from a crew has: a sitting changed under
-    // whoever was leading it must not trap them there with no way off.
     const server = await build()
     await givenBurn()
     const admin = await givenAccount(['admin'])
@@ -974,9 +911,6 @@ describe('telling somebody a meal role moved', () => {
   }
 
   it('tells the one handed the lead, and the one it came off', async () => {
-    // Vacating is how every handover starts now, so being taken off has to be told
-    // as well as being given it. A third person moves it, or the one who did it
-    // would be the one not told — which is the next test.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, admin, ada, meal } = await setUp(deliver)
     const bea = await givenAttending('Bea')
@@ -995,8 +929,6 @@ describe('telling somebody a meal role moved', () => {
   })
 
   it('names the sitting by its day, so two jobs on two Dinners do not read the same', async () => {
-    // The bell links to the whole plan rather than a sitting, so the words are all
-    // there is to tell one Dinner's job from another's.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, admin, ada } = await setUp(deliver)
     const bea = await givenAttending('Bea')
@@ -1015,8 +947,6 @@ describe('telling somebody a meal role moved', () => {
   })
 
   it('says nothing to somebody who took it themselves', async () => {
-    // Taking a job you want is the common case, and a notification for your own
-    // click is what teaches people to ignore the channel.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, ada, meal } = await setUp(deliver)
     await givenSubscribed(ada.id)
@@ -1053,8 +983,6 @@ describe('telling somebody a meal role moved', () => {
   })
 
   it('says nothing when nobody was actually taken off', async () => {
-    // Bea was never on it. Without the guard she is told she has been dropped from
-    // something she never joined — which a second tab makes ordinary.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, ada, meal } = await setUp(deliver)
     const bea = await givenAttending('Bea')
@@ -1108,8 +1036,6 @@ describe('changing a plan somebody else has just changed', () => {
 
     expect((await setIdea(server, admin.cookie, first)).statusCode).toBe(428)
 
-    // The words above the table are part of the same representation, so rewriting
-    // them moves the version an idea is written against. One page, one tag.
     expect(
       (
         await send(server, 'PATCH', `/api/events/${BURN}/meal-intro`, admin.cookie, {

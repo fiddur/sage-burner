@@ -95,11 +95,6 @@ describe('AdminInvites', () => {
   })
 
   it('closes at the end of the day named, so the date given back is the date picked', async () => {
-    // `vite.config.ts` pins TZ=Europe/Stockholm: under UTC both the old midnight and this
-    // land on the same date, and the assertion would pass against either.
-    //
-    // The date is a year out rather than written down: the form refuses one already gone, so a
-    // fixture with a date in it would start failing on that date rather than when something broke.
     const closes = todayForInput(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000))
     const createGroupInvite = vi.fn<InvitesApi['createGroupInvite']>(() =>
       Promise.resolve({
@@ -238,9 +233,6 @@ describe('AdminInvites', () => {
   })
 
   it('offers Revoke for exactly the invites the route accepts', async () => {
-    // Which is every unredeemed direct one, expired included — an expired link
-    // is still a row an admin wants out of the list, and the route deletes
-    // it happily. Only `used` and application-backed invites are refused.
     renderPage(
       stub({
         getInvites: () =>
@@ -262,9 +254,6 @@ describe('AdminInvites', () => {
 
     await screen.findByText('Application from Fredrik')
 
-    // Per row, not a count: inverting the predicate moves the button to the other
-    // two rows and a count of two stays green. Rows are addressed by their
-    // expiry, which is the one column unique to each here.
     const revokeIn = (expiry: string) => {
       const row = screen.getByText(expiry).closest('tr')
       if (row === null) throw new Error(`no row expiring ${expiry}`)
@@ -279,8 +268,6 @@ describe('AdminInvites', () => {
   })
 
   it('does not still say Copied after a second invite is minted', async () => {
-    // The link is shown once and cannot be shown again, so a stale "Copied"
-    // is how an admin pastes the first token twice and loses the second.
     const writeText = vi.fn(() => Promise.resolve())
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     const createInvite = vi
@@ -298,8 +285,6 @@ describe('AdminInvites', () => {
     ;(await screen.findByRole('button', { name: 'Create an invite' })).click()
     ;(await screen.findByRole('button', { name: 'Copy link' })).click()
     await screen.findByRole('button', { name: 'Copied' })
-    // The button is disabled until the re-read the mint started has landed (#176), and
-    // a click on a disabled button is not a click.
     const again = screen.getByRole('button', { name: 'Create an invite' })
     await waitFor(() => expect(again.hasAttribute('disabled')).toBe(false))
     again.click()

@@ -12,12 +12,6 @@ afterEach(() => {
   globalThis.localStorage?.clear()
 })
 
-/**
- * A watch under the test's control, rather than one listening to a real page.
- *
- * `offersItself` is which browser this is: Chromium has `onbeforeinstallprompt` and makes the
- * offer itself, Safari and Firefox have neither and are where the instructions belong.
- */
 const aWatch = ({
   start,
   standalone = false,
@@ -44,7 +38,6 @@ const aWatch = ({
   return {
     watch,
     prompted,
-    /** What the browser deciding the site qualifies looks like from here. */
     offers: () => {
       offer = { prompt: prompted }
       for (const listener of listeners) listener()
@@ -121,8 +114,6 @@ describe('offering to install the app', () => {
   })
 
   it('shows an offer that arrived before it rendered', () => {
-    // The race this exists for: `beforeinstallprompt` fires once, and can fire before
-    // any component has mounted. A strip that only listened would never appear.
     const { watch } = aWatch({ start: { prompt: () => Promise.resolve(undefined) }, offersItself: true })
 
     render(<InstallApp watch={watch} />)
@@ -131,12 +122,6 @@ describe('offering to install the app', () => {
   })
 
   it('catches an offer that arrives between the first render and the effect', () => {
-    // The narrow window `onChange` cannot cover: the subscription is registered in an
-    // effect, so an offer landing after the initial render but before that runs fires
-    // nothing. The effect re-reads for exactly this.
-    //
-    // Simulated by call order rather than by timing — the first `offer()` is the
-    // `useState` initializer at first render, the second is the effect's re-read.
     let asked = 0
     const watch: InstallWatch = {
       offer: () => (++asked === 1 ? undefined : { prompt: () => Promise.resolve(undefined) }),
@@ -191,10 +176,6 @@ describe('offering to install the app', () => {
   })
 
   it('still renders where the browser throws on reading storage', () => {
-    // The consequence, not just the read: this is called from `useState` during
-    // render and nothing above it is an error boundary, so a throw here paints an
-    // empty page instead of the app. Chromium with site data blocked for the origin
-    // is where that happens.
     const store = vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(() => {
       throw new Error('SecurityError')
     })
@@ -207,8 +188,6 @@ describe('offering to install the app', () => {
   })
 
   it('stays quiet on the next visit after a no', () => {
-    // The event fires on every load until the app is installed, so a nudge with no
-    // memory is a nudge for ever.
     globalThis.localStorage.setItem(DISMISSED_KEY, 'yes')
     const { watch } = aWatch({ start: { prompt: () => Promise.resolve(undefined) }, offersItself: true })
 

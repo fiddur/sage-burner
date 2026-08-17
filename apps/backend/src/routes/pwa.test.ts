@@ -62,7 +62,6 @@ const givenAccount = async (roles: ('admin' | 'member')[] = ['admin']) => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-/** A tiny but real PNG, so the bytes stored are bytes that mean something. */
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
@@ -112,9 +111,6 @@ describe('the web manifest', () => {
   })
 
   it('names a splash colour from the dark palette, which is where most phones are', async () => {
-    // A manifest colour cannot follow `prefers-color-scheme`, so one of the two is
-    // wrong. The light one showed as a cream strip behind Android's gesture bar for
-    // as long as the app was open; this one is wrong only for the length of a launch.
     const server = await build()
 
     expect((await getManifest(server)).json()).toMatchObject({
@@ -124,9 +120,6 @@ describe('the web manifest', () => {
   })
 
   it('is readable by somebody who is not signed in', async () => {
-    // The homepage is public and so is installing from it, so neither of these may
-    // depend on a cookie. Both are also fetched by the browser itself, which does not
-    // send one.
     const server = await build()
 
     expect((await getManifest(server)).statusCode).toBe(200)
@@ -149,9 +142,6 @@ describe('the web manifest', () => {
   })
 
   it('says when the icon changed, so one ?v= serves the manifest and the settings page', async () => {
-    // Two spellings of one picture is two entries in the offline cache under one path,
-    // and the newest-versioned-wins rule then evicts one on every store (#376). The
-    // settings page reads this rather than inventing a version of its own.
     const server = await build()
     const root = await givenAccount()
 
@@ -161,8 +151,6 @@ describe('the web manifest', () => {
 
     const said = (await getInstallation(server)).json().installation.icon_updated_at
     expect(said).toBe(NOW)
-    // Through the shared builder, since agreement is the property — the manifest, the
-    // settings page and the share card all go through it now (#378).
     expect((await getManifest(server)).json().icons[0].src).toBe(iconSrc(said))
   })
 
@@ -170,9 +158,6 @@ describe('the web manifest', () => {
     const server = await build()
     const root = await givenAccount()
 
-    // The flame's SVG entry is not maskable: it has no background of its own, and a
-    // launcher fills a maskable icon's box. The drawn PNGs beside it are, being opaque and
-    // keeping a tenth of the tile clear at every edge (#453).
     expect((await getManifest(server)).json().icons.map((icon: { purpose: string }) => icon.purpose)).toEqual(
       ['any', 'maskable', 'maskable', 'maskable'],
     )
@@ -185,9 +170,6 @@ describe('the web manifest', () => {
   })
 
   it('names the icon once however many purposes it serves', async () => {
-    // The same `src` listed once per purpose is what killed Pixel Launcher on "add
-    // to home screen": Firefox built two icon records from one URL, and a 512-square
-    // bitmap is already the whole of what a binder transaction may carry.
     const server = await build()
     const root = await givenAccount()
 
@@ -351,9 +333,6 @@ describe('the app icon', () => {
   })
 
   it('cannot be run as a page even though an SVG may carry script', async () => {
-    // The trade #256 settled: an admin's own SVG is trusted, and navigating straight
-    // to it is the one place it could execute. `sandbox` gives that document an opaque
-    // origin, so a script in there reaches nothing of this app's.
     const server = await build()
     const root = await givenAccount()
     await putIcon(server, root.cookie, SVG, 'image/svg+xml')
@@ -397,9 +376,6 @@ describe('the app icon', () => {
   })
 
   it('cannot be stored as a type the route would refuse, even by a write that skips it', async () => {
-    // The route's 415 is the boundary; the CHECK is what holds for a migration or a
-    // repair by hand. Without it, an `image/svg+xml` ban at the API would still leave
-    // `text/html` servable from this URL by anything that wrote the row directly.
     await build()
 
     expect(() =>
@@ -410,8 +386,6 @@ describe('the app icon', () => {
   })
 
   it('stores the two types it does allow, by that same route', async () => {
-    // The passing sibling: a CHECK refusing everything would satisfy the test above
-    // while making the feature impossible to use.
     const server = await build()
 
     for (const type of ['image/png', 'image/svg+xml']) {

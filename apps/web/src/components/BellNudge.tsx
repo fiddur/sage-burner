@@ -43,7 +43,6 @@ const Strip = ({
   )
 }
 
-/** `usePushHere` lives in `Strip` so a reader who has already said no registers no service worker. */
 export const BellNudge = ({
   api,
   browser,

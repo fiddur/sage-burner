@@ -7,18 +7,8 @@ import { AvatarField, messageForFailure } from './AvatarField.tsx'
 
 afterEach(cleanup)
 
-/**
- * The branches, from the function rather than the component.
- *
- * `resizedAvatar` calls `createImageBitmap`, which happy-dom does not implement, so a
- * rendered `AvatarField` never gets as far as a request — every choose fails the same
- * way whatever the client stub does. Asserting on these through the component would
- * be four tests agreeing about one branch.
- */
 describe('why the picture did not go up', () => {
   it('sends nobody after their file when the session went', () => {
-    // The whole point of #226: a member with a perfectly good photo was told to
-    // re-export it, and the second attempt failed the same way.
     const message = messageForFailure(apiError(401, 'unauthenticated', 'unauthenticated'))
 
     expect(message).toContain('signed out')

@@ -36,10 +36,6 @@ const registerWithin = async (browser: PushBrowser, limitMs: number) => {
   }
 }
 
-/**
- * One implementation of turning push on, so every place that offers it is the same control rather
- * than a second copy of it — the distinction `docs/the-app.md` draws for the toggle's own page.
- */
 export const usePushHere = (api: PushApi, supplied?: PushBrowser | undefined): PushHere => {
   const browser = useMemo(() => supplied ?? browserPush(), [supplied])
   const [state, setState] = useState<PushState | 'working' | 'checking'>(

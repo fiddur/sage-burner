@@ -28,7 +28,6 @@ export const songSortLabel: Record<SongSort, string> = {
   artist: 'By artist',
 }
 
-/** Nameless songs go last either way, rather than sorting under the empty string. */
 export const inSongOrder = (songs: readonly SongSummary[], by: SongSort): SongSummary[] =>
   [...songs].sort((one, other) => {
     if (by === 'artist' && one.artist !== other.artist) {

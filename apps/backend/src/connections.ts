@@ -23,8 +23,6 @@ export const providerConnection = (
   reach: { kind: ConnectionKind; value: string },
   held: readonly { kind: ConnectionKind; order: number }[],
 ) => {
-  // A labelled kind needs one, and `connectionCreateSchema` refuses an empty one — so a row
-  // written with `label: ''` would be a row the member could not save an edit to.
   if (connectionKindInfo[reach.kind].labelled) return undefined
 
   const value = connectionValue(reach.kind, reach.value)

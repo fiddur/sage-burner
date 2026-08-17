@@ -47,8 +47,6 @@ describe('ensureAdmin', () => {
   })
 
   it('is safe to run twice', async () => {
-    // A deploy script or a confused operator will do this. The second run must
-    // not fail on the primary key, and must not create a second account.
     const db = database()
     const first = await ensureAdmin({
       db,
@@ -86,9 +84,6 @@ describe('ensureAdmin', () => {
   })
 
   it('adds nothing to an account that already exists, whatever it took off', async () => {
-    // Re-running the bootstrap grants roles and stops. Putting the address back would undo
-    // a deletion the person meant, and this command is run again whenever an operator is
-    // unsure whether the admin exists.
     const db = database()
     await db.insert(account).values({
       id: 'existing',
@@ -123,8 +118,6 @@ describe('ensureAdmin', () => {
   })
 
   it('never changes an existing password', async () => {
-    // Otherwise the bootstrap command is an offline password reset for any
-    // account, and anyone who can run it can take over the admin's login.
     const db = database()
     const first = await ensureAdmin({
       db,
@@ -141,8 +134,6 @@ describe('ensureAdmin', () => {
   })
 
   it('matches an existing account case-insensitively', async () => {
-    // The account table's UNIQUE is BINARY, so without normalising here the
-    // admin gets a second account rather than the role they asked for.
     const db = database()
     const first = await ensureAdmin({
       db,
@@ -196,8 +187,6 @@ describe('ensureAdmin', () => {
   })
 
   it('still grants the roles when the password would be refused', async () => {
-    // The password rule guards a password being *set*. Refusing to grant a role
-    // over it would fail for a reason that has nothing to do with the request.
     const db = database()
     const first = await ensureAdmin({
       db,

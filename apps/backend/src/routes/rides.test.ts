@@ -13,14 +13,6 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, event, ride } from '../db/schema.ts'
 
-/**
- * Getting to the burn and back (#26).
- *
- * Two properties carry most of these: a journey is **yours** to change, unlike the
- * lanes or the register beside it, and the contact on the board is the account's
- * rather than a copy taken when the row was written.
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 const OPEN_BURN = '9f1c2f2a-6f1a-4a2e-9c6d-2f0a1b3c4d5e'
@@ -144,10 +136,6 @@ const remove = (server: FastifyInstance, cookie: string | undefined, id: string)
 
 describe('the rideshare board', () => {
   it('keeps both halves in one list, each saying which it is', async () => {
-    // By kind rather than by position. The clock is fixed here, so two rows posted in
-    // one test share a `created_at` and the order falls to the random id behind it —
-    // an assertion on position passes or fails by coin toss, which mutation testing
-    // is how this was found.
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
@@ -163,9 +151,6 @@ describe('the rideshare board', () => {
   })
 
   it('answers oldest first, which is the order it is read in', async () => {
-    // The one ordering worth pinning, and it needs two distinct times to mean
-    // anything — so these are written straight in rather than posted through a fixed
-    // clock that would give them the same one.
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
@@ -184,8 +169,6 @@ describe('the rideshare board', () => {
   })
 
   it('answers with the poster from the account, not from the row', async () => {
-    // The whole reason there is no contact column: a number changed on the details
-    // page changes on every lift that person has offered.
     const server = await build()
     await givenEvent()
     const ada = await givenAccount(['member'], { name: 'Ada Lovelace', contact: '070 111 22 33' })
@@ -199,8 +182,6 @@ describe('the rideshare board', () => {
   })
 
   it('takes the burn from the path and the poster from the session', async () => {
-    // Neither is offered in the body: a request naming either would be a second,
-    // disagreeing opinion about whose journey this is and which burn it is to.
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
@@ -244,9 +225,6 @@ describe('the rideshare board', () => {
   })
 
   it('is nobody else’s, which is where this differs from the lanes beside it', async () => {
-    // The register and the grid are the burn's shared furniture and anyone may
-    // rearrange them. This is somebody's own statement about their own travel, and it
-    // carries their contact.
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
@@ -271,7 +249,6 @@ describe('the rideshare board', () => {
   })
 
   it('refuses a write to a burn that has ended, and still reads it', async () => {
-    // The board of a finished burn is the record of who travelled with whom.
     const server = await build()
     const ended = randomUUID()
     await givenEvent({ id: ended, start_date: '2025-08-01', end_date: '2025-08-05' })
@@ -298,8 +275,6 @@ describe('the rideshare board', () => {
     expect((await list(server, undefined)).statusCode).toBe(401)
     expect((await list(server, applicant.cookie)).statusCode).toBe(403)
     expect((await patch(server, applicant.cookie, id, { when: 'x' })).statusCode).toBe(403)
-    // An organiser who is not attending may still read the board and post their own
-    // journey — the same rule the timetable follows (#200).
     expect((await list(server, organiser.cookie)).statusCode).toBe(200)
     expect((await post(server, organiser.cookie)).statusCode).toBe(201)
   })
@@ -310,9 +285,6 @@ describe('the rideshare board', () => {
     const ada = await givenAccount()
     await post(server, ada.cookie)
 
-    // Asserted before each delete as well as after: without it both `toEqual([])`
-    // hold just as well for a `post` that started answering 4xx, and the cascade
-    // would be the one thing the test is not measuring.
     expect(await db().select().from(ride)).toHaveLength(1)
 
     await db().delete(account).where(eq(account.id, ada.id))
@@ -330,8 +302,6 @@ describe('the rideshare board', () => {
   })
 
   it('refuses a half of the board the vocabulary has never heard of', async () => {
-    // The CHECK, proved by a write that skips the API — the migration's, not the
-    // schema's, since the test database is built from the SQL.
     await build()
     await givenEvent()
     const ada = await givenAccount()
@@ -347,8 +317,6 @@ describe('the rideshare board', () => {
   })
 
   it('refuses an empty journey and a negative seat count at the database too', async () => {
-    // The schema refuses these at the boundary; these are the same rules where a
-    // hand-edited database or a future route cannot get round them.
     await build()
     await givenEvent()
     const ada = await givenAccount()
@@ -372,8 +340,6 @@ describe('the rideshare board', () => {
     expect(() => insert({ from: '   ' })).toThrow()
     expect(() => insert({ when: '' })).toThrow()
     expect(() => insert({ seats: -1 })).toThrow()
-    // The passing sibling: an ordinary row goes in, so the three above fail for the
-    // rule each names rather than for a column list that never worked.
     expect(() => insert({})).not.toThrow()
   })
 

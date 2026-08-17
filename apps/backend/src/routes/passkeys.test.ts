@@ -14,20 +14,6 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, passkey, webauthnChallenge } from '../db/schema.ts'
 
-/**
- * The passkey ceremonies against the real verifier.
- *
- * Nothing here is stubbed, which is the point: what is worth testing about a
- * WebAuthn route is exactly the part a stub would replace. So the suite carries a
- * small authenticator — a P-256 key, `authenticatorData`, a CBOR attestation
- * object and a real ECDSA signature — and the routes verify its output the same
- * way they would verify a phone's.
- *
- * That also makes the negative tests mean something: a flipped byte in the
- * signature or a challenge already spent fails here because the library rejects
- * it, not because a mock was told to.
- */
-
 const ORIGIN = 'https://burn.example.org'
 const RP_ID = 'burn.example.org'
 const NOW = new Date('2026-08-05T12:00:00.000Z')
@@ -93,8 +79,6 @@ const post = (server: FastifyInstance, url: string, cookie: string, payload?: ob
     payload,
   })
 
-// --- a small authenticator -------------------------------------------------
-
 const utf8 = (text: string) => new TextEncoder().encode(text)
 
 const concat = (...parts: Uint8Array[]) => {
@@ -109,7 +93,6 @@ const concat = (...parts: Uint8Array[]) => {
 
 const sha256 = (bytes: Uint8Array) => new Uint8Array(createHash('sha256').update(bytes).digest())
 
-/** rpIdHash ‖ flags ‖ signCount, and the attested credential when registering. */
 const authenticatorData = (flags: number, counter: number, attested?: Uint8Array) => {
   const head = new Uint8Array(37)
   head.set(sha256(utf8(RP_ID)), 0)
@@ -122,7 +105,6 @@ const authenticatorData = (flags: number, counter: number, attested?: Uint8Array
 const clientData = (type: string, challenge: string, origin = ORIGIN) =>
   utf8(JSON.stringify({ type, challenge, origin, crossOrigin: false }))
 
-/** User present, user verified, and — for a registration — attested key included. */
 const PRESENT_AND_VERIFIED = 0x05
 const WITH_ATTESTED_KEY = 0x40
 
@@ -133,7 +115,6 @@ const makeAuthenticator = () => {
 
   if (jwk.x === undefined || jwk.y === undefined) throw new Error('no P-256 coordinates')
 
-  // COSE_Key for ES256: kty EC2, alg -7, crv P-256, then the two coordinates.
   const coseKey = isoCBOR.encode(
     new Map<string | number, number | Uint8Array>([
       [1, 2],
@@ -197,12 +178,9 @@ const makeAuthenticator = () => {
   }
 }
 
-// --- the ceremonies --------------------------------------------------------
-
 const challengeFrom = (response: { json: () => { options: { challenge: string } } }) =>
   response.json().options.challenge
 
-/** Register one passkey and answer the cookie that was used to do it. */
 const givenPasskey = async (server: FastifyInstance, cookie: string, label = 'Phone') => {
   const authenticator = makeAuthenticator()
   const started = await post(server, '/api/me/passkeys/challenge', cookie)
@@ -241,9 +219,6 @@ describe('registering a passkey', () => {
   })
 
   it('turns nobody away for having no role', async () => {
-    // An applicant waiting on a decision, or somebody organising but not attending.
-    // A role check on the way to your own credentials is a lockout with no way
-    // round it, so the guard here is being signed in and nothing more.
     const server = await build()
     await givenAccount('ada@example.org', 'a good long passphrase')
     const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')
@@ -267,8 +242,6 @@ describe('registering a passkey', () => {
     })
 
     expect(added.statusCode).toBe(400)
-    // Spent all the same: a challenge one account has seen is not one another
-    // may keep trying against.
     expect(await db().select().from(webauthnChallenge)).toHaveLength(0)
   })
 
@@ -325,7 +298,6 @@ describe('signing in with a passkey', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json()).toMatchObject({ viewer: { account_id: id, name: 'Ada', roles: [] } })
 
-    // The cookie is the session, so it has to work rather than merely be present.
     const me = await server.inject({
       method: 'GET',
       url: '/api/auth/me',
@@ -356,8 +328,6 @@ describe('signing in with a passkey', () => {
 
     const started = await post(server, '/api/auth/passkey/challenge', '')
     const assertion = authenticator.assert(challengeFrom(started))
-    // The last byte, so the DER structure still parses and it is the signature
-    // itself that fails to verify rather than the encoding around it.
     const bytes = isoBase64URL.toBuffer(assertion.response.signature)
     const tampered = Uint8Array.from(bytes, (byte, at) => (at === bytes.length - 1 ? byte ^ 0xff : byte))
 
@@ -369,11 +339,6 @@ describe('signing in with a passkey', () => {
     })
 
     expect(response.statusCode).toBe(401)
-    // The slug as well as the status. A passkey login answers `invalid_credentials`
-    // like the password login does, and `unauthenticated` — what a bare 401 maps to —
-    // would be a different promise: the client documents this one as "did not
-    // verify", not "you are signed out". #138's sweep changed it and every test here
-    // stayed green, because they all asserted the status alone.
     expect(response.json()).toEqual({ error: 'invalid_credentials' })
   })
 
@@ -388,8 +353,6 @@ describe('signing in with a passkey', () => {
     const body = { response: assertion }
 
     expect((await post(server, '/api/auth/passkey/login', '', body)).statusCode).toBe(200)
-    // The same bytes again. A challenge is one attempt, which is the whole reason
-    // it is stored rather than signed into a cookie.
     expect((await post(server, '/api/auth/passkey/login', '', body)).statusCode).toBe(401)
   })
 
@@ -409,9 +372,6 @@ describe('signing in with a passkey', () => {
   })
 
   it('refuses a registration challenge', async () => {
-    // The two ceremonies mint challenges into the same table, and only the account
-    // column tells them apart. A login carrying one that was minted for a
-    // registration is somebody reaching for the wrong half.
     const server = await build()
     await givenAccount('ada@example.org', 'a good long passphrase')
     const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')
@@ -426,9 +386,6 @@ describe('signing in with a passkey', () => {
   })
 
   it('sweeps the challenges nobody came back for', async () => {
-    // Nothing else deletes them. Somebody who starts a ceremony and walks away
-    // leaves a row behind, and the next ceremony is the only thing in a position
-    // to notice — which is why there is no scheduled job.
     const server = await build()
     await post(server, '/api/auth/passkey/challenge', '')
 
@@ -468,12 +425,6 @@ describe('removing a passkey', () => {
   })
 
   it('lists them oldest first, whatever order the rows went in', async () => {
-    // #240. Without an `ORDER BY` the answer is whatever the query plan produced —
-    // insertion order, here — and the list re-renders from this response after every
-    // add and remove, so rows appeared to move for no reason anybody could see.
-    //
-    // The newer one is added *first*, so the two orders disagree. Added in the
-    // obvious order they agree, and this would pass against no `ORDER BY` at all.
     const server = await build()
     await givenAccount('ada@example.org', 'a good long passphrase')
     const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')
@@ -487,8 +438,6 @@ describe('removing a passkey', () => {
   })
 
   it('lets a passkey-only account remove one while it has a spare', async () => {
-    // The other arm of the guard (#239): the refusal below is about the *last* way
-    // in, not about having no password. Removing a second phone is ordinary.
     const server = await build()
     const id = await givenAccount('ada@example.org', 'a good long passphrase')
     const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')
@@ -514,8 +463,6 @@ describe('removing a passkey', () => {
     const { added } = await givenPasskey(server, cookie)
     const only = added.json().passkeys[0].id
 
-    // Passkey-only from here: removing this would leave no way in at all. Nothing in
-    // the app lets them back — the reset is an admin's, from the accounts page.
     await db().update(account).set({ password_hash: null }).where(eq(account.id, id))
 
     const response = await server.inject({
@@ -529,8 +476,6 @@ describe('removing a passkey', () => {
   })
 
   it('allows the last one while a password is set', async () => {
-    // The passing sibling of the refusal above, and the case that matters: a
-    // member who decides they would rather not keep a passkey at all.
     const server = await build()
     await givenAccount('ada@example.org', 'a good long passphrase')
     const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')
@@ -560,8 +505,6 @@ describe('removing a passkey', () => {
       headers: { cookie: bo },
     })
 
-    // 404 rather than 403: whether a given id exists is not something one member
-    // has any business learning about another's devices.
     expect(response.statusCode).toBe(404)
     expect(await db().select().from(passkey)).toHaveLength(1)
   })
@@ -569,8 +512,6 @@ describe('removing a passkey', () => {
 
 describe('which domain a passkey is bound to', () => {
   it('takes the configured origin over the one the request claims', async () => {
-    // A relaying proxy sends its own `Origin`. With `PUBLIC_ORIGIN` set, the
-    // ceremony it relays is refused rather than registered against its domain.
     const server = await build({ PUBLIC_ORIGIN: 'https://burn.example.org' })
     await givenAccount('ada@example.org', 'a good long passphrase')
     const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')

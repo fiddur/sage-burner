@@ -16,19 +16,8 @@ import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
 import { landsOn, Login, signInOutcome } from './Login.tsx'
 
-/**
- * The login form against an injected client, so the assertions are about what a
- * member sees rather than about fetch being called.
- */
-
 afterEach(cleanup)
 
-/**
- * The passkey half is stubbed to reject: these tests are about the password form,
- * and a stub that resolved would let one of them pass while the ceremony it
- * silently ran did nothing. The `signing in with a passkey` block below supplies
- * its own.
- */
 const noPasskeys = (): PasskeyApi => ({
   startPasskeyRegistration: () => Promise.reject(new Error('startPasskeyRegistration is not stubbed here')),
   addPasskey: () => Promise.reject(new Error('addPasskey is not stubbed here')),
@@ -36,11 +25,6 @@ const noPasskeys = (): PasskeyApi => ({
   finishPasskeyLogin: () => Promise.reject(new Error('finishPasskeyLogin is not stubbed here')),
 })
 
-/**
- * Under the router, because signing in navigates: outside a `LocationProvider` preact-iso's
- * context is `{}`, so `route` is undefined and calling it throws where nothing here would
- * notice — which is how the first version of this shipped untested.
- */
 const renderLogin = (login: AppApi['login'], viewer: Viewer = { status: 'signed-out' }) => {
   history.replaceState(null, '', '/login')
 
@@ -113,9 +97,6 @@ describe('Login', () => {
   })
 
   it('shows one message for a wrong password and an unknown address alike', async () => {
-    // The API refuses to distinguish them — 401 `invalid_credentials` for both
-    // — so this copy must not either, or the message becomes the enumeration
-    // oracle the API avoided.
     const login = vi.fn(() => Promise.reject(apiError(401, 'invalid_credentials', 'You need to sign in.')))
     renderLogin(login)
 
@@ -126,10 +107,6 @@ describe('Login', () => {
   })
 
   it('tells a rate-limited member to wait, rather than to try again', async () => {
-    // The login gate sheds with 429 and `Retry-After`. "Please try again"
-    // invites exactly the immediate retry that header exists to prevent — and
-    // under a flood, that is the client behaviour that makes it worse. This is
-    // what `rate_limited` was added to the vocabulary for.
     const login = vi.fn<AppApi['login']>(() =>
       Promise.reject(apiError(429, 'rate_limited', 'Too many attempts just now.')),
     )
@@ -140,14 +117,10 @@ describe('Login', () => {
 
     const message = (await screen.findByRole('alert')).textContent
     expect(message).toContain('Wait a few seconds')
-    // Specifically not the generic failure copy, which says only "Please try
-    // again" and so invites the immediate retry.
     expect(message).not.toBe('Could not sign in just now. Please try again.')
   })
 
   it('distinguishes a server failure from a rejected password', async () => {
-    // "That email and password did not match" would send someone hunting for a
-    // typo when the database is down.
     const login = vi.fn(() => Promise.reject(apiError(500, 'internal_error', 'Something went wrong.')))
     renderLogin(login)
 
@@ -180,8 +153,6 @@ describe('Login', () => {
   })
 
   it('does not submit twice while a request is in flight', async () => {
-    // Double-clicking a login button is ordinary, and each attempt costs a
-    // ~200ms scrypt hash on the server.
     let release = (_: { viewer: null }) => undefined as void
     const login = vi.fn(() => new Promise<{ viewer: null }>((resolve) => (release = resolve)))
     renderLogin(login)
@@ -209,9 +180,6 @@ describe('Login', () => {
   })
 
   it('explains that a 200 without a viewer is not a rejected password', async () => {
-    // The API answers 401 for a failed login, so this shape is a contradiction
-    // rather than a refusal. Saying "wrong password" would send someone hunting
-    // for a typo that is not there.
     const login = vi.fn(() => Promise.resolve({ viewer: null }))
     renderLogin(login)
 
@@ -222,10 +190,6 @@ describe('Login', () => {
   })
 
   it('does not post an empty form, which would be answered as a wrong password', async () => {
-    // The form previously carried `noValidate`, which suppresses constraint
-    // validation on submit and made the `required` attributes inert: an empty
-    // submit POSTed `{ email: '', password: '' }`, got a 401, and told the
-    // member their details did not match a form they never filled in.
     const login = vi.fn<AppApi['login']>(() => Promise.resolve({ viewer: null }))
     renderLogin(login)
 
@@ -235,10 +199,6 @@ describe('Login', () => {
   })
 
   it('shows no form while the viewer is still loading', async () => {
-    // A signed-in member opening /login directly would otherwise see the form
-    // flash before it swaps — the same flicker `loading` was introduced in
-    // viewer.tsx to avoid for the nav, reappearing where it is most likely to
-    // be typed into.
     render(
       <ViewerProvider viewer={{ status: 'loading' }}>
         <Login api={{ login: vi.fn(() => Promise.resolve({ viewer: null })), ...noPasskeys() }} />
@@ -250,9 +210,6 @@ describe('Login', () => {
   })
 
   it('says why there is no password reset, and where to go with no account', async () => {
-    // There is no reset flow at all: #30 gave the app a mail server and nothing that sends a
-    // reset through it, and a dead link would be worse than saying so. Sign-up is not absent
-    // any more (#476), so the sentence that said accounts come from invites had to go with it.
     renderLogin(vi.fn(() => Promise.resolve({ viewer: null })))
 
     expect((await screen.findByText(/lost your password/)).textContent).toContain('ask someone with admin')
@@ -300,8 +257,6 @@ describe('signing in with a passkey', () => {
     )
 
   it('signs in without an email or a password', async () => {
-    // Usernameless: the browser offers whatever it holds for this domain, so
-    // nothing is typed and nothing here says which addresses have accounts.
     const login = vi.fn<AppApi['login']>(() => Promise.reject(new Error('the password route was used')))
     const finish = vi.fn(() =>
       Promise.resolve({ viewer: { account_id: 'a-1', name: 'Ada', avatar: null, roles: [] } }),
@@ -347,7 +302,6 @@ describe('signing in with a passkey', () => {
   })
 
   it('offers no button where passkeys cannot work', () => {
-    // An old browser, or a page not on HTTPS. The password form is still there.
     renderWithPasskeys({}, ceremonyOf(), false)
 
     expect(screen.queryByRole('button', { name: 'Use a passkey' })).toBeNull()
@@ -391,8 +345,6 @@ describe('signing in navigates rather than offering a link', () => {
   })
 
   it('takes somebody already signed in off the login page, rather than stranding them', async () => {
-    // Pressing Back after signing in, or opening a bookmark: the page has no link out and the
-    // nav offers none to somebody signed in.
     renderLogin(() => Promise.reject(new Error('login is not called here')), {
       status: 'signed-in',
       account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] },

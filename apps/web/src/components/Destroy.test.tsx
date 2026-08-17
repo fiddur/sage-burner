@@ -158,7 +158,6 @@ describe('destroying something', () => {
   })
 
   it('marks the one being worked on rather than dimming every other', () => {
-    // `busy` bars the whole page's controls; `working` is which of them is the reason.
     render(<Destroy what="Planning call" busy={false} working onDestroy={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Remove Planning call' }).getAttribute('aria-busy')).toBe(

@@ -45,7 +45,6 @@ const givenAccount = async (wantsIt?: boolean) => {
   return id
 }
 
-/** Collects who was told what, in place of writing rows and reaching a push service. */
 const collector = () => {
   const told: { accountId: string; body: string; link: string | null }[] = []
 
@@ -70,8 +69,6 @@ const storedSha = async () => {
 
 describe('announcing a redeploy', () => {
   it('says nothing on the first boot, but remembers what it booted on', async () => {
-    // There is no previous version for it to be new against, and greeting the first
-    // admin with news about the app they have just installed is not a welcome.
     given()
     await givenAccount(true)
     const heard = collector()
@@ -92,13 +89,10 @@ describe('announcing a redeploy', () => {
 
     expect(heard.told.map((one) => one.accountId)).toEqual([ada])
     expect(heard.told[0]?.body).toContain('new version')
-    // Where "what's new" is written down (#325). It named no page until there was one.
     expect(heard.told[0]?.link).toBe('/changelog')
   })
 
   it('says nothing at all on a restart of the same build', async () => {
-    // A container restarting is not a release. Without this, every crash-loop or
-    // manual `docker compose up` would announce itself.
     given()
     await givenAccount(true)
     const heard = collector()
@@ -110,8 +104,6 @@ describe('announcing a redeploy', () => {
   })
 
   it('offers it to every account, and lets the notifier decide', async () => {
-    // The filtering is `recordAndPush`'s, in one place, rather than a second copy of
-    // the defaults here — which is what a query for `enabled = 1` would have been.
     given()
     const ada = await givenAccount(true)
     const bea = await givenAccount(false)
@@ -125,9 +117,6 @@ describe('announcing a redeploy', () => {
   })
 
   it('does not announce a build going backwards to unknown', async () => {
-    // `unknown` is what an image built without the arg reports, and a local
-    // `pnpm start` besides. Somebody running one against the live volume should not
-    // send the whole burn a release note.
     given()
     await givenAccount(true)
     const heard = collector()
@@ -139,9 +128,6 @@ describe('announcing a redeploy', () => {
   })
 
   it('does not let an unknown build make the next boot look like a release', async () => {
-    // `unknown` is not recorded at all, which is stronger than not announcing it.
-    // Were it recorded, the container coming back on the build it was already
-    // running would announce a version nobody deployed.
     given()
     await givenAccount(true)
     const heard = collector()
@@ -154,8 +140,6 @@ describe('announcing a redeploy', () => {
   })
 
   it('still announces a genuinely new build after an unknown one', async () => {
-    // The passing sibling: ignoring `unknown` entirely must not swallow the next
-    // real deploy, only the return to the one already running.
     given()
     await givenAccount(true)
     const heard = collector()

@@ -175,9 +175,6 @@ describe('inviteStatusOf', () => {
   })
 
   it('is expired exactly at the expiry, which is what the create route refuses', () => {
-    // `POST /api/admin/invites` refuses an `expires_at` that is `<= now`, so an
-    // invite minted at the boundary would be dead on arrival. The two comparisons
-    // have to agree, and this is the edit that would silently break it.
     expect(
       inviteStatusOf({ expires_at: '2026-08-01T00:00:00Z', used_at: null }, at('2026-08-01T00:00:00Z')),
     ).toBe('expired')
@@ -202,7 +199,6 @@ describe('where a way of being reached points', () => {
   })
 
   it('takes a handle with or without its @', () => {
-    // People type it both ways, and a doubled @ is a link to nobody.
     expect(connectionHref('instagram', '@wren')).toBe('https://instagram.com/wren')
     expect(connectionHref('tiktok', '@wren')).toBe('https://tiktok.com/@wren')
   })
@@ -217,10 +213,6 @@ describe('where a way of being reached points', () => {
   })
 
   it('offers no link for a value kept whole, rather than a dead one', () => {
-    // A URL has one `@` in it too, so the handle pattern matched a value `connectionValue`
-    // deliberately kept as typed — and built `https://wren/statuses/1/@https://chaos.social/`,
-    // a link to host `wren` (#433). With the scheme and without it: dropping `https://` is not
-    // what makes a post URL a handle.
     expect(connectionHref('mastodon', 'https://chaos.social/@wren/statuses/1')).toBeUndefined()
     expect(connectionHref('mastodon', 'https://chaos.social/@wren\\x')).toBeUndefined()
     expect(connectionHref('mastodon', 'chaos.social/@wren/statuses/1')).toBeUndefined()
@@ -228,8 +220,6 @@ describe('where a way of being reached points', () => {
   })
 
   it('says there is nowhere to go for the ones with no profile page', () => {
-    // Discord is the one that matters: a username is a string you paste into Discord's
-    // own search, so the page has to offer something to copy rather than an anchor.
     expect(connectionHref('discord', 'wren')).toBeUndefined()
     expect(connectionHref('signal', '+46701234567')).toBeUndefined()
   })
@@ -250,11 +240,6 @@ describe('where a way of being reached points', () => {
   })
 
   it('builds only addresses a browser should be sent to, for every kind', () => {
-    // What the type cannot give: `satisfies Record<ConnectionKind, ConnectionKindInfo>`
-    // makes a missing `links` a compile error, so asserting it is a function proves
-    // nothing (#395). What is worth asserting is what the functions produce — every href
-    // reachable from this vocabulary carries a scheme the app is willing to emit, whatever
-    // somebody typed into the box.
     const schemes = new Set<string>()
 
     for (const kind of connectionKinds) {
@@ -272,14 +257,10 @@ describe('where a way of being reached points', () => {
   })
 
   it('writes to somebody on Messenger, which is what Facebook is as a contact', () => {
-    // Looking at somebody's Facebook page is a different act and not a way of reaching
-    // them; the profile page draws that from a linked sign-in (#393).
     expect(connectionHref('messenger', 'wren')).toBe('https://m.me/wren')
   })
 
   it('takes the numeric form of a Facebook account, which has no handle', () => {
-    // An account with no vanity name is only ever `profile.php?id=…`, and Messenger takes
-    // the number just the same.
     expect(connectionHref('messenger', '1234567890')).toBe('https://m.me/1234567890')
   })
 
@@ -290,8 +271,6 @@ describe('where a way of being reached points', () => {
 
 describe('what is stored for a way of being reached', () => {
   it('reduces a pasted profile URL to the handle', () => {
-    // What autofill and every "copy link" button hand over. Kept whole, it builds
-    // `instagram.com/https://instagram.com/wren` and points at nobody.
     expect(connectionValue('instagram', 'https://instagram.com/wren')).toBe('wren')
     expect(connectionValue('instagram', 'https://www.instagram.com/wren/')).toBe('wren')
     expect(connectionValue('instagram', 'https://instagram.com/wren/?hl=en')).toBe('wren')
@@ -301,16 +280,11 @@ describe('what is stored for a way of being reached', () => {
   it('reduces a pasted Facebook link to what Messenger needs, in both of its shapes', () => {
     expect(connectionValue('messenger', 'https://www.facebook.com/wren')).toBe('wren')
     expect(connectionValue('messenger', 'https://facebook.com/wren/')).toBe('wren')
-    // An account with no vanity name has only this shape, and its path segment is
-    // `profile.php` — reduced as a handle it would point at nobody.
     expect(connectionValue('messenger', 'https://facebook.com/profile.php?id=1234567890')).toBe('1234567890')
     expect(connectionValue('messenger', 'https://www.facebook.com/profile.php?locale=sv_SE&id=42')).toBe('42')
   })
 
   it('keeps a Facebook link whole when its first segment is not a handle', () => {
-    // `handleIn` takes the first path segment, so these reduced to the literal
-    // `profile.php` or `people` and rendered `m.me/profile.php` — a wrong handle stored
-    // silently. Kept whole they are visibly wrong, which is the better failure (#398).
     expect(connectionValue('messenger', 'https://facebook.com/profile.php?id=abc')).toBe(
       'https://facebook.com/profile.php?id=abc',
     )
@@ -323,16 +297,12 @@ describe('what is stored for a way of being reached', () => {
   })
 
   it('agrees with itself about what Facebook is, on both branches', () => {
-    // The numeric branch matched `[^\s/]*facebook\.com`, which takes `notfacebook.com` and
-    // eats a whole authority — so a query string naming Facebook was read as one (#398).
     expect(connectionValue('messenger', 'https://notfacebook.com/profile.php?id=123')).toBe(
       'https://notfacebook.com/profile.php?id=123',
     )
     expect(connectionValue('messenger', 'https://evil.example?x=facebook.com/profile.php?id=123')).toBe(
       'https://evil.example?x=facebook.com/profile.php?id=123',
     )
-    // The passing sibling, so anchoring has not simply refused everything: a subdomain is
-    // still Facebook, on both branches.
     expect(connectionValue('messenger', 'https://m.facebook.com/profile.php?id=123')).toBe('123')
     expect(connectionValue('messenger', 'https://m.facebook.com/wren')).toBe('wren')
   })
@@ -355,10 +325,6 @@ describe('what is stored for a way of being reached', () => {
   })
 
   it('reads a pasted host the way a browser would', () => {
-    // `handleIn`'s share of the same hole. Before this, a backslash let another host end
-    // `.facebook.com`, so `wren` was lifted out of somebody else's URL and stored as though
-    // they had typed it. Kept whole instead, which is this function's stated fallback:
-    // visibly wrong beats storing the wrong thing.
     expect(connectionValue('messenger', 'https://evil.example\\.facebook.com/wren')).toBe(
       'https://evil.example\\.facebook.com/wren',
     )
@@ -368,21 +334,14 @@ describe('what is stored for a way of being reached', () => {
   })
 
   it('reads a path the way a browser segments it', () => {
-    // `\` separates segments too, not just the authority: a browser reads `/a\b/c` as `/a/b/c`,
-    // so `a\b` would have been a handle nobody has.
     expect(connectionValue('instagram', 'https://instagram.com/a\\b/c')).toBe('a')
   })
 
   it('keeps a Mastodon URL whole when the segment is not just a handle', () => {
-    // The same divergence on the branch that recognises a Mastodon URL by its shape. One
-    // segment, and that segment an `@handle` — `@wren\x` is two to a browser, so it stays as
-    // typed rather than becoming `@wren@chaos.social`.
     expect(connectionValue('mastodon', 'https://chaos.social/@wren\\x')).toBe('https://chaos.social/@wren\\x')
   })
 
   it('does not mistake somebody else’s URL for a handle', () => {
-    // A link to an Instagram post is not a profile, and a URL on another host is not
-    // Instagram at all — both stay as typed rather than becoming a wrong handle.
     expect(connectionValue('instagram', 'https://example.org/wren')).toBe('https://example.org/wren')
     expect(connectionValue('mastodon', 'https://chaos.social/@wren/statuses/1')).toBe(
       'https://chaos.social/@wren/statuses/1',
@@ -390,7 +349,6 @@ describe('what is stored for a way of being reached', () => {
   })
 
   it('makes the link that a pasted URL would otherwise have broken', () => {
-    // The two halves together, which is the whole point of normalising on the way in.
     expect(connectionHref('instagram', connectionValue('instagram', 'https://instagram.com/wren'))).toBe(
       'https://instagram.com/wren',
     )
@@ -401,8 +359,6 @@ describe('what is stored for a way of being reached', () => {
 
   describe('a profile URL Facebook itself answered', () => {
     it('keeps a link on Facebook, whichever subdomain it is on', () => {
-      // The two shapes `user_link` actually answers: a vanity name, and `profile.php` for an
-      // account without one.
       expect(facebookProfileLink('https://www.facebook.com/wren')).toBe('https://www.facebook.com/wren')
       expect(facebookProfileLink('https://facebook.com/profile.php?id=1234567890')).toBe(
         'https://facebook.com/profile.php?id=1234567890',
@@ -411,26 +367,15 @@ describe('what is stored for a way of being reached', () => {
     })
 
     it('refuses a host a browser would read differently', () => {
-      // The hole this closed, and the only input that distinguished it: WHATWG treats `\\` as
-      // `/` for a special scheme, so a browser reads this as host `evil.example` and path
-      // `/.facebook.com/wren`, while an authority captured up to the first `/?#` ends
-      // `.facebook.com` and passed the host check. The value lands in an `href` other members
-      // click, so the two readings have to agree.
       expect(facebookProfileLink('https://evil.example\\.facebook.com/wren')).toBeUndefined()
     })
 
     it('refuses a userinfo form, as it always did', () => {
-      // Its own case because it proves nothing about the backslash fix — the old code refused
-      // this too, since the captured authority ended `@facebook.com` and the host pattern is
-      // anchored on a preceding dot. Kept as the belt to the braces, not as evidence.
       expect(facebookProfileLink('https://evil.example\\@facebook.com/wren')).toBeUndefined()
       expect(facebookProfileLink('https://evil.example@facebook.com/wren')).toBeUndefined()
     })
 
     it('refuses a host that only looks like Facebook', () => {
-      // `facebookNumericId`'s mistake, which this must not repeat: a loose match takes
-      // `notfacebook.com`, and one that eats an authority takes a query string naming Facebook
-      // on somebody else's host. It lands in an `href` other members click.
       expect(facebookProfileLink('https://notfacebook.com/wren')).toBeUndefined()
       expect(facebookProfileLink('https://evil.example?x=facebook.com/wren')).toBeUndefined()
       expect(facebookProfileLink('https://facebook.com.evil.example/wren')).toBeUndefined()

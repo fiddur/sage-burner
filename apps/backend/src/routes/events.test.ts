@@ -15,14 +15,6 @@ import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, event } from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 
-/**
- * Events, and the rule for which one is "active".
- *
- * The clock is injected throughout — an active-event rule tested against the
- * real date passes in July and fails in September, which is the worst kind of
- * test to own.
- */
-
 const SECRET = 's'.repeat(40)
 
 let handle: DbHandle | undefined
@@ -83,8 +75,6 @@ const givenEvent = async (fields: { slug: string; start_date: string; end_date: 
       welcome_markdown: '',
       payment_info_markdown: '',
       member_cap: 42,
-      // Written here, or the leak these tests exist to catch is a `null` under test and a
-      // live secret in production (#408).
       feed_token: `token-${id}`,
       created_at: '2026-01-01T00:00:00.000Z',
     })
@@ -137,9 +127,6 @@ describe('PATCH /api/events/:id/welcome', () => {
   })
 
   it('refuses rewriting a burn that has ended, however approved the member', async () => {
-    // #218. This was the one member-facing write keyed by a bare id that never looked
-    // at `end_date`, so any approved member could rewrite a finished burn's welcome
-    // text indefinitely — years later, on the page a past burn's link still opens.
     const server = await build('2026-09-01')
     const over = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
     const cookie = await givenAccount(['member', 'admin'])
@@ -152,9 +139,6 @@ describe('PATCH /api/events/:id/welcome', () => {
   })
 
   it('still rewrites one that has not ended, including while it is running', async () => {
-    // The passing sibling, and it pins the boundary that matters: the guard is
-    // `openEvent`, so a burn in progress is still editable. A check against
-    // `start_date` would pass the refusal above and break the burn everyone is at.
     const server = await build('2026-08-03')
     const running = await givenEvent({
       slug: 'summer-2026',
@@ -182,9 +166,6 @@ describe('PATCH /api/events/:id/welcome', () => {
   })
 
   it("refuses the burn's shape smuggled in beside the welcome text", async () => {
-    // The whole reason this is its own route. `.strict()` makes a `member_cap`
-    // here a 400 rather than a dropped key, so nobody can believe they raised the
-    // cap — and a member cannot raise it at all, which is the point.
     const server = await build()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
     const member = await givenAccount(['member'])
@@ -198,8 +179,6 @@ describe('PATCH /api/events/:id/welcome', () => {
   })
 
   it('still refuses a member at the admin route that writes the shape', async () => {
-    // The sibling that proves the split did its job: opening the welcome text did
-    // not open the dates or the cap.
     const server = await build()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
     const member = await givenAccount(['member'])
@@ -216,8 +195,6 @@ describe('PATCH /api/events/:id/welcome', () => {
   })
 
   it('requires the field rather than treating an empty body as a no-op', async () => {
-    // Unlike the admin PATCH, which is `.partial()` and answers `{}` with the row
-    // unchanged. There is one field here, so an empty body is a malformed request.
     const server = await build()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
     const member = await givenAccount(['member'])
@@ -228,12 +205,6 @@ describe('PATCH /api/events/:id/welcome', () => {
 
 describe('GET /api/events/active', () => {
   it('carries no calendar feed token, which is the whole of what #408 fixed', async () => {
-    // The route is unguarded and the public homepage fetches it on every anonymous visit,
-    // so anything in this body is public. `db.select()` put `feed_token` here — trading one
-    // readable-off-the-front-page key for another.
-    //
-    // Asserted on the payload rather than on the parsed keys: a serializer, a spread or a
-    // future `.returning()` would each put it back, and only the bytes catch all three.
     const server = await build()
     await givenEvent({ slug: 'summer', start_date: '2026-08-01', end_date: '2026-08-05' })
 
@@ -241,15 +212,10 @@ describe('GET /api/events/active', () => {
 
     expect(response.payload).not.toContain('feed_token')
     expect(response.payload).not.toContain('token-')
-    // The passing sibling: the burn itself is answered, so this is not passing on an
-    // empty body.
     expect(response.json().event.slug).toBe('summer')
   })
 
   it('answers only what `Event` describes, so a new column cannot ride along', async () => {
-    // `asEvent` is an object literal against the type, in the manner of `asMemberEntry`.
-    // A response schema would be the other way and there is none: nothing validates or
-    // serializes against `eventSchema`, so a type here is documentation, not a filter.
     const server = await build()
     await givenEvent({ slug: 'summer', start_date: '2026-08-01', end_date: '2026-08-05' })
 
@@ -273,7 +239,6 @@ describe('GET /api/events/active', () => {
   })
 
   it('is null before any event exists', async () => {
-    // A fresh deployment. Not a 404 — the homepage renders an explanation.
     const server = await build()
 
     const response = await active(server)
@@ -298,8 +263,6 @@ describe('GET /api/events/active', () => {
   })
 
   it('still counts an event that is running today', async () => {
-    // Mid-burn is exactly when the homepage matters most; a rule keyed on the
-    // start date would have dropped it the moment it began.
     const server = await build('2026-08-03')
     await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
@@ -314,8 +277,6 @@ describe('GET /api/events/active', () => {
   })
 
   it('is null once every event has ended', async () => {
-    // Deliberate: last year's welcome text must not stay up as though it were
-    // an invitation. Creating the next event is what fills the gap.
     const server = await build('2026-08-06')
     await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
@@ -327,7 +288,6 @@ describe('GET /api/events/active', () => {
     await givenEvent({ slug: 'b-burn', start_date: '2026-08-02', end_date: '2026-08-05' })
     await givenEvent({ slug: 'a-burn', start_date: '2026-08-01', end_date: '2026-08-05' })
 
-    // Same end date, so the earlier start wins.
     expect((await active(server)).json().event.slug).toBe('a-burn')
   })
 
@@ -340,9 +300,6 @@ describe('GET /api/events/active', () => {
 
 describe('admin event routes', () => {
   it('refuse an anonymous caller', async () => {
-    // The signed-in-but-not-admin case lives in `auth/guards.test.ts`, which is
-    // where the guard itself is exercised; duplicating it here would test the
-    // same preHandler twice.
     const server = await build()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
@@ -350,9 +307,6 @@ describe('admin event routes', () => {
     expect(
       (await server.inject({ method: 'POST', url: '/api/admin/events', payload: valid })).statusCode,
     ).toBe(401)
-    // PATCH was missing while the name claimed the whole route group. It shares
-    // the preHandler, so the risk was low — but a test's name should not be
-    // broader than its assertions.
     expect(
       (
         await server.inject({
@@ -376,9 +330,6 @@ describe('admin event routes', () => {
   })
 
   it('takes where the burn is held, and hands it back', async () => {
-    // Both schemas are `.strict()`, so a field missing from either is a 400 — and
-    // every other test writes `location` straight into the table, which would not
-    // notice (#309).
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -407,8 +358,6 @@ describe('admin event routes', () => {
   })
 
   it('reject a duplicate slug with 409 rather than 500', async () => {
-    // The slug is in URLs, so this is a thing the admin fixes by picking
-    // another — it needs to be distinguishable from a server fault.
     const server = await build()
     const cookie = await givenAdmin()
     await create(server, cookie, valid)
@@ -447,9 +396,6 @@ describe('admin event routes', () => {
   })
 
   it('edit the welcome text without restating the event', async () => {
-    // The whole point of #11: an admin changes the welcome text and the
-    // public page reflects it, with no redeploy and no risk of clobbering the
-    // dates someone else just fixed.
     const server = await build('2026-06-01')
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -472,9 +418,6 @@ describe('admin event routes', () => {
   })
 
   it('treats an empty patch as a no-op rather than a 500', async () => {
-    // `set({})` is not valid SQL, so drizzle refuses it outright — this used to
-    // answer `internal_error` with a stack in the log. A no-op PATCH is
-    // idempotent, so the row comes back unchanged.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -486,10 +429,6 @@ describe('admin event routes', () => {
   })
 
   it('rejects an unrecognised key on create too, not only on update', async () => {
-    // Otherwise `welcome` for `welcome_markdown` is stripped and the event is
-    // created with the `.default('')`, so an admin gets a 201 for an event
-    // whose welcome text is silently empty. Same argument as the update path; the
-    // two schemas should not differ for no stated reason.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -500,9 +439,6 @@ describe('admin event routes', () => {
   })
 
   it('answers 404 for an empty patch against an event that does not exist', async () => {
-    // The one branch that decides what `{}` means when there is no row. It is the
-    // only path that still reads before writing, so it is also the only place a
-    // missing event is detected without the `UPDATE` doing it.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -513,11 +449,6 @@ describe('admin event routes', () => {
   })
 
   it('rejects a whole event object patched back, the round-trip docs/burns.md warns about', async () => {
-    // The documented contract — "reading an event, editing the object and sending
-    // the whole thing back is a 400 on `id` and `created_at`" — rests on two
-    // independent facts: `.strict()`, and `id`/`created_at` being omitted from the
-    // update schema. Either one changing alone breaks the promise, and the
-    // `welcome` test covers `.strict()` for a different key for a different reason.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -533,10 +464,6 @@ describe('admin event routes', () => {
   })
 
   it('rejects an unrecognised key instead of answering "saved"', async () => {
-    // `welcome` for `welcome_markdown` is a plausible typo against a partial
-    // endpoint. A non-strict schema stripped it, the body became `{}`, and the
-    // no-op path above answered 200 — which the editor renders as "Saved."
-    // while nothing was written. Silent success is worse to diagnose than a 500.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -548,10 +475,6 @@ describe('admin event routes', () => {
   })
 
   it('rejects a patch with both dates in the wrong order', async () => {
-    // Rejected by `withEventDateOrder` before the handler sees it, which is why
-    // the handler carries no both-dates check. Nothing covered this on the update
-    // path before — only on POST — so relaxing that refine would have gone
-    // unnoticed until an out-of-order pair reached the database CHECK.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -564,9 +487,6 @@ describe('admin event routes', () => {
   })
 
   it('rejects a one-sided date move in either direction, and stores nothing', async () => {
-    // The schema cannot catch this: it tolerates a partial range, since a PATCH
-    // may legitimately carry one date. The handler reads the row, merges the
-    // patch onto it and checks the result.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -582,15 +502,6 @@ describe('admin event routes', () => {
   })
 
   it('answers 200 when the welcome text is re-saved unchanged', async () => {
-    // The realistic path: an admin opens the editor, changes nothing, clicks
-    // Save. What it pins is that a write which changes no values is still a
-    // success — not an error, and not "no such event".
-    //
-    // It pins the contract rather than a driver quirk, which matters because the
-    // obvious implementation has one: a handler that decided from `changes` would
-    // depend on SQLite counting a row whose SET values are identical, where MySQL
-    // reports 0. `RETURNING` emits a row per row the `WHERE` matched, differing
-    // values or not, so the answer here is the same on either engine.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -603,9 +514,6 @@ describe('admin event routes', () => {
   })
 
   it('allows a one-sided date move that keeps the order, in either direction', async () => {
-    // The guard must not have become "no single-date patches", and moving either
-    // date needs a passing case, not just a rejecting one. Only `end_date` was
-    // covered here, so nothing exercised a `start_date` move that should succeed.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -620,14 +528,6 @@ describe('admin event routes', () => {
   })
 
   it('allows moving the whole range forward, with both dates in one patch', async () => {
-    // A both-dates patch that is in order. Nothing exercised it: every other
-    // both-dates PATCH here is out of order, so
-    // `withEventDateOrder` rejects it at `safeParse` and the handler never reaches the
-    // function with both set.
-    //
-    // Deleting that line is not harmless — the next branch would then compare the
-    // *new* start against the *old* end column (`2026-09-01 <= 2026-08-05`), match
-    // no rows, and refuse a perfectly ordinary "the burn moved to September".
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -640,15 +540,6 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-05' })
   })
 
-  // A one-day event is legal, so the ordering rule must admit an equal pair —
-  // `<=`, not `<`, in the schema and in `event_date_order_check` alike.
-  //
-  // One case each, on its own fixture. They were a single test with two sequential
-  // patches, and that only exercised the second boundary *because the first
-  // succeeded*: under a strict `<` the start move is refused, the row stays
-  // `08-01..08-05`, and the end move then evaluates `08-01 < 08-05` and passes. The
-  // mutation was still caught, but by one assertion rather than the two the comment
-  // claimed.
   it('allows a start date landing exactly on the end date', async () => {
     const server = await build()
     const cookie = await givenAdmin()
@@ -674,36 +565,17 @@ describe('admin event routes', () => {
   })
 
   it('answers 404, not 400, when a valid one-sided move hits a deleted event', async () => {
-    // Zero matched rows has two causes when an ordering condition is in the
-    // `WHERE`: the condition failed, or the row is gone. Guessing attributed it to
-    // the body, so a perfectly ordered move against a deleted event answered
-    // `bad_request` — which the editor renders as "check the dates and lengths",
-    // dates that were never the problem. The handler re-reads instead.
-    //
-    // No stub any more: since the pre-read moved inside the empty-body branch,
-    // nothing is read before the write, so a deleted row reaches the same path a
-    // concurrent delete would.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
     await db().delete(event).where(eq(event.id, id))
 
-    // Well ordered against the row as it was: 2026-08-02 sits inside 08-01..08-05.
     const response = await patch(server, cookie, id, { start_date: '2026-08-02' })
 
     expect(response.statusCode).toBe(404)
     expect(response.json()).toEqual({ error: 'not_found' })
   })
   it("answers 409 when a patch takes another event's slug", async () => {
-    // The 409 was only covered on POST, and it matters more here because the
-    // handler signals a conflict with an `undefined` sentinel out of `.catch()`
-    // rather than by throwing — nothing else pins that `undefined` means "slug
-    // conflict" rather than "the driver returned nothing".
-    //
-    // That distinction carries more weight since `.returning()` landed, because the
-    // handler now reads two different empty-ish results from the same statement:
-    // `undefined` from the `.catch()` is a conflict (409), and `[]` is "no row
-    // matched" (400 or 404). Collapsing them would answer the wrong one.
     const server = await build()
     const cookie = await givenAdmin()
     await givenEvent({ slug: 'winter-2026', start_date: '2026-12-01', end_date: '2026-12-05' })
@@ -781,8 +653,6 @@ describe('the hours a burn is open', () => {
   })
 
   it('accepts a one-day burn that runs forwards', async () => {
-    // The passing sibling: the rule must refuse the inverted pair, not every
-    // single-day burn.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -807,7 +677,6 @@ describe('the hours a burn is open', () => {
   })
 
   it('keeps a nonsense time out of the database, whatever the caller is', async () => {
-    // The CHECK earns its place against writes that never see the Zod schema.
     await build()
     const row = (start: string, end: string) => () =>
       client()
@@ -832,8 +701,6 @@ describe('the hours a burn is open', () => {
   })
 
   it('answers 400, not 500, when a patch would invert the stored hours', async () => {
-    // A multi-day burn may run 22:00 to 10:00. Narrowing it to one day makes that
-    // pair invalid, and the body alone cannot see it.
     const server = await build()
     const cookie = await givenAdmin()
     const id = (await create(server, cookie, { ...valid, start_time: '22:00', end_time: '10:00' })).json()
@@ -864,10 +731,6 @@ describe('the hours a burn is open', () => {
   })
 
   it('answers 404 for a patch against an event that is not there', async () => {
-    // Answered by the read the ordering check needs, before the UPDATE runs —
-    // not by the guard after it. That guard is for a row deleted *between* the
-    // two, which `inject` cannot produce, so nothing here reaches it and this
-    // test should not be read as covering it.
     const server = await build()
     const cookie = await givenAdmin()
 
@@ -875,11 +738,6 @@ describe('the hours a burn is open', () => {
   })
 
   it('recognises the ordering CHECK by its message, so the race answers 400', async () => {
-    // The predicate, pinned against a real violation rather than a hand-written
-    // string — `inject` serialises two requests, so the path that uses it cannot
-    // be reached under test. Same shape as `isAlreadyJoined` in `attendance.ts`,
-    // and for the same reason: at least the message it matches cannot drift
-    // unnoticed.
     await build()
     let raised: unknown
 
@@ -946,7 +804,6 @@ describe('rewriting a welcome somebody else has just rewritten', () => {
     const cookie = await givenAccount(['member'])
     const other = await givenAccount(['member'])
 
-    // The homepage is what reads this, so the tag comes off `GET /api/events/active`.
     const asTheySawIt = String((await active(server)).headers.etag)
 
     expect((await write(server, cookie, id, 'mine')).statusCode).toBe(428)
@@ -955,7 +812,6 @@ describe('rewriting a welcome somebody else has just rewritten', () => {
 
     const refused = await write(server, cookie, id, 'mine', asTheySawIt)
     expect(refused.statusCode).toBe(412)
-    // What the other person wrote, so the page can show it beside what was typed.
     expect(refused.json().event.welcome_markdown).toBe('theirs')
   })
 

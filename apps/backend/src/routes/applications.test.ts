@@ -23,16 +23,6 @@ import {
   pushSubscription,
 } from '../db/schema.ts'
 
-/**
- * Submitting the application form.
- *
- * Behind being signed in since #476 — the account comes first and the application second — but
- * a role-less account is what anybody off the street can make, so everything it accepts is still
- * attacker-controlled. The rules worth proving are that the questions are honoured (a required
- * one cannot be skipped, an agreement cannot be left unticked) and that nothing the submitter
- * sends decides their own status.
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
 
@@ -61,7 +51,6 @@ const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   return app
 }
 
-/** An admin with a browser signed up for push, which is who an application reaches. */
 const givenSubscribedAdmin = async () => {
   const id = randomUUID()
   await db()
@@ -104,25 +93,9 @@ const givenQuestion = async (over: Partial<FormQuestion> & Pick<FormQuestion, 't
   return id
 }
 
-/**
- * The answer keys, or none.
- *
- * `payload` is `Record<string, unknown>`, so `payload.answers` is `unknown` and
- * cannot go to `Object.keys` without narrowing. Guarded rather than cast, and the
- * `[]` is what a test passing a non-object `answers` would want anyway: casting
- * would turn a string into `asked: ['0','1',…]` and quietly rewrite the body of a
- * test that meant to probe something else.
- */
 const answerKeys = (answers: unknown): string[] =>
   typeof answers === 'object' && answers !== null ? Object.keys(answers) : []
 
-/**
- * Submit, defaulting `asked` to whatever the answers name.
- *
- * The field is required by the schema, and spelling it out in every test that is
- * not about it would bury the thing each one is asserting. Tests that care pass
- * it explicitly.
- */
 const submit = (
   server: FastifyInstance,
   payload: Record<string, unknown>,
@@ -135,11 +108,6 @@ const submit = (
     payload: { asked: answerKeys(payload.answers), ...payload },
   })
 
-/**
- * The account an applicant has before they have a role, made on the way in. Held in a module
- * variable rather than threaded through every test: the tests here are about the form, and the
- * account is furniture the flow now requires.
- */
 let applicantAccount: { id: string; cookie: string } | undefined
 
 const applicantCookie = () => {
@@ -164,10 +132,6 @@ const givenSignedIn = async (roles: ('admin' | 'member')[] = []) => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-/**
- * Only the first call becomes the one `submit()` uses by default — a second would
- * otherwise repoint it, and a test mixing the two would fail somewhere else entirely.
- */
 const givenApplicant = async () => {
   const made = await givenSignedIn()
   applicantAccount ??= made
@@ -179,7 +143,6 @@ const applicant = { applicant_name: 'Fredrik', applicant_email: 'fredrik@example
 
 const stored = async () => db().select().from(application)
 
-/** Submit an answer, with the question's wording edited in between. */
 const submitAfter = async (server: FastifyInstance, questionId: string, label: string) => {
   await db().update(formQuestion).set({ label }).where(eq(formQuestion.id, questionId))
   return submit(server, { ...applicant, answers: { [questionId]: 'For the fire' }, asked: [questionId] })
@@ -291,9 +254,6 @@ describe('submitting an application', () => {
   })
 
   it('records answers in the same order the public form serves them', async () => {
-    // `order` is not unique, so a tie is broken by id — and it has to be broken
-    // the same way in both places, or the applicant sees one order and the
-    // stored snapshot records another.
     const server = await build()
     const first = '00000000-0000-4000-8000-000000000001'
     const second = '00000000-0000-4000-8000-000000000002'
@@ -307,8 +267,6 @@ describe('submitting an application', () => {
     const storedOrder = row?.answers.map((answer) => answer.question_id)
 
     expect(storedOrder).toEqual(served.questions.map((question: { id: string }) => question.id))
-    // Both halves: that the two agree, and that they agree on id — sharing one
-    // query makes them agree on anything, including nothing in particular.
     expect(storedOrder).toEqual([first, second])
   })
 
@@ -333,8 +291,6 @@ describe('submitting an application', () => {
   })
 
   it('refuses an agreement omitted rather than sent as false', async () => {
-    // A browser omits an unticked box entirely, so this is the shape the rule
-    // actually meets — checking only for `false` would let it through.
     const server = await build()
     await givenQuestion({ type: 'agreement', label: 'I agree', required: true })
 
@@ -357,8 +313,6 @@ describe('submitting an application', () => {
   })
 
   it('refuses a status the submitter tries to set', async () => {
-    // `.strict()`, so this is a 400 rather than a silent drop — a submitter who
-    // could set their own status would approve themselves.
     const server = await build()
 
     const response = await submit(server, { ...applicant, answers: {}, status: 'approved' })
@@ -403,9 +357,6 @@ describe('submitting an application', () => {
   })
 
   it('stores the wording as it is at submission, not as it was on screen', async () => {
-    // The one thing still read from the current list rather than from `asked`: a
-    // label edited while the form was open is stored as the new text, against an
-    // answer given to the old.
     const server = await build()
     const why = await givenQuestion({ type: 'text', label: 'Why?', required: false })
     await submitAfter(server, why, 'Why do you want to come?')
@@ -417,8 +368,6 @@ describe('submitting an application', () => {
   })
 
   it('stores an untouched optional text answer as an empty string', async () => {
-    // The other half of "one entry per question asked, answered or not", the
-    // `false` case being the sibling below.
     const server = await build()
     const why = await givenQuestion({ type: 'text', label: 'Why?', required: false })
 
@@ -429,10 +378,6 @@ describe('submitting an application', () => {
   })
 
   it('refuses a cleared field naming a question that has since gone', async () => {
-    // The boundary the phrase "left blank" hides: `Apply.tsx` writes
-    // `answers[id]` on every keystroke, so a field typed into and then emptied
-    // sends `''` — a key, which `answerProblems` calls `unknown` for a deleted
-    // question. Blank on screen, 400 in the API.
     const server = await build()
     const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
     const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
@@ -448,9 +393,6 @@ describe('submitting an application', () => {
   })
 
   it('stores an unticked checkbox as false rather than dropping it', async () => {
-    // Shown and left alone, which is the distinction the per-question entry
-    // exists for: `false` here means "asked, said no", and no entry at all would
-    // mean "never asked".
     const server = await build()
     const box = await givenQuestion({ type: 'checkbox', label: 'Bring food', required: false })
 
@@ -461,9 +403,6 @@ describe('submitting an application', () => {
   })
 
   it('leaves out a question added while the form was open', async () => {
-    // The bug: an optional question added mid-fill passed validation and was
-    // stored as `""`, which reads as "asked and declined" to whoever reviews it.
-    // The applicant never saw it.
     const server = await build()
     const shown = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
     const late = await givenQuestion({ type: 'text', label: 'Added later', required: false, order: 1 })
@@ -476,9 +415,6 @@ describe('submitting an application', () => {
   })
 
   it('drops a question deleted while the form was open and left blank', async () => {
-    // The honest case for `asked` naming something the server does not have: there
-    // is nothing to store, since the wording comes from the row and the row is
-    // gone. Answered, it is a 400 instead — the test below draws that boundary.
     const server = await build()
     const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
     const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
@@ -496,10 +432,6 @@ describe('submitting an application', () => {
   })
 
   it('refuses when the deleted question had been answered', async () => {
-    // The boundary of the case above, and it is not the `asked` filter that
-    // decides it: `answerProblems` sees an answer naming no question it holds and
-    // says `unknown`, so this is a 400 before the filter is reached. The 201 is
-    // for a deleted question left *blank*.
     const server = await build()
     const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
     const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
@@ -516,8 +448,6 @@ describe('submitting an application', () => {
   })
 
   it('still checks a required question added while the form was open', async () => {
-    // The half that must not move. Validation runs against the server's list, or
-    // "I wasn't shown that" becomes the way to skip an agreement.
     const server = await build()
     const shown = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
     await givenQuestion({ type: 'agreement', label: 'I agree', required: true, order: 1 })
@@ -533,8 +463,6 @@ describe('submitting an application', () => {
   })
 
   it('refuses an answer to a question the form says it never showed', async () => {
-    // A body disagreeing with itself. Dropping the answer silently would lose
-    // what someone typed; storing it would make `asked` a decoration.
     const server = await build()
     const one = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
     const two = await givenQuestion({ type: 'text', label: 'Anything else?', required: false, order: 1 })
@@ -557,8 +485,6 @@ describe('submitting an application', () => {
   })
 
   it('is open to the public, with no session', async () => {
-    // Explicit, because every other write in this app requires an admin — the
-    // absence of a guard here is a decision, not an oversight.
     const server = await build()
 
     const response = await submit(server, { ...applicant, answers: {} })
@@ -569,11 +495,6 @@ describe('submitting an application', () => {
 
 describe('telling the admins', () => {
   it('sends the page to open and the category with the wording, like every other push', async () => {
-    // It went to the push senders directly and carried a body alone, which was
-    // invisible while the worker had `/admin/applications` written into it and the one
-    // notification going nowhere the moment it stopped (#279). Now it is a bell row
-    // first and a push copied from it (#326), so all three fields come from one place
-    // — what the row holds is what the push carries.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     await givenSubscribedAdmin()
@@ -673,8 +594,6 @@ describe('talking to an applicant', () => {
   })
 
   it('is nobody else’s to read, however they ask', async () => {
-    // The one conversation that is not member-visible: an applicant sees their own and no other,
-    // and the route takes no id for exactly that reason.
     const server = await build()
     await givenSent(server)
     const stranger = await givenApplicant()
@@ -727,8 +646,6 @@ describe('talking to an applicant', () => {
 
 describe('the name an application carries', () => {
   it('fills in an account that came in with none, which a provider often leaves', async () => {
-    // `updateMyProfile` is behind `requireApproved`, so an applicant cannot fill it in while
-    // they wait — and without it every card and every push about them says "Somebody".
     const server = await build()
 
     await submit(server, { ...applicant, answers: {} })
@@ -799,8 +716,6 @@ describe('who an applicant is told to ask', () => {
   })
 
   it('names nobody to an account that has not applied at all', async () => {
-    // Sign-up is open, so this route is reachable by anybody who can make an account — and the
-    // admins' contact details are a members-only read everywhere else.
     const server = await build()
     await givenOrganiser()
 

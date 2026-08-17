@@ -49,7 +49,6 @@ const aRoster = (over: Partial<MemberRosterResponse> = {}): MemberRosterResponse
 
 const stub = (roster = aRoster()): MembersApi => ({ getMembers: () => Promise.resolve(roster) })
 
-/** The selector's view of the same burn, so the two cannot describe different ones. */
 const CHOSEN: MyBurn = {
   event: {
     id: 'e-1',
@@ -68,8 +67,6 @@ const MEMBER: Viewer = {
   account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
 }
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
-// the default, so "no burn" written that way silently rendered the usual one.
 const renderPage = (api: MembersApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -90,8 +87,6 @@ describe('Members', () => {
   })
 
   it('lists them in the order the API gives, rather than re-sorting', async () => {
-    // That order decides who has a place. A page that sorted for itself would
-    // disagree with the admin's list about who is on the waiting line.
     renderPage(stub(aRoster({ entries: [anEntry({ name: 'Second' }), anEntry({ name: 'First' })] })))
 
     await screen.findByText('Second')
@@ -158,8 +153,6 @@ describe('Members', () => {
   })
 
   it('says a name is missing rather than falling back to an address it was not sent', async () => {
-    // The admin's list falls back to the email. This response carries none, so
-    // a fallback written the same way would print `undefined`.
     renderPage(stub(aRoster({ entries: [anEntry({ name: null, contact: null })] })))
 
     expect(await screen.findByText('Name not filled in yet')).toBeTruthy()
@@ -167,8 +160,6 @@ describe('Members', () => {
   })
 
   it('asks the API nothing for somebody still waiting on a decision', async () => {
-    // An applicant with an account and no roles. Asking anyway renders a failure
-    // where the explanation belongs, and spends a round trip on a certain 403.
     const getMembers = vi.fn(() => Promise.reject(new Error('should not be called')))
     renderPage(
       { getMembers },
@@ -220,8 +211,6 @@ describe('how to pay', () => {
   })
 
   it('says nothing to somebody who has', async () => {
-    // Everybody else has done it, and a standing instruction to pay is noise on a
-    // page they read for the allergies.
     renderPage(
       stub(
         aRoster({
@@ -274,13 +263,11 @@ describe('where the places run out', () => {
     const lines = await screen.findAllByText('Waiting list')
     expect(lines).toHaveLength(1)
 
-    // The row order is the answer to who has a place, so the line's position is it.
     const rows = [...document.querySelectorAll('tbody tr')]
     expect(rows.findIndex((row) => row.textContent?.includes('Waiting list'))).toBe(2)
   })
 
   it('draws none at all while there is room', async () => {
-    // The passing sibling: a line drawn unconditionally would satisfy the test above.
     renderPage(
       stub(
         aRoster({
@@ -294,8 +281,6 @@ describe('where the places run out', () => {
   })
 
   it('says how a place changes hands, not how to pay, once the burn is full', async () => {
-    // Paying no longer gets anybody in, so the payment instructions are the wrong
-    // thing to leave up in front of somebody who has not paid.
     renderPage(stub(full()))
 
     expect(await screen.findByText('Ask on the waiting list.')).toBeTruthy()
@@ -325,10 +310,6 @@ describe('where the places run out', () => {
 
 describe('which text a burn shows when the list is full', () => {
   it('still says how to pay while fewer than the cap have paid', async () => {
-    // The list being full is not the burn being paid full. Paying re-sorts you above
-    // every unpaid member, so while places remain unpaid it is still exactly what
-    // secures one — and the people above the line who have not paid are the ones the
-    // payment instructions are for.
     renderPage(
       stub(
         aRoster({

@@ -2,15 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { fetchPictureOverHttps, identifyOverHttps } from './client.ts'
 
-/**
- * The module that opens the socket (#393), which had no tests at all until #430 — and the
- * failing path is the whole reason it needed them: every misconfiguration collapsed into one
- * indistinguishable refusal, and nothing said which.
- *
- * `fetch` is stubbed rather than a server started. What is being asserted is what this module
- * sends and what it makes of what comes back, and neither wants a socket.
- */
-
 const SECRET = 'secret-1'
 const CODE = 'code-1'
 const TOKEN = 'tok-1'
@@ -27,21 +18,12 @@ const input = (over: { provider?: 'facebook' | 'discord'; profileLink?: boolean 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
-/** A profile Facebook would answer with. */
 const FACE = {
   id: 'app-scoped-1',
   picture: { data: { url: 'https://scontent.example/f.png', is_silhouette: false } },
 }
 
-/**
- * `fetch` answering the token leg and then the profile leg, in that order.
- *
- * By call order rather than by URL, because which URL is asked for is itself under test —
- * matching on it would make a wrong URL look like a missing stub.
- */
 const answering = (...responses: (Response | Error)[]) => {
-  // Typed arguments rather than a bare `async () =>`, so `mock.calls` carries them and the
-  // assertions below need no cast to read what was sent.
   const stub = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => {
     const next = responses.shift()
     if (next === undefined) throw new Error('fetch was called more times than the test stubbed')
@@ -69,8 +51,6 @@ describe('exchanging a code for somebody', () => {
     expect(tokenCall?.[1]?.method).toBe('POST')
 
     const body = tokenCall?.[1]?.body
-    // A guard rather than a cast: `BodyInit` is a union, and asserting it away would let a
-    // change to a JSON body pass this while breaking every real exchange.
     expect(body).toBeInstanceOf(URLSearchParams)
     if (!(body instanceof URLSearchParams)) throw new Error('the exchange stopped being form-encoded')
 
@@ -78,13 +58,10 @@ describe('exchanging a code for somebody', () => {
     expect(body.get('code')).toBe(CODE)
     expect(body.get('client_secret')).toBe(SECRET)
     expect(body.get('redirect_uri')).toBe(input().redirectUri)
-    // The token goes as a bearer, never in the query, where it would reach a provider's logs.
     expect(profileCall?.[1]?.headers).toMatchObject({ authorization: `Bearer ${TOKEN}` })
   })
 
   it('asks Discord its own two endpoints', async () => {
-    // The other provider through the same code, since one shape passing says nothing about the
-    // other — and both were failing when this was written.
     answering(json({ access_token: TOKEN }), json({ id: 'snowflake-1', avatar: 'abc' }))
 
     const got = await identifyOverHttps(input({ provider: 'discord' }))
@@ -118,7 +95,6 @@ describe('exchanging a code for somebody', () => {
 
 describe('why a round trip could not be finished', () => {
   it('names the token leg, with what the provider said', async () => {
-    // A wrong secret looks like this, and the message is the whole diagnosis.
     answering(json({ error: { message: 'Error validating client secret.', code: 1 } }, 400))
 
     expect(await identifyOverHttps(input())).toEqual({
@@ -127,8 +103,6 @@ describe('why a round trip could not be finished', () => {
   })
 
   it('names the token leg for a 200 that carries no token', async () => {
-    // An unapproved scope answers this way rather than with a 4xx, which is why the ok status
-    // is not what decides — the missing `access_token` is.
     answering(json({ error: { message: 'Invalid Scopes: user_link' } }))
 
     expect(await identifyOverHttps(input())).toEqual({
@@ -145,16 +119,12 @@ describe('why a round trip could not be finished', () => {
   })
 
   it('keeps none of an ok answer, because that is the member’s own profile', async () => {
-    // A 200 that fails to read carries their id, their picture URL and their page — and the rest
-    // of the app keeps member detail out of logs. The status is all an operator can act on.
     answering(json({ access_token: TOKEN }), json({ picture: { data: { url: 'https://x.example/f.png' } } }))
 
     expect(await identifyOverHttps(input())).toEqual({ failed: { at: 'profile', status: 200 } })
   })
 
   it('keeps html and form-encoded answers verbatim rather than calling them nothing', async () => {
-    // A provider having a bad day answers HTML, and Facebook answers form-encoded on some
-    // errors. Neither parses, and both are the only clue there is.
     answering(new Response('<html><body>502 Bad Gateway</body></html>', { status: 502 }))
 
     expect(await identifyOverHttps(input())).toEqual({
@@ -163,8 +133,6 @@ describe('why a round trip could not be finished', () => {
   })
 
   it('names the network when nothing arrived, and says which kind', async () => {
-    // The difference between a slow provider and a container with no outbound HTTPS, which is
-    // the one an admin cannot otherwise tell.
     answering(Object.assign(new Error('getaddrinfo ENOTFOUND graph.facebook.com'), { name: 'TypeError' }))
 
     expect(await identifyOverHttps(input())).toEqual({
@@ -173,11 +141,6 @@ describe('why a round trip could not be finished', () => {
   })
 
   it('carries only which leg, the status and what came back', async () => {
-    // The security property of logging any of this at all, and pinned as a whole shape rather
-    // than field by field: what this module *sends* — the secret, the code, the token — must not
-    // reappear in something written to a log, and neither should the decoded body. Spreading
-    // `bodyOf`'s result straight in put `json` here while it was being written, so this is the
-    // assertion that catches that class rather than a restatement of the interface.
     answering(json({ error: { message: 'Error validating client secret.' } }, 400))
 
     const got = await identifyOverHttps(input())
@@ -187,9 +150,6 @@ describe('why a round trip could not be finished', () => {
   })
 
   it('adds none of what it sent, even where the provider echoes it back', async () => {
-    // A provider that quotes the secret back is its own problem and not one to scrub — the point
-    // is that the three values appear only if they came *from* the provider, never because this
-    // module put them there. Distinct from the case above, so one failing does not hide the other.
     answering(json({ error: 'plain refusal' }, 400))
 
     const said = JSON.stringify(await identifyOverHttps(input()))
@@ -233,7 +193,6 @@ describe('the picture, if it is one this app will store', () => {
   })
 
   it('refuses anything that is not https, without asking', async () => {
-    // The scheme is pinned rather than trusted, since the URL is whatever a provider named.
     const stub = answering(bytes(PNG, 'image/png'))
 
     expect(await fetchPictureOverHttps('http://cdn.example/f.png')).toBeUndefined()

@@ -79,11 +79,8 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   ...over,
 })
 
-/** The selector's view of the same burn, so the two cannot describe different ones. */
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
-// the default, so "no burn" written that way silently rendered the usual one.
 const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -95,11 +92,6 @@ const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER, burn: MyBurn | null
     </ViewerProvider>,
   )
 
-/**
- * The same, under the router — which is where a link naming a dream is read from.
- *
- * `LocationProvider` reads `location` on mount, so the address is set first.
- */
 const renderPageAt = (at: string, api: DreamsApi) => {
   history.replaceState(null, '', at)
 
@@ -114,13 +106,6 @@ const renderPageAt = (at: string, api: DreamsApi) => {
   )
 }
 
-/**
- * The row, which opens the panel — the same one the grid opens (#342).
- *
- * Editing and withdrawing are inside it now, so the tests below take two steps where
- * they took one. That is the change, not an accident of the tests: the list used to
- * carry a second edit form that had none of what #205 and #207 gave the panel.
- */
 const openDream = async (title: string) => {
   fireEvent.click(await screen.findByRole('button', { name: `Open ${title}` }))
 }
@@ -138,7 +123,6 @@ describe('Dreams', () => {
   })
 
   it('shows an unscheduled dream as unscheduled rather than blank', async () => {
-    // Most dreams sit here right up until the burn. A blank cell reads as a bug.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
 
     expect(await screen.findByText('Sunrise yoga')).toBeTruthy()
@@ -191,9 +175,6 @@ describe('Dreams', () => {
   })
 
   it('schedules one into a place and a slot, sending UTC', async () => {
-    // The inputs speak local wall-clock time; the API speaks UTC. The suite is
-    // pinned to Europe/Stockholm in `vite.config.ts`, so 20:00 local in August
-    // is 18:00Z and this literal is stable.
     const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Sunrise yoga' }) }),
     )
@@ -271,9 +252,6 @@ describe('Dreams', () => {
   })
 
   it('sends only what this form changed, so a title fix cannot unschedule a dream', async () => {
-    // Concurrent editing is the premise of the page: another member may schedule
-    // this dream while the form is open. Sending the whole row would put back the
-    // place and slot as they were at mount and undo their work.
     const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
     )
@@ -297,9 +275,6 @@ describe('Dreams', () => {
   })
 
   it('leaves a slot carrying seconds alone when only the title was touched', async () => {
-    // The inputs are minute-precision, so a stored slot with seconds does not
-    // round-trip. Comparing the round-tripped value against the raw one would
-    // call an untouched field changed and quietly zero the seconds.
     const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
     )
@@ -322,8 +297,6 @@ describe('Dreams', () => {
   })
 
   it('sends nothing at all when the form was opened and closed unchanged', async () => {
-    // An empty body is the documented no-op read, so this is harmless — but it
-    // is worth pinning that an untouched save cannot carry a value.
     const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -349,7 +322,6 @@ describe('Dreams', () => {
 
     await openEditor('Cacao ceremony')
 
-    // Local time, since the suite is pinned to Europe/Stockholm.
     expect(screen.getByLabelText('Start of Cacao ceremony').getAttribute('max')).toBe('2026-08-02T22:00')
     expect(screen.getByLabelText('End of Cacao ceremony').getAttribute('min')).toBe('2026-08-02T20:00')
   })
@@ -368,9 +340,6 @@ describe('Dreams', () => {
   })
 
   it('leaves the flag out of an edit that did not touch it', async () => {
-    // The passing sibling, and the same rule the other five fields follow: sending
-    // every field would carry the values loaded at mount, so fixing a typo would put
-    // back whatever somebody else changed meanwhile.
     const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed', repeatable: true }) }),
     )
@@ -400,9 +369,6 @@ describe('Dreams', () => {
   })
 
   it('names a facilitator who has since withdrawn, rather than reading as nobody', async () => {
-    // The control is fed by the attendee list, so an id that is no longer on it
-    // selects nothing and the select falls back to its first option — "Nobody yet",
-    // while the id is still stored. What is shown and what would be saved disagreed.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony', facilitator_account_id: 'a-9' })]))
 
     await openEditor('Cacao ceremony')
@@ -413,8 +379,6 @@ describe('Dreams', () => {
   })
 
   it('offers no such option when the facilitator is coming', async () => {
-    // The passing sibling: an option added unconditionally would satisfy the test
-    // above and put "no longer coming" beside every name on the list.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony', facilitator_account_id: 'a-2' })]))
 
     await openEditor('Cacao ceremony')
@@ -425,9 +389,6 @@ describe('Dreams', () => {
   })
 
   it('withdraws one, but only after asking — as the grid’s panel does', async () => {
-    // The list withdrew on a single unconfirmed click while the grid asked first, so
-    // the same act had two levels of protection and the weaker one was the list (#209)
-    // — the page where hitting the neighbouring row is easiest.
     const withdrawSession = vi.fn<DreamsApi['withdrawSession']>(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
 
@@ -453,9 +414,6 @@ describe('Dreams', () => {
   })
 
   it('asks about the dream that was opened, not about the one beside it', async () => {
-    // One panel at a time, so the question can only be about what is in it. The list
-    // used to carry a bin per row, where a single shared flag would have asked about
-    // both — and where the neighbouring row was easiest to hit (#209).
     renderPage(
       stub({}, [
         aDream({ id: 's-1', title: 'Sunrise yoga' }),
@@ -472,7 +430,6 @@ describe('Dreams', () => {
   })
 
   it('lets a member edit a dream someone else offered', async () => {
-    // #20: the schedule belongs to the members, not to the dream's host.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Theirs', facilitator_account_id: 'a-9' })]))
 
     await openDream('Theirs')
@@ -481,8 +438,6 @@ describe('Dreams', () => {
   })
 
   it('opens the panel the grid opens, with what the row never showed', async () => {
-    // The point of #342: the row is a title and a time, and the description, the
-    // helpers and the supporters were only ever reachable from the Schedule.
     renderPage(
       stub({}, [
         aDream({
@@ -503,8 +458,6 @@ describe('Dreams', () => {
   })
 
   it('carries no pen and no bin on the row itself', async () => {
-    // Both went with the second edit form. On a phone they wrapped onto a third line,
-    // under a title they no longer sat beside.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
 
     await screen.findByRole('button', { name: 'Open Sunrise yoga' })
@@ -554,9 +507,6 @@ describe('Dreams', () => {
   })
 
   it('opens to an organiser who holds admin alone', async () => {
-    // #200: the burn selector is `requireApproved`, so this account could choose a
-    // burn and was then turned away from the pages about it. The dreams are the
-    // burn's shared furniture, like the lanes and the register beside them.
     const organiser: Viewer = {
       status: 'signed-in',
       account: { id: 'a-9', name: null, avatar: null, roles: ['admin'] },
@@ -567,8 +517,6 @@ describe('Dreams', () => {
   })
 
   it('opens the dream a link names, and shows what has been said about it', async () => {
-    // A card on the feed and a notification about a comment both lead here, and the
-    // panel is local state — so without this a link could only ever open the list.
     const thread = vi.fn<DreamsApi['getThread']>(() =>
       Promise.resolve({
         thread: {
@@ -616,7 +564,6 @@ describe('Dreams', () => {
   })
 
   it('opens nothing for a dream this burn does not have', async () => {
-    // A withdrawn one, or a link from another burn. The panel simply stays shut.
     renderPageAt('/dreams?dream=gone', stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
 
     await screen.findByText('Sunrise yoga')

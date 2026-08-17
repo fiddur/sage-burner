@@ -127,7 +127,6 @@ const WhoTheLinkIsFor = ({ invited }: { invited: Invited }) => (
   </p>
 )
 
-/** A link posted in a group is opened by somebody who already has that provider (#512). */
 const OneClickWaysIn = ({ token }: { token: string }) => {
   const configured = useSocialLogins()
   const providers = oauthProviders.filter((provider) => configured.includes(provider))

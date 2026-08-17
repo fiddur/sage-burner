@@ -13,14 +13,6 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, formQuestion, pushSubscription } from '../db/schema.ts'
 
-/**
- * Opting a browser in, and the one thing that notifies today.
- *
- * Through the real app rather than the module, because the properties worth pinning
- * here are the HTTP ones: who may subscribe, and that a push service falling over
- * cannot turn a successful application into an error for the person applying.
- */
-
 const SECRET = 's'.repeat(40)
 const NOW = '2026-08-03T00:00:00.000Z'
 const KEYS: VapidKeys = { publicKey: 'pub-key', privateKey: 'priv-key' }
@@ -93,14 +85,6 @@ const key = (server: FastifyInstance, cookie?: string) =>
     headers: cookie === undefined ? {} : { cookie },
   })
 
-/**
- * Let the fire-and-forget notification finish, or fail to start.
- *
- * The route answers before delivery is attempted, so a negative assertion made
- * the moment `inject()` resolves races the chain rather than out-waiting it — it
- * would pass against a regression that notified a beat later. Two macrotask turns
- * are more than the chain needs: the positive case takes one.
- */
 const settle = async () => {
   await new Promise((resolve) => setTimeout(resolve, 0))
   await new Promise((resolve) => setTimeout(resolve, 0))
@@ -134,10 +118,6 @@ describe('the VAPID key a browser subscribes with', () => {
   })
 
   it('is offered to anybody signed in, and refused to a stranger', async () => {
-    // These moved out from under `/api/admin/` when being handed a lead role started notifying
-    // the person it was handed to (#184), and out from under `requireApproved` when the account
-    // came before the application (#476): waiting on a decision is exactly when somebody has a
-    // live reason to allow notifications, and there is a decision to tell them about.
     const server = await build()
     const member = await givenAccount(['member'])
     const applicant = await givenAccount([])
@@ -162,8 +142,6 @@ describe('subscribing a browser', () => {
   })
 
   it('refuses an account id in the body rather than honouring it', async () => {
-    // Whose browser it is follows from the session. `.strict()` is what makes an
-    // attempt to say otherwise a 400 instead of a quietly ignored key.
     const server = await build()
     const admin = await givenAccount(['admin'])
     const victim = await givenAccount(['admin'])
@@ -178,9 +156,6 @@ describe('subscribing a browser', () => {
   })
 
   it('refuses an endpoint that is not an https URL', async () => {
-    // The stored value is what the server itself POSTs to on every application, so
-    // a plain-HTTP endpoint would point it at something on its own network. A real
-    // push service is always https.
     const server = await build()
     const admin = await givenAccount(['admin'])
 
@@ -195,15 +170,11 @@ describe('subscribing a browser', () => {
   })
 
   it('takes a member and an account still waiting on a decision, and nobody signed out', async () => {
-    // A subscription is keyed by account and a push only carries what is addressed to you, so
-    // there is nothing an applicant could hear that is not theirs (#476).
     const server = await build()
     const member = await givenAccount(['member'])
     const applicant = await givenAccount([])
 
     expect((await subscribe(server, member.cookie)).statusCode).toBe(204)
-    // Their own browser, since a subscription is keyed by endpoint: the same one twice is one
-    // browser changing hands, which is a different thing and already covered below.
     expect(
       (
         await subscribe(server, applicant.cookie, {
@@ -236,8 +207,6 @@ describe('subscribing a browser', () => {
 
 describe('an application arriving', () => {
   it('notifies every subscribed admin, saying nothing about who applied', async () => {
-    // Read on a lock screen. The applicant's name is theirs until an admin opens
-    // the page, so the payload carries none of it.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     const admin = await givenAccount(['admin'])
@@ -253,9 +222,6 @@ describe('an application arriving', () => {
   })
 
   it('still answers 201 when the push service is down', async () => {
-    // The application is written before this runs. An applicant must not be told
-    // their application failed because Google was unreachable — and an
-    // unauthenticated route is not a place to make the server wait on one.
     const server = await build(() => Promise.reject(new Error('push service unreachable')))
     const admin = await givenAccount(['admin'])
     await subscribe(server, admin.cookie)
@@ -267,8 +233,6 @@ describe('an application arriving', () => {
   })
 
   it('answers before the notification is delivered, rather than waiting for it', async () => {
-    // Fire-and-forget rather than awaited: a slow push service would otherwise
-    // hold the applicant's request open for as long as it takes.
     let release = () => {}
     const held = new Promise<void>((resolve) => {
       release = resolve
@@ -297,8 +261,6 @@ describe('an application arriving', () => {
   })
 
   it('does not notify for an application the form refuses', async () => {
-    // A 400 is not an application. Notifying on one would be a way to ring every
-    // admin's phone without ever writing a row.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     const admin = await givenAccount(['admin'])

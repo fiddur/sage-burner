@@ -3,17 +3,6 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-/**
- * `index.html` names four paths it cannot import (#256).
- *
- * Every other spelling of an endpoint comes from `apiRoutes`, which is what stops the
- * client and the route file drifting apart. A `<link href>` is the one place that
- * cannot — so the drift is caught here instead, by reading the file rather than by
- * trusting that nobody will move a route.
- */
-// From the working directory rather than from `import.meta.url`: the suite runs in
-// happy-dom, where that is an http URL and `fileURLToPath` refuses it. Vitest's cwd
-// is this package, which is where `index.html` lives.
 const shell = readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8')
 
 const attribute = (tag: string, name: string): string | undefined =>
@@ -29,8 +18,6 @@ describe('the HTML shell', () => {
   })
 
   it('links a manifest at all, and as a manifest', () => {
-    // The assertions above would both pass on a file that had lost its `rel`, since
-    // they only look for the path.
     expect(attribute('link', 'rel')).toBe('manifest')
     expect(shell).toContain('rel="apple-touch-icon"')
   })
@@ -45,42 +32,26 @@ describe('the HTML shell', () => {
   })
 
   it('gives the tab the installation’s icon, for a signed-out visitor too (#285)', () => {
-    // `favicon.ts` runs from the notification bell, which only a signed-in member
-    // renders — so without this the public homepage's tab wore nothing at all.
-    // One tag carrying both, not two `toContain`s: the `apple-touch-icon` beside it
-    // already has that href, so a bare href check passes with no `rel="icon"` at all.
     expect(shell).toMatch(
       new RegExp(`<link[^>]*rel="icon"[^>]*href="${apiRoutes.getInstallationIcon.path()}"`),
     )
   })
 
   it('gives that link the id favicon.ts rewrites, and declares only one', () => {
-    // Two `rel="icon"` links leave it to the browser which wins, which is how the
-    // first attempt at #285 came out doing nothing at all. `favicon.ts` finds this
-    // one by id and rewrites its href rather than appending a second.
     expect(shell).toContain('id="app-favicon"')
-    // Counted as tags, not as text: the comment above the links says the words
-    // "a second `rel=\"icon\"`", and a bare match counts that too.
     expect(shell.match(/<link[^>]*rel="icon"/g)).toHaveLength(1)
   })
 
   it('claims no type for the icon, since the upload decides it', () => {
-    // A `type="image/svg+xml"` here would be a lie the moment somebody uploads a PNG,
-    // and nothing in this process decodes an image to find out which it is.
     expect(/<link[^>]*rel="icon"[^>]*\stype=/.test(shell)).toBe(false)
   })
 
   it('names a theme colour from the palette', () => {
-    // `--ember`, the same one the manifest sends. Two places, because a browser reads
-    // this one before it has fetched anything.
     expect(shell).toContain('name="theme-color"')
     expect(shell).toContain('content="#c2410c"')
   })
 
   it('has no route with a dot in it, which the backend would 404', () => {
-    // The rule `app.ts` documents: any path whose last segment has an extension is
-    // treated as a file. Both paths here are served by real routes, and this is the
-    // check that they still are rather than being client-side routes by accident.
     expect(apiRoutes.webManifest.fastify).toBe('/manifest.webmanifest')
     expect(apiRoutes.getInstallationIcon.fastify).toBe('/api/installation/icon')
     expect(apiRoutes.getTouchIcon.fastify).toBe('/api/installation/icons/:size')

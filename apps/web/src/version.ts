@@ -13,10 +13,6 @@ const inApp = (link: HTMLAnchorElement, scope: RegExp): boolean =>
   (link.target === '' || link.target === '_self') &&
   scope.test(link.pathname)
 
-/**
- * `preact-iso` claims every in-app link and pushes state instead, which is what leaves this tab
- * on the build the bar is complaining about. The listener runs at capture, before the router's.
- */
 export const hardenNavigation = (
   go: (href: string) => void = (href) => globalThis.location.assign(href),
   scope: RegExp = ROUTER_SCOPE,

@@ -119,8 +119,8 @@ export const useDreamThread = ({
     },
   )
 
-  // `useLoad` keeps the last successful data across a key change, so opening dream B while A's
-  // thread is loaded rendered A's entries under B's panel for one round trip (#387).
+  // `useLoad` keeps the last successful data across a key change, so A’s entries would render
+  // under B’s panel for one round trip.
   const answered = loaded.status === 'ready' ? loaded.data : undefined
   const fetched = answered?.id === threadId ? answered : undefined
   const thread = held?.id === fetched?.id && held !== undefined ? held : fetched

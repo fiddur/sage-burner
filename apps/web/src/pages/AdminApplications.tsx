@@ -193,10 +193,6 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   )
 }
 
-/**
- * The private thread with one applicant (#477). Only where the application has an account to
- * address — the ones from before that have nobody on the other end.
- */
 const Conversation = ({ api, application }: { api: ApplicationsApi; application: string }) => {
   const [said, setSaid] = useState<readonly ApplicationMessage[] | undefined>(undefined)
   const { loaded } = useLoad(

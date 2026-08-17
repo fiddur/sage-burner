@@ -75,10 +75,6 @@ export const transposeChord = (token: string, semitones: number): string => {
   return `${root}${chord.suffix}${bass}`
 }
 
-/**
- * Column starts are held as close as a shifted token allows, so `Bb` becoming `B` does not
- * walk the rest of the line out from under the words it sits above.
- */
 export const transposeLine = (line: string, semitones: number): string => {
   if (((semitones % SEMITONES) + SEMITONES) % SEMITONES === 0 || !isChordLine(line)) return line
 
@@ -124,10 +120,6 @@ export interface CapoSuggestion {
   shapes: string[]
 }
 
-/**
- * The position that turns the most of a song's chords into open shapes. Ties go to the lower
- * capo, and capo 0 winning means there is nothing to suggest.
- */
 export const capoSuggestion = (body: string): CapoSuggestion | undefined => {
   const chords = chordsIn(body)
   if (chords.length === 0) return undefined

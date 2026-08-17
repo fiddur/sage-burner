@@ -34,11 +34,6 @@ const signedInAs = (...roles: AccountRole[]): Viewer => ({
   account: { id: 'a-1', name: 'Ada Lovelace', avatar: null, roles },
 })
 
-/**
- * The gear is a glyph, so its name comes from `aria-label` rather than its text — and a
- * page link carries its icon in an `aria-hidden` span, which a screen reader skips and
- * `textContent` does not. Dropping those is what makes this the name rather than the words.
- */
 const nameOf = (link: Element): string => {
   const said = link.getAttribute('aria-label')
   if (said !== null) return said
@@ -53,23 +48,12 @@ const nameOf = (link: Element): string => {
 
 const links = () => screen.getAllByRole('link').map(nameOf)
 
-/**
- * Asserted one at a time, never as a negated `arrayContaining`.
- *
- * `expect(links).not.toEqual(expect.arrayContaining(['a', 'b', 'c']))` passes when
- * *any one* of the three is absent — measured, not assumed — so a test written that
- * way stays green while two of the three leak. Every absence here names one link.
- */
 const expectLinks = (present: string[], absent: string[]) => {
   const shown = links()
   for (const label of present) expect(shown, `${label} should be offered`).toContain(label)
   for (const label of absent) expect(shown, `${label} should not be offered`).not.toContain(label)
 }
 
-/**
- * The bell asks on mount wherever the layout is drawn. Resolving with nothing keeps
- * these tests about the nav rather than about what has happened to anybody.
- */
 const noBell: LayoutApi = {
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
   markNotificationsSeen: () => Promise.reject(new Error('markNotificationsSeen is not stubbed here')),
@@ -93,18 +77,10 @@ describe('the nav', () => {
   it('gives a member their own pages and the shared ones', () => {
     renderNav(signedInAs('member'))
 
-    // "Your burn" is not among them: the burns are sections of the details page
-    // now, since more than one is planned at a time and the singular was from when
-    // there was only ever the next one (#184).
     expectLinks(['Feed', 'Members', 'Schedule', 'Leads', 'FAQ', 'Your details'], ['Your burn'])
   })
 
   it("gives the corner's icons one class, since neither of them is a word", () => {
-    // The wheel wore the nav's underline while the face beside it did not. One class
-    // for both, so a third icon in that corner cannot be added without it.
-    //
-    // The class, not the underline: happy-dom applies no CSS, so nothing here can
-    // pin `text-decoration: none` — the shared class is the half that is testable.
     renderNav(signedInAs('admin', 'member'))
 
     for (const label of ['Organise', 'Your details']) {
@@ -113,30 +89,18 @@ describe('the nav', () => {
   })
 
   it('keeps Organise from a member who is not an admin', () => {
-    // The ⚙️ split: the page behind it is admin's alone now, so offering it to a
-    // member sends them to a refusal. The burn's shared furniture, which a member
-    // does curate, is reached from Schedule and from their own details instead.
     renderNav(signedInAs('member'))
 
     expectLinks([], ['Organise'])
   })
 
   it('reaches the shared pages for an admin who holds admin alone', () => {
-    // Schedule and Leads are `requireApproved` server-side, so an admin who is
-    // not attending may use them — and used to be able to only by typing the URL,
-    // because the nav gated them on `member`. Your details is `approved` too since
-    // #396: the half of it that is the account — a picture, ways of being reached,
-    // and the notification switch — is theirs, and application notifications go
-    // precisely to admins.
     renderNav(signedInAs('admin'))
 
     expectLinks(['Feed', 'Members', 'Schedule', 'Leads', 'FAQ', 'Organise', 'Your details'], ['Your burn'])
   })
 
   it('offers it to nobody who is not approved at all', () => {
-    // `approved` is not "signed in": an account with no role yet would be refused by
-    // `requireApproved` on every section of that page. The passing sibling is the
-    // `admin`-alone case above, which is where a too-tight guard would show.
     renderNav({
       status: 'signed-in',
       account: { id: 'a-1', name: 'Ada Lovelace', avatar: null, roles: [] },
@@ -146,17 +110,12 @@ describe('the nav', () => {
   })
 
   it('offers Dreams from the Schedule rather than from the bar', () => {
-    // Merged in #184: the schedule is where a dream is placed, and two entries for
-    // one thing is what the restructure is undoing.
     renderNav(signedInAs('member', 'admin'))
 
     expectLinks(['Schedule'], ['Dreams'])
   })
 
   it('puts the details behind initials, and falls back to a glyph without a name', () => {
-    // The corner is an avatar image later; initials are the placeholder. A name
-    // nobody has filled in is ordinary — the bootstrap admin has none — and that is
-    // exactly the account whose owner most needs the link to the page that fixes it.
     renderNav(signedInAs('member'))
     expect(screen.getByRole('link', { name: 'Your details' }).textContent).toBe('AL')
 
@@ -166,8 +125,6 @@ describe('the nav', () => {
   })
 
   it('offers an account with no roles none of them', () => {
-    // An applicant with an account, waiting on a decision. Every link named, because
-    // this is the case where a leak would matter.
     renderNav(signedInAs())
 
     expectLinks(
@@ -230,8 +187,6 @@ describe('the menu at the edge of the bar', () => {
   })
 
   it('is not offered to somebody who may open none of it', () => {
-    // Rideshares is `requireApproved`, so for a signed-out visitor ☰ would open onto
-    // one link to a page that refuses them.
     renderNav({ status: 'signed-out' })
 
     expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull()
@@ -310,7 +265,6 @@ describe('the column of pages beside a wide page', () => {
 
   const startedAt = `${globalThis.location.pathname}${globalThis.location.search}`
 
-  /** Under the router, which is where a link finds out whether it is the page you are on. */
   const renderNavAt = (at: string) => {
     history.replaceState(null, '', at)
 
@@ -413,12 +367,6 @@ describe('the column of pages beside a wide page', () => {
 })
 
 describe('the nav on a phone', () => {
-  /**
-   * The six pages, by the accessible name they carry in both layouts.
-   *
-   * The bar draws them as emoji, so `aria-label` is the only name there — which is
-   * the point of naming them: an icon bar nobody can read is six identical buttons.
-   */
   const pages = ['Feed', 'Members', 'Schedule', 'Leads', 'Meals', 'FAQ']
 
   const inTheBottomBar = () =>
@@ -440,8 +388,6 @@ describe('the nav on a phone', () => {
   })
 
   it('leaves the topbar what is about the session rather than a page', () => {
-    // Nine entries do not fit a phone, which is the whole of #337: the six pages go
-    // down, and the bell, ⚙️ and the face — none of which is a page — stay up.
     onAPhone()
     renderNav(signedInAs('admin', 'member'))
 
@@ -453,8 +399,6 @@ describe('the nav on a phone', () => {
   })
 
   it('puts the words in the column beside the page where there is room for them', () => {
-    // The success path the two above cannot show: a wide viewport keeps every page
-    // reachable, and there is no second copy of any link left in the bar.
     onADesktop()
     renderNav(signedInAs('member'))
 
@@ -465,9 +409,6 @@ describe('the nav on a phone', () => {
   })
 
   it('starts the bar shown, whatever it does on a scroll', () => {
-    // The half a unit test can hold: happy-dom lays nothing out, so no scroll here is
-    // distinguishable from being at the end of a page — `viewport.test.ts` has the
-    // arithmetic, and the bar arriving hidden is the failure that would matter most.
     onAPhone()
     renderNav(signedInAs('member'))
 
@@ -475,8 +416,6 @@ describe('the nav on a phone', () => {
   })
 
   it('gives a signed-out visitor no bottom bar at all', () => {
-    // Apply and Log in are two entries, which fit — and a bar of six pages none of
-    // them may open would be six refusals.
     onAPhone()
     renderNav({ status: 'signed-out' })
 
@@ -485,7 +424,6 @@ describe('the nav on a phone', () => {
   })
 
   it('gives an account with no roles none either', () => {
-    // An applicant waiting on a decision, and the case where a leak would matter.
     onAPhone()
     renderNav(signedInAs())
 
@@ -495,22 +433,16 @@ describe('the nav on a phone', () => {
 
 describe('the brand', () => {
   it('wears the installation icon rather than a flame written into the bar', () => {
-    // The route answers with the uploaded icon or the app's own mark, so the header
-    // and the home screen cannot end up showing different things.
     renderNav(signedInAs('member'))
 
     const mark = document.querySelector('img.brand-mark')
     expect(mark?.getAttribute('src')).toBe(apiRoutes.getInstallationIcon.path())
-    // Decorative: the name is beside it, and a second reading of it is noise.
     expect(mark?.getAttribute('alt')).toBe('')
   })
 })
 
 describe('the footer', () => {
   it('carries the policy on every page, signed in or not', () => {
-    // Where a reader looks for it, and the only link to it outside the admin's Facebook
-    // field until this. The source link is AGPL §13 and is asserted beside it so neither
-    // is tidied away alone.
     renderNav({ status: 'signed-out' })
 
     const footer = document.querySelector('footer.site-footer')
@@ -537,8 +469,6 @@ describe('initials', () => {
   })
 
   it('takes a whole character, not half a surrogate pair', () => {
-    // `'🌟ada'[0]` is a lone high surrogate, which renders as �. Measured, not
-    // assumed: this is what a name starting outside the basic plane produces.
     expect(initials('🌟ada')).toBe('🌟')
     expect(initials('Ægir Ödegård')).toBe('ÆÖ')
   })

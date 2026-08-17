@@ -17,13 +17,6 @@ const SETTINGS = {
   updated_at: '2026-08-07T10:00:00.000Z',
 }
 
-/**
- * Enough of drizzle to answer the one query `post` makes.
- *
- * A fake rather than a database, because everything worth asserting here is what
- * happens *around* the read: what is passed to `Send`, and what a rejection turns
- * into. The route tests use a real one.
- */
 const dbAnswering = (row: typeof SETTINGS | undefined): Database => {
   const chain = {
     from: () => chain,
@@ -51,8 +44,6 @@ describe('the from address', () => {
   })
 
   it('quotes a name a comma would otherwise split', () => {
-    // An installation calls itself whatever it likes, and an unquoted comma in a
-    // display name is a second recipient as far as the header is concerned.
     expect(fromAddress('Sage, Burning', 'burn@example.org')).toBe('"Sage, Burning" <burn@example.org>')
   })
 
@@ -61,8 +52,6 @@ describe('the from address', () => {
   })
 
   it('takes a newline out, since no encoding of one belongs in a name', () => {
-    // The one that matters: a header ends at a newline, so this is where a second
-    // header — a `Bcc:`, say — would be injected from the settings page.
     expect(fromAddress('Sage\r\nBcc: someone@example.org', 'burn@example.org')).toBe(
       '"Sage Bcc: someone@example.org" <burn@example.org>',
     )
@@ -118,8 +107,6 @@ describe('posting', () => {
   })
 
   it('never throws — a refusal comes back as an answer', async () => {
-    // Every caller is doing something else and none of them may fail because a mail
-    // server was down. The thing being notified about is already written.
     const send = vi.fn<Send>(() => Promise.reject(new Error('connect ECONNREFUSED')))
 
     expect(await post({ db: dbAnswering(SETTINGS), send }, A_MESSAGE)).toEqual({

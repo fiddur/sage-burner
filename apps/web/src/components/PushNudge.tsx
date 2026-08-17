@@ -35,11 +35,6 @@ const Strip = ({
   )
 }
 
-/**
- * Mounted once, above the routed page, so switching a category on anywhere raises the same strip
- * with the same dismissal. `usePushHere` lives in `Strip` rather than here, so a page nobody has
- * ticked anything on registers no service worker and re-posts no subscription.
- */
 export const PushNudge = ({ api, browser }: { api: PushApi; browser?: PushBrowser | undefined }) => {
   const { wanted, dismiss } = usePushNudge()
 

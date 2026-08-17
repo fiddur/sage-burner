@@ -62,8 +62,6 @@ describe('YourBurns', () => {
   })
 
   it('names the burn each button belongs to, since there is more than one', async () => {
-    // The reason join and leave stopped being scoped to the active burn: pressing
-    // the second burn's button must not join the first.
     const joinEvent = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
     render(
       <YourBurns
@@ -90,7 +88,6 @@ describe('YourBurns', () => {
   })
 
   it('asks for no lists at all for a burn they have not joined', async () => {
-    // There is no form until they are coming, and the lists are the form's data.
     const getEventOptions = vi.fn(() => Promise.resolve({ options: [] }))
     render(<YourBurns api={stub({ getEventOptions }, { coming: [aBurn('e-1', 'Summer')], past: [] })} />)
 
@@ -99,9 +96,6 @@ describe('YourBurns', () => {
   })
 
   it('points a refused withdrawal at the hand-over, rather than saying try again', async () => {
-    // A 409 means they have paid, and retrying cannot change that. It reaches this
-    // page only when the payment landed after the list was fetched — a paid burn
-    // offers the hand-over and no withdraw button at all.
     const leaveEvent = vi.fn(() => Promise.reject(apiError(409, 'conflict', 'nope')))
     render(
       <YourBurns
@@ -116,9 +110,6 @@ describe('YourBurns', () => {
   })
 
   it('says a burn is over rather than "try again" when joining it 404s', async () => {
-    // The route answers 404 for a burn that has ended, deliberately — an ended burn
-    // and an id that never existed get the same answer. Mapped only from 409, this
-    // told the member to retry, which is advice that cannot help.
     const joinEvent = vi.fn(() => Promise.reject(apiError(404, 'not_found', 'Not found.')))
     render(<YourBurns api={stub({ joinEvent }, { coming: [aBurn('e-1', 'Summer')], past: [] })} />)
 
@@ -128,8 +119,6 @@ describe('YourBurns', () => {
   })
 
   it('still falls back to try-again for a status that is not a refusal', async () => {
-    // The passing sibling: what the map replaces is the *refusals*, not the generic
-    // failure. A 500 is worth retrying and should still say so.
     const joinEvent = vi.fn(() => Promise.reject(apiError(500, 'internal', 'Boom.')))
     render(<YourBurns api={stub({ joinEvent }, { coming: [aBurn('e-1', 'Summer')], past: [] })} />)
 
@@ -164,12 +153,6 @@ describe('YourBurns', () => {
 })
 
 describe('the bar’s list of burns', () => {
-  /**
-   * The selector fetches once for the session, so this page — the only thing that
-   * changes what belongs in it — has to say when it has. Without that, somebody who
-   * joined and then opened Members or Schedule was told they were not coming to a
-   * burn, and a reload was the only way out of it.
-   */
   const renderWithBurns = (api: YourBurnsApi, reload: () => void) =>
     render(
       <BurnProvider value={{ status: 'ready', burns: [], selected: undefined, reload }}>
@@ -204,8 +187,6 @@ describe('the bar’s list of burns', () => {
   })
 
   it('leaves it alone when the join was refused', async () => {
-    // The passing sibling. A refresh fired before the write resolves would say the
-    // list had changed when it had not.
     const reload = vi.fn()
     renderWithBurns(
       stub(
@@ -263,7 +244,6 @@ describe('handing on a place that has been paid for', () => {
   })
 
   it('offers the hand-over instead of withdrawing, once they have paid', async () => {
-    // Withdrawing is refused after payment, so offering it would be a dead button.
     render(<YourBurns api={stub({}, paidBurn())} />)
 
     expect(await screen.findByRole('button', { name: 'Hand my place to somebody else' })).toBeTruthy()
@@ -271,7 +251,6 @@ describe('handing on a place that has been paid for', () => {
   })
 
   it('offers withdrawing while nothing has been paid', async () => {
-    // The passing sibling: always offering the hand-over would satisfy the test above.
     render(<YourBurns api={stub({}, { coming: [aBurn('e-1', 'Summer', anAttendance())], past: [] })} />)
 
     expect(await screen.findByRole('button', { name: 'I cannot come after all' })).toBeTruthy()
@@ -309,9 +288,6 @@ describe('handing on a place that has been paid for', () => {
   })
 
   it('says everybody has paid when nobody can take it, rather than an empty picker', async () => {
-    // The words the filter actually supports (#263). It offers every *unpaid* entry,
-    // members above the line included, so "nobody is waiting" described a different
-    // list from the one being built.
     render(<YourBurns api={stub({ getMembers: () => Promise.resolve(roster([])) }, paidBurn())} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Hand my place to somebody else' }))
@@ -320,8 +296,6 @@ describe('handing on a place that has been paid for', () => {
   })
 
   it('offers an unpaid member above the line, which is what the words now say', async () => {
-    // The passing sibling for the copy above: an unpaid member is exactly who you
-    // might hand a place to, since paying is what secures one.
     const getMembers = vi.fn(() =>
       Promise.resolve(roster([waiting({ account_id: 'a-4', name: 'Dag', waiting: false })])),
     )
@@ -333,8 +307,6 @@ describe('handing on a place that has been paid for', () => {
   })
 
   it('drops the list it fetched last time when the picker is reopened', async () => {
-    // *Never mind* then reopening rendered the previous list until the refetch landed,
-    // with whoever had paid in between still on it (#263).
     let entries = [waiting()]
     const getMembers = vi.fn(() => Promise.resolve(roster(entries)))
     render(<YourBurns api={stub({ getMembers }, paidBurn())} />)

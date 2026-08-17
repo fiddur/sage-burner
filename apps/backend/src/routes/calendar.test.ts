@@ -43,7 +43,6 @@ const db = () => {
   return found
 }
 
-/** Straight into the table, so the route rather than `createEvent` is what is under test. */
 const givenEvent = async (over: { feed_token?: string | null } = {}) => {
   const id = randomUUID()
   await db()
@@ -103,7 +102,6 @@ describe('where a burn’s calendar feed lives', () => {
   })
 
   it('answers it to an organiser who is not attending', async () => {
-    // `requireApproved`, like the schedule the feed is of.
     const server = await build()
     const eventId = await givenEvent()
     const boss = await givenAccount(['admin'])
@@ -112,7 +110,6 @@ describe('where a burn’s calendar feed lives', () => {
   })
 
   it('is nobody’s to read who is not approved', async () => {
-    // The whole point: a token anybody could ask for would be a public id again (#408).
     const server = await build()
     const eventId = await givenEvent()
     const nobody = await givenAccount([])
@@ -122,8 +119,6 @@ describe('where a burn’s calendar feed lives', () => {
   })
 
   it('gives a burn written without one an address on first read', async () => {
-    // The column is nullable only because adding it needed no rebuild, so a null is a gap
-    // to close rather than a state to report.
     const server = await build()
     const eventId = await givenEvent({ feed_token: null })
     const wren = await givenAccount()
@@ -136,8 +131,6 @@ describe('where a burn’s calendar feed lives', () => {
   })
 
   it('mints one for a burn made through the app, without answering it', async () => {
-    // `eventSchema` is what the *public* homepage is answered with, so the token must not
-    // ride along in the create response.
     const server = await build()
     const boss = await givenAccount(['admin'])
 
@@ -156,8 +149,6 @@ describe('where a burn’s calendar feed lives', () => {
 
     expect(made.statusCode).toBe(201)
     expect(made.payload).not.toContain('feed_token')
-    // `expect.any(String)` rather than `not.toBeNull()`, which also passes for the
-    // `undefined` a missing row returns.
     expect(await tokenOf(made.json().event.id)).toEqual(expect.any(String))
   })
 
@@ -183,7 +174,6 @@ describe('giving the feed a new address', () => {
     expect(
       (await server.inject({ method: 'GET', url: `/calendar/token-${eventId}/schedule.ics` })).statusCode,
     ).toBe(404)
-    // The passing sibling: the new one works, so rotation is not just a way to break it.
     expect(
       (
         await server.inject({
@@ -201,7 +191,6 @@ describe('giving the feed a new address', () => {
 
     expect((await rotate(server, eventId)).statusCode).toBe(401)
     expect((await rotate(server, eventId, wren.cookie)).statusCode).toBe(403)
-    // And nothing moved: a refused rotation must not have half-happened.
     expect(await tokenOf(eventId)).toBe(`token-${eventId}`)
   })
 

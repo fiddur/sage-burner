@@ -15,8 +15,6 @@ const MAX_TARGET = 64
 const pattern = () =>
   new RegExp(`@\\[([^\\][\\n]{1,${MAX_MENTION_NAME}})\\]\\(mention:([\\w-]{1,${MAX_TARGET}})\\)`, 'gu')
 
-// `[`, `]`, `(`, `)` and newlines are what the token is delimited by, so a name carrying one
-// could otherwise end it early and put the rest of itself outside.
 export const mentionName = (name: string): string =>
   name
     .replaceAll(/[[\]()\n\r]/gu, ' ')
@@ -44,7 +42,6 @@ export const mentionedAccounts = (body: string): string[] =>
 export const mentionsEverybody = (body: string): boolean =>
   mentionsIn(body).some(({ target }) => target === MENTION_EVERYBODY)
 
-/** Rewrites each token's display name from whoever the caller can resolve, at read time. */
 export const withMentionNames = (body: string, nameOf: (target: string) => string | undefined): string =>
   body.replaceAll(pattern(), (whole, name: string, target: string) => {
     const now = target === MENTION_EVERYBODY ? MENTION_EVERYBODY : nameOf(target)
@@ -52,11 +49,6 @@ export const withMentionNames = (body: string, nameOf: (target: string) => strin
     return now === undefined ? whole : mentionToken(now, target)
   })
 
-/**
- * `@[Ada](mention:a-1)` becomes `[@Ada](/members/a-1)`, which the markdown renderer then
- * escapes like any other link. A token left unconverted renders as its own text, since
- * `mention:` is not an allowed scheme — so the failure mode is a plain `@Ada`.
- */
 export const mentionsAsLinks = (body: string): string =>
   body.replaceAll(pattern(), (_whole, name: string, target: string) =>
     target === MENTION_EVERYBODY

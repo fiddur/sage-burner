@@ -17,11 +17,6 @@ const aTable = (also?: string) => (
 
 describe('the shared table', () => {
   it('sits in a box that scrolls, so a wide one does not take the page with it', () => {
-    // The defect (#339): a bare `.table` wider than the screen overflowed the body,
-    // so a sideways drag on Members moved the whole page, nav included.
-    //
-    // The class, not the scrolling: happy-dom applies no CSS, so nothing here can pin
-    // `overflow-x: auto` — the wrapper being there at all is the testable half.
     render(aTable())
 
     expect(screen.getByRole('table').parentElement?.className).toBe('table-wrap')
@@ -34,8 +29,6 @@ describe('the shared table', () => {
   })
 
   it('takes a class of its own without losing the shared one', () => {
-    // The notification switches are `.table.notification-settings`, and dropping
-    // either half changes what the other one draws.
     render(aTable('notification-settings'))
 
     expect(screen.getByRole('table').className).toBe('table notification-settings')

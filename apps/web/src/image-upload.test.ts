@@ -18,9 +18,6 @@ describe('what stands in while the bytes go up', () => {
   })
 
   it('takes a second one for the same name rather than repeating itself', () => {
-    // The finished upload finds its own placeholder by matching the text, because an
-    // offset is wrong the moment somebody types. Two identical ones would let the first
-    // upload to land replace the wrong picture.
     const held = `here ${uploadPlaceholder('sauna.jpg')}`
 
     expect(freePlaceholder(held, 'sauna.jpg')).toBe('![Uploading sauna.jpg (2)…]()')
@@ -39,7 +36,6 @@ describe('what stands in while the bytes go up', () => {
 
 describe('knowing a picture is still on the way', () => {
   it('recognises the placeholder it builds', () => {
-    // The two share a constant rather than agreeing by hand; this is what pins that.
     expect(stillUploading(uploadPlaceholder('sauna.jpg'))).toBe(true)
     expect(stillUploading(`said something ${uploadPlaceholder('sauna.jpg')} and more`)).toBe(true)
   })
@@ -53,8 +49,6 @@ describe('knowing a picture is still on the way', () => {
 
 describe('how much room a picture needs', () => {
   it('is the finished markdown, which is longer than the placeholder it replaces', () => {
-    // The guard checks the larger of the two. Checking the placeholder alone let a
-    // nearly-full field take a picture and overflow on the swap.
     expect(STORED_MARKDOWN_LENGTH).toBeGreaterThan(uploadPlaceholder('sauna.jpg').length)
   })
 
@@ -74,7 +68,6 @@ describe('writing into what somebody is typing', () => {
   })
 
   it('clamps a cursor that no longer fits the text', () => {
-    // The field is controlled and the value can shrink between the event and the write.
     expect(insertAt('lit', 99, '!')).toBe('lit!')
     expect(insertAt('lit', -5, '!')).toBe('!lit')
   })
@@ -84,7 +77,6 @@ describe('writing into what somebody is typing', () => {
   })
 
   it('leaves the text alone when what it is looking for has been typed away', () => {
-    // Somebody deleting the placeholder mid-upload must not have the picture reappear.
     expect(replaceFirst('gone now', '![Uploading a.png…]()', '![](/api/images/1)')).toBe('gone now')
   })
 

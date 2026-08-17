@@ -47,10 +47,6 @@ const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
   ...over,
 })
 
-/**
- * No burn on offer by default, so the tests that predate #224 see the form they were
- * written against. `withBurn` is what turns the checkbox and the stay questions on.
- */
 const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
   getAllergyItems: () => Promise.resolve({ items: [] }),
   getInviteState: () => Promise.resolve({ status: 'outstanding', kind: 'single', name: null, email: null }),
@@ -72,7 +68,6 @@ const withBurn = (over: Partial<InviteApi> = {}, options: EventOptionTaken[] = [
     ...over,
   })
 
-/** Renders the shared viewer's state, so a test can see it change. */
 const ViewerProbe = () => <p data-testid="viewer">{useViewer().status}</p>
 
 const renderPage = (
@@ -101,7 +96,6 @@ const complete = () => {
 
 const join = () => screen.getByRole('button', { name: 'Join' }).click()
 
-/** The form's own check, past the field's `minLength` — which a browser enforces and jsdom does. */
 const submitPastTheField = () => {
   const form = document.querySelector('form')
   if (form === null) throw new Error('there is no form on the page')
@@ -177,15 +171,12 @@ describe('Invite', () => {
         name: 'Fredrik',
         allergies_notes: 'peanuts',
         allergy_item_ids: [],
-        // No burn on offer, so nothing to join — said explicitly rather than left off.
         join_event_id: null,
       }),
     )
   })
 
   it('sends null rather than an empty string when allergies are left blank', async () => {
-    // The column is nullable and "not said" has one representation; an empty
-    // string would read as "asked and answered nothing".
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
@@ -212,10 +203,6 @@ describe('Invite', () => {
   })
 
   it('signs them into the shared viewer, not just the cookie', async () => {
-    // The session cookie is set server-side, but `Layout`'s nav reads the shared
-    // viewer, which is populated once on mount and not refetched on client-side
-    // navigation. Without this the newly-joined member clicks through to the
-    // start page and is still offered "Log in".
     renderPage(
       stub({
         redeemInvite: () =>
@@ -239,8 +226,6 @@ describe('Invite', () => {
     ['unknown', /do not recognise/],
   ] as const) {
     it(`explains a ${status} invite on its own page, with no form`, async () => {
-      // Three dead ends with three different things to do about them, which is why
-      // this is a status rather than one error code.
       renderPage(withState(status))
 
       expect((await screen.findByRole('alert')).textContent).toMatch(expected)
@@ -324,10 +309,6 @@ describe('Invite', () => {
   })
 
   it('puts the complaint by the button that was clicked, and focuses it', async () => {
-    // The reported symptom: on a phone this form is taller than the screen, so an
-    // error rendered above the first field is off screen when Join is tapped and
-    // the button reads as broken. Both halves are asserted — placement after the
-    // button in document order, and focus, which is what scrolls it into view.
     renderPage(stub())
 
     await screen.findByRole('button', { name: 'Join' })
@@ -343,11 +324,6 @@ describe('Invite', () => {
   })
 
   it('says it again on a second attempt, rather than looking broken twice', async () => {
-    // The first tap focuses the alert. If the second tap does not, someone who
-    // scrolled off to look at a field is left with a button that appears to do
-    // nothing — which is the whole symptom this is here to fix, reappearing on
-    // attempt two. Both `setError` calls land in one commit, so the message that
-    // reaches the DOM is unchanged and only the attempt tells them apart.
     renderPage(stub())
 
     await screen.findByRole('button', { name: 'Join' })
@@ -365,8 +341,6 @@ describe('Invite', () => {
   })
 
   it('leaves the focus alone while they are typing the fix', async () => {
-    // The other half of the same rule: refocusing on every render would snatch
-    // the caret out of the field mid-correction.
     renderPage(stub())
 
     await screen.findByRole('button', { name: 'Join' })
@@ -396,7 +370,6 @@ describe('Invite', () => {
   })
 
   it('tells them to ask for a fresh link when the invite went while the page was open', async () => {
-    // A 409 is not worth retrying — the same request fails the same way.
     renderPage(stub({ redeemInvite: () => Promise.reject(apiError(409, 'conflict', 'nope')) }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -407,9 +380,6 @@ describe('Invite', () => {
   })
 
   it('says to wait rather than to check the connection when the server is at capacity', async () => {
-    // A 429 is the server bounding how much password hashing it runs at once.
-    // Nothing is wrong with their connection, and waiting a moment does work —
-    // which is the opposite of what the generic message tells them to do.
     renderPage(stub({ redeemInvite: () => Promise.reject(apiError(429, 'rate_limited', 'nope')) }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -422,10 +392,6 @@ describe('Invite', () => {
   })
 
   it('passes on the connection advice for a request that never reached a server', async () => {
-    // What the client actually raises for a dead network since it started
-    // mapping them: `ApiError(0, 'network')`, whose message already says what to
-    // do. This is the one branch where advice about a connection is right, and it
-    // was the one branch that did not give it.
     renderPage(
       stub({
         redeemInvite: () =>
@@ -443,8 +409,6 @@ describe('Invite', () => {
   })
 
   it("does not render the page's own cancellation at someone", async () => {
-    // `aborted` shares status 0 with `network`, and "Request cancelled." is the
-    // page tidying up after itself rather than anything the member did.
     renderPage(stub({ redeemInvite: () => Promise.reject(apiError(0, 'aborted', 'Request cancelled.')) }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -455,8 +419,6 @@ describe('Invite', () => {
   })
 
   it('does not blame the connection for a failure that arrived as a response', async () => {
-    // The passing sibling, and the inversion it caught: a 500 is the server
-    // answering, so "check your connection" sends them after the wrong thing.
     renderPage(stub({ redeemInvite: () => Promise.reject(apiError(500, 'internal', 'nope')) }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -469,8 +431,6 @@ describe('Invite', () => {
   })
 
   it('does not offer redemption to someone already signed in', async () => {
-    // It would create a second account for the same human, and the page cannot
-    // tell whether that is what they meant.
     const getInviteState = vi.fn(() =>
       Promise.resolve({ status: 'outstanding' as const, kind: 'single' as const, name: null, email: null }),
     )
@@ -504,8 +464,6 @@ describe('the name the applicant already gave', () => {
   })
 
   it('starts the address from it too, since the invite arrived there', async () => {
-    // #30. Asking for the address the message it came in was addressed to is worse
-    // than not listening.
     renderPage(
       stub({
         getInviteState: () =>
@@ -522,15 +480,12 @@ describe('the name the applicant already gave', () => {
   })
 
   it('leaves the address blank for an invite nobody applied for', async () => {
-    // An admin's direct invite has no application behind it.
     renderPage(stub())
 
     expect(await screen.findByLabelText('Email', { exact: false })).toHaveProperty('value', '')
   })
 
   it('leaves it blank for an invite nobody applied for', async () => {
-    // An admin's direct invite has no application behind it, and is still a
-    // perfectly good invite.
     renderPage(stub())
 
     expect(await screen.findByLabelText('Your name', { exact: false })).toHaveProperty('value', '')
@@ -552,11 +507,6 @@ describe('the name the applicant already gave', () => {
   })
 })
 
-/**
- * #224. Almost everybody spending an invite is joining the burn that is coming, so
- * the form says so — and asks for the stay details in the same breath, rather than
- * leaving a new member to find a second page.
- */
 describe('joining the upcoming burn from the form', () => {
   it('offers it by name, already ticked', async () => {
     renderPage(withBurn())
@@ -566,8 +516,6 @@ describe('joining the upcoming burn from the form', () => {
   })
 
   it('asks nothing about a burn when there is none coming', async () => {
-    // A fresh installation, or the gap after the last one ends. `activeEvent` is
-    // deliberately null there rather than falling back to a past burn.
     renderPage(stub())
 
     await screen.findByRole('button', { name: 'Join' })
@@ -604,7 +552,6 @@ describe('joining the upcoming burn from the form', () => {
   })
 
   it('asks nothing about the stay once the box is unticked', async () => {
-    // An admin who is setting the burn up without attending it.
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(withBurn({ redeemInvite }))
 
@@ -620,8 +567,6 @@ describe('joining the upcoming burn from the form', () => {
   })
 
   it('saves nothing about a stay the server did not create', async () => {
-    // The burn ended while the form was open. The account is made, the join is
-    // skipped, and a stay update against a burn nobody joined would only 404.
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
     renderPage(
       withBurn({ redeemInvite: () => Promise.resolve({ viewer: null, attendance: null }), updateMyStay }),
@@ -631,18 +576,12 @@ describe('joining the upcoming burn from the form', () => {
     complete()
     join()
 
-    // The member welcome, which offers the burn now rather than describing one.
     expect(await screen.findByRole('button', { name: /Summer burn/ })).toBeTruthy()
     expect(updateMyStay).not.toHaveBeenCalled()
-    // And quietly: not reaching for `attendance.event_id` at all. Dropping the null
-    // guard still calls nothing — it throws on the property first — so a test that
-    // only counted calls would pass against it and report a failure to the reader.
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('says they are in even when the details did not save', async () => {
-    // The token is spent and cannot be spent again, so the second write failing must
-    // not read as a signup that failed.
     renderPage(
       withBurn({
         redeemInvite: () => Promise.resolve({ viewer: null, attendance: anAttendance() }),
@@ -672,8 +611,6 @@ describe('joining the upcoming burn from the form', () => {
   })
 
   it('still signs them up when the burn cannot be fetched at all', async () => {
-    // The invite is what this page is for. Somebody who cannot be offered a burn can
-    // still become a member and pick one afterwards.
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(
       stub({ getActiveEvent: () => Promise.reject(apiError(500, 'internal_error', 'nope')), redeemInvite }),
@@ -715,14 +652,11 @@ describe('joining the upcoming burn from the form', () => {
     const sleeping = await screen.findByLabelText(/Where are you sleeping/)
     expect(sleeping.textContent).toContain('Temple mattress — full')
     expect(sleeping.textContent).toContain('Own tent')
-    // The helping list is checkboxes, not options in the sleeping select.
     expect(sleeping.textContent).not.toContain('Sauna')
     expect(screen.getByLabelText('Sauna')).toBeTruthy()
   })
 
   it('offers no link to the lodging list, which nobody here can reach yet', async () => {
-    // The account does not exist while this form is on screen, so `/options` is a
-    // page the reader would be bounced off.
     renderPage(withBurn())
 
     await screen.findByLabelText(/Where are you sleeping/)
@@ -762,8 +696,6 @@ describe('the welcome for somebody who did not join a burn', () => {
   })
 
   it('says plainly there is none, rather than pointing at a burn that is not there', async () => {
-    // The passing sibling for the offer above: a page that always said this would
-    // satisfy neither, and one that always offered would leave a dead button here.
     renderPage(stub(redeemAsMemberOnly))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -784,8 +716,6 @@ describe('the welcome for somebody who did not join a burn', () => {
   })
 
   it('offers no members-only link on a page nobody has an account on yet', async () => {
-    // The same stay fields, drawn before the account exists — so the rideshare board
-    // and the lodging list are both links that cannot be followed from here (#26).
     renderPage(withBurn())
     await screen.findByLabelText('Your name')
 

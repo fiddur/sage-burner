@@ -14,16 +14,12 @@ describe('how old an answer is', () => {
   })
 
   it('is when it was fetched, for one the worker had stored', () => {
-    // The whole point of the header: offline the page still renders, and this is what
-    // stops it claiming the roster it is showing is current.
     expect(freshnessAt(withStamp('2026-08-06T11:40:00.000Z'), NOW)).toBe(
       Date.parse('2026-08-06T11:40:00.000Z'),
     )
   })
 
   it('falls back to now rather than to the beginning of time', () => {
-    // Cannot happen — the worker writes an ISO string — but treating a header it
-    // could not read as ancient would pin a banner to the page permanently.
     expect(freshnessAt(withStamp('not a date'), NOW)).toBe(NOW)
   })
 })
@@ -43,8 +39,6 @@ describe('the newest of those', () => {
   })
 
   it('moves forward when something newer lands', () => {
-    // The passing sibling to the test above: one that never moved would also refuse
-    // the older value, and would leave the banner up for good.
     const freshness = createFreshness()
 
     freshness.note(NOW - 60_000)

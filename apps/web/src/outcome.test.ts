@@ -18,7 +18,6 @@ describe('the reason a provider round trip left in the URL', () => {
     const { result, rerender } = renderHook(() => useOauthOutcome())
 
     expect(result.current.outcome).toBe('linked')
-    // The page still says the thing this time; what goes is the parameter behind it.
     expect(window.location.search).toBe('')
     rerender()
     expect(result.current.outcome).toBe('linked')

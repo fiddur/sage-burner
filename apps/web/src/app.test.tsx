@@ -7,26 +7,6 @@ import type { Viewer } from './viewer.tsx'
 
 import { App } from './app.tsx'
 
-/**
- * A stub satisfying exactly what `App` declares it needs — a plain object, no
- * cast.
- *
- * This was `as unknown as ApiClient`, which is the double cast the standards
- * are aimed at: through `unknown` the object stops being checked against the
- * type at all, so it would have survived `App` calling a method the stub does
- * not have.
- *
- * Every entry rejects except `getActiveEvent`, so a test that comes to depend on
- * one fails loudly instead of quietly reading an empty result and asserting
- * against it. `getActiveEvent` is the single exception because `Home` fetches it
- * on mount, so it is called by every `renderAt` here — rejecting would drive
- * `Home`'s failure branch through the whole routing suite, which is not what
- * those tests are about.
- *
- * The exception is meant to stay a single one: a stub added for a route this
- * file never visits should reject, or the first test that does visit it gets an
- * empty screen instead of the failure this convention exists to produce.
- */
 const clientWith = (
   logout: AppApi['logout'] = () => Promise.reject(new Error('logout is not stubbed in this file')),
 ): AppApi => ({
@@ -143,8 +123,6 @@ const clientWith = (
   getMyPasskeys: () => Promise.reject(new Error('getMyPasskeys is not stubbed in this file')),
   removePasskey: () => Promise.reject(new Error('removePasskey is not stubbed in this file')),
   adminAddAttendance: () => Promise.reject(new Error('adminAddAttendance is not stubbed in this file')),
-  // Resolves rather than rejecting: the version watcher runs on every route in this
-  // file, and a rejection is swallowed anyway — being offline is not a new version.
   getVersion: () => Promise.resolve({ build_sha: 'the-one-this-page-loaded' }),
   getChangelog: () => Promise.resolve({ markdown: '## 2026-08-07\n\n- Something changed.\n' }),
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
@@ -241,51 +219,12 @@ const clientWith = (
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed in this file')),
 })
 
-/**
- * Mounts the real `App` — its route table, its layout, its providers — rather
- * than a copy of them. A route added, removed or repointed in app.tsx must be
- * able to fail here, which a re-declared table could not do.
- */
-
-/**
- * Signed-out by default, and always explicit — in every argument.
- *
- * `title` is here for the same reason as `viewer`: omitting it selects the
- * provider that asks the API, and the assertion below would catch the fetch.
- * Its value is deliberately not the software's name, so the homepage heading
- * and the header can only pass by reading the installation.
- *
- * Omitting `viewer` selects the provider that asks the API — which is right for
- * the app and wrong for a suite, where it would mean every render reaching for
- * `fetch`. `viewer.test.tsx` covers that provider directly with an injected
- * client.
- *
- * `api` was omitted here for the same reason it should not have been. That
- * builds a real `createApiClient()`, and once `Home` began fetching on mount,
- * `renderAt('/')` issued a genuine `fetch('/api/events/active')` — resolved by
- * happy-dom against vitest's document URL, so an actual connection to
- * `localhost:3000`, which is also the dev proxy target. On a machine with the
- * backend running, this unit suite was talking to the live API. Nothing failed,
- * because `Home` catches and the unmount abort swallowed the late `setState` —
- * which is why it went unnoticed rather than why it was fine.
- */
 const renderAt = (path: string, viewer: Viewer = { status: 'signed-out' }, over: Partial<AppApi> = {}) => {
   window.history.replaceState(null, '', path)
 
   return render(<App viewer={viewer} title="The Burning Sage" api={{ ...clientWith(), ...over }} />)
 }
 
-/**
- * The network is closed to this file, and the closure is checked.
- *
- * Stubbing `api` fixes today's leak; this fails the *next* one — a route added
- * to `app.tsx` that fetches on mount, a component reaching past its injected
- * client. Both would otherwise reproduce exactly the silence described above.
- *
- * It has to be an assertion rather than only a rejecting stub, because the
- * pages catch their own fetch failures: a stub that rejects is indistinguishable
- * to the suite from one that is never called.
- */
 let fetches: string[] = []
 
 beforeEach(() => {
@@ -297,14 +236,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  // Explicit because the library's automatic cleanup only registers itself
-  // when vitest globals are on, and they are off here. Without it every render
-  // stacks in the same document and the nav assertions below see links from
-  // earlier tests.
   cleanup()
   window.history.replaceState(null, '', '/')
 
-  // After `cleanup()`, so a request fired during unmount counts too.
   const attempted = fetches
   vi.restoreAllMocks()
   expect(attempted).toEqual([])
@@ -314,32 +248,18 @@ describe('routing', () => {
   it('renders the home page at the root', () => {
     renderAt('/')
 
-    // The homepage's own invitation to apply, which the nav's shorter "Apply" is not.
-    // Its `h1` is the burn's name now (#306), and this file's client never answers
-    // with a burn — the installation's name is in the bar, asserted below.
     expect(screen.getByRole('link', { name: 'Apply to join' })).toBeTruthy()
   })
 
   it('routes every page the app links to, from the nav and the admin landing page', () => {
-    // A page can exist, be tested, and still be unreachable because no route
-    // names it — which is what happened to /admin/applications.
-    //
-    // The paths come from the links the landing page renders rather than a list
-    // here: a hand-written list goes stale the moment someone adds a link, which
-    // is the same failure one level up.
     const admin = {
       status: 'signed-in',
       account: { id: 'a1', name: null, avatar: null, roles: ['admin', 'member'] },
     } as const
     const { container } = renderAt('/admin', admin)
-    // Every link the nav offers, too: `/profile` and `/schedule` sat there for
-    // pages that were never routed, so a member clicking them got NotFound.
     const navPaths = [...container.querySelectorAll('nav a[href^="/"]')].map((link) =>
       link.getAttribute('href'),
     )
-    // Scoped to the page, not the container: `Layout`'s nav renders its own
-    // `/admin` link for an admin, so scraping the whole tree would satisfy the
-    // guard below even if the landing page had lost every link on it.
     const page = container.querySelector('section.page')
     const paths = [...(page?.querySelectorAll('a[href^="/admin"]') ?? [])].map((link) =>
       link.getAttribute('href'),
@@ -355,9 +275,6 @@ describe('routing', () => {
   })
 
   it('names the installation in the header, on every page', () => {
-    // The header is `Layout`, which every route sits inside, so this is the one
-    // place the name has to be right — and it is the software's name that used
-    // to be hardcoded there.
     for (const path of ['/', '/login', '/no/such/page']) {
       cleanup()
       const { container } = renderAt(path)
@@ -366,21 +283,11 @@ describe('routing', () => {
   })
 
   it('leaves a link the backend serves to the browser, rather than routing it', async () => {
-    // #422: `LocationProvider` installs one global click handler and claimed every same-origin
-    // anchor, so "Link it" and "Continue with Facebook" both rendered the not-found page and the
-    // redirect never happened. Asserted against the real `App`, because the bug was a missing
-    // prop on the one provider — a test that supplies the scope itself would pass without it.
-    //
-    // The anchor is appended rather than found on a page: the handler is on `window`, so it does
-    // not matter which element the click came from, and this stays true wherever such a link is
-    // added next.
     renderAt('/')
     const link = document.createElement('a')
     link.href = apiRoutes.startOauthLink.path('facebook')
     link.textContent = 'Link it'
     document.body.append(link)
-    // Only to stop happy-dom attempting the navigation for real; registered after the
-    // provider's, so it cannot prevent the routing being tested.
     const swallow = (event: Event) => event.preventDefault()
     addEventListener('click', swallow)
 
@@ -403,18 +310,12 @@ describe('routing', () => {
   })
 
   it('handles an invite path rather than sending it to the not-found page', () => {
-    // The whole point of #17: an invite link used to fall through to NotFound,
-    // which explained single-use invites because that is where people landed.
     renderAt('/invite/an-expired-token')
 
     expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Nothing here')
   })
 
   it('routes a base64url token, which is what the API mints', () => {
-    // `app.tsx` forbids a dot in any route, because the backend tells a missing
-    // asset from a client route by whether the last segment has an extension.
-    // base64url has no dot, so a real token is safe — asserted rather than
-    // assumed, since minting is one module away from routing.
     renderAt('/invite/tqYh-_9Zx0AbCdEfGhIjKlMnOpQrStUvWxYz012345')
 
     expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Nothing here')
@@ -422,9 +323,6 @@ describe('routing', () => {
 })
 
 describe('signing out', () => {
-  // On the details page rather than in the bar, beside the sentence naming the
-  // account it ends. Rendered through `App` so the route, the layout and the viewer
-  // provider are the real ones — clicking it has to actually empty the nav.
   const renderProfile = (logout: AppApi['logout']) => {
     window.history.replaceState(null, '', '/profile')
 
@@ -458,8 +356,6 @@ describe('signing out', () => {
   })
 
   it('clears the viewer even when the logout request fails', async () => {
-    // A nav still saying signed-in after a failed request is worse than one that
-    // says signed-out while a stale cookie expires on its own.
     renderProfile(vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
 
     screen.getByRole('button', { name: 'Log out' }).click()
@@ -469,7 +365,6 @@ describe('signing out', () => {
 })
 
 describe('navigation', () => {
-  // ⚙️ is a glyph, so its name comes from `aria-label` rather than its text.
   const linkNames = () =>
     screen
       .getAllByRole('link')
@@ -493,14 +388,10 @@ describe('navigation', () => {
 
     expect(linkNames()).toContain('Your details')
     expect(linkNames()).not.toContain('Log in')
-    // ⚙️ is admin's alone since #184. What a member curates is reached from the
-    // page it belongs to — Places from Schedule, the lodging list from Your burn.
     expect(linkNames()).not.toContain('Organise')
   })
 
   it('offers Organise to nobody without a role', () => {
-    // An applicant checking on their application has an account and no roles, and
-    // there is nothing behind the link for them.
     renderAt('/', { status: 'signed-in', account: { id: 'a1', name: null, avatar: null, roles: [] } })
 
     expect(linkNames()).not.toContain('Organise')
@@ -517,8 +408,6 @@ describe('navigation', () => {
   })
 
   it('shows nothing role-specific while the session is still loading', () => {
-    // Otherwise the nav flickers from signed-out to signed-in on every load,
-    // which reads as a bug and is worse than showing less for a moment.
     renderAt('/', { status: 'loading' })
 
     expect(linkNames()).not.toContain('Log in')

@@ -43,10 +43,6 @@ const stub = (over: Partial<PushToggleApi> = {}): PushToggleApi => ({
   ...over,
 })
 
-/**
- * The strip and the settings table under one provider, which is the whole point of the shape:
- * mounted separately they could not be asked whether they share a dismissal.
- */
 const app = (api: PushToggleApi, browser: PushBrowser, elsewhere?: ComponentChildren) =>
   render(
     <ViewerProvider
@@ -70,12 +66,10 @@ const tick = async (name?: string) => {
   fireEvent.change(box, { target: { checked: true } })
 }
 
-/** The sections start collapsed (#682), so a per-category switch has to be uncovered first. */
 const uncover = async (heading: string) => {
   fireEvent.click(await screen.findByRole('button', { name: heading }))
 }
 
-/** Waits out the mount effect: until it has answered, the nudge is hidden by the state alone. */
 const settled = async () => await screen.findAllByRole('button', { name: 'Notify me here' })
 
 const Elsewhere = () => {

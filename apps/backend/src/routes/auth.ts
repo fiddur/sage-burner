@@ -126,13 +126,6 @@ export const registerAuthRoutes = (
     }
   })
 
-  /**
-   * Open sign-up (#476), which the app deliberately did not have until the account came before
-   * the application. A new account holds **no roles**, and that state already means "not a
-   * member" everywhere — `requireApproved` gates the rest of the app, so what a junk account can
-   * reach is its own application and nothing else. `limits.byIp` is what bounds how many of them
-   * one client can make.
-   */
   app.post(apiRoutes.signUp.fastify, async (request, reply) => {
     void noStore(reply)
 

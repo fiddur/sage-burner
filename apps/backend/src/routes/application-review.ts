@@ -83,11 +83,6 @@ export const registerApplicationReviewRoutes = (
     return { ...posted, to: settled.applicant_email }
   }
 
-  /**
-   * Applying means wanting to come, so approval puts them on the list for the next burn — the
-   * same `joinBurn` redeeming an invite used, and the same card and bell every other arrival
-   * gets. A burn nobody has planned yet is not a failure: the member joins from the page.
-   */
   const joinTheNextBurn = async (accountId: string) => {
     const next = await activeEventNow(db, now)
     if (next === undefined) return
@@ -107,12 +102,6 @@ export const registerApplicationReviewRoutes = (
     )
   }
 
-  /**
-   * The bell, and a message to the address they gave. Direct rather than through the notification
-   * email column, which is off until somebody asks (#30): this is the mail the invite email used
-   * to be — about the account itself — and a rejection heard by nobody is a door closing in
-   * silence.
-   */
   const tellApplicant = async (
     request: FastifyRequest,
     settled: { account_id: string | null; applicant_name: string; applicant_email: string },

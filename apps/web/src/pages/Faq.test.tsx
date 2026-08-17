@@ -61,8 +61,6 @@ const stub = (over: Partial<FaqApi> = {}, entries: FaqEntry[] = TWO): FaqApi => 
 
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
-// `null`, not `undefined`: passing `undefined` to a parameter with a default gets the
-// default, so "no burn" written that way silently renders the usual one.
 const renderPage = (api: FaqApi, viewer: Viewer = ADA, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -78,7 +76,6 @@ const asked = () => [...document.querySelectorAll('.faq-entry summary')].map((no
 
 describe('the burn’s questions', () => {
   it('shows every question at once, in the order they are arranged', async () => {
-    // The whole shape of the page: a column of headings somebody scans.
     renderPage(stub())
 
     await screen.findByText('How do I get there?')
@@ -86,8 +83,6 @@ describe('the burn’s questions', () => {
   })
 
   it('keeps the answers folded away until one is opened', async () => {
-    // `<details>` starts closed, and the answer is inside it — a page of expanded
-    // answers is the wall of text this replaces.
     renderPage(stub())
 
     await screen.findByText('How do I get there?')
@@ -97,8 +92,6 @@ describe('the burn’s questions', () => {
   })
 
   it('renders an answer as markdown, not as raw html', async () => {
-    // Members write these and members read them; `markdown.ts` escapes rather than
-    // filters, so a script tag typed into an answer must come out as text.
     renderPage(stub({}, [anEntry({ id: 'f-1', question: 'Why?', answer: '**Hot**<script>bad()</script>' })]))
 
     await screen.findByText('Why?')
@@ -211,8 +204,6 @@ describe('putting them in order', () => {
   })
 
   it('leaves the first one where it is', async () => {
-    // The passing sibling: `swap` answers undefined at the edge rather than wrapping
-    // the list round, and nothing should be sent for a move that cannot happen.
     const reorderFaq = vi.fn<FaqApi['reorderFaq']>(() => Promise.resolve({ entries: TWO }))
     renderPage(stub({ reorderFaq }))
 
@@ -243,9 +234,6 @@ describe('seeding from a previous burn', () => {
 
 describe('with no burn selected', () => {
   it('reads the next burn instead, and says which it is', async () => {
-    // The page most worth browsing before deciding to come, so it does not need a burn
-    // you are in — an approved member who has joined none used to land on `NoBurn` and
-    // could read nothing (#321).
     const getFaq = vi.fn<FaqApi['getFaq']>(() => Promise.resolve({ entries: TWO }))
     renderPage(stub({ getFaq, getActiveEvent: () => Promise.resolve({ event: BURN }) }), ADA, null)
 
@@ -255,7 +243,6 @@ describe('with no burn selected', () => {
   })
 
   it('offers the ask form against that burn', async () => {
-    // Somebody deciding whether to come is exactly who has a question.
     const addFaqEntry = vi.fn<FaqApi['addFaqEntry']>(() =>
       Promise.resolve({ entry: anEntry({ id: 'f-9', question: 'Is there a shower?' }) }),
     )
@@ -278,20 +265,15 @@ describe('with no burn selected', () => {
   })
 
   it('names no burn when the bar picked one', async () => {
-    // The passing sibling: the note is for the fallback, and saying it over somebody's
-    // own burn would read as though they were looking at the wrong one.
     const getActiveEvent = vi.fn<FaqApi['getActiveEvent']>(() => Promise.resolve({ event: BURN }))
     renderPage(stub({ getActiveEvent }))
 
     await screen.findByText('How do I get there?')
     expect(screen.queryByText(/Showing Summer burn/)).toBeNull()
-    // And nothing was asked of it: the bar had the answer already.
     expect(getActiveEvent).not.toHaveBeenCalled()
   })
 
   it('waits for the burns before falling back', async () => {
-    // The burns are fetched once for the session, so a page mounted before they arrive
-    // would otherwise load the next burn and swap it for the reader's a moment later.
     const getActiveEvent = vi.fn<FaqApi['getActiveEvent']>(() => Promise.resolve({ event: BURN }))
     render(
       <ViewerProvider viewer={ADA}>

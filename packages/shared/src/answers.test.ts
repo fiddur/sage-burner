@@ -65,8 +65,6 @@ describe('answerProblems', () => {
   })
 
   it('rejects a string answer to a tick box', () => {
-    // `'false'` is truthy, so accepting strings here would tick an agreement the
-    // applicant did not tick.
     expect(answerProblems([box], { 'q-box': 'false' })).toEqual([
       { question_id: 'q-box', reason: 'wrong_type' },
     ])
@@ -79,8 +77,6 @@ describe('answerProblems', () => {
   })
 
   it('accepts an answer exactly at the limit', () => {
-    // The passing sibling: an off-by-one here refuses a legitimate answer, which
-    // is the failure nobody reports because they just give up.
     expect(answerProblems([optional], { 'q-opt': 'x'.repeat(MAX_ANSWER_LENGTH) })).toEqual([])
   })
 
@@ -116,8 +112,6 @@ describe('whether something is shaped like an address', () => {
   })
 
   it('rejects the things the old free-text box held', () => {
-    // Phone numbers and Discord handles, which is what "how can we reach you" got
-    // before this was an address field (#30).
     expect(looksLikeEmail('+46 70 123 45 67')).toBe(false)
     expect(looksLikeEmail('@ada on discord')).toBe(false)
     expect(looksLikeEmail('ada')).toBe(false)

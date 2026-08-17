@@ -25,15 +25,8 @@ const stub = (over: Partial<OauthApi> = {}): OauthApi => ({
 
 const show = (api: OauthApi) => render(<OauthField api={api} provider="facebook" />)
 
-/** What a sibling reading `useSocialLogins()` sees — the login page and Your details both do. */
 const Elsewhere = () => <span data-testid="elsewhere">{useSocialLogins().join(',')}</span>
 
-/**
- * The field inside a real installation context, with a sibling reading the list (#428).
- *
- * Asserted through a consumer rather than on a spy, because the property is that the *other*
- * pages see it: a spy would pass on a setter that wrote somewhere nothing reads.
- */
 const showWithSiblings = (api: OauthApi, socialLogins: readonly ('discord' | 'facebook')[] = []) =>
   render(
     <InstallationProvider socialLogins={socialLogins}>
@@ -44,7 +37,6 @@ const showWithSiblings = (api: OauthApi, socialLogins: readonly ('discord' | 'fa
 
 describe('setting a provider up', () => {
   it('says where the id comes from and what it costs before anybody starts', async () => {
-    // Facebook's review is the thing worth knowing before filling this in, not after.
     show(stub())
 
     expect(await screen.findByText(/developers\.facebook\.com/)).toBeTruthy()
@@ -58,33 +50,22 @@ describe('setting a provider up', () => {
   })
 
   it('shows the redirect URI to register, since the app builds it', async () => {
-    // An admin pasting a different one into the console is the failure this prevents.
     show(stub())
 
     expect(await screen.findByText('/api/auth/oauth/facebook/callback')).toBeTruthy()
   })
 
   it('prints every URL Basic Settings asks for, so none is retyped', async () => {
-    // The strings an admin pastes into the Meta console beside the redirect URI. #400 named the
-    // privacy one three times without producing a page for it; #419 added the other two, and the
-    // deletion instructions are the privacy page again rather than a callback.
     show(stub())
 
-    // Each row's own link rather than a count across the page: counting made this fail when an
-    // unrelated `/privacy` link was added elsewhere in the field, which says nothing about
-    // whether the three rows an admin pastes from are right.
     const linkIn = (row: RegExp) => within(screen.getByText(row)).getByRole('link').getAttribute('href')
 
     expect(linkIn(/Privacy Policy/)).toBe('/privacy')
     expect(linkIn(/Terms of Service/)).toBe('/terms')
-    // The policy again: the deletion instructions are that page, not a callback.
     expect(linkIn(/Data Deletion Instructions/)).toBe('/privacy')
   })
 
   it('tells the admin what their members will be asked to allow', async () => {
-    // #429: the consent screen names more than this app keeps, and an admin who has not seen it
-    // cannot answer a member who has. Asserted on the container's text because the sentence is
-    // built from an interpolation and a link, so no single element holds it.
     const { container } = show(stub())
     await screen.findByLabelText('Facebook client ID')
 
@@ -93,8 +74,6 @@ describe('setting a provider up', () => {
   })
 
   it('uses Discord’s own wording for Discord', async () => {
-    // The two differ, and the point is that it matches what the member is actually shown —
-    // Discord's screen says exactly this, which is what prompted #429.
     const { container } = render(<OauthField api={stub()} provider="discord" />)
     await screen.findByLabelText('Discord client ID')
 
@@ -113,8 +92,6 @@ describe('setting a provider up', () => {
   })
 
   it('omits the secret from a save that left the box alone', async () => {
-    // Empty is a secret being cleared; typing nothing into a blank box is not that, and
-    // treating them the same would wipe the secret on every unrelated edit.
     const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: SAVED }))
     show(stub({ getOauthSettings: () => Promise.resolve({ settings: SAVED }), updateOauthSettings }))
 
@@ -163,8 +140,6 @@ describe('setting a provider up', () => {
   })
 
   it('seeds the box from what is stored, so a save does not turn it back off', async () => {
-    // The failure this prevents: correcting a typo in the client id, with the box redrawn
-    // unticked, would send `false` and stop asking for the permission on every later sign-in.
     show(
       stub({
         getOauthSettings: () => Promise.resolve({ settings: { ...SAVED, ask_profile_link: true } }),
@@ -178,9 +153,6 @@ describe('setting a provider up', () => {
   })
 
   it('puts the provider in front of the other pages without a reload', async () => {
-    // #428: the sign-in links come from `social_logins` on the installation read, fetched once at
-    // app start — so a client-side navigation to Your details showed "not linked" against a
-    // provider that had just been configured.
     const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: SAVED }))
     showWithSiblings(stub({ updateOauthSettings }))
 
@@ -194,8 +166,6 @@ describe('setting a provider up', () => {
   })
 
   it('leaves the other provider where it was', async () => {
-    // One field saves one provider. Rebuilding the list must not drop Discord, which this field
-    // knows nothing about.
     const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: SAVED }))
     showWithSiblings(stub({ updateOauthSettings }), ['discord'])
 
@@ -220,8 +190,6 @@ describe('setting a provider up', () => {
   })
 
   it('draws no link for a client id saved without a secret', async () => {
-    // `configuredProviders` wants both halves — a button that can only end at "that did not work"
-    // reads as a promise, which is the rule the login page already follows.
     const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: { ...SAVED, has_secret: false } }))
     showWithSiblings(stub({ updateOauthSettings }))
 
