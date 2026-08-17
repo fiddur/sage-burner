@@ -40,9 +40,12 @@ type definitions. All layers import from it — never duplicate a schema.
   (what an uploaded icon may be, and `flameIcon` — the app's own mark, which the
   backend serves when nobody has uploaded one), `routes.ts` (`apiRoutes`, every
   endpoint's path and verb), `pages.ts` (the client-side paths a link is built from),
-  `mentions.ts` (the `@[Name](mention:id)` token, which `markdown.ts` renders), and
+  `mentions.ts` (the `@[Name](mention:id)` token, which `markdown.ts` renders),
   `dates.ts` (`dayName`, which names a plain calendar day for the backend's meal cards
-  and the web's day headings alike). Nothing under `schemas/`.
+  and the web's day headings alike), `meetings.ts` (`meetingEnds` and `nextMeeting`,
+  which decide what the banner shows), `songs.ts` (`isChordLine` and `transposeLine`,
+  which the songbook renders with) and `roster.ts` (`withPlaces`, which draws the line
+  between a place and the waiting list). Nothing under `schemas/`.
 - **Every endpoint lives in `routes.ts` and nowhere else.** The client builds its
   path from it and the route file registers `fastify` from it, so the two spellings
   of one endpoint cannot drift; `routes.test.ts` checks that each built path routes
@@ -245,7 +248,9 @@ These are member records, so treat them as such:
   service cannot cost somebody the record. A category somebody does not want is not
   written at all.
 - **A stored setting is an explicit choice, not a mute** (#259). What happens _to you_
-  is on unless refused; what happens _around you_ is off unless asked for. One list of
+  is on unless refused; what happens _around you_ is off unless asked for, bar
+  `meeting_scheduled`, which is on because a meeting nobody heard about is a meeting
+  nobody comes to. One list of
   exceptions cannot mean both, so `notification_setting` carries `enabled` and absence
   means "has not said" — the default lives in `notificationCategoryInfo`, and the wire
   carries the complete `{ on: [...] }` rather than a delta. **Attendance is the whole

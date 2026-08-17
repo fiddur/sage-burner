@@ -79,14 +79,22 @@ describe('the stylesheet', () => {
     expect(rules.find((rule) => rule.selector === '.song-body')?.body).toMatch(/font-family:[^;]*monospace/)
   })
 
-  it('keeps the nudge above the popdown that raises it, and under the drawer', () => {
+  it('stacks the six rungs in the order docs/the-app.md writes down, ties and all', () => {
     const layer = (selector: string) =>
       Number(/z-index:\s*(\d+)/.exec(rules.find((rule) => rule.selector === selector)?.body ?? '')?.[1])
 
-    expect(layer('.push-nudge')).toBeGreaterThan(layer('.card-bell-menu'))
-    expect(layer('.push-nudge')).toBeGreaterThan(layer('.bell-panel'))
-    expect(layer('.push-nudge')).toBeLessThan(layer('.menu-backdrop'))
-    expect(layer('.push-nudge')).toBeGreaterThan(layer('.bottom-bar'))
+    const scale = [
+      '.bottom-bar',
+      '.card-bell-menu',
+      '.push-nudge',
+      '.menu-backdrop',
+      '.menu-drawer',
+      '.dream-modal',
+    ]
+
+    expect(scale.map(layer)).toEqual(scale.map(layer).sort((one, other) => one - other))
+    expect(new Set(scale.map(layer)).size).toBe(scale.length)
+    expect(layer('.bell-panel')).toBe(layer('.card-bell-menu'))
   })
 
   it('spaces a diary row rather than leaving its controls against the time', () => {

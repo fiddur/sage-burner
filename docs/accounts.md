@@ -1085,7 +1085,8 @@ the kind of thing that goes one fix stale.
 it: 60px of a 93px menu below the panel's edge, neither entry hit-testable where it was drawn,
 and **Remove this notification** entirely off screen. Opening it silently made the panel
 scrollable, so the content was technically reachable — but nothing before the click suggested
-it continued. `/notifications` was never affected, having no enclosing scroller.
+it continued. `/notifications` has no enclosing scroller, so `useFlipUp` measures the window
+there — a low row flips up on that page too.
 
 `flipsUp(menu, above, below)` is the whole rule and it is a plain function, because the
 interesting part is the decision rather than the plumbing: flip only where it does not fit
@@ -1130,9 +1131,9 @@ It answers a tick that can happen anywhere, and the settings table is three scre
 feed is longer, so a notice in the flow at the top of the page would appear off-screen exactly when
 it was raised. It sat _under_ the card bell's menu for a while, which put the offer behind the very
 panel it had been ticked in whenever the card was low in the window — the tap landed on the menu and
-did nothing at all, with no way out but pressing somewhere unrelated first. `usePushHere` lives inside the
-strip rather than beside it, so a page nobody has ticked anything on registers no service worker and
-re-posts no subscription.
+did nothing at all, with no way out but pressing somewhere unrelated first. `usePushHere` lives
+inside the strip rather than beside it, so a page nobody has ticked anything on asks the browser for
+nothing and re-posts no subscription.
 
 **The bell asks too, more quietly** (#695). Somebody reading their notifications on a device push
 cannot reach is exactly the person push is for — they care what happened and nothing reached them
@@ -1144,7 +1145,7 @@ back the next sitting. The lasting "Do not ask me here" silences it as well, the
 covering the lighter occasion but not the other way round. It is never drawn where the button could
 not work: no push in this browser, permission already refused, or a subscription already live.
 `usePushHere` sits inside the strip rather than beside it for the reason the one above gives, so a
-reader who has waved it off registers no service worker.
+reader who has waved it off is asked nothing by the browser.
 
 **On iOS it leads with installing**, because push does not exist in Safari until the app is on the
 home screen: `PushAsk` renders the install line rather than a button that cannot deliver, splitting
@@ -1313,8 +1314,8 @@ threaded through `digestMessage` rather than a single link being handed to it. T
 href where there is no `PUBLIC_ORIGIN` to build an absolute one from — the rule every other link
 in these messages follows.
 
-**The sections are the feed's own chips** — `feedKindLabel`, so Burns, Dreams, People, Posts,
-Songs, Bring, Points, Meetings, in `feedKinds` order. The digest then reads as the page it
+**The sections are the feed's own chips** — `feedKindLabel`, so Dreams, People, Posts, Songs,
+Bring, Points, Meetings, Leads, Meals, in `feedKinds` order. The digest then reads as the page it
 links to, and a new kind will not compile until it has a heading.
 
 **A card is one line, and never a quoted comment.** `lineFor` writes `title — verbs (+N

@@ -546,12 +546,13 @@ same situation, and telling those two people different things implies a queue po
 honours. Both messages therefore go to **every** unpaid member, and split on `member_cap - paid`:
 
 - places left, and few enough to be worth saying: _N places left, and they go to whoever pays._
+  One place is its own sentence — _1 place left, and it goes to whoever pays._
 - none left: _full — every place is held by somebody who has paid._
 
-That keeps #506's fix — it compared `paid` to `member_cap` for equality, so an over-subscribed burn
-whose payments had not landed exactly on the cap told the person below the line nothing, and an admin
-who recorded more payments than places silenced it altogether — without #506's split of the audience,
-which said more than the data supports. The roster still draws the line, because for a **paid**
+`member_cap - paid` rather than #506's equality test, which told the person below the line nothing on
+an over-subscribed burn whose payments had not landed exactly on the cap, and silenced the message
+altogether for an admin who recorded more payments than places. #506's split of the audience goes with
+it, having said more than the data supports. The roster still draws the line, because for a **paid**
 member it is a real fact and the page is where somebody looks to see it.
 
 **Told once per burn, per sentence** — the query asks whether this account already has _this exact

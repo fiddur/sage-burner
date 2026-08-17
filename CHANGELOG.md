@@ -374,8 +374,8 @@ under today's heading, and make a new heading when there is none.
   whole form to fill in first.
 
 - **The first person onto a new burn can put their hand up.** On a burn nobody had joined yet — every
-  burn on the day it is planned — 🙋 was missing everywhere: no lead role, no meal crew, no helping
-  out, and so not even the nudge telling you to join first. The hand is there now, and pressing it
+  burn on the day it is planned — 🙋 was missing everywhere: no lead role, no meal crew, no bring
+  list, no helping out, and so not even the nudge telling you to join first. The hand is there now, and pressing it
   says what to do. Where a job is closed to everybody, as a chore's cook is, nothing is offered, which
   is unchanged.
 

@@ -14,6 +14,12 @@ the same PR.
 **Run it against a disposable copy, never a live installation** — the protocol
 creates accounts, burns and content.
 
+**A glyph for a control in these docs stands for the drawn icon of that meaning**, not for an
+emoji on screen: since #621 every control is Lucide line art, so ✏️ means the pen, 🗑️ the bin, ☰
+the menu, ✕ the close, ⚙️ the cog, ↻ the reload, 🖼 the picture button and 🙋 the raised hand.
+What the pages, a card's entry marks and the Leads phases wear really is emoji, and so are the
+two states — 🔔 / 🔕 and ♡ / ❤️‍🔥 — for the reason `docs/the-app.md` gives under **The icons**.
+
 [← back to the README](../README.md)
 
 ## Setting up
@@ -259,9 +265,9 @@ phone" means 360px.
 - [ ] From an account that has not joined the burn, 🙋 says to join the burn and
       links to the details page rather than refusing — from an opened dream panel and
       a meal dialog as well as from a page, since that is where it is pressed.
-- [ ] On a burn nobody has joined yet, the lead-role, meal-crew and helping 🙋 are all
-      offered (and the appoint control is not, there being nobody to appoint). A chore's cook offers
-      neither.
+- [ ] On a burn nobody has joined yet, the lead-role, meal-crew, bring-list and helping 🙋 are
+      all offered (and the appoint control is not, there being nobody to appoint). A chore's cook
+      offers neither.
 - [ ] Leave the burn with a pledge outstanding: the hand is gone from the item
       and the item is not.
 
@@ -323,8 +329,9 @@ phone" means 360px.
       on the ⋯. A second Escape shuts the panel.
 - [ ] On the bell panel and on `/notifications`, a row's ⋯ offers two things. **Stop telling
       me about this** names the kind; press it, and a line under the panel says which kind was
-      switched off, and that kind is off in both columns on the details page. **Remove this notification** takes the row off, and a reload does not
-      bring it back — with an unseen row, the count above drops with it.
+      switched off, and that kind is off in both columns on the details page. **Remove this
+      notification** takes the row off, and a reload does not bring it back — with an unseen row,
+      the count above drops with it.
 - [ ] In a browser with push off, tick a category on the details page: a strip appears at the
       bottom of the window offering to turn notifications on here.
 - [ ] Without dismissing it, go to the feed and tick "Notify me on similar" in a card's 🔔:
@@ -377,7 +384,8 @@ phone" means 360px.
 - [ ] Take the meeting out of the diary: its card goes off the feed with it, and so does what
       was said on it. The same for a talking point.
 - [ ] Move the meeting: the card says "moved it" and comes back to the top. Moving it again
-      does not stack up a second line. Rewording its note changes nothing on the feed.
+      does not stack up a second line. Rewording its note rewrites the paragraph under the card head
+      without bumping the card or adding a line.
 - [ ] Subscribe to the burn's calendar feed: the meeting is in it beside the dreams, with the
       joining link as its description — and the note you typed is nowhere in the file.
 - [ ] A meeting whose time has passed moves under **Meetings that have been**, and one that is
@@ -438,6 +446,7 @@ phone" means 360px.
       _Add a picture_ under the box.
 - [ ] The picture button opens a file picker and the chosen picture lands at the end of
       the body; pasting one and dropping one on the box still do the same.
+- [ ] Tab to the picture button: the ring is drawn around the button, not around the toolbar.
 - [ ] While it is going up, the note below the box says a picture is on its way and the
       picture button is dimmed. Choosing an SVG says so below the box, not in the toolbar.
 - [ ] Choosing two at once puts two placeholders in the box and the note reads _Sending
@@ -460,6 +469,8 @@ phone" means 360px.
       It draws the same outlined icon the toolbar's button does, not a coloured emoji.
 - [ ] A picture put in the **welcome text** is drawn on the homepage while signed out, in a
       private window that has never signed in.
+- [ ] Press a 🗑️ anywhere: focus is on the confirming button, and pressing **Keep it** puts it
+      back on the 🗑️.
 
 ## The nav on a wide screen
 
@@ -472,8 +483,6 @@ phone" means 360px.
       focus lands on it. Reload: still gone. Press ☰: it is back, and a reload keeps it back.
 - [ ] With the browser window made short — under about 500px tall — the column scrolls, so
       Meetings at the bottom of it can be reached.
-- [ ] Press a 🗑️ anywhere: focus is on the confirming button, and pressing **Keep it** puts it
-      back on the 🗑️.
 - [ ] Signed out, there is no column and no ☰.
 
 ## On a phone
