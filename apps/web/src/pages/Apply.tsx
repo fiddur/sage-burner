@@ -103,16 +103,44 @@ const Talk = ({ api, messages }: { api: ApplyApi; messages: readonly Application
   )
 }
 
+const Organisers = ({ organisers }: { organisers: MyApplication['organisers'] }) =>
+  organisers.length === 0 ? null : (
+    <ul class="plain-list">
+      {organisers.map((who) => (
+        <li key={who.account_id}>
+          {who.name ?? 'An organiser'}
+          {who.contact !== null && who.contact !== '' && ` — ${who.contact}`}
+        </li>
+      ))}
+    </ul>
+  )
+
+const LetGo = ({ organisers }: { organisers: MyApplication['organisers'] }) => (
+  <>
+    <h1>Your membership</h1>
+    <p role="status">
+      Your application was accepted, but you are not a member here at the moment. If you would like to know
+      more, the organisers are the people to ask.
+    </p>
+
+    <Organisers organisers={organisers} />
+  </>
+)
+
 const Answered = ({
   approved,
+  member,
   organisers,
   joined,
 }: {
   approved: boolean
+  member: boolean
   organisers: MyApplication['organisers']
   joined: string | undefined
-}) =>
-  approved ? (
+}) => {
+  if (approved && !member) return <LetGo organisers={organisers} />
+
+  return approved ? (
     <>
       <h1>You are in</h1>
       <p role="status">
@@ -131,32 +159,25 @@ const Answered = ({
         This one has not been accepted. If you would like to know more, the organisers are the people to ask.
       </p>
 
-      {organisers.length > 0 && (
-        <ul class="plain-list">
-          {organisers.map((who) => (
-            <li key={who.account_id}>
-              {who.name ?? 'An organiser'}
-              {who.contact !== null && who.contact !== '' && ` — ${who.contact}`}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Organisers organisers={organisers} />
     </>
   )
+}
 
 const hasProblem = (problems: string[], field: string) =>
   problems.some((problem) => problem.startsWith(`${field}:`))
 
-const Decided = ({ api, mine }: { api: ApplyApi; mine: MyApplication }) => {
+const Decided = ({ api, mine, member }: { api: ApplyApi; mine: MyApplication; member: boolean }) => {
   const { status, burns } = useBurns()
   const approved = mine.application?.status === 'approved'
 
-  if (approved && status === 'loading') return <article class="column" />
+  if (approved && member && status === 'loading') return <article class="column" />
 
   return (
     <article class="column">
       <Answered
         approved={approved}
+        member={member}
         organisers={mine.organisers}
         joined={burns.find((one) => one.attendance !== null)?.event.name}
       />
@@ -208,7 +229,7 @@ export const Apply = ({ api }: ApplyProps) => {
   }
 
   if (mine?.application != null && mine.application.status !== 'pending') {
-    return <Decided api={api} mine={mine} />
+    return <Decided api={api} mine={mine} member={isMember(viewer)} />
   }
 
   if (sent || mine?.application != null) {

@@ -9,6 +9,20 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-17
 
+- **The page column reaches its own last entry.** On a short window it scrolled, but never far
+  enough — the bottom of it sat below the window, so Meetings could not be got to without
+  scrolling the page as well.
+
+- **The composer's help line stops pointing at a button Preview has hidden.** While Preview was
+  showing it still said to paste, drop or click the picture button, none of which was on screen.
+
+- **`/apply` says what is true where a membership has been taken away.** It read "You are in — you
+  are a member here now" from the decision alone, next to a navigation with nothing in it. It now
+  says the application was accepted and the membership is not current, and who to ask.
+
+- **An empty bring list says so once.** Two notes under two headings each said something true
+  about its own half and together read as two problems where there is only nothing there yet.
+
 - **The digest says which burn each line is about.** Two lead roles with the same name on two
   different burns read as the same line twice, and following either one landed on whichever burn
   happened to be selected. Every line now ends with its burn — and a song with "Songbook".

@@ -104,11 +104,22 @@ describe('the bring list', () => {
     expect(asks.nextElementSibling?.textContent).not.toContain('Speakers')
   })
 
-  it('says an empty list is empty, rather than that everything asked for is covered', async () => {
+  it('says an empty list is empty once, rather than twice or as two covered halves (#544)', async () => {
     renderPage(stub())
 
     expect(await screen.findByText(/Nothing on the list yet/)).toBeTruthy()
     expect(screen.queryByText(/Everything asked for has somebody bringing it/)).toBeNull()
+    expect(screen.queryByText(/Nobody has said they are bringing anything yet/)).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Nobody is bringing these yet' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Somebody is bringing these' })).toBeNull()
+  })
+
+  it('shows both halves and their own notes as soon as there is one thing', async () => {
+    renderPage(stub({}, [anItem({ id: 'b-1' })]))
+
+    expect(await screen.findByRole('heading', { name: 'Nobody is bringing these yet' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Somebody is bringing these' })).toBeTruthy()
+    expect(screen.getByText(/Nobody has said they are bringing anything yet/)).toBeTruthy()
   })
 
   it('says everything asked for is covered when every item has a hand', async () => {

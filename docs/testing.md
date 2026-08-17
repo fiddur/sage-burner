@@ -90,6 +90,9 @@ phone" means 360px.
 - [ ] Once approved, `/apply` reads "You are on _burn_" and never flickers the between-burns
       sentence on the way. Leave that burn and join another by hand: it names the one you are
       on, and claims nobody added you to it.
+- [ ] Take that member's roles off again (⚙️ → Members) and load `/apply` as them: it says the
+      application was accepted and they are not a member at the moment, with the organisers to
+      ask — not "You are in" beside a navigation holding nothing but the bell (#578).
 - [ ] The group-link form offers no closing date before today, and says so rather than
       answering "Request failed" if one is typed anyway.
 - [ ] Mint a group link under ⚙️ → Invites with a closing date and a cap of 2.
@@ -249,8 +252,10 @@ phone" means 360px.
 
 ## The bring list
 
-- [ ] ☰ → Bring list. Add something without ticking "I am bringing this
-      myself": it lands under "Nobody is bringing these yet".
+- [ ] ☰ → Bring list on a burn nobody has added to: one line, "Nothing on the list yet — add the
+      first thing below.", and neither half's heading (#544).
+- [ ] Add something without ticking "I am bringing this myself": both headings appear and it lands
+      under "Nobody is bringing these yet".
 - [ ] Put your hand up on it from a second member's account: it moves to the
       half below, and the member who asked is told somebody is bringing it. A
       second hand on the same item tells them nothing more.
@@ -464,6 +469,9 @@ phone" means 360px.
       applicant's box on `/apply` — each with **Write | Preview** over it and a footer under
       it. The song sheet and the application answers are plain boxes, and say nothing about
       markdown.
+- [ ] Press **Preview**: the footer keeps _Markdown is supported_ and drops the picture half of
+      the sentence, there being no toolbar and no textarea to paste into while it is showing
+      (#719). **Write** brings both back.
 - [ ] **Preview** renders what **Write** holds, and an empty box previews as _Nothing
       written yet._ rather than blank. Switching back keeps what was typed.
 - [ ] Say something on a card with **Preview** showing: the box empties and comes back to
@@ -490,7 +498,10 @@ phone" means 360px.
 - [ ] Press ‹ at the top of it: the column goes, ☰ appears at the leading edge of the bar and
       focus lands on it. Reload: still gone. Press ☰: it is back, and a reload keeps it back.
 - [ ] With the browser window made short — under about 500px tall — the column scrolls, so
-      Meetings at the bottom of it can be reached.
+      Meetings at the bottom of it can be reached **by the column's own scroll**, with the page
+      itself left at the top. This is the check for `--header-height`: if the column's own scroll
+      runs out before Meetings is on screen, the token no longer matches the header's real box
+      (#721). Try it again with the browser's font size set large.
 - [ ] Signed out, there is no column and no ☰.
 
 ## On a phone

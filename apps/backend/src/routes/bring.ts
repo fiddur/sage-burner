@@ -101,8 +101,7 @@ export const registerBringRoutes = (
     item: BringItem,
     body: string,
     by: string | undefined,
-    kind: ThreadEntryKind = 'helper',
-    talkedOn?: string,
+    { kind = 'helper', talkedOn }: { kind?: ThreadEntryKind; talkedOn?: string } = {},
   ) =>
     await addEntry(
       db,
@@ -194,13 +193,10 @@ export const registerBringRoutes = (
         return threadIdFor(tx, { type: 'bring', id: row.id, event_id: row.event_id, title: row.title })
       })
 
-      await noteOnItem(
-        row,
-        body.bringing ? 'is bringing this' : 'asked for this',
-        viewer.account_id,
-        'added',
-        threadId,
-      )
+      await noteOnItem(row, body.bringing ? 'is bringing this' : 'asked for this', viewer.account_id, {
+        kind: 'added',
+        talkedOn: threadId,
+      })
 
       const who = await displayName(db, viewer.account_id)
       const named = await reachedByMention(
@@ -251,7 +247,7 @@ export const registerBringRoutes = (
 
         const reworded = patched.row.title !== existing.title || patched.row.comment !== existing.comment
 
-        if (reworded) await noteOnItem(patched.row, 'went over it', viewer.account_id, 'edited')
+        if (reworded) await noteOnItem(patched.row, 'went over it', viewer.account_id, { kind: 'edited' })
 
         const already = new Set(await namedBy(db, existing.comment, existing.event_id, viewer.account_id))
         const newly = (
@@ -292,7 +288,7 @@ export const registerBringRoutes = (
           .set({ withdrawn_at: now().toISOString() })
           .where(eq(bringItem.id, existing.id))
 
-        await noteOnItem(existing, 'took it off the list', viewer.account_id, 'withdrawn')
+        await noteOnItem(existing, 'took it off the list', viewer.account_id, { kind: 'withdrawn' })
       }
 
       return reply.code(204).send()

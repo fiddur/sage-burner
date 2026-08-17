@@ -111,6 +111,42 @@ describe('MarkdownField', () => {
     expect(screen.getByText(/paste, drop or click/)).toBeTruthy()
   })
 
+  it('drops the picture half of the help line in Preview, where none of it is on screen (#719)', () => {
+    render(
+      <MarkdownField
+        label="Help text"
+        value="Something"
+        maxLength={2000}
+        upload={() => Promise.reject(new Error('not used'))}
+        onInput={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/paste, drop or click/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    expect(screen.queryByText(/paste, drop or click/)).toBeNull()
+    expect(screen.getByRole('link', { name: 'Markdown is supported' })).toBeTruthy()
+  })
+
+  it('brings it back on the way to Write, the toolbar coming with it', () => {
+    render(
+      <MarkdownField
+        label="Help text"
+        value="Something"
+        maxLength={2000}
+        upload={() => Promise.reject(new Error('not used'))}
+        onInput={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Write' }))
+
+    expect(screen.getByText(/paste, drop or click/)).toBeTruthy()
+  })
+
   it('escapes raw HTML in the preview, so it shows what an applicant gets', async () => {
     render(
       <MarkdownField
