@@ -56,11 +56,11 @@ export const textFrom = (blocks: readonly Block[]): string => {
     else if ('heading' in block) out.push(...wrapped(block.heading), '')
     else if ('action' in block) out.push(block.action.href, '')
     else if ('note' in block) {
-      out.push(...wrapped(block.link === undefined ? block.note : `${block.note} ${block.link.label}`))
-      if (block.link !== undefined) out.push(block.link.href)
+      out.push(...wrapped(block.note))
+      if (block.link !== undefined) out.push(...wrapped(block.link.label), block.link.href)
     } else {
       for (const line of block.lines) {
-        out.push(...bulleted(line.aside === undefined ? line.text : `${line.text} · ${line.aside}`))
+        out.push(...bulleted(line.aside === undefined ? line.text : `${line.text} (${line.aside})`))
         if (line.href !== undefined) out.push(`  ${line.href}`)
       }
       out.push('')
@@ -110,7 +110,7 @@ const htmlBlock = (block: Block): string => {
       const where =
         line.aside === undefined
           ? ''
-          : ` <span style="font-family:${SANS};font-size:13px;color:${MUTED};">· ${escapeHtml(line.aside)}</span>`
+          : ` <span style="font-family:${SANS};font-size:13px;color:${MUTED};">(${escapeHtml(line.aside)})</span>`
 
       return `<li style="margin:0 0 6px;">${shown}${where}</li>`
     })

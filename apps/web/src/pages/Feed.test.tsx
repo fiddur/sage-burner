@@ -1326,10 +1326,10 @@ describe('what everyone has been doing', () => {
   })
 
   it('leaves a card with no page of its own as plain text', async () => {
-    renderPage(stub({}, [aCard({ id: 'c-1', title: 'The planning call is Sunday', link: null })]))
+    renderPage(stub({}, [aCard({ id: 'c-1', title: 'A song nobody kept', link: null })]))
 
-    await screen.findByText('The planning call is Sunday')
-    expect(screen.queryByRole('link', { name: 'The planning call is Sunday' })).toBeNull()
+    await screen.findByText('A song nobody kept')
+    expect(screen.queryByRole('link', { name: 'A song nobody kept' })).toBeNull()
   })
 
   it('offers to switch the category on, and says it is off', async () => {

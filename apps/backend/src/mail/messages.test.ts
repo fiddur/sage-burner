@@ -152,8 +152,8 @@ describe('the digest', () => {
       origin: 'https://burn.example.org',
     })
 
-    expect(digest.text).toContain('- Ada commented · Summer burn')
-    expect(digest.html).toContain('· Summer burn')
+    expect(digest.text).toContain('- Ada commented (Summer burn)')
+    expect(digest.html).toContain('(Summer burn)')
   })
 
   it('says nothing where a line belongs nowhere', () => {
@@ -172,7 +172,7 @@ describe('the digest', () => {
     })
 
     expect(digest.text).toContain('- Ada commented')
-    expect(digest.text).not.toContain('·')
+    expect(digest.text).not.toContain('(')
   })
 
   it('still prints the remainder where there is no origin to build a link from', () => {

@@ -90,7 +90,7 @@ describe('the footer note', () => {
       { note: 'Change it:', link: { href: 'https://x/profile', label: 'Your details' } },
     ])
 
-    expect(text.split('\n')).toEqual(['--', 'Change it: Your details', 'https://x/profile'])
+    expect(text.split('\n')).toEqual(['--', 'Change it:', 'Your details', 'https://x/profile'])
   })
 })
 
@@ -106,8 +106,8 @@ describe('where a line belongs', () => {
     ])
 
     expect(text.split('\n')).toEqual([
-      '- A new lead role: Kitchen lead · Boundary Burn',
-      '- A new lead role: Kitchen lead · Midsummer Burn',
+      '- A new lead role: Kitchen lead (Boundary Burn)',
+      '- A new lead role: Kitchen lead (Midsummer Burn)',
     ])
   })
 
@@ -118,11 +118,17 @@ describe('where a line belongs', () => {
     })
 
     expect(html).toContain('<a href="https://x/roles?burn=1"')
-    expect(html).toMatch(/<\/a>[^<]*<span[^>]*>·\s*Boundary Burn<\/span>/u)
+    expect(html).toMatch(/<\/a>[^<]*<span[^>]*>\(Boundary Burn\)<\/span>/u)
   })
 
   it('says nothing where a line belongs nowhere', () => {
     expect(textFrom([{ lines: [{ text: 'Ada added one' }] }]).split('\n')).toEqual(['- Ada added one'])
+  })
+
+  it('does not read as a second separator beside a title that carries one', () => {
+    const text = textFrom([{ lines: [{ text: 'Breakfast · Sat — Ada is cooking', aside: 'Autumn burn' }] }])
+
+    expect(text.split('\n')).toEqual(['- Breakfast · Sat — Ada is cooking (Autumn burn)'])
   })
 })
 

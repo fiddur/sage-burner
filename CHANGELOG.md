@@ -15,7 +15,7 @@ under today's heading, and make a new heading when there is none.
 
 - **A Posts line in the digest has somewhere to go.** Every other section's lines were links;
   a post's was plain text, so being told eight comments had landed on your announcement left you
-  with nowhere to press. It opens the feed's Posts, on that burn.
+  with nowhere to press. It opens the feed with the Posts chip lit.
 
 - **The plain-text version of an email says where to press again.** It had been reduced to a bare
   web address where the formatted version reads "under Your details → Notifications".

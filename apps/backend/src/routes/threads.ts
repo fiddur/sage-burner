@@ -691,7 +691,7 @@ const personFacts = (row: CardRow): CardFacts => ({
 
 const postFacts = (row: CardRow): CardFacts => ({
   title: row.post_title ?? row.title,
-  link: row.post_title === null ? null : feedPage(['post'], row.event_id ?? undefined),
+  link: row.post_title === null || row.event_id === null ? null : feedPage(['post'], row.event_id),
   body: row.post_withdrawn_at === null ? written(row.post_body) : null,
   gone: row.post_withdrawn_at !== null,
 })
@@ -1306,7 +1306,7 @@ export const registerThreadRoutes = (
       what: await titleOf(song, found),
     }),
     post: async (found: Subject) => ({
-      link: feedPage(['post'], found.event_id ?? undefined),
+      link: found.event_id === null ? null : feedPage(['post'], found.event_id),
       what: await titleOf(post, found),
     }),
     bring: async (found: Subject) => ({

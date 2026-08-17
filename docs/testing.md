@@ -309,10 +309,11 @@ phone" means 360px.
 - [ ] Put a lead role of the same name on two burns and press it again: the two lines read the
       same but end with different burns, and each opens its own. A song's line says "Songbook".
 - [ ] Announce something and press it again: the Posts line is a link, and it opens the feed
-      filtered to Posts on that burn.
+      with the Posts chip lit. It lists posts from every burn — the feed has no burn filter, and
+      the `burn` in the address only moves the selector.
 - [ ] Read the same digest as plain text (most clients offer it, or look at the raw message):
-      the footer says "…or stop it: Your details → Notifications" above the address, not the
-      address alone.
+      the footer carries "Your details → Notifications" on its own line above the address,
+      rather than the address alone.
 - [ ] Raise a talking point from a second account with **every** notification category
       switched off on your own. The digest preview still carries it: it is the feed, not
       your notifications.
