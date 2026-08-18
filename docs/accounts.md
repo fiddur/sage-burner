@@ -829,12 +829,13 @@ password for somebody is the accounts list's job.
 
 ## Setting somebody's password
 
-Every row of ⚙️'s accounts list has a field for it (#211). It is the **only** way a
-password changes once it is set: redemption is where one is chosen, `admin:create`
-refuses to touch an existing one, and nothing else writes the column except a silent
-rehash on login when scrypt's parameters have moved on. Before this, an account whose
-owner had lost the password — or one an admin made and did not write down — had
-no way back at all.
+Every row of ⚙️'s accounts list has a field for it (#211). Until #738 it was the
+**only** way a password changed once it was set: redemption is where one is chosen,
+`admin:create` refuses to touch an existing one, and nothing else wrote the column
+except a silent rehash on login when scrypt's parameters have moved on. A reset link
+is the second way, and the section below is what it does not change here — this route
+stays, because it is the answer for an installation with no mail server and for the
+account an admin made and did not write down.
 
 No old password is asked for, because an admin does not have it. That is the
 point, and it also makes this the most powerful route in the app: admin taking over
@@ -890,6 +891,66 @@ schema is a floor for (#489).
 member whose existing password is shorter than it. `ensureAdmin` is the one place
 a short one now stops something — a first bootstrap, which is a fresh choice
 rather than an old one.
+
+## Forgetting a password (#738)
+
+`/login` offers **Forgotten your password?**, and it lands on `/forgotten`: an address,
+and a link posted to it. Before this the page said outright that the app could not send
+one, which left finding an admin as the only way back in — for an app that exists to
+replace a spreadsheet and a Discord thread, one of the last two reasons to go back to
+Discord.
+
+Three routes, none of them behind a guard, because somebody who cannot sign in is
+exactly who they are for:
+
+- `POST /api/auth/forgotten` — `{ email }`, and **204 whatever the answer is**.
+- `GET /api/auth/resets/:token` — `{ status }`, one of `outstanding | expired | unknown`,
+  so the page can say a link has run out before asking anybody to choose a password.
+- `POST /api/auth/resets/:token` — `{ password }`. 200 with `{ viewer }` and a session
+  cookie, the same pair redeeming an invite answers with, or 409.
+
+**It never says whether an address has an account.** That is the same rule login follows
+and for the same reason: on a membership app the membership _is_ the private part. The
+body is empty, the status is the same either way, and — the half that is easy to lose —
+so is the time taken, because **every read of the account happens inside the deferred
+work**, on the email queue, after the route has already answered. A handler that looked
+the account up first and only queued when it found one would answer a stranger measurably
+faster, which is the oracle written out longhand. Both throttles sit above that, keyed by
+IP and by address, so neither an inbox nor the process can be hammered; the address one is
+its own counter rather than login's, or asking for a reset would lock somebody out of
+signing in with the password they then remembered.
+
+**The token has the invite token's properties**, minted by the same `mintToken`: 32 CSPRNG
+bytes, stored only as a SHA-256 digest, single-use and expiring. `RESET_VALID_HOURS` is 2
+and lives in `packages/shared/limits.ts`, because the page says how long the link lasts and
+a number written out in prose beside a constant is a number that goes stale. Minting one
+**drops whatever that account already had**, and sweeps every expired row while it is there,
+so an account has at most one live link and a spent one leaves nothing behind. Spending it
+is a `DELETE … RETURNING` inside the transaction that writes the password: a second press
+of the same link finds no row and answers 409, so the window is the statement rather than
+the request.
+
+**A reset gives a password to an account that has none.** Somebody who arrived through
+Discord, or who has only ever used a passkey, proves they hold the mailbox and gets one —
+which is #9's rule from the other side: a passkey is an extra way in, never the only one
+imposed.
+
+**It does not end that account's other sessions**, for the reason setting a password from
+the accounts list does not: sessions are stateless signed cookies with a TTL and there is
+nothing to revoke them against. Same limit, same shape of fix if a compromised account ever
+needs one.
+
+**Where no mail server is set up there is no offer at all.** `GET /api/installation` already
+carries `sends_email`, so the login page shows the old sentence — ask an organiser — instead
+of a link, and `/forgotten` reached directly says the same. That is #30's rule about the email
+column: absent rather than present and inert, because a control that cannot do anything reads
+as a promise. The route still answers 204 in that case and writes nothing, since a route that
+went quiet only for installations without mail would be answering a question about the
+installation, not about the person.
+
+The link is `PUBLIC_ORIGIN`, or the request's own `Host` where that is unset — `originOf`,
+the same function the share card uses. With neither there is no link to post, so nothing is
+minted and the log says why.
 
 ## Passkeys
 
@@ -1232,10 +1293,27 @@ the split by heading does not put the same control in two different places.
 
 **Email is a channel of its own, not a copy of the bell.** They are independent: take
 the burn-wide ones in your inbox and off your phone if that is what suits. It is **off
-for every category until somebody asks**, so it needs no defaults at all — absence and
-`false` say the same thing, which is why `notification_setting.email` has a SQL
-`DEFAULT 0` and the migration adding it decided nothing for the rows already there. An
-upgrade must never be what starts posting to somebody's inbox.
+for every category but one until somebody asks** — absence and `false` say the same thing
+for all of those, which is why `notification_setting.email` has a SQL `DEFAULT 0` and the
+migration adding it decided nothing for the rows already there. An upgrade must never be
+what starts posting to somebody's inbox.
+
+**`application_news` is that one, and the exception is the point of it** (#739). The
+notification log had a row reading _told 1, off 0, taken none registered, emails 0_: an
+admin had answered somebody's application on the message thread, the bell held the sentence,
+and nothing carried it anywhere. **An applicant is by definition somebody who is not in the
+app yet** — no browser registered for push, no habit of opening it, and usually not signed
+in at all between applying and being answered. The address they just handed over is the only
+way to reach them, and it was handed over for exactly this. So the default lives in
+`notificationCategoryInfo` beside `on`, as `email: true` on that one row, and
+`emailsByDefault` reads it the way `notifiesByDefault` reads its neighbour — which also means
+the next category anybody adds has to decide both. No backfill and no migration: absence
+already means "has not said", so nobody's stored choices are touched and the default arrives
+on its own. Somebody who has been to the settings page has a stored row for every category and
+keeps whatever it says.
+
+The decision mail on approval or rejection is separate from all of this and still goes out
+directly, for the reason given under Reviewing applications.
 
 **The digest is the one exception, and it is deliberately one** (#620). The rule above is
 about the per-category channel — an instant copy of each notification, which is somebody

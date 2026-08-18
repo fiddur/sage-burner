@@ -1,6 +1,13 @@
 import type { AccountRole, MeResponse } from '@sage-burner/shared'
 
-import { apiRoutes, applyPage, feedPage, oauthProviderInfo, oauthProviders } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  applyPage,
+  feedPage,
+  forgottenPage,
+  oauthProviderInfo,
+  oauthProviders,
+} from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
@@ -10,7 +17,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
-import { useSocialLogins } from '../installation.tsx'
+import { useInstallationSendsEmail, useSocialLogins } from '../installation.tsx'
 import { quoting, useOauthOutcome } from '../outcome.ts'
 import { messageForCeremony, passkeysWork, signInWithPasskey } from '../passkey.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
@@ -43,6 +50,7 @@ export const Login = ({
   const [error, setError] = useFormError()
   const [submitting, setSubmitting] = useState(false)
   const configured = useSocialLogins()
+  const sendsEmail = useInstallationSendsEmail()
   const offered = oauthProviders.filter((provider) => configured.includes(provider))
 
   const { outcome: came, ref } = useOauthOutcome()
@@ -189,7 +197,11 @@ export const Login = ({
       )}
 
       <p class="form-note">
-        If you have lost your password, ask someone with admin — this app cannot send you a reset link.
+        {sendsEmail === false ? (
+          'If you have lost your password, ask someone with admin — this installation has no mail server to send you a link.'
+        ) : (
+          <a href={forgottenPage()}>Forgotten your password?</a>
+        )}
       </p>
     </section>
   )

@@ -7,6 +7,19 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-18
+
+- **A forgotten password can be reset from the login page.** Give the address you sign in with
+  and a link comes to your inbox; following it sets a new password and signs you in. The link
+  works once and for two hours, and asking again replaces the one before it. It never says
+  whether an address has an account here, and it is offered only where an organiser has set a
+  mail server up — without one, the page still points at the organisers, as it always did.
+
+- **News about your application now reaches your inbox.** Somebody waiting to hear back has no
+  reason to keep opening the app, and until now a reply from the organisers only rang a bell
+  nobody was there to see. That one kind of message is emailed unless you say otherwise;
+  everything else stays off until you ask for it, under Your details → Notifications.
+
 # 2026-08-17
 
 - **The page column reaches its own last entry.** On a short window it scrolled, but never far

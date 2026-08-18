@@ -72,6 +72,7 @@ import type {
   ProfileResponse,
   PushKeyResponse,
   RedeemResponse,
+  ResetState,
   Ride,
   RidesResponse,
   RosterResponse,
@@ -324,6 +325,21 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<MeResponse>(apiRoutes.login.path(), { method: apiRoutes.login.method, body }),
 
     logout: () => request<MeResponse>(apiRoutes.logout.path(), { method: apiRoutes.logout.method }),
+
+    requestPasswordReset: (body: BodyOf<'requestPasswordReset'>) =>
+      request<void>(apiRoutes.requestPasswordReset.path(), {
+        method: apiRoutes.requestPasswordReset.method,
+        body,
+      }),
+
+    getPasswordResetState: (token: string, signal?: AbortSignal) =>
+      request<ResetState>(apiRoutes.getPasswordResetState.path(token), { signal }),
+
+    resetPassword: (token: string, body: BodyOf<'resetPassword'>) =>
+      request<MeResponse>(apiRoutes.resetPassword.path(token), {
+        method: apiRoutes.resetPassword.method,
+        body,
+      }),
 
     startPasskeyRegistration: () =>
       request<{ options: PublicKeyCredentialCreationOptionsJSON }>(

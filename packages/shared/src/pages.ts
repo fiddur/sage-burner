@@ -100,4 +100,8 @@ export const detailsPage = (outcome?: OAuthOutcome, ref?: string): string =>
 
 export const notificationsPage = (): string => '/notifications'
 
+export const forgottenPage = (): string => '/forgotten'
+
+export const resetPage = (token: string): string => `/reset/${encodeURIComponent(token)}`
+
 export const homePage = (): string => '/'

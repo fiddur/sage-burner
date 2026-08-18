@@ -11,7 +11,8 @@ import { viewerFor } from '../auth/viewer.ts'
 import { whyNothingWritten } from '../db/refusals.ts'
 import { account, application, inviteRedemption, inviteToken } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { defaultExpiry, mintToken } from '../invites.ts'
+import { defaultExpiry } from '../invites.ts'
+import { mintToken } from '../tokens.ts'
 
 export interface InviteRouteDeps extends GuardDeps {
   now: () => Date

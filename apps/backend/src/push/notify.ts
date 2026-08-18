@@ -2,6 +2,7 @@ import type { DigestChoice, Notification, NotificationCategory } from '@sage-bur
 
 import {
   DEFAULT_DIGEST,
+  emailsByDefault,
   mentionedAccounts,
   mentionsEverybody,
   notificationCategories,
@@ -118,7 +119,7 @@ export const wants = async (
     .where(and(eq(notificationSetting.account_id, accountId), eq(notificationSetting.category, category)))
     .limit(1)
 
-  return { bell: row?.enabled ?? notifiesByDefault(category), email: row?.email ?? false }
+  return { bell: row?.enabled ?? notifiesByDefault(category), email: row?.email ?? emailsByDefault(category) }
 }
 
 export const reachedByMention = async (db: Database, named: readonly string[]): Promise<string[]> => {
@@ -203,7 +204,9 @@ export const switchedOn = async (
     on: notificationCategories.filter(
       (category) => said.get(category)?.enabled ?? notifiesByDefault(category),
     ),
-    email: notificationCategories.filter((category) => said.get(category)?.email ?? false),
+    email: notificationCategories.filter(
+      (category) => said.get(category)?.email ?? emailsByDefault(category),
+    ),
     digest: who?.digest ?? DEFAULT_DIGEST,
   }
 }

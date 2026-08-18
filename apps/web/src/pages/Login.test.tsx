@@ -13,6 +13,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 import type { Viewer } from '../viewer.tsx'
 
 import { apiError } from '../api/client.ts'
+import { InstallationProvider } from '../installation.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { landsOn, Login, signInOutcome } from './Login.tsx'
 
@@ -25,14 +26,20 @@ const noPasskeys = (): PasskeyApi => ({
   finishPasskeyLogin: () => Promise.reject(new Error('finishPasskeyLogin is not stubbed here')),
 })
 
-const renderLogin = (login: AppApi['login'], viewer: Viewer = { status: 'signed-out' }) => {
+const renderLogin = (
+  login: AppApi['login'],
+  viewer: Viewer = { status: 'signed-out' },
+  sendsEmail = true,
+) => {
   history.replaceState(null, '', '/login')
 
   return render(
     <LocationProvider>
-      <ViewerProvider viewer={viewer}>
-        <Login api={{ login, ...noPasskeys() }} />
-      </ViewerProvider>
+      <InstallationProvider sendsEmail={sendsEmail}>
+        <ViewerProvider viewer={viewer}>
+          <Login api={{ login, ...noPasskeys() }} />
+        </ViewerProvider>
+      </InstallationProvider>
     </LocationProvider>,
   )
 }
@@ -209,11 +216,24 @@ describe('Login', () => {
     expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull()
   })
 
-  it('says why there is no password reset, and where to go with no account', async () => {
+  it('offers the way to a forgotten password, and where to go with no account', async () => {
     renderLogin(vi.fn(() => Promise.resolve({ viewer: null })))
 
-    expect((await screen.findByText(/lost your password/)).textContent).toContain('ask someone with admin')
+    expect((await screen.findByRole('link', { name: 'Forgotten your password?' })).getAttribute('href')).toBe(
+      '/forgotten',
+    )
     expect(screen.getByRole('link', { name: 'Apply to join' }).getAttribute('href')).toBe('/apply')
+  })
+
+  it('says why there is none where no mail server is set up, rather than offering a dead link', async () => {
+    renderLogin(
+      vi.fn(() => Promise.resolve({ viewer: null })),
+      { status: 'signed-out' },
+      false,
+    )
+
+    expect((await screen.findByText(/lost your password/)).textContent).toContain('ask someone with admin')
+    expect(screen.queryByRole('link', { name: 'Forgotten your password?' })).toBeNull()
   })
 })
 

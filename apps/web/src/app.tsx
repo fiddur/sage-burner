@@ -1,4 +1,4 @@
-import { changelogPage, formattingPage, notificationsPage } from '@sage-burner/shared'
+import { changelogPage, forgottenPage, formattingPage, notificationsPage } from '@sage-burner/shared'
 import { LocationProvider, Route, Router } from 'preact-iso'
 import { useMemo } from 'preact/hooks'
 
@@ -34,6 +34,7 @@ import { Changelog } from './pages/Changelog.tsx'
 import { Dreams } from './pages/Dreams.tsx'
 import { Faq } from './pages/Faq.tsx'
 import { Feed } from './pages/Feed.tsx'
+import { Forgotten } from './pages/Forgotten.tsx'
 import { Formatting } from './pages/Formatting.tsx'
 import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
@@ -48,6 +49,7 @@ import { Person } from './pages/Person.tsx'
 import { Places } from './pages/Places.tsx'
 import { Privacy } from './pages/Privacy.tsx'
 import { ProfilePage } from './pages/Profile.tsx'
+import { Reset } from './pages/Reset.tsx'
 import { Rides } from './pages/Rides.tsx'
 import { Roles } from './pages/Roles.tsx'
 import { Schedule } from './pages/Schedule.tsx'
@@ -95,6 +97,9 @@ export type RoutesApi = Pick<
   | 'deleteAllergyItem'
   | 'reorderAllergyItems'
   | 'logout'
+  | 'requestPasswordReset'
+  | 'getPasswordResetState'
+  | 'resetPassword'
   | 'updateWelcome'
   | 'getAdminAccounts'
   | 'setAccountRoles'
@@ -304,6 +309,12 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       ({ token }: { token?: string }) => <Invite api={api} token={token ?? ''} />,
     [api],
   )
+  const ForgottenRoute = useMemo(() => () => <Forgotten api={api} />, [api])
+  const ResetRoute = useMemo(
+    () =>
+      ({ token }: { token?: string }) => <Reset api={api} token={token ?? ''} />,
+    [api],
+  )
 
   return (
     <Router>
@@ -330,6 +341,8 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/invite/:token" component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />
+      <Route path={forgottenPage()} component={ForgottenRoute} />
+      <Route path="/reset/:token" component={ResetRoute} />
       <Route path="/admin" component={AdminRoute} />
       <Route path="/admin/events" component={AdminEventsRoute} />
       <Route path="/admin/allergies" component={AdminAllergiesRoute} />

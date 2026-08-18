@@ -9,7 +9,7 @@ import type { PushDeps } from './push.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, attendance, event, notification, notificationSetting } from '../db/schema.ts'
 import { createEmailQueue } from '../mail/queue.ts'
-import { recordAndPush, tellAttendees } from './notify.ts'
+import { recordAndPush, switchedOn, tellAttendees, wants } from './notify.ts'
 
 const NOW = '2026-08-03T00:00:00.000Z'
 const BURN = '9f1c2f2a-6f1a-4a2e-9c6d-2f0a1b3c4d5e'
@@ -74,6 +74,50 @@ const givenBurn = async () => {
 }
 
 const TOLD: Told = { category: 'dream_offered', body: 'Ada offered a dream', link: '/dreams' }
+
+const givenSilent = async (): Promise<string> => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
+
+  return id
+}
+
+describe('what an account that has said nothing is due', () => {
+  it('emails news about their own application, an applicant having no browser here yet', async () => {
+    build()
+
+    expect(await wants(db(), await givenSilent(), 'application_news')).toEqual({ bell: true, email: true })
+  })
+
+  it('emails nothing else, the column staying off until somebody asks', async () => {
+    build()
+    const accountId = await givenSilent()
+
+    expect((await switchedOn(db(), accountId)).email).toEqual(['application_news'])
+  })
+
+  it('takes a stored no over the default, so switching it off switches it off', async () => {
+    build()
+    const accountId = await givenSilent()
+    await db()
+      .insert(notificationSetting)
+      .values({ account_id: accountId, category: 'application_news', enabled: true, email: false })
+
+    expect((await wants(db(), accountId, 'application_news')).email).toBe(false)
+  })
+
+  it('leaves it out of the list it answers once it is stored off', async () => {
+    build()
+    const accountId = await givenSilent()
+    await db()
+      .insert(notificationSetting)
+      .values({ account_id: accountId, category: 'application_news', enabled: true, email: false })
+
+    expect((await switchedOn(db(), accountId)).email).toEqual([])
+  })
+})
 
 describe('telling everybody coming to a burn', () => {
   it('does not make the request wait on one mail server wait per person', async () => {

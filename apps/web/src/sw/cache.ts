@@ -19,6 +19,7 @@ const prefixOf = (fastify: string): string => `${fastify.split('/:')[0] ?? fasti
 const NEVER_CACHED_PREFIXES: readonly string[] = [
   prefixOf(apiRoutes.getThread.fastify),
   prefixOf(apiRoutes.storedImage.fastify),
+  prefixOf(apiRoutes.getPasswordResetState.fastify),
 ]
 
 export const planFor = (

@@ -24,7 +24,8 @@ import {
   inviteToken,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { digestOf, redemptionsOf, roomInside } from '../invites.ts'
+import { redemptionsOf, roomInside } from '../invites.ts'
+import { digestOf } from '../tokens.ts'
 import { writeAllergyTicks } from './allergy-ticks.ts'
 import { announceJoined, joinBurn } from './attendance.ts'
 import { cookieHeader } from './auth.ts'

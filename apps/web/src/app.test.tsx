@@ -12,6 +12,9 @@ const clientWith = (
 ): AppApi => ({
   logout,
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
+  requestPasswordReset: () => Promise.reject(new Error('requestPasswordReset is not stubbed in this file')),
+  getPasswordResetState: () => Promise.reject(new Error('getPasswordResetState is not stubbed in this file')),
+  resetPassword: () => Promise.reject(new Error('resetPassword is not stubbed in this file')),
   readAt: () => undefined,
   markTargetShown: () => Promise.reject(new Error('markTargetShown is not stubbed in this file')),
   deleteMyNotification: () => Promise.reject(new Error('deleteMyNotification is not stubbed in this file')),

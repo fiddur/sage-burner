@@ -81,6 +81,9 @@ phone" means 360px.
       review card shows the address the account signed up with.
 - [ ] Signed in as a member, `/apply` says there is nothing to apply for and shows
       no form.
+- [ ] With SMTP configured, send the applicant a message from ⚙️ → Applications: the mail
+      arrives at the address their account signed up with, with nobody having ticked
+      anything — the bell alone would have reached somebody who is not in the app yet.
 - [ ] The confirmation says whether anything will be emailed, matching whether
       SMTP is configured.
 - [ ] The new applicant, signed in, reaches their own application and their bell
@@ -120,6 +123,21 @@ phone" means 360px.
       card appears on the feed, and their bell says they are in. With no burn planned,
       the same page says every coming burn is open to them and claims no join. This account is
       the protocol's **member** persona from here on.
+
+## Forgetting a password
+
+- [ ] With SMTP configured, `/login` offers **Forgotten your password?**; with the mail
+      server removed it says to ask an organiser and offers no link.
+- [ ] Give the member's address: the page says a link is on its way _if there is an
+      account_, and the mail arrives with a link that is `/reset/<token>`.
+- [ ] Give an address nobody has: the same page, the same wording, and nothing is posted.
+- [ ] Follow the link, set a password of at least 10 characters: it signs you in and lands
+      on the feed. The old password no longer works; the new one does.
+- [ ] Open the same link again: it says it has been used, and offers a fresh one.
+- [ ] Ask twice in a row and follow the **first** mail's link: it says the same, only the
+      newest link being live.
+- [ ] Open `/reset/nonsense`: it says the link is not recognised, and asks nobody for a
+      password.
 
 ## Setting a burn up (admin)
 
@@ -335,8 +353,9 @@ phone" means 360px.
       your notifications.
 - [ ] With SMTP configured (⚙️ → Settings), the test message goes to the
       admin's own address, and the Email column appears on the notification
-      settings — unticked for every kind until asked. The digest below the tables
-      is the one thing there that starts on.
+      settings — unticked for every kind until asked, bar **News about your
+      application**, which starts ticked. The digest below the tables is the other
+      thing there that starts on.
 - [ ] Your details → Notifications shows four collapsed sections rather than a row per
       category. **A new version of the app is out** has no expander — with one category in
       it, its header row is the row.

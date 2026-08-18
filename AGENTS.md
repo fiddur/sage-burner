@@ -236,6 +236,13 @@ These are member records, so treat them as such:
   prefix**, never exempting it there — the hook's whole value is having no
   exception to forget.
 - Invite tokens are CSPRNG-random and unguessable, single-use, and expiring.
+- **A forgotten password is reset by email, and the route says nothing about who exists**
+  (#738). One token with the invite token's properties — CSPRNG, stored hashed, single-use,
+  expiring — and 204 whatever the address turns out to be. Every read of the account happens
+  on the email queue after the route has answered, so the time taken cannot answer the
+  question the body refuses to; minting drops the account's earlier link, spending it is a
+  `DELETE … RETURNING` in the transaction that writes the password. Offered only where an
+  admin has configured SMTP, which is #30's rule about a control that cannot do anything.
 - **A passkey is an extra way in, never the only one imposed.** Passwords and
   passkeys coexist per account (#9), so the routes live outside both `/api/admin/`
   and `requireApproved` — the guard is being signed in at all, because an account
@@ -334,10 +341,13 @@ These are member records, so treat them as such:
   `createApp` takes `defer`. `mail/smtp.ts` is the only module that opens a socket,
   exactly as `web-push.ts` is.
 - **The email column on the notification settings is a channel of its own** (#30),
-  independent of the bell, and **off for every category until somebody asks** — so
-  it needs no defaults, and an upgrade is never what starts posting to somebody's
-  inbox. Absent where the installation has no mail server, rather than present and
-  inert: a switch that cannot do anything reads as a promise.
+  independent of the bell, and **off for every category but one until somebody asks** —
+  so an upgrade is never what starts posting to somebody's inbox. Absent where the
+  installation has no mail server, rather than present and inert: a switch that cannot
+  do anything reads as a promise. The one exception is `application_news` (#739), because
+  an applicant has no browser registered for push and no habit of opening the app, so a
+  reply on their application reached nobody at all; the default sits in
+  `notificationCategoryInfo` beside `on`, so the next category has to decide both.
 - **The digest is the one thing that is on by default** (#620), and the exception is
   deliberate: it is **only what you have not seen, and only when you have not been
   here**, so the people it reaches are exactly the people who have stopped opening the
