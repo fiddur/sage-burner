@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { absolute, digestMessage, inviteMessage, notificationMessage, testMessage } from './messages.ts'
+import {
+  absolute,
+  digestMessage,
+  inviteMessage,
+  notificationMessage,
+  resetMessage,
+  testMessage,
+} from './messages.ts'
 
 describe('an absolute link', () => {
   it('is the origin and the path', () => {
@@ -44,6 +51,42 @@ describe('the invite', () => {
 
   it('goes to the address they applied with', () => {
     expect(invite.to).toBe('ada@example.org')
+  })
+})
+
+describe('the password reset', () => {
+  const reset = resetMessage({
+    installation: 'The Burning Sage',
+    to: 'ada@example.org',
+    name: 'Ada',
+    link: 'https://burn.example.org/reset/a-token',
+    hours: 2,
+  })
+
+  it('names the installation in the subject, not the software', () => {
+    expect(reset.subject).toBe('Setting a new password at The Burning Sage')
+  })
+
+  it('keeps the link on a line of its own, and every line short', () => {
+    expect(reset.text.split('\n')).toContain('https://burn.example.org/reset/a-token')
+    for (const line of reset.text.split('\n')) expect(line.length).toBeLessThanOrEqual(76)
+  })
+
+  it('tells whoever did not ask for it that nothing has happened', () => {
+    expect(reset.text.replaceAll('\n', ' ')).toContain('If it was not you who asked, nothing has happened')
+  })
+
+  it('greets an account that has never given a name without a gap where one goes', () => {
+    const nameless = resetMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      name: null,
+      link: 'https://burn.example.org/reset/a-token',
+      hours: 2,
+    })
+
+    expect(nameless.text).toContain('Hello,')
+    expect(nameless.text).not.toContain('Hello ,')
   })
 })
 

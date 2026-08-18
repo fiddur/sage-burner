@@ -6,6 +6,8 @@ import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Message } from '../mail/mail.ts'
+import type { EmailQueue } from '../mail/queue.ts'
 import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
@@ -19,9 +21,12 @@ import {
   accountRole,
   application,
   formQuestion,
+  INSTALLATION_ID,
+  mailSetting,
   notification,
   pushSubscription,
 } from '../db/schema.ts'
+import { createEmailQueue } from '../mail/queue.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -37,7 +42,12 @@ afterEach(async () => {
   applicantAccount = undefined
 })
 
+const posted: Message[] = []
+let emails: EmailQueue
+
 const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
+  posted.length = 0
+  emails = createEmailQueue(() => undefined)
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
@@ -45,10 +55,30 @@ const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     deliver,
     mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
+    defer: emails.defer,
+    send: (_transport, message) => {
+      posted.push(message)
+
+      return Promise.resolve()
+    },
   })
   await givenApplicant()
 
   return app
+}
+
+const givenMailServer = async () => {
+  await db().insert(mailSetting).values({
+    id: INSTALLATION_ID,
+    host: 'smtp.example.org',
+    port: 587,
+    secure: false,
+    username: '',
+    password: '',
+    from_email: 'burn@example.org',
+    from_name: '',
+    updated_at: NOW,
+  })
 }
 
 const givenSubscribedAdmin = async () => {
@@ -630,6 +660,31 @@ describe('talking to an applicant', () => {
     expect(told.map((one) => [one.category, one.body])).toEqual([
       ['application_news', 'The organisers replied to your application.'],
     ])
+  })
+
+  it('posts that reply, an applicant having no browser here to hear a bell with', async () => {
+    const server = await build()
+    await givenMailServer()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+    await emails.drain()
+
+    expect(posted.map((one) => one.to)).toEqual([`${applicantId()}@example.org`])
+  })
+
+  it('posts nothing to the organisers, whose own switches are off until they ask', async () => {
+    const server = await build()
+    await givenMailServer()
+    await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsApplicant(server, applicantCookie(), 'My neighbour Bea.')
+    await emails.drain()
+
+    expect(posted).toEqual([])
+    expect(await db().select().from(notification).where(eq(notification.account_id, ada.id))).toHaveLength(1)
   })
 
   it('tells the organisers when the applicant does', async () => {

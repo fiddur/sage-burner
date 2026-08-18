@@ -42,11 +42,12 @@ import {
   oauthState,
 } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
-import { digestOf, redemptionsOf, roomInside } from '../invites.ts'
+import { redemptionsOf, roomInside } from '../invites.ts'
 import { anotherWayInSurvives, identitiesFor } from '../oauth/identities.ts'
 import { authorizeUrl } from '../oauth/providers.ts'
 import { usableOauthSetting } from '../oauth/settings.ts'
 import { originOf } from '../shell.ts'
+import { digestOf } from '../tokens.ts'
 import { cookieHeader } from './auth.ts'
 
 export interface OAuthDeps extends GuardDeps {

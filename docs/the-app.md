@@ -1588,6 +1588,12 @@ banner. The feed's card carries the newest few lines of each conversation, so of
 still shows what is being talked about. The prefix is taken off the route manifest rather
 than written out, like every other path in `cache.ts`.
 
+**What a reset link is worth is never cached either** (#738). `GET /api/auth/resets/:token`
+puts the token in the key, and the API cache is only emptied on sign-out — which is not
+something the person following a reset link is in a position to do. A stale `outstanding`
+would also hand somebody a password form for a link that has been spent. The prefix comes
+off the route manifest with the other two.
+
 **A navigation is only stored if it answered with HTML.** Not every same-origin
 navigation returns the app: the ICS feed is a plain `<a href>` in the page, so
 clicking it is a `mode: 'navigate'` fetch answering `text/calendar`. Without the

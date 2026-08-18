@@ -13,6 +13,12 @@ export type ClientStatus = 400 | 401 | 403 | 404 | 409 | 415 | 429
 export const sendError = (reply: FastifyReply, status: ClientStatus, code?: ErrorCode) =>
   reply.code(status).send(errorResponse(code ?? codeFor(status)))
 
+export const sendThrottled = (reply: FastifyReply, retryAfterSeconds: number) => {
+  void reply.header('retry-after', String(retryAfterSeconds))
+
+  return sendError(reply, 429)
+}
+
 export const bodyOf = <Schema extends ZodType>(
   schema: Schema,
   request: Pick<FastifyRequest, 'body'>,

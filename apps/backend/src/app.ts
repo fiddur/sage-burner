@@ -27,6 +27,8 @@ import {
   LOGIN_BY_ADDRESS,
   LOGIN_BY_IP,
   REDEEM_BY_IP,
+  RESET_BY_ADDRESS,
+  RESET_BY_IP,
 } from './auth/throttle.ts'
 import { readSessionCookie, viewerFor } from './auth/viewer.ts'
 import { refuseEnvelopeStrippers } from './envelope.ts'
@@ -66,6 +68,7 @@ import { registerNotificationRoutes } from './routes/notifications.ts'
 import { registerOauthAdminRoutes } from './routes/oauth-admin.ts'
 import { registerOauthRoutes } from './routes/oauth.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
+import { registerPasswordResetRoutes } from './routes/password-reset.ts'
 import { registerPeopleRoutes } from './routes/people.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerPostRoutes } from './routes/posts.ts'
@@ -95,7 +98,14 @@ export interface AppDeps {
   oauth?: OAuthCalls
   defer?: EmailQueue['defer']
   gate?: Gate
-  bounds?: { login?: Bound; address?: Bound; redeem?: Bound; applicationMessages?: Bound }
+  bounds?: {
+    login?: Bound
+    address?: Bound
+    redeem?: Bound
+    applicationMessages?: Bound
+    reset?: Bound
+    resetAddress?: Bound
+  }
   changelog?: string
   privacy?: string
   terms?: string
@@ -170,6 +180,10 @@ const throttles = (bounds: NonNullable<AppDeps['bounds']>, now: () => number) =>
   },
   redemptions: createThrottle({ ...(bounds.redeem ?? REDEEM_BY_IP), now }),
   applicationMessages: createThrottle({ ...(bounds.applicationMessages ?? APPLICATION_MESSAGES), now }),
+  resets: {
+    byIp: createThrottle({ ...(bounds.reset ?? RESET_BY_IP), now }),
+    byAddress: createThrottle({ ...(bounds.resetAddress ?? RESET_BY_ADDRESS), now }),
+  },
 })
 
 const ADMIN_PREFIX = '/api/admin'
@@ -251,7 +265,7 @@ export const createApp = async ({
 
   const gate = suppliedGate ?? createGate(SCRYPT_GATE)
 
-  const { limits, redemptions, applicationMessages } = throttles(bounds, () => now().getTime())
+  const { limits, redemptions, applicationMessages, resets } = throttles(bounds, () => now().getTime())
 
   registerAdminPrefixGuard(app, { db, sessions })
   registerActivityHook(app, { db, sessions, now })
@@ -269,6 +283,7 @@ export const createApp = async ({
   const emails = createEmailQueue((failure: unknown) => {
     app.log.warn({ err: failure }, 'a queued notification email')
   })
+  const queue = defer ?? emails.defer
 
   app.addHook('onClose', async () => await drainWithin(emails))
 
@@ -278,13 +293,24 @@ export const createApp = async ({
     (trouble) => {
       app.log.warn({ ...trouble }, 'notifying a member')
     },
-    { post: byEmail, defer: defer ?? emails.defer },
+    { post: byEmail, defer: queue },
   )
 
   registerAuthRoutes(app, { db, config, sessions, gate, limits, now })
+  registerPasswordResetRoutes(app, {
+    db,
+    config,
+    sessions,
+    now,
+    hash,
+    gate,
+    limits: resets,
+    mail,
+    defer: queue,
+  })
   registerPasskeyRoutes(app, { db, config, sessions, now })
   registerAdminRoutes(app, { db, hash })
-  registerInstallationRoutes(app, { db, sessions })
+  registerInstallationRoutes(app, { db, sessions, config })
   registerEventRoutes(app, { db, sessions, now })
   registerEventOptionRoutes(app, { db, sessions })
   registerQuestionRoutes(app, { db })

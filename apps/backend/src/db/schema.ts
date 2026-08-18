@@ -386,6 +386,15 @@ export const webauthnChallenge = sqliteTable('webauthn_challenge', {
   expires_at: text('expires_at').notNull(),
 })
 
+export const passwordReset = sqliteTable('password_reset', {
+  token_hash: text('token_hash').primaryKey(),
+  account_id: text('account_id')
+    .notNull()
+    .references(() => account.id, { onDelete: 'cascade' }),
+  expires_at: text('expires_at').notNull(),
+  created_at: text('created_at').notNull(),
+})
+
 export const accountRole = sqliteTable(
   'account_role',
   {

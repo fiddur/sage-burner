@@ -92,6 +92,34 @@ export const decisionMessage = ({
     ],
   })
 
+export const resetMessage = ({
+  installation,
+  to,
+  name,
+  link,
+  hours,
+}: {
+  installation: string
+  to: string
+  name: string | null
+  link: string
+  hours: number
+}): Message =>
+  written({
+    installation,
+    to,
+    subject: `Setting a new password at ${installation}`,
+    blocks: [
+      { paragraph: name === null ? 'Hello,' : `Hello ${name},` },
+      { paragraph: `Somebody asked to set a new password for your account at ${installation}.` },
+      { action: { href: link, label: 'Set a new password' } },
+      {
+        paragraph: `The link works once, and for the next ${hours} hours. If it was not you who asked, nothing has happened — your password is as it was, and you can ignore this.`,
+      },
+      { note: installation },
+    ],
+  })
+
 export const notificationMessage = ({
   installation,
   to,

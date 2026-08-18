@@ -29,10 +29,11 @@ import {
   inviteToken,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { defaultExpiry, mintToken } from '../invites.ts'
+import { defaultExpiry } from '../invites.ts'
 import { NO_ORIGIN, post } from '../mail/mail.ts'
 import { decisionMessage, inviteMessage } from '../mail/messages.ts'
 import { originOf } from '../shell.ts'
+import { mintToken } from '../tokens.ts'
 import { messagesOn, sayOnApplication } from './applications.ts'
 import { announceJoined, joinBurn } from './attendance.ts'
 import { activeEventNow } from './events.ts'

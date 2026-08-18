@@ -25,6 +25,18 @@ export const signUpRequestSchema = z
   .strict()
 export type SignUpRequest = z.infer<typeof signUpRequestSchema>
 
+export const passwordResetRequestSchema = z.object({ email: emailSchema }).strict()
+export type PasswordResetRequest = z.infer<typeof passwordResetRequestSchema>
+
+export const passwordResetSchema = z.object({ password: newPasswordSchema }).strict()
+export type PasswordReset = z.infer<typeof passwordResetSchema>
+
+export const resetStatuses = ['outstanding', 'expired', 'unknown'] as const
+export type ResetStatus = (typeof resetStatuses)[number]
+
+export const resetStateSchema = z.object({ status: z.enum(resetStatuses) })
+export type ResetState = z.infer<typeof resetStateSchema>
+
 export const viewerSchema = z.object({
   account_id: idSchema,
   roles: z.array(z.enum(accountRoles)),

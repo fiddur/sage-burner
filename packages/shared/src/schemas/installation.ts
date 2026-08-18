@@ -9,6 +9,7 @@ export const installationSchema = z.object({
   banner_updated_at: dateTimeSchema.nullable(),
   icon_updated_at: dateTimeSchema.nullable(),
   sends_email: z.boolean(),
+  knows_own_address: z.boolean(),
   social_logins: z.array(z.enum(oauthProviders)),
 })
 
@@ -17,7 +18,13 @@ export const installationResponseSchema = z.object({
 })
 
 export const installationUpdateSchema = installationSchema
-  .omit({ banner_updated_at: true, icon_updated_at: true, sends_email: true, social_logins: true })
+  .omit({
+    banner_updated_at: true,
+    icon_updated_at: true,
+    sends_email: true,
+    knows_own_address: true,
+    social_logins: true,
+  })
   .partial()
   .strict()
 

@@ -57,6 +57,8 @@ import type {
   OAuthSettingsUpdate,
   PasskeyLogin,
   PasskeyRegistration,
+  PasswordReset,
+  PasswordResetRequest,
   PaymentUpdate,
   PlaceCreate,
   PlaceOrder,
@@ -592,6 +594,11 @@ export const apiRoutes = {
     fastify: '/api/allergy-items',
     path: () => '/api/allergy-items',
   },
+  getPasswordResetState: {
+    method: 'GET',
+    fastify: '/api/auth/resets/:token',
+    path: (token: string) => `/api/auth/resets/${encodeURIComponent(token)}`,
+  },
   getPlaces: {
     method: 'GET',
     fastify: '/api/events/:eventId/places',
@@ -724,6 +731,16 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/invites/:token/redeem',
     path: (token: string) => `/api/invites/${encodeURIComponent(token)}/redeem`,
+  },
+  requestPasswordReset: {
+    method: 'POST',
+    fastify: '/api/auth/forgotten',
+    path: () => '/api/auth/forgotten',
+  },
+  resetPassword: {
+    method: 'POST',
+    fastify: '/api/auth/resets/:token',
+    path: (token: string) => `/api/auth/resets/${encodeURIComponent(token)}`,
   },
   reissueInvite: {
     method: 'POST',
@@ -1177,6 +1194,8 @@ export interface RouteBodies {
   offerSession: SessionCreateInput
   postComment: CommentInput
   redeemInvite: RedeemRequestInput
+  requestPasswordReset: PasswordResetRequest
+  resetPassword: PasswordReset
   reorderEventOptions: EventOptionOrder
   reorderAllergyItems: AllergyItemOrder
   reorderFaq: IdOrder

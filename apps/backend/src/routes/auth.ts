@@ -16,7 +16,7 @@ import { SESSION_COOKIE, viewerFor, viewerOf } from '../auth/viewer.ts'
 import { loginAddressConnection } from '../connections.ts'
 import { isUniqueViolation } from '../db/errors.ts'
 import { account, accountConnection } from '../db/schema.ts'
-import { bodyOf, noStore, sendError } from '../http.ts'
+import { bodyOf, noStore, sendError, sendThrottled } from '../http.ts'
 
 export const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): string => {
   const parts = [
@@ -44,12 +44,6 @@ export interface AuthRouteDeps {
   limits: LoginLimits
 }
 
-const refuse = (reply: FastifyReply, retryAfterSeconds: number) => {
-  void reply.header('retry-after', String(retryAfterSeconds))
-
-  return sendError(reply, 429)
-}
-
 export const registerAuthRoutes = (
   app: FastifyInstance,
   { db, config, sessions, gate, limits, now }: AuthRouteDeps,
@@ -62,7 +56,7 @@ export const registerAuthRoutes = (
     }
 
     const attempt = limits.byAddress.take(parsed.data.email)
-    if (!attempt.ok) return refuse(reply, attempt.retryAfterSeconds)
+    if (!attempt.ok) return sendThrottled(reply, attempt.retryAfterSeconds)
 
     const [row] = await db
       .select({ id: account.id, password_hash: account.password_hash })
@@ -108,7 +102,7 @@ export const registerAuthRoutes = (
     if (!room.ok) {
       request.log.warn({ status: 429 }, 'login throttled')
 
-      return refuse(reply, room.retryAfterSeconds)
+      return sendThrottled(reply, room.retryAfterSeconds)
     }
 
     const admission = await gate.enter()
@@ -133,7 +127,7 @@ export const registerAuthRoutes = (
     if (!room.ok) {
       request.log.warn({ status: 429 }, 'sign-up throttled')
 
-      return refuse(reply, room.retryAfterSeconds)
+      return sendThrottled(reply, room.retryAfterSeconds)
     }
 
     const body = bodyOf(signUpRequestSchema, request)

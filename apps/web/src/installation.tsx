@@ -12,6 +12,7 @@ interface InstallationContextValue {
   banner?: string | null
   icon?: string | null
   sendsEmail?: boolean
+  knowsOwnAddress?: boolean
   socialLogins?: readonly OAuthProvider[]
   setTitle: (title: string) => void
   setBanner: (banner: string | null) => void
@@ -33,6 +34,7 @@ const Provide = ({
   banner,
   icon,
   sendsEmail,
+  knowsOwnAddress,
   socialLogins,
   children,
 }: {
@@ -40,6 +42,7 @@ const Provide = ({
   banner?: string | null
   icon?: string | null
   sendsEmail?: boolean
+  knowsOwnAddress?: boolean
   socialLogins?: readonly OAuthProvider[]
   children: ComponentChildren
 }) => {
@@ -61,6 +64,7 @@ const Provide = ({
         banner: bannerOverride === undefined ? banner : bannerOverride,
         icon: iconOverride === undefined ? icon : iconOverride,
         sendsEmail: mailOverride ?? sendsEmail,
+        knowsOwnAddress,
         socialLogins: loginsOverride ?? socialLogins,
         setTitle: setOverride,
         setBanner: setBannerOverride,
@@ -87,6 +91,7 @@ export const InstallationProvider = ({
   banner,
   icon,
   sendsEmail,
+  knowsOwnAddress,
   socialLogins,
 }: {
   children: ComponentChildren
@@ -94,9 +99,17 @@ export const InstallationProvider = ({
   banner?: string | null
   icon?: string | null
   sendsEmail?: boolean
+  knowsOwnAddress?: boolean
   socialLogins?: readonly OAuthProvider[]
 }) => (
-  <Provide title={title} banner={banner} icon={icon} sendsEmail={sendsEmail} socialLogins={socialLogins}>
+  <Provide
+    title={title}
+    banner={banner}
+    icon={icon}
+    sendsEmail={sendsEmail}
+    knowsOwnAddress={knowsOwnAddress}
+    socialLogins={socialLogins}
+  >
     {children}
   </Provide>
 )
@@ -112,6 +125,7 @@ export const FetchedInstallationProvider = ({
   const [banner, setBanner] = useState<string | null | undefined>(undefined)
   const [icon, setIcon] = useState<string | null | undefined>(undefined)
   const [sendsEmail, setSendsEmail] = useState<boolean | undefined>(undefined)
+  const [knowsOwnAddress, setKnowsOwnAddress] = useState<boolean | undefined>(undefined)
   const [socialLogins, setSocialLogins] = useState<readonly OAuthProvider[] | undefined>(undefined)
 
   useEffect(() => {
@@ -125,6 +139,7 @@ export const FetchedInstallationProvider = ({
         setBanner(response.installation.banner_updated_at)
         setIcon(response.installation.icon_updated_at)
         setSendsEmail(response.installation.sends_email)
+        setKnowsOwnAddress(response.installation.knows_own_address)
         setSocialLogins(response.installation.social_logins)
       })
       .catch(() => {})
@@ -135,7 +150,14 @@ export const FetchedInstallationProvider = ({
   }, [api])
 
   return (
-    <Provide title={title} banner={banner} icon={icon} sendsEmail={sendsEmail} socialLogins={socialLogins}>
+    <Provide
+      title={title}
+      banner={banner}
+      icon={icon}
+      sendsEmail={sendsEmail}
+      knowsOwnAddress={knowsOwnAddress}
+      socialLogins={socialLogins}
+    >
       {children}
     </Provide>
   )
@@ -154,6 +176,12 @@ export const useInstallationIcon = () => useContext(InstallationContext).icon
 export const useSetInstallationIcon = () => useContext(InstallationContext).setIcon
 
 export const useInstallationSendsEmail = () => useContext(InstallationContext).sendsEmail
+
+export const useCanResetPassword = (): boolean => {
+  const { sendsEmail, knowsOwnAddress } = useContext(InstallationContext)
+
+  return sendsEmail !== false && knowsOwnAddress !== false
+}
 
 export const useSocialLogins = (): readonly OAuthProvider[] =>
   useContext(InstallationContext).socialLogins ?? []

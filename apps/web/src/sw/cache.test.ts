@@ -54,6 +54,10 @@ describe('what the worker does with a request', () => {
     expect(asked(apiRoutes.getFeed.path())).toBe('api')
   })
 
+  it('never caches what a reset link is worth, the URL being the token itself', () => {
+    expect(asked(apiRoutes.getPasswordResetState.path('a-token'))).toBe('skip')
+  })
+
   it('does cache somebody’s page, which is one key per member and not per thing', () => {
     expect(asked(apiRoutes.accountProfile.path('a-1'))).toBe('api')
     expect(cacheFor(asked(apiRoutes.accountProfile.path('a-1')))).toBe(API_CACHE)

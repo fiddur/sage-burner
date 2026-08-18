@@ -22,6 +22,10 @@ export const LOGIN_BY_ADDRESS: Bound = { attempts: 10, windowMs: 15 * 60_000 }
 
 export const REDEEM_BY_IP: Bound = { attempts: 20, windowMs: 10 * 60_000 }
 
+export const RESET_BY_IP: Bound = { attempts: 10, windowMs: 15 * 60_000 }
+
+export const RESET_BY_ADDRESS: Bound = { attempts: 5, windowMs: 60 * 60_000 }
+
 export const APPLICATION_MESSAGES: Bound = { attempts: 10, windowMs: 10 * 60_000 }
 
 export const MOST_KEYS = 4096

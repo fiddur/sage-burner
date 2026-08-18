@@ -35,6 +35,10 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   review queue holds only the people it can still decide about.
 - The review card says which door an applicant signed up through — the provider and
   the name used there, with a link to their profile where the provider gives one.
+- Forgotten your password? The login page posts a link to the address on the account,
+  good once and for two hours; following it sets a new password and signs you in. Offered
+  only where an admin has set a mail server up and told the app its own address, and it never
+  says whether an address has an account here.
 - Signing in: password, passkey, or a linked provider. Passkeys are usernameless
   and per device, several per account, alongside a password or instead of one —
   removing the last passkey off an account with no password is refused.
@@ -181,7 +185,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   reading their notifications on a device push cannot reach. Its ✕ lasts the sitting
   rather than for good, and the heavier refusal above silences it too.
 - Email as a channel of its own, per category, off until asked for — the column
-  appears only once an admin has configured SMTP.
+  appears only once an admin has configured SMTP. News about your own application is
+  the exception, emailed unless you say otherwise, an applicant having nowhere else
+  to hear it.
 - A digest of the feed, by email, **on by default** — daily, weekly or never. It carries
   what has happened since you were last here whatever the switches above say, and goes
   only to people who have stayed away, so it reaches whoever has stopped opening the app

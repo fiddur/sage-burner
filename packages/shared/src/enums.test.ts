@@ -8,6 +8,7 @@ import {
   connectionKinds,
   connectionValue,
   effortLevels,
+  emailsByDefault,
   eventOptionKinds,
   facebookProfileLink,
   feedKinds,
@@ -25,6 +26,7 @@ import {
   isInviteStatus,
   isPaymentStatus,
   isPlaceColor,
+  notificationCategories,
   paymentStatuses,
   placeColors,
   threadEntityTypes,
@@ -387,5 +389,15 @@ describe('what is stored for a way of being reached', () => {
       expect(facebookProfileLink('')).toBeUndefined()
       expect(facebookProfileLink(undefined)).toBeUndefined()
     })
+  })
+})
+
+describe('which categories are emailed before anybody has said anything', () => {
+  it('emails news about your own application, an applicant not being here to see a bell', () => {
+    expect(emailsByDefault('application_news')).toBe(true)
+  })
+
+  it('emails nothing else, so an upgrade never starts posting to somebody’s inbox', () => {
+    expect(notificationCategories.filter(emailsByDefault)).toEqual(['application_news'])
   })
 })
