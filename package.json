@@ -21,12 +21,12 @@
     "fix": "oxfmt . && oxlint -c .oxlintrc.json --fix"
   },
   "devDependencies": {
-    "@tsconfig/node24": "^24.0.4",
+    "@tsconfig/node24": "^24.0.5",
     "@typescript/native-preview": "^7.0.0-0",
     "oxfmt": "^0",
     "oxlint": "^1",
     "oxlint-tsgolint": "^7.0.2001",
-    "typescript": "^5.6.3"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": "~24"
