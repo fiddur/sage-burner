@@ -940,17 +940,33 @@ the accounts list does not: sessions are stateless signed cookies with a TTL and
 nothing to revoke them against. Same limit, same shape of fix if a compromised account ever
 needs one.
 
-**Where no mail server is set up there is no offer at all.** `GET /api/installation` already
-carries `sends_email`, so the login page shows the old sentence — ask an organiser — instead
-of a link, and `/forgotten` reached directly says the same. That is #30's rule about the email
-column: absent rather than present and inert, because a control that cannot do anything reads
-as a promise. The route still answers 204 in that case and writes nothing, since a route that
-went quiet only for installations without mail would be answering a question about the
-installation, not about the person.
+**The link is `PUBLIC_ORIGIN` and nothing else** — the one mail in this app that does not go
+through `originOf`. That helper falls back to the request's own `Host`, which is checked for
+shape and never for being this installation's address, and every other caller is safe because
+of who is asking: the invite and decision mails go out on an _admin's_ request, and the share
+card only reflects the header back to the same client. This route is the first where a
+stranger supplies the header, names the recipient **and** sets the send off, so a `Host`
+fallback would be:
 
-The link is `PUBLIC_ORIGIN`, or the request's own `Host` where that is unset — `originOf`,
-the same function the share card uses. With neither there is no link to post, so nothing is
-minted and the log says why.
+```
+POST /api/auth/forgotten
+Host: evil.example
+{"email": "victim@example.org"}
+```
+
+— a correctly branded mail from the real installation whose button points at
+`http://evil.example/reset/<token>`, the click handing the attacker a live token to spend at
+the real host. Account takeover, admin accounts included, from an unauthenticated request.
+With `PUBLIC_ORIGIN` unset nothing is minted and nothing is posted; the log says why.
+
+**Where the installation cannot post one there is no offer at all.** `GET /api/installation`
+carries `sends_email` and, since this, `knows_own_address` — the two halves of being able to
+send a link, and `useCanResetPassword` is the pair. Without both, the login page shows the old
+sentence — ask an organiser — and `/forgotten` reached directly says the same. That is #30's
+rule about the email column: absent rather than present and inert, because a control that
+cannot do anything reads as a promise. The route still answers 204 in that case and writes
+nothing, since a route that went quiet only for a misconfigured installation would be
+answering a question about the installation rather than about the person.
 
 ## Passkeys
 

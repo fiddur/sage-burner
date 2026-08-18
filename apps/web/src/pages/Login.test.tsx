@@ -29,13 +29,13 @@ const noPasskeys = (): PasskeyApi => ({
 const renderLogin = (
   login: AppApi['login'],
   viewer: Viewer = { status: 'signed-out' },
-  sendsEmail = true,
+  installation: { sendsEmail?: boolean; knowsOwnAddress?: boolean } = {},
 ) => {
   history.replaceState(null, '', '/login')
 
   return render(
     <LocationProvider>
-      <InstallationProvider sendsEmail={sendsEmail}>
+      <InstallationProvider sendsEmail knowsOwnAddress {...installation}>
         <ViewerProvider viewer={viewer}>
           <Login api={{ login, ...noPasskeys() }} />
         </ViewerProvider>
@@ -229,7 +229,18 @@ describe('Login', () => {
     renderLogin(
       vi.fn(() => Promise.resolve({ viewer: null })),
       { status: 'signed-out' },
-      false,
+      { sendsEmail: false },
+    )
+
+    expect((await screen.findByText(/lost your password/)).textContent).toContain('ask someone with admin')
+    expect(screen.queryByRole('link', { name: 'Forgotten your password?' })).toBeNull()
+  })
+
+  it('offers none where the installation does not know its own address, no link being postable', async () => {
+    renderLogin(
+      vi.fn(() => Promise.resolve({ viewer: null })),
+      { status: 'signed-out' },
+      { knowsOwnAddress: false },
     )
 
     expect((await screen.findByText(/lost your password/)).textContent).toContain('ask someone with admin')

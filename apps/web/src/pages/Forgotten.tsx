@@ -5,7 +5,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { FormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
-import { useInstallationSendsEmail } from '../installation.tsx'
+import { useCanResetPassword } from '../installation.tsx'
 import { useAction } from '../load.ts'
 
 export type ForgottenApi = Pick<ApiClient, 'requestPasswordReset'>
@@ -17,18 +17,18 @@ const BackToLogin = () => (
 )
 
 export const Forgotten = ({ api }: { api: ForgottenApi }) => {
-  const sendsEmail = useInstallationSendsEmail()
+  const canReset = useCanResetPassword()
   const [email, setEmail] = useState('')
   const [asked, setAsked] = useState(false)
   const { busy, formError: error, setError, run } = useAction()
 
-  if (sendsEmail === false) {
+  if (!canReset) {
     return (
       <section class="page column">
         <h1>Forgotten your password?</h1>
         <p>
-          This installation has no mail server set up, so it cannot send you a link. Ask an organiser to set a
-          new password for you.
+          This installation cannot post you a link — it has no mail server set up, or does not know its own
+          address. Ask an organiser to set a new password for you.
         </p>
         <BackToLogin />
       </section>

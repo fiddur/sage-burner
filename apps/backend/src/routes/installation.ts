@@ -5,6 +5,7 @@ import { apiRoutes, installationUpdateSchema, mapLinkUpdateSchema } from '@sage-
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Config } from '../config.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isEmptyPatch } from '../db/patch.ts'
@@ -15,7 +16,14 @@ import { configuredProviders } from '../oauth/settings.ts'
 import { bannerVersion } from './banner.ts'
 import { iconVersion } from './pwa.ts'
 
-export const registerInstallationRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
+export interface InstallationDeps extends GuardDeps {
+  config: Config
+}
+
+export const registerInstallationRoutes = (
+  app: FastifyInstance,
+  { db, sessions, config }: InstallationDeps,
+) => {
   const { requireApproved } = createGuards({ db, sessions })
 
   const mapLink = async (): Promise<MapLinkResponse> => {
@@ -42,6 +50,7 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db, sessions 
       banner_updated_at: (await bannerVersion(db)) ?? null,
       icon_updated_at: (await iconVersion(db))?.updated_at ?? null,
       sends_email: (await mailSettingsFor(db)) !== undefined,
+      knows_own_address: config.public_origin !== undefined,
       social_logins: await configuredProviders(db),
     }
   }

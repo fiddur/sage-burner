@@ -25,19 +25,19 @@ The other defaults are what you get without any configuration. An empty value is
 treated as unset, since `FOO: ${FOO}` in a compose file with `FOO` undefined
 expands to an empty string rather than to nothing.
 
-| Variable              | Default                     | Meaning                                                                                                                                                 |
-| --------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`            | `development`               | `development` \| `test` \| `production`                                                                                                                 |
-| `PORT`                | `3000`                      | Port to listen on                                                                                                                                       |
-| `HOST`                | `127.0.0.1`                 | Bind address. Loopback by default; the image sets `0.0.0.0`. Binding anywhere else requires `SESSION_SECRET`                                            |
-| `DATABASE_URL`        | `./data/sage-burner.sqlite` | SQLite file; parent directory is created                                                                                                                |
-| `LOG_LEVEL`           | `info`                      | `fatal` … `trace`, or `silent`                                                                                                                          |
-| `BUILD_SHA`           | `unknown`                   | Commit the image was built from                                                                                                                         |
-| `WEB_ROOT`            | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it                                                                                      |
-| `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                                                          |
-| `SESSION_SECRET`      | _(none)_                    | **Required if `NODE_ENV=production`, `HOST` is not loopback, or `WEB_ROOT` is set.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48` |
-| `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                                                     |
-| `PUBLIC_ORIGIN`       | _(unset)_                   | Where a browser reaches this installation, e.g. `https://burn.example.org`. Passkeys, the share card and links in email read it — see below             |
+| Variable              | Default                     | Meaning                                                                                                                                                                 |
+| --------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`            | `development`               | `development` \| `test` \| `production`                                                                                                                                 |
+| `PORT`                | `3000`                      | Port to listen on                                                                                                                                                       |
+| `HOST`                | `127.0.0.1`                 | Bind address. Loopback by default; the image sets `0.0.0.0`. Binding anywhere else requires `SESSION_SECRET`                                                            |
+| `DATABASE_URL`        | `./data/sage-burner.sqlite` | SQLite file; parent directory is created                                                                                                                                |
+| `LOG_LEVEL`           | `info`                      | `fatal` … `trace`, or `silent`                                                                                                                                          |
+| `BUILD_SHA`           | `unknown`                   | Commit the image was built from                                                                                                                                         |
+| `WEB_ROOT`            | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it                                                                                                      |
+| `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                                                                          |
+| `SESSION_SECRET`      | _(none)_                    | **Required if `NODE_ENV=production`, `HOST` is not loopback, or `WEB_ROOT` is set.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48`                 |
+| `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                                                                     |
+| `PUBLIC_ORIGIN`       | _(unset)_                   | Where a browser reaches this installation, e.g. `https://burn.example.org`. Password resets require it; passkeys, the share card and links in email read it — see below |
 
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.
@@ -58,6 +58,14 @@ register a passkey scoped to it. They still could not use anyone's _existing_
 passkey — the authenticator will not sign for a domain the credential was not
 registered under — but this closes the other half. It is one line, and it is not
 required only because `docker compose up` has to stay sufficient.
+
+**Password resets need it, and are refused without it** (#738). This is the one place the
+`Host` fallback is dangerous: `POST /api/auth/forgotten` is unauthenticated, so a stranger
+supplies the header, names whose mailbox to write to and triggers the send — a reset link
+built from `Host` would point wherever they liked, and the click would hand them a live
+token. So the reset mail reads `PUBLIC_ORIGIN` alone. Unset, nothing is minted and nothing
+is posted, and the login page offers no reset at all rather than a control that cannot work
+— `GET /api/installation` carries `knows_own_address` so the page can tell.
 
 The share card reads it too (#306), and is happier without it: `og:url` and
 `og:image` are absolute and are otherwise built from the request's own `Host`,

@@ -241,8 +241,12 @@ These are member records, so treat them as such:
   expiring — and 204 whatever the address turns out to be. Every read of the account happens
   on the email queue after the route has answered, so the time taken cannot answer the
   question the body refuses to; minting drops the account's earlier link, spending it is a
-  `DELETE … RETURNING` in the transaction that writes the password. Offered only where an
-  admin has configured SMTP, which is #30's rule about a control that cannot do anything.
+  `DELETE … RETURNING` in the transaction that writes the password. **The link is
+  `PUBLIC_ORIGIN` alone, never `originOf`** — this is the one route where a stranger supplies
+  the `Host` header, names the recipient and sets the send off, so the fallback every other
+  mail may safely use would be an account takeover here. Offered only where an admin has
+  configured SMTP _and_ the installation knows its own address, which is #30's rule about a
+  control that cannot do anything.
 - **A passkey is an extra way in, never the only one imposed.** Passwords and
   passkeys coexist per account (#9), so the routes live outside both `/api/admin/`
   and `requireApproved` — the guard is being signed in at all, because an account

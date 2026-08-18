@@ -17,7 +17,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
-import { useInstallationSendsEmail, useSocialLogins } from '../installation.tsx'
+import { useCanResetPassword, useSocialLogins } from '../installation.tsx'
 import { quoting, useOauthOutcome } from '../outcome.ts'
 import { messageForCeremony, passkeysWork, signInWithPasskey } from '../passkey.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
@@ -50,7 +50,7 @@ export const Login = ({
   const [error, setError] = useFormError()
   const [submitting, setSubmitting] = useState(false)
   const configured = useSocialLogins()
-  const sendsEmail = useInstallationSendsEmail()
+  const canReset = useCanResetPassword()
   const offered = oauthProviders.filter((provider) => configured.includes(provider))
 
   const { outcome: came, ref } = useOauthOutcome()
@@ -197,10 +197,10 @@ export const Login = ({
       )}
 
       <p class="form-note">
-        {sendsEmail === false ? (
-          'If you have lost your password, ask someone with admin — this installation has no mail server to send you a link.'
-        ) : (
+        {canReset ? (
           <a href={forgottenPage()}>Forgotten your password?</a>
+        ) : (
+          'If you have lost your password, ask someone with admin — this installation cannot send you a link.'
         )}
       </p>
     </section>

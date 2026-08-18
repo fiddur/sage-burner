@@ -37,8 +37,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   the name used there, with a link to their profile where the provider gives one.
 - Forgotten your password? The login page posts a link to the address on the account,
   good once and for two hours; following it sets a new password and signs you in. Offered
-  only where an admin has set a mail server up, and it never says whether an address has
-  an account here.
+  only where an admin has set a mail server up and told the app its own address, and it never
+  says whether an address has an account here.
 - Signing in: password, passkey, or a linked provider. Passkeys are usernameless
   and per device, several per account, alongside a password or instead of one —
   removing the last passkey off an account with no password is refused.

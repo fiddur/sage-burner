@@ -107,6 +107,14 @@ const askFor = async (server: FastifyInstance, email: unknown) =>
     payload: { email },
   })
 
+const askAs = async (server: FastifyInstance, email: string, host: string) =>
+  await server.inject({
+    method: apiRoutes.requestPasswordReset.method,
+    url: apiRoutes.requestPasswordReset.path(),
+    payload: { email },
+    headers: { host },
+  })
+
 const linkIn = (message: Message | undefined): string => {
   const [, link] = /https:\/\/burn\.example\.org\/reset\/([^\s"<]+)/u.exec(message?.text ?? '') ?? []
 
@@ -253,20 +261,38 @@ describe('asking for a password reset', () => {
     expect(await db().select().from(passwordReset)).toHaveLength(0)
   })
 
-  it('builds the link from the Host header where PUBLIC_ORIGIN is not set', async () => {
+  it('posts nothing where PUBLIC_ORIGIN is not set, rather than trusting the Host it was given', async () => {
     const server = await build({ PUBLIC_ORIGIN: undefined })
     await givenMailServer()
     await givenAccount()
 
-    await server.inject({
-      method: apiRoutes.requestPasswordReset.method,
-      url: apiRoutes.requestPasswordReset.path(),
-      payload: { email: 'ada@example.org' },
-      headers: { host: 'burn.example.org' },
-    })
+    await askAs(server, 'ada@example.org', 'evil.example')
     await settled()
 
-    expect(posted[0]?.text).toContain('http://burn.example.org/reset/')
+    expect(posted).toEqual([])
+  })
+
+  it('mints nothing either, so a stranger cannot spend a link nobody was sent', async () => {
+    const server = await build({ PUBLIC_ORIGIN: undefined })
+    await givenMailServer()
+    await givenAccount()
+
+    await askAs(server, 'ada@example.org', 'evil.example')
+    await settled()
+
+    expect(await db().select().from(passwordReset)).toHaveLength(0)
+  })
+
+  it('sends the link to this installation whatever Host the asking said', async () => {
+    const server = await build()
+    await givenMailServer()
+    await givenAccount()
+
+    await askAs(server, 'ada@example.org', 'evil.example')
+    await settled()
+
+    expect(posted[0]?.text).toContain('https://burn.example.org/reset/')
+    expect(posted[0]?.text).not.toContain('evil.example')
   })
 
   it('refuses a body that is not an address', async () => {

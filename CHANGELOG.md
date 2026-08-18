@@ -13,7 +13,8 @@ under today's heading, and make a new heading when there is none.
   and a link comes to your inbox; following it sets a new password and signs you in. The link
   works once and for two hours, and asking again replaces the one before it. It never says
   whether an address has an account here, and it is offered only where an organiser has set a
-  mail server up — without one, the page still points at the organisers, as it always did.
+  mail server up and told the app its own address — without either, the page still points at
+  the organisers, as it always did.
 
 - **News about your application now reaches your inbox.** Somebody waiting to hear back has no
   reason to keep opening the app, and until now a reply from the organisers only rang a bell

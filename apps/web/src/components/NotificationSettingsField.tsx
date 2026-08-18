@@ -258,7 +258,8 @@ export const NotificationSettingsField = ({
       <p class="form-note">
         What others are doing means the burns you are coming to — nobody hears about a burn they have not said
         they are attending.
-        {sendsEmail && ' The Email column is off for every kind until you tick it.'}
+        {sendsEmail &&
+          ' The Email column is off for every kind until you tick it, bar news about your own application.'}
       </p>
     </>
   )

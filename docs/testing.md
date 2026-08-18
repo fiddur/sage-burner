@@ -126,8 +126,11 @@ phone" means 360px.
 
 ## Forgetting a password
 
-- [ ] With SMTP configured, `/login` offers **Forgotten your password?**; with the mail
-      server removed it says to ask an organiser and offers no link.
+- [ ] With SMTP configured and `PUBLIC_ORIGIN` set, `/login` offers **Forgotten your
+      password?**; with either the mail server or `PUBLIC_ORIGIN` removed it says to ask an
+      organiser and offers no link.
+- [ ] With `PUBLIC_ORIGIN` set, ask for a link with `curl -H 'Host: evil.example'`: the mail
+      still points at the real installation, and `evil.example` is nowhere in it.
 - [ ] Give the member's address: the page says a link is on its way _if there is an
       account_, and the mail arrives with a link that is `/reset/<token>`.
 - [ ] Give an address nobody has: the same page, the same wording, and nothing is posted.

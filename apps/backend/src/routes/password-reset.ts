@@ -25,7 +25,6 @@ import { account, passwordReset } from '../db/schema.ts'
 import { bodyOf, noStore, sendError, sendThrottled } from '../http.ts'
 import { installationTitle, mailSettingsFor, post } from '../mail/mail.ts'
 import { resetMessage } from '../mail/messages.ts'
-import { originOf } from '../shell.ts'
 import { digestOf, mintToken } from '../tokens.ts'
 import { cookieHeader } from './auth.ts'
 
@@ -60,7 +59,17 @@ export const registerPasswordResetRoutes = (
     return row
   }
 
-  const offerAReset = async (email: string, origin: string | undefined) => {
+  // `originOf` is deliberately not used here, unlike every other mail this app posts: this is
+  // the one route where a stranger supplies the `Host` header, names the recipient and sets the
+  // send off, so a shape-checked header would be a link to wherever they liked.
+  const offerAReset = async (email: string) => {
+    const origin = config.public_origin
+    if (origin === undefined) {
+      app.log.warn('a password reset was asked for, but PUBLIC_ORIGIN is not set')
+
+      return
+    }
+
     if ((await mailSettingsFor(db)) === undefined) return
 
     const [who] = await db
@@ -70,12 +79,6 @@ export const registerPasswordResetRoutes = (
       .limit(1)
 
     if (who === undefined) return
-
-    if (origin === undefined) {
-      app.log.warn('a password reset was asked for, but this installation does not know its own address')
-
-      return
-    }
 
     const minted = mintToken()
     const at = now()
@@ -123,11 +126,9 @@ export const registerPasswordResetRoutes = (
     const attempt = limits.byAddress.take(body.email)
     if (!attempt.ok) return sendThrottled(reply, attempt.retryAfterSeconds)
 
-    const origin = originOf(request, config)
-
     // Every read of the account is inside here, so the answer costs the same either way.
     defer(async () => {
-      await offerAReset(body.email, origin).catch((failure: unknown) => {
+      await offerAReset(body.email).catch((failure: unknown) => {
         request.log.error({ err: failure }, 'offering a password reset')
       })
     })

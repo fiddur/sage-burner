@@ -10,12 +10,17 @@ import { Forgotten } from './Forgotten.tsx'
 
 afterEach(cleanup)
 
-const renderPage = (api: Partial<ForgottenApi> = {}, sendsEmail = true) => {
+interface Installation {
+  sendsEmail?: boolean
+  knowsOwnAddress?: boolean
+}
+
+const renderPage = (api: Partial<ForgottenApi> = {}, installation: Installation = {}) => {
   history.replaceState(null, '', '/forgotten')
 
   return render(
     <LocationProvider>
-      <InstallationProvider sendsEmail={sendsEmail}>
+      <InstallationProvider sendsEmail knowsOwnAddress {...installation}>
         <Forgotten
           api={{
             requestPasswordReset: () => Promise.reject(new Error('requestPasswordReset is not stubbed here')),
@@ -61,10 +66,18 @@ describe('asking for a link to a new password', () => {
 
   it('asks for nothing where the installation has no mail server', () => {
     const ask = vi.fn<ForgottenApi['requestPasswordReset']>(() => Promise.resolve())
-    renderPage({ requestPasswordReset: ask }, false)
+    renderPage({ requestPasswordReset: ask }, { sendsEmail: false })
 
     expect(screen.queryByLabelText('Email')).toBeNull()
-    expect(screen.getByText(/no mail server set up/)).toBeTruthy()
+    expect(screen.getByText(/cannot post you a link/)).toBeTruthy()
+    expect(ask).not.toHaveBeenCalled()
+  })
+
+  it('asks for nothing where the installation does not know its own address either', () => {
+    const ask = vi.fn<ForgottenApi['requestPasswordReset']>(() => Promise.resolve())
+    renderPage({ requestPasswordReset: ask }, { knowsOwnAddress: false })
+
+    expect(screen.queryByLabelText('Email')).toBeNull()
     expect(ask).not.toHaveBeenCalled()
   })
 
