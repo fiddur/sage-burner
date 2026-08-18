@@ -8,7 +8,13 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, applicationMessageInputSchema, errorResponse, looksLikeEmail } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  applicationMessageInputSchema,
+  errorResponse,
+  invitePage,
+  looksLikeEmail,
+} from '@sage-burner/shared'
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -31,7 +37,7 @@ import {
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { defaultExpiry } from '../invites.ts'
 import { NO_ORIGIN, post } from '../mail/mail.ts'
-import { decisionMessage, inviteMessage } from '../mail/messages.ts'
+import { absolute, decisionMessage, inviteMessage, replyMessage } from '../mail/messages.ts'
 import { originOf } from '../shell.ts'
 import { mintToken } from '../tokens.ts'
 import { messagesOn, sayOnApplication } from './applications.ts'
@@ -74,7 +80,7 @@ export const registerApplicationReviewRoutes = (
         installation: named?.title ?? '',
         to: settled.applicant_email,
         name: settled.applicant_name,
-        link: `${origin}/invite/${token}`,
+        link: `${origin}${invitePage(token)}`,
         expires: expires_at.slice(0, 10),
       }),
     )
@@ -111,37 +117,24 @@ export const registerApplicationReviewRoutes = (
     const { account_id } = settled
     if (account_id === null) return
 
+    const where = approved ? '/' : '/apply'
+    const origin = originOf(request, config)
+
     await notify(account_id, {
       category: 'application_news',
       body: approved ? 'You are in. Welcome!' : 'Your application has been answered.',
-      link: approved ? '/' : '/apply',
+      link: where,
+      letter: ({ installation: named }) =>
+        decisionMessage({
+          installation: named,
+          to: settled.applicant_email,
+          name: settled.applicant_name,
+          approved,
+          link: absolute(origin, where),
+        }),
     }).catch((failure: unknown) => {
       app.log.error({ err: failure }, 'telling an applicant of the decision')
     })
-
-    if (!looksLikeEmail(settled.applicant_email)) return
-
-    const origin = originOf(request, config)
-    if (origin === undefined) return
-
-    const [named] = await db
-      .select({ title: installation.title })
-      .from(installation)
-      .where(eq(installation.id, INSTALLATION_ID))
-      .limit(1)
-
-    const posted = await post(
-      mail,
-      decisionMessage({
-        installation: named?.title ?? '',
-        to: settled.applicant_email,
-        name: settled.applicant_name,
-        approved,
-        link: `${origin}${approved ? '/' : '/apply'}`,
-      }),
-    )
-
-    if (!posted.sent) app.log.warn({ reason: posted.reason }, 'posting a decision')
   }
 
   app.get(apiRoutes.getApplications.fastify, async (_request, reply) => {
@@ -265,7 +258,12 @@ export const registerApplicationReviewRoutes = (
     if (body === undefined) return sendError(reply, 400)
 
     const [found] = await db
-      .select({ id: application.id, account_id: application.account_id })
+      .select({
+        id: application.id,
+        account_id: application.account_id,
+        applicant_name: application.applicant_name,
+        applicant_email: application.applicant_email,
+      })
       .from(application)
       .where(eq(application.id, request.params.id))
       .limit(1)
@@ -275,10 +273,20 @@ export const registerApplicationReviewRoutes = (
     await sayOnApplication(db, found.id, viewer.account_id, body.body, now())
 
     if (found.account_id !== null) {
+      const origin = originOf(request, config)
+
       await notify(found.account_id, {
         category: 'application_news',
         body: 'The organisers replied to your application.',
         link: '/apply',
+        letter: ({ installation: named }) =>
+          replyMessage({
+            installation: named,
+            to: found.applicant_email,
+            name: found.applicant_name,
+            said: body.body,
+            link: absolute(origin, '/apply'),
+          }),
       }).catch((failure: unknown) => {
         request.log.error({ err: failure }, 'telling an applicant of a reply')
       })

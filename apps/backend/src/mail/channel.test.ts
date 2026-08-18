@@ -47,13 +47,23 @@ const givenMailServer = async () => {
   })
 }
 
-const givenAccount = async () => {
+const givenAccount = async (name: string | null = null) => {
   const id = randomUUID()
   await db()
     .insert(account)
-    .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
+    .values({ id, email: `${id}@example.org`, name, password_hash: null, created_at: NOW })
 
   return id
+}
+
+const LETTER: Told = {
+  ...TOLD,
+  letter: ({ installation, name }) => ({
+    to: 'somewhere@else.example',
+    subject: `${installation} wrote to ${name ?? 'nobody'}`,
+    text: 'the whole of what was said',
+    html: '<p>the whole of what was said</p>',
+  }),
 }
 
 describe('posting a notification by email', () => {
@@ -109,5 +119,63 @@ describe('posting a notification by email', () => {
     await emailChannel({ db: database, send, log: () => undefined })(accountId, TOLD)
 
     expect(send).not.toHaveBeenCalled()
+  })
+})
+
+describe('a notification that carries its own letter', () => {
+  const sender = () => {
+    const posted: { to: string; subject: string }[] = []
+
+    return {
+      posted,
+      send: (_transport: unknown, message: { to: string; subject: string }) => {
+        posted.push(message)
+
+        return Promise.resolve()
+      },
+    }
+  }
+
+  it('posts the letter instead of the one-line copy', async () => {
+    const database = build()
+    await givenMailServer()
+    const accountId = await givenAccount('Ada')
+    const { posted, send } = sender()
+
+    await emailChannel({ db: database, send, log: () => undefined })(accountId, LETTER)
+
+    expect(posted[0]?.subject).toBe('Sage Burner wrote to Ada')
+  })
+
+  it('lets the letter choose its own address, the account’s being only what it is offered', async () => {
+    const database = build()
+    await givenMailServer()
+    const accountId = await givenAccount('Ada')
+    const { posted, send } = sender()
+
+    await emailChannel({ db: database, send, log: () => undefined })(accountId, LETTER)
+
+    expect(posted[0]?.to).toBe('somewhere@else.example')
+  })
+
+  it('still posts the one-line copy where a notification carries none', async () => {
+    const database = build()
+    await givenMailServer()
+    const accountId = await givenAccount('Ada')
+    const { posted, send } = sender()
+
+    await emailChannel({ db: database, send, log: () => undefined })(accountId, TOLD)
+
+    expect(posted[0]?.subject).toBe('Sage Burner: You are on helper for Dinner')
+  })
+
+  it('posts no letter where no mail server has been set up, the gate being the same one', async () => {
+    const database = build()
+    const accountId = await givenAccount('Ada')
+    const { posted, send } = sender()
+
+    await emailChannel({ db: database, send, log: () => undefined })(accountId, LETTER)
+
+    expect(posted).toEqual([])
   })
 })

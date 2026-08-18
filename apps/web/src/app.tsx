@@ -1,4 +1,11 @@
-import { changelogPage, forgottenPage, formattingPage, notificationsPage } from '@sage-burner/shared'
+import {
+  changelogPage,
+  forgottenPage,
+  formattingPage,
+  INVITE_PATTERN,
+  notificationsPage,
+  RESET_PATTERN,
+} from '@sage-burner/shared'
 import { LocationProvider, Route, Router } from 'preact-iso'
 import { useMemo } from 'preact/hooks'
 
@@ -339,10 +346,10 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/feed" component={FeedRoute} />
       <Route path={notificationsPage()} component={NotificationsRoute} />
       <Route path="/profile" component={ProfileRoute} />
-      <Route path="/invite/:token" component={InviteRoute} />
+      <Route path={INVITE_PATTERN} component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />
       <Route path={forgottenPage()} component={ForgottenRoute} />
-      <Route path="/reset/:token" component={ResetRoute} />
+      <Route path={RESET_PATTERN} component={ResetRoute} />
       <Route path="/admin" component={AdminRoute} />
       <Route path="/admin/events" component={AdminEventsRoute} />
       <Route path="/admin/allergies" component={AdminAllergiesRoute} />

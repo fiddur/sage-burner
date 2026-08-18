@@ -81,6 +81,19 @@ describe('asking for a link to a new password', () => {
     expect(ask).not.toHaveBeenCalled()
   })
 
+  it('asks nothing while the installation read is in flight', () => {
+    render(
+      <LocationProvider>
+        <InstallationProvider>
+          <Forgotten api={{ requestPasswordReset: () => Promise.resolve() }} />
+        </InstallationProvider>
+      </LocationProvider>,
+    )
+
+    expect(screen.queryByLabelText('Email')).toBeNull()
+    expect(screen.queryByText(/cannot post you a link/)).toBeNull()
+  })
+
   it('says how long to wait when it has been asked too often', async () => {
     renderPage({ requestPasswordReset: () => Promise.reject(apiError(429, 'rate_limited', 'Too many.')) })
 

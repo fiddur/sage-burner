@@ -19,7 +19,7 @@ import type { MailDeps } from '../mail/mail.ts'
 import type { EmailQueue } from '../mail/queue.ts'
 
 import { hashPassword } from '../auth/password.ts'
-import { resetExpiry, resetStatusOf } from '../auth/reset.ts'
+import { dropResets, resetExpiry, resetStatusOf } from '../auth/reset.ts'
 import { viewerOf } from '../auth/viewer.ts'
 import { account, passwordReset } from '../db/schema.ts'
 import { bodyOf, noStore, sendError, sendThrottled } from '../http.ts'
@@ -59,9 +59,7 @@ export const registerPasswordResetRoutes = (
     return row
   }
 
-  // `originOf` is deliberately not used here, unlike every other mail this app posts: this is
-  // the one route where a stranger supplies the `Host` header, names the recipient and sets the
-  // send off, so a shape-checked header would be a link to wherever they liked.
+  // Deliberately not `originOf` — see docs/accounts.md, Forgetting a password.
   const offerAReset = async (email: string) => {
     const origin = config.public_origin
     if (origin === undefined) {
@@ -181,6 +179,7 @@ export const registerPasswordResetRoutes = (
       if (claimed === undefined) return undefined
 
       tx.update(account).set({ password_hash }).where(eq(account.id, claimed.account_id)).run()
+      dropResets(tx, claimed.account_id)
 
       return claimed.account_id
     })

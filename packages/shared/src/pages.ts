@@ -102,6 +102,12 @@ export const notificationsPage = (): string => '/notifications'
 
 export const forgottenPage = (): string => '/forgotten'
 
+export const RESET_PATTERN = '/reset/:token'
+
 export const resetPage = (token: string): string => `/reset/${encodeURIComponent(token)}`
+
+export const INVITE_PATTERN = '/invite/:token'
+
+export const invitePage = (token: string): string => `/invite/${encodeURIComponent(token)}`
 
 export const homePage = (): string => '/'

@@ -19,7 +19,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   thread with the admins, and their bell — and nothing else.
 - Admins review applications with the answers as the applicant saw them, can ask
   a question back on the thread, and approve or reject; either way the applicant
-  is told.
+  is told once, by bell and by one email carrying the whole of it — a question on
+  the thread arrives with the question in it.
 - Approval is one action: membership granted, the coming burn joined, the feed
   card opened, the bell rung.
 - Direct invites: an admin mints a single-use, expiring link for somebody

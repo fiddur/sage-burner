@@ -671,7 +671,44 @@ describe('talking to an applicant', () => {
     await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
     await emails.drain()
 
-    expect(posted.map((one) => one.to)).toEqual([`${applicantId()}@example.org`])
+    expect(posted).toHaveLength(1)
+  })
+
+  it('posts it to the address the form gave, which is the one they said reaches them', async () => {
+    const server = await build()
+    await givenMailServer()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+    await emails.drain()
+
+    expect(posted[0]?.to).toBe('fredrik@example.org')
+    expect(posted[0]?.to).not.toBe(`${applicantId()}@example.org`)
+  })
+
+  it('carries what was written, the point of reaching somebody who is not in the app', async () => {
+    const server = await build()
+    await givenMailServer()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+    await emails.drain()
+
+    expect(posted[0]?.text).toContain('> Who are you coming with?')
+  })
+
+  it('keeps the reply out of the bell row, a lock screen not getting the private thread', async () => {
+    const server = await build()
+    await givenMailServer()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+
+    const told = await db().select().from(notification).where(eq(notification.account_id, applicantId()))
+    expect(told.map((one) => one.body)).toEqual(['The organisers replied to your application.'])
   })
 
   it('posts nothing to the organisers, whose own switches are off until they ask', async () => {

@@ -11,6 +11,7 @@ import type { Message } from '../mail/mail.ts'
 import type { EmailQueue } from '../mail/queue.ts'
 
 import { createApp } from '../app.ts'
+import { createSessions } from '../auth/session.ts'
 import { readSessionCookie, SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
@@ -106,6 +107,18 @@ const askFor = async (server: FastifyInstance, email: unknown) =>
     url: apiRoutes.requestPasswordReset.path(),
     payload: { email },
   })
+
+const givenSignedInAdmin = async () => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
+  await db().insert(accountRole).values({ account_id: id, role: 'admin' })
+
+  const sessions = createSessions({ secret: 's'.repeat(40), now: () => new Date(), ttlSeconds: 3600 })
+
+  return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+}
 
 const askAs = async (server: FastifyInstance, email: string, host: string) =>
   await server.inject({
@@ -323,6 +336,39 @@ describe('asking for a password reset', () => {
     const third = await askFor(server, 'three@example.org')
 
     expect(third.statusCode).toBe(429)
+  })
+})
+
+describe('a password set another way', () => {
+  const setByAdmin = async (server: FastifyInstance, accountId: string, cookie: string) =>
+    await server.inject({
+      method: apiRoutes.setAccountPassword.method,
+      url: apiRoutes.setAccountPassword.path(accountId),
+      headers: { cookie },
+      payload: { password: 'what the admin chose' },
+    })
+
+  it('drops an outstanding link, which is the case an admin reset is for', async () => {
+    const server = await build()
+    await givenMailServer()
+    const id = await givenAccount()
+    const admin = await givenSignedInAdmin()
+    const token = await tokenPosted(server)
+
+    await setByAdmin(server, id, admin.cookie)
+
+    expect((await stateOf(server, token)).json()).toEqual({ status: 'unknown' })
+  })
+
+  it('leaves the link alone when the account it names does not exist', async () => {
+    const server = await build()
+    await givenMailServer()
+    await givenAccount()
+    const admin = await givenSignedInAdmin()
+    const token = await tokenPosted(server)
+
+    expect((await setByAdmin(server, randomUUID(), admin.cookie)).statusCode).toBe(404)
+    expect((await stateOf(server, token)).json()).toEqual({ status: 'outstanding' })
   })
 })
 

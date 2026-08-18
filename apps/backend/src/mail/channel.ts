@@ -18,21 +18,24 @@ export const emailChannel = (deps: ChannelDeps): EmailChannel => {
       if ((await mailSettingsFor(deps.db)) === undefined) return
 
       const [who] = await deps.db
-        .select({ email: account.email })
+        .select({ email: account.email, name: account.name })
         .from(account)
         .where(eq(account.id, accountId))
         .limit(1)
 
       if (who === undefined) return
 
+      const about = { installation: await installationTitle(deps.db), to: who.email, name: who.name }
+
       const posted = await post(
         deps,
-        notificationMessage({
-          installation: await installationTitle(deps.db),
-          to: who.email,
-          body: told.body,
-          link: told.link === null ? undefined : absolute(deps.origin, told.link),
-        }),
+        told.letter?.(about) ??
+          notificationMessage({
+            installation: about.installation,
+            to: about.to,
+            body: told.body,
+            link: told.link === null ? undefined : absolute(deps.origin, told.link),
+          }),
       )
 
       if (!posted.sent) deps.log(posted, accountId)

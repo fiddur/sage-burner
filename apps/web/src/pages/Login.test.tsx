@@ -236,6 +236,22 @@ describe('Login', () => {
     expect(screen.queryByRole('link', { name: 'Forgotten your password?' })).toBeNull()
   })
 
+  it('offers neither while the installation read is in flight, so nothing appears and vanishes', async () => {
+    render(
+      <LocationProvider>
+        <InstallationProvider>
+          <ViewerProvider viewer={{ status: 'signed-out' }}>
+            <Login api={{ login: vi.fn(() => Promise.resolve({ viewer: null })), ...noPasskeys() }} />
+          </ViewerProvider>
+        </InstallationProvider>
+      </LocationProvider>,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Log in' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Forgotten your password?' })).toBeNull()
+    expect(screen.queryByText(/lost your password/)).toBeNull()
+  })
+
   it('offers none where the installation does not know its own address, no link being postable', async () => {
     renderLogin(
       vi.fn(() => Promise.resolve({ viewer: null })),

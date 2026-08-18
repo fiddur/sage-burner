@@ -22,6 +22,15 @@ export const Forgotten = ({ api }: { api: ForgottenApi }) => {
   const [asked, setAsked] = useState(false)
   const { busy, formError: error, setError, run } = useAction()
 
+  if (canReset === undefined) {
+    return (
+      <section class="page column">
+        <h1>Forgotten your password?</h1>
+        <p class="form-note">One moment…</p>
+      </section>
+    )
+  }
+
   if (!canReset) {
     return (
       <section class="page column">

@@ -352,6 +352,12 @@ These are member records, so treat them as such:
   an applicant has no browser registered for push and no habit of opening the app, so a
   reply on their application reached nobody at all; the default sits in
   `notificationCategoryInfo` beside `on`, so the next category has to decide both.
+- **One event, one bell row, at most one email** (#741). A `Told` may carry a `letter`, and
+  `emailChannel` posts that in place of the one-line copy — so the switch decides _whether_ a
+  mail goes and the event decides what it _says_, through one code path that checks the mail
+  server once and counts the send once. Nothing posts beside a notification any more: a route
+  that wants a fuller mail hands it over as a letter. Anything about an application is
+  addressed to `applicant_email`, which is the address the form says will reach them.
 - **The digest is the one thing that is on by default** (#620), and the exception is
   deliberate: it is **only what you have not seen, and only when you have not been
   here**, so the people it reaches are exactly the people who have stopped opening the

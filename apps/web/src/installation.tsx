@@ -177,10 +177,11 @@ export const useSetInstallationIcon = () => useContext(InstallationContext).setI
 
 export const useInstallationSendsEmail = () => useContext(InstallationContext).sendsEmail
 
-export const useCanResetPassword = (): boolean => {
+export const useCanResetPassword = (): boolean | undefined => {
   const { sendsEmail, knowsOwnAddress } = useContext(InstallationContext)
+  if (sendsEmail === undefined || knowsOwnAddress === undefined) return undefined
 
-  return sendsEmail !== false && knowsOwnAddress !== false
+  return sendsEmail && knowsOwnAddress
 }
 
 export const useSocialLogins = (): readonly OAuthProvider[] =>

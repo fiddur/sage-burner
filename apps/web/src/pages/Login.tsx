@@ -196,13 +196,15 @@ export const Login = ({
         </p>
       )}
 
-      <p class="form-note">
-        {canReset ? (
-          <a href={forgottenPage()}>Forgotten your password?</a>
-        ) : (
-          'If you have lost your password, ask someone with admin — this installation cannot send you a link.'
-        )}
-      </p>
+      {canReset !== undefined && (
+        <p class="form-note">
+          {canReset ? (
+            <a href={forgottenPage()}>Forgotten your password?</a>
+          ) : (
+            'If you have lost your password, ask someone with admin — this installation cannot send you a link.'
+          )}
+        </p>
+      )}
     </section>
   )
 }

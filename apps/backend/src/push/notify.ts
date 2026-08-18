@@ -12,7 +12,7 @@ import { and, count, desc, eq, inArray, isNull, lt, lte, sql } from 'drizzle-orm
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
-import type { Posted } from '../mail/mail.ts'
+import type { Message, Posted } from '../mail/mail.ts'
 import type { EmailQueue } from '../mail/queue.ts'
 import type { DeliveryCounts, PushDeps } from './push.ts'
 
@@ -26,11 +26,14 @@ import {
 } from '../db/schema.ts'
 import { notifyAccount } from './push.ts'
 
+export type Letter = (about: { installation: string; to: string; name: string | null }) => Message
+
 export interface Told {
   category: NotificationCategory
   body: string
   link: string | null
   batch?: string
+  letter?: Letter
 }
 
 export const RETENTION_DAYS = 90

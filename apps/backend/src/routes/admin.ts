@@ -7,6 +7,7 @@ import { count, eq } from 'drizzle-orm'
 import type { Database } from '../db/index.ts'
 
 import { hashPassword } from '../auth/password.ts'
+import { dropResets } from '../auth/reset.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
@@ -79,12 +80,22 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
     if (body === undefined) return sendError(reply, 400)
 
     const password_hash = await hash(body.password)
+    const { accountId } = request.params
 
-    const [updated] = await db
-      .update(account)
-      .set({ password_hash })
-      .where(eq(account.id, request.params.accountId))
-      .returning({ id: account.id })
+    const updated = db.transaction((tx) => {
+      const [row] = tx
+        .update(account)
+        .set({ password_hash })
+        .where(eq(account.id, accountId))
+        .returning({ id: account.id })
+        .all()
+
+      if (row === undefined) return undefined
+
+      dropResets(tx, accountId)
+
+      return row
+    })
 
     return updated === undefined ? sendError(reply, 404) : reply.code(204).send()
   })
