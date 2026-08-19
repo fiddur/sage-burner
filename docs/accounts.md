@@ -959,9 +959,22 @@ Host: evil.example
 the real host. Account takeover, admin accounts included, from an unauthenticated request.
 With `PUBLIC_ORIGIN` unset nothing is minted and nothing is posted; the log says why.
 
+**A password set any other way drops an outstanding link** (#743). Minting drops the account's
+earlier row and spending deletes it, so the link is single-use against itself — but an admin
+setting the password from ⚙️'s accounts list used to leave one live for up to two hours, which is
+exactly the case that reset exists for. `dropResets` is the one function both call, inside the
+transaction that writes the hash. The opportunistic rehash on login deliberately does not: it
+writes the same password, so nothing about the account changed and there is nothing to invalidate.
+
+**The token never reaches a log line** (#744). It travels in the path, so `req.url` carried it
+into anything reading the container's output — for two hours, the same as holding the mail.
+`requestSerializer` masks the token segment of the two token-carrying routes, this one and the
+invite's, which had always had the same exposure.
+
 **Where the installation cannot post one there is no offer at all.** `GET /api/installation`
 carries `sends_email` and, since this, `knows_own_address` — the two halves of being able to
-send a link, and `useCanResetPassword` is the pair. Without both, the login page shows the old
+send a link, and `useCanResetPassword` is the pair, answering `undefined` until the read lands so
+the offer never appears and vanishes. Without both, the login page shows the old
 sentence — ask an organiser — and `/forgotten` reached directly says the same. That is #30's
 rule about the email column: absent rather than present and inert, because a control that
 cannot do anything reads as a promise. The route still answers 204 in that case and writes
@@ -1328,8 +1341,30 @@ already means "has not said", so nobody's stored choices are touched and the def
 on its own. Somebody who has been to the settings page has a stored row for every category and
 keeps whatever it says.
 
-The decision mail on approval or rejection is separate from all of this and still goes out
-directly, for the reason given under Reviewing applications.
+**One event, one bell row, at most one email** (#741). Every mail about an application now goes
+through this channel rather than beside it, and the switch above decides _whether_ one goes while
+the event decides what it _says_. `Told` may carry a `letter` — a function of
+`{ installation, to, name }` returning a `Message` — and `emailChannel` posts that instead of the
+one-line copy where there is one. It resolves what it already resolved either way, so the
+mail-server check, the switch and the `emailed` tally are the same code for both.
+
+That fixed three things at once, of which the double mail was only the visible one. Approving used
+to send `decisionMessage` by hand **and** the notification's copy of "You are in. Welcome!"; the
+hand-rolled send did the mail-server check, the installation title, the origin and the `post` a
+second time, and was counted by nothing, so the log read _emailed 1_ while two went out. It also
+wrote to `account.email` while the direct mail wrote to `applicant_email` — and the apply form
+says the address you fill in is the one that reaches you better, so the one applicant who filled
+it in got the reply on the address they said reaches them worse.
+
+So `tellApplicant` is one `notify` call with `decisionMessage` as its letter, and the reply on the
+thread carries a `replyMessage` with **what was written in it**. The bell row stays a short
+sentence — a lock screen does not get the private thread — and the email is the fullest thing that
+event has to say, because reaching somebody who is not in the app is the whole point of it. Both
+address `applicant_email`, which `submitApplication` falls back to `account.email` for, so there
+is one address for everything about an application.
+
+The invite mail on the legacy path — an application from before #476, with no account — still goes
+out directly, since there is no account to notify.
 
 **The digest is the one exception, and it is deliberately one** (#620). The rule above is
 about the per-category channel — an instant copy of each notification, which is somebody

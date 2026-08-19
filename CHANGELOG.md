@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-18
 
+- **A decision on your application is one email, and it is the one that explains itself.** Being
+  approved or turned down sent two within a second of each other, and the organisers' reply on
+  your application arrived as a line saying only that they had replied. Now each is a single
+  message carrying the whole of what was said, to the address you gave on the form — the one the
+  form says will reach you.
+
 - **A forgotten password can be reset from the login page.** Give the address you sign in with
   and a link comes to your inbox; following it sets a new password and signs you in. The link
   works once and for two hours, and asking again replaces the one before it. It never says

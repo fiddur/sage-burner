@@ -1,8 +1,10 @@
 import type { Invite, InviteDelivery } from '@sage-burner/shared'
 
+import { invitePage } from '@sage-burner/shared'
+
 import { CopyButton } from './CopyButton.tsx'
 
-const urlFor = (invite: Invite) => `${window.location.origin}/invite/${invite.token}`
+const urlFor = (invite: Invite) => `${window.location.origin}${invitePage(invite.token)}`
 
 const deliveryNote = (delivery: InviteDelivery) => {
   if (delivery === null) return 'Send this link — it is shown once and cannot be recovered afterwards.'

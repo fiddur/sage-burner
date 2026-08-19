@@ -34,6 +34,7 @@ import { readSessionCookie, viewerFor } from './auth/viewer.ts'
 import { refuseEnvelopeStrippers } from './envelope.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
+import { requestSerializer } from './logging.ts'
 import { emailChannel } from './mail/channel.ts'
 import { createEmailQueue, drainWithin } from './mail/queue.ts'
 import { sendWithSmtp } from './mail/smtp.ts'
@@ -143,6 +144,7 @@ const assertServableWebRoot = (root: string): void => {
 
 export const loggerOptions = (level: string) => ({
   level,
+  serializers: { req: requestSerializer },
   redact: {
     paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', 'err.headers'],
     remove: true,

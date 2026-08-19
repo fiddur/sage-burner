@@ -81,9 +81,11 @@ phone" means 360px.
       review card shows the address the account signed up with.
 - [ ] Signed in as a member, `/apply` says there is nothing to apply for and shows
       no form.
-- [ ] With SMTP configured, send the applicant a message from ⚙️ → Applications: the mail
-      arrives at the address their account signed up with, with nobody having ticked
-      anything — the bell alone would have reached somebody who is not in the app yet.
+- [ ] With SMTP configured, send the applicant a message from ⚙️ → Applications: **one** mail
+      arrives, at the address the apply form gave, with the question quoted in it — and the bell
+      row is the short sentence, without it. Nobody has ticked anything.
+- [ ] Approve, then (on a second applicant) reject: **one** mail each, and it is the decision
+      mail rather than the one-line copy. ⚙️ → Notifications sent counts one email for it.
 - [ ] The confirmation says whether anything will be emailed, matching whether
       SMTP is configured.
 - [ ] The new applicant, signed in, reaches their own application and their bell
@@ -141,6 +143,10 @@ phone" means 360px.
       newest link being live.
 - [ ] Open `/reset/nonsense`: it says the link is not recognised, and asks nobody for a
       password.
+- [ ] Ask for a link, then set that member's password from ⚙️ → Accounts: the link stops
+      working, which is what an admin reset is for.
+- [ ] `grep` the backend's log output for the token you were sent: it is `[redacted]` on the
+      request line, and the same holds for an invite link.
 
 ## Setting a burn up (admin)
 

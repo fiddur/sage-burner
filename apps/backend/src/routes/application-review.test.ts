@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
 import type { Message } from '../mail/mail.ts'
+import type { EmailQueue } from '../mail/queue.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
@@ -23,10 +24,13 @@ import {
   inviteToken,
   mailSetting,
   notification,
+  notificationBatch,
+  notificationSetting,
   thread,
   threadEntry,
 } from '../db/schema.ts'
 import { NO_ORIGIN, NOT_CONFIGURED } from '../mail/mail.ts'
+import { createEmailQueue } from '../mail/queue.ts'
 
 const SECRET = 's'.repeat(40)
 
@@ -43,15 +47,20 @@ afterEach(async () => {
 const NOW = '2026-07-02T00:00:00.000Z'
 
 const posted: Message[] = []
+let emails: EmailQueue
+
+const settled = async () => await emails.drain()
 
 const build = async (now: () => Date = () => new Date(NOW)) => {
   posted.length = 0
+  emails = createEmailQueue(() => undefined)
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now,
+    defer: emails.defer,
     send: (_transport, message) => {
       posted.push(message)
       return Promise.resolve()
@@ -519,6 +528,90 @@ describe('a fresh link when the first one was lost', () => {
 
     expect((await reissue(server, undefined, id)).statusCode).toBe(401)
     expect((await reissue(server, member.cookie, id)).statusCode).toBe(403)
+  })
+})
+
+describe('what a decision puts in the applicant’s inbox', () => {
+  it('posts exactly one email for an approval, where two used to go out', async () => {
+    const server = await build()
+    await givenMailServer()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+    await settled()
+
+    expect(posted).toHaveLength(1)
+  })
+
+  it('makes that one the decision mail, which is the half that says what happens next', async () => {
+    const server = await build()
+    await givenMailServer()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+    await settled()
+
+    expect(posted[0]?.subject).toBe('You are in at Sage Burner')
+  })
+
+  it('posts one for a rejection too, and it is the one naming who to ask', async () => {
+    const server = await build()
+    await givenMailServer()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'reject')
+    await settled()
+
+    expect(posted).toHaveLength(1)
+    expect(posted[0]?.subject).toBe('About your application to Sage Burner')
+  })
+
+  it('writes to the address the form gave, not the one they sign in with', async () => {
+    const server = await build()
+    await givenMailServer()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+    await settled()
+
+    expect(posted[0]?.to).toBe('someone@example.org')
+    expect(posted[0]?.to).not.toBe(`${wren.id}@example.org`)
+  })
+
+  it('counts that send in the log, which the hand-rolled post never was', async () => {
+    const server = await build()
+    await givenMailServer()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+    await settled()
+
+    const [row] = await db()
+      .select()
+      .from(notificationBatch)
+      .where(eq(notificationBatch.category, 'application_news'))
+    expect(row?.emailed).toBe(1)
+  })
+
+  it('posts nothing where the applicant has the email switch off, the bell row standing alone', async () => {
+    const server = await build()
+    await givenMailServer()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+    await db()
+      .insert(notificationSetting)
+      .values({ account_id: wren.id, category: 'application_news', enabled: true, email: false })
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+    await settled()
+
+    expect(posted).toEqual([])
+    expect(await db().select().from(notification).where(eq(notification.account_id, wren.id))).toHaveLength(1)
   })
 })
 

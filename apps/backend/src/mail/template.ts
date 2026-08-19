@@ -1,5 +1,6 @@
 export type Block =
   | { paragraph: string }
+  | { quote: string }
   | { heading: string }
   | { action: { href: string; label: string } }
   | { lines: readonly { text: string; href?: string; aside?: string }[] }
@@ -45,6 +46,12 @@ const bulleted = (text: string, width = WRAP_AT): string[] => {
   return [`- ${first}`, ...rest.map((line) => `  ${line}`)]
 }
 
+const quoted = (text: string, width = WRAP_AT): string[] =>
+  text
+    .split('\n')
+    .flatMap((line) => (line.trim() === '' ? [''] : wrapped(line, width - 2)))
+    .map((line) => (line === '' ? '>' : `> ${line}`))
+
 export const textFrom = (blocks: readonly Block[]): string => {
   const firstNote = blocks.findIndex(isNote)
   const out: string[] = []
@@ -53,6 +60,7 @@ export const textFrom = (blocks: readonly Block[]): string => {
     if (at === firstNote) out.push('--')
 
     if ('paragraph' in block) out.push(...wrapped(block.paragraph), '')
+    else if ('quote' in block) out.push(...quoted(block.quote), '')
     else if ('heading' in block) out.push(...wrapped(block.heading), '')
     else if ('action' in block) out.push(block.action.href, '')
     else if ('note' in block) {
@@ -83,6 +91,9 @@ const SANS = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 const htmlBlock = (block: Block): string => {
   if ('paragraph' in block) {
     return `<p style="margin:0 0 14px;">${escapeHtml(block.paragraph)}</p>`
+  }
+  if ('quote' in block) {
+    return `<blockquote style="margin:0 0 14px;padding:2px 0 2px 14px;border-left:3px solid ${LINE};color:${MUTED};white-space:pre-wrap;">${escapeHtml(block.quote)}</blockquote>`
   }
   if ('heading' in block) {
     return `<h2 style="font-family:${SANS};font-size:15px;font-weight:600;margin:22px 0 8px;color:${INK};">${escapeHtml(block.heading)}</h2>`

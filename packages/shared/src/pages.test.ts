@@ -5,10 +5,14 @@ import {
   applyPage,
   bringPage,
   formattingPage,
+  INVITE_PATTERN,
+  invitePage,
   linkingOutcomes,
   loginPage,
   meetingsPage,
   oauthOutcomes,
+  RESET_PATTERN,
+  resetPage,
   rolesPage,
   signingInOutcomes,
 } from './pages.ts'
@@ -85,5 +89,19 @@ describe('the lead-roles register', () => {
 describe('the formatting help', () => {
   it('belongs to no burn and takes no parameter, an applicant reading it as well', () => {
     expect(formattingPage()).toBe('/formatting')
+  })
+})
+
+describe('a page whose path carries a token', () => {
+  const filled = (pattern: string, token: string) => pattern.replace(':token', encodeURIComponent(token))
+
+  it('builds what its own router pattern routes to, so the two spellings cannot drift', () => {
+    expect(resetPage('a-token')).toBe(filled(RESET_PATTERN, 'a-token'))
+    expect(invitePage('a-token')).toBe(filled(INVITE_PATTERN, 'a-token'))
+  })
+
+  it('encodes the token, a slash in one otherwise inventing a path segment', () => {
+    expect(resetPage('a/b')).toBe('/reset/a%2Fb')
+    expect(invitePage('a/b')).toBe('/invite/a%2Fb')
   })
 })

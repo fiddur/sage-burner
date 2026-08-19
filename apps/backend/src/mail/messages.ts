@@ -63,6 +63,11 @@ export const inviteMessage = ({
     ],
   })
 
+const greeting = (name: string | null): Block => ({ paragraph: name === null ? 'Hello,' : `Hello ${name},` })
+
+const action = (link: string | undefined, label: string): Block[] =>
+  link === undefined ? [] : [{ action: { href: link, label } }]
+
 export const decisionMessage = ({
   installation,
   to,
@@ -72,22 +77,48 @@ export const decisionMessage = ({
 }: {
   installation: string
   to: string
-  name: string
+  name: string | null
   approved: boolean
-  link: string
+  link: string | undefined
 }): Message =>
   written({
     installation,
     to,
     subject: approved ? `You are in at ${installation}` : `About your application to ${installation}`,
     blocks: [
-      { paragraph: `Hello ${name},` },
+      greeting(name),
       {
         paragraph: approved
           ? `Your application has been accepted — you are a member of ${installation}, and you are on the list for the next burn.`
           : 'Your application has not been accepted this time. If you would like to know more, the organisers are the people to ask — their names and how to reach them are on your page:',
       },
-      { action: { href: link, label: approved ? 'See the burn' : 'Your page' } },
+      ...action(link, approved ? 'See the burn' : 'Your page'),
+      { note: installation },
+    ],
+  })
+
+export const replyMessage = ({
+  installation,
+  to,
+  name,
+  said,
+  link,
+}: {
+  installation: string
+  to: string
+  name: string | null
+  said: string
+  link: string | undefined
+}): Message =>
+  written({
+    installation,
+    to,
+    subject: `About your application to ${installation}`,
+    blocks: [
+      greeting(name),
+      { paragraph: 'The organisers wrote on your application:' },
+      { quote: said },
+      ...action(link, 'Reply'),
       { note: installation },
     ],
   })
@@ -110,7 +141,7 @@ export const resetMessage = ({
     to,
     subject: `Setting a new password at ${installation}`,
     blocks: [
-      { paragraph: name === null ? 'Hello,' : `Hello ${name},` },
+      greeting(name),
       { paragraph: `Somebody asked to set a new password for your account at ${installation}.` },
       { action: { href: link, label: 'Set a new password' } },
       {
