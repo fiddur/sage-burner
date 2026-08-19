@@ -13,6 +13,7 @@ export interface ProviderAsks {
 export interface ProviderProfile {
   subject: string
   name?: string
+  handle?: string
   email?: string
   picture?: string
   profile_url?: string
@@ -22,6 +23,7 @@ export interface ProviderProfile {
 export interface ProviderShape {
   authorize: string
   token: string
+  names_the_person: boolean
   profile: (asks: ProviderAsks) => string
   scope: (asks: ProviderAsks) => string
   read: (body: unknown) => ProviderProfile | undefined
@@ -50,6 +52,7 @@ export const providerShapes = {
   discord: {
     authorize: 'https://discord.com/oauth2/authorize',
     token: 'https://discord.com/api/oauth2/token',
+    names_the_person: false,
     profile: () => 'https://discord.com/api/users/@me',
     // `email` because an account is keyed by an address. Discord answers a verified one;
     // Facebook is asked the same and often does not.
@@ -62,7 +65,8 @@ export const providerShapes = {
 
       return {
         subject,
-        name: stringField(body, 'global_name') ?? username,
+        name: stringField(body, 'global_name'),
+        handle: username,
         email: verifiedEmail(body),
         picture: discordPicture(subject, stringField(body, 'avatar')),
         ...(username === undefined ? {} : { reach: { kind: 'discord' as const, value: username } }),
@@ -72,6 +76,7 @@ export const providerShapes = {
   facebook: {
     authorize: `https://www.facebook.com/${FACEBOOK_GRAPH_VERSION}/dialog/oauth`,
     token: `https://graph.facebook.com/${FACEBOOK_GRAPH_VERSION}/oauth/access_token`,
+    names_the_person: true,
     // `link` only where the scope was asked for: whether Graph omits an unpermitted field or
     // refuses the whole read is not answerable without an unapproved app to try.
     profile: ({ profileLink }) =>

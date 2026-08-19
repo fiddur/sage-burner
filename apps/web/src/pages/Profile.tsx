@@ -206,7 +206,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       <WaysInField api={api} />
 
       <p class="form-note">
-        Signed in as {email ?? 'you'}. Changing that address is not possible yet — ask someone with admin.
+        Signed in as {email ?? 'you'}. To change that address, ask someone with admin — they can set it.
       </p>
 
       <LogOutButton api={api} />

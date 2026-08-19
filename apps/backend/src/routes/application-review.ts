@@ -26,7 +26,6 @@ import type { Notifier } from '../push/notify.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { whyNothingWritten } from '../db/refusals.ts'
 import {
-  account,
   accountIdentity,
   accountRole,
   application,
@@ -150,11 +149,11 @@ export const registerApplicationReviewRoutes = (
             .select({
               account_id: accountIdentity.account_id,
               provider: accountIdentity.provider,
-              name: account.name,
+              name: accountIdentity.name,
+              handle: accountIdentity.handle,
               profile_url: accountIdentity.profile_url,
             })
             .from(accountIdentity)
-            .innerJoin(account, eq(account.id, accountIdentity.account_id))
             .where(inArray(accountIdentity.account_id, applicants))
 
     const byAccount = new Map<string, ApplicantIdentity[]>()

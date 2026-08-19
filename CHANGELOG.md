@@ -7,6 +7,23 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-19
+
+- **Signing up through Discord no longer copies the Discord name into your name.** A Discord
+  name is rarely anybody's real one, and it was landing in the field every member knows you by.
+  The apply form now asks for your real name and starts empty; Facebook names, which mostly are
+  real, are still filled in. Somebody coming in on a group link through Discord lands on Your
+  details, where the name is asked for.
+
+- **An organiser can correct an account.** The name in the accounts list opens it: the real
+  name, the login address, the allergies — ticks and notes — and setting a password, which
+  moved there from the table. So a mistyped address, or a Discord handle where a name should
+  be, is one visit to fix rather than a message asking you to.
+
+- **The review card names the Discord account.** "via Discord — ȐJaƔ (robby5859)": what
+  Discord shows and the username behind it, which is what tells organisers who somebody is.
+  Identities linked before this say so once you sign in through them again.
+
 # 2026-08-18
 
 - **A decision on your application is one email, and it is the one that explains itself.** Being

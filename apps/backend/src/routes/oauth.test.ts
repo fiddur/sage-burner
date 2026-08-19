@@ -48,7 +48,7 @@ const PNG = Buffer.from(
   'base64',
 )
 
-let identified: { email?: string; name?: string } = {}
+let identified: { email?: string; name?: string; handle?: string } = {}
 
 const fakeOAuth = (over: Partial<OAuthCalls> = {}): OAuthCalls => ({
   identify: () =>
@@ -171,7 +171,7 @@ const lastLogLine = (chunks: readonly string[]): LogLine | undefined =>
 const signInThrough = async (
   server: FastifyInstance,
   provider = 'facebook',
-  profile: { email?: string; name?: string } = {},
+  profile: { email?: string; name?: string; handle?: string } = {},
 ) => {
   identified = profile
   const leaving = await start(server, provider)
@@ -216,7 +216,13 @@ const givenLink = async (over: { kind?: 'single' | 'group'; expires_at?: string;
   return token
 }
 
-const linkThrough = async (server: FastifyInstance, cookie: string, provider = 'facebook') => {
+const linkThrough = async (
+  server: FastifyInstance,
+  cookie: string,
+  provider = 'facebook',
+  profile: { name?: string; handle?: string } = {},
+) => {
+  identified = profile
   const leaving = await startLink(server, provider, cookie)
   return await callback(server, provider, `code=abc&state=${await mintedState()}`, nonceFrom(leaving))
 }
@@ -227,7 +233,7 @@ describe('signing up from an invite link through a provider', () => {
     await givenProvider()
     const token = await givenLink()
 
-    const back = await signInFromInvite(server, token, { email: 'wren@example.org' })
+    const back = await signInFromInvite(server, token, { email: 'wren@example.org', name: 'Wren' })
 
     expect(back.headers.location).toBe('/')
     expect(cookiesOn(back)).toContain(`${SESSION_COOKIE}=`)
@@ -240,6 +246,19 @@ describe('signing up from an invite link through a provider', () => {
         .from(accountRole)
         .where(eq(accountRole.account_id, made?.id ?? '')),
     ).toEqual([{ account_id: made?.id, role: 'member' }])
+  })
+
+  it('lands somebody who arrived without a name on their details, where the name is asked for', async () => {
+    const server = await build()
+    await givenProvider('discord')
+    const token = await givenLink()
+
+    const back = await signInFromInvite(server, token, { email: 'wren@example.org', name: 'ȐJaƔ' }, 'discord')
+
+    expect(back.headers.location).toBe('/profile')
+    expect(cookiesOn(back)).toContain(`${SESSION_COOKIE}=`)
+    const [made] = await db().select().from(account).where(eq(account.email, 'wren@example.org'))
+    expect(made?.name).toBeNull()
   })
 
   it('records the arrival against the link, and leaves invite_token_id null for a group one', async () => {
@@ -877,7 +896,7 @@ describe('signing in from a provider', () => {
     expect(await db().select().from(account)).toEqual([])
   })
 
-  it('takes the name the provider gives, since the account carries the person', async () => {
+  it('takes the name Facebook gives, since the account carries the person and that is their name', async () => {
     const server = await build()
     await givenProvider()
 
@@ -885,6 +904,46 @@ describe('signing in from a provider', () => {
 
     const [made] = await db().select().from(account)
     expect(made?.name).toBe('Wren')
+  })
+
+  it('leaves the name empty for Discord, whose display name is rarely a real one', async () => {
+    const server = await build()
+    await givenProvider('discord')
+
+    await signInThrough(server, 'discord', { email: 'wren@example.org', name: 'ȐJaƔ', handle: 'robby5859' })
+
+    const [made] = await db().select().from(account)
+    expect(made?.name).toBeNull()
+  })
+
+  it('keeps what the provider calls them on the identity, for the review card to say', async () => {
+    const server = await build()
+    await givenProvider('discord')
+
+    await signInThrough(server, 'discord', { email: 'wren@example.org', name: 'ȐJaƔ', handle: 'robby5859' })
+
+    const [identity] = await db().select().from(accountIdentity)
+    expect(identity).toMatchObject({ provider: 'discord', name: 'ȐJaƔ', handle: 'robby5859' })
+  })
+
+  it('refreshes what the provider calls them on each sign-in, leaving alone what was not answered', async () => {
+    const server = await build()
+    await givenProvider('discord')
+    const wren = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'discord',
+      subject: 'provider-1',
+      name: 'old name',
+      handle: 'oldhandle',
+      created_at: NOW.toISOString(),
+    })
+
+    await signInThrough(server, 'discord', { name: 'new name' })
+
+    const [identity] = await db().select().from(accountIdentity)
+    expect(identity).toMatchObject({ name: 'new name', handle: 'oldhandle' })
   })
 
   it('folds the case of the address, as every other way in does', async () => {
@@ -1305,6 +1364,20 @@ describe('linking a provider to an account', () => {
 
     const [written] = await db().select().from(accountIdentity)
     expect(written?.profile_url).toBeNull()
+  })
+
+  it('keeps what the provider calls them, without touching the account’s own name', async () => {
+    const server = await build()
+    await givenProvider('discord')
+    const wren = await givenAccount()
+    await db().update(account).set({ name: 'Wren' }).where(eq(account.id, wren.id))
+
+    await linkThrough(server, wren.cookie, 'discord', { name: 'ȐJaƔ', handle: 'robby5859' })
+
+    const [written] = await db().select().from(accountIdentity)
+    expect(written).toMatchObject({ name: 'ȐJaƔ', handle: 'robby5859' })
+    const [held] = await db().select().from(account).where(eq(account.id, wren.id))
+    expect(held?.name).toBe('Wren')
   })
 })
 

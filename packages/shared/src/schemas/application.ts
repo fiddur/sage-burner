@@ -28,6 +28,7 @@ export const storedAnswersSchema = z.array(storedAnswerSchema)
 export const applicantIdentitySchema = z.object({
   provider: z.enum(oauthProviders),
   name: z.string().nullable(),
+  handle: z.string().nullable(),
   profile_url: z.string().nullable(),
 })
 

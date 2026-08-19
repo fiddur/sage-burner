@@ -49,7 +49,10 @@ describe('AdminApplications', () => {
           Promise.resolve({
             applications: [
               anApplication({
-                identities: [{ provider: 'facebook', name: 'Fredrik Liljegren', profile_url: null }],
+                account_id: 'acc-1',
+                identities: [
+                  { provider: 'facebook', name: 'Fredrik Liljegren', handle: null, profile_url: null },
+                ],
               }),
             ],
           }),
@@ -61,6 +64,42 @@ describe('AdminApplications', () => {
     expect(screen.queryByRole('link', { name: /Fredrik Liljegren/ })).toBeNull()
   })
 
+  it('says both what Discord shows and the username behind it, which is what identifies somebody', async () => {
+    renderPage(
+      stub({
+        getApplications: () =>
+          Promise.resolve({
+            applications: [
+              anApplication({
+                account_id: 'acc-1',
+                identities: [{ provider: 'discord', name: 'ȐJaƔ', handle: 'robby5859', profile_url: null }],
+              }),
+            ],
+          }),
+      }),
+    )
+
+    expect((await screen.findByText(/via Discord/)).textContent).toBe('via Discord — ȐJaƔ (robby5859)')
+  })
+
+  it('says the username alone where Discord has no display name', async () => {
+    renderPage(
+      stub({
+        getApplications: () =>
+          Promise.resolve({
+            applications: [
+              anApplication({
+                account_id: 'acc-1',
+                identities: [{ provider: 'discord', name: null, handle: 'robby5859', profile_url: null }],
+              }),
+            ],
+          }),
+      }),
+    )
+
+    expect((await screen.findByText(/via Discord/)).textContent).toBe('via Discord — robby5859')
+  })
+
   it('links to the profile only where the provider gave one', async () => {
     renderPage(
       stub({
@@ -68,8 +107,14 @@ describe('AdminApplications', () => {
           Promise.resolve({
             applications: [
               anApplication({
+                account_id: 'acc-1',
                 identities: [
-                  { provider: 'discord', name: 'fiddur', profile_url: 'https://discord.com/users/1' },
+                  {
+                    provider: 'discord',
+                    name: 'fiddur',
+                    handle: null,
+                    profile_url: 'https://discord.com/users/1',
+                  },
                 ],
               }),
             ],
@@ -81,11 +126,23 @@ describe('AdminApplications', () => {
     expect(link.getAttribute('href')).toBe('https://discord.com/users/1')
   })
 
-  it('says nothing about doors for an application with no account behind it', async () => {
+  it('links to the account behind an application, where there is one', async () => {
+    renderPage(
+      stub({
+        getApplications: () => Promise.resolve({ applications: [anApplication({ account_id: 'acc-1' })] }),
+      }),
+    )
+
+    const link = await screen.findByRole('link', { name: 'Their account' })
+    expect(link.getAttribute('href')).toBe('/admin/accounts/acc-1')
+  })
+
+  it('says nothing about doors or an account for an application with no account behind it', async () => {
     renderPage(stub())
 
     await screen.findByText('Fredrik')
     expect(screen.queryByText(/via /)).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Their account' })).toBeNull()
   })
 
   it('shows an application with its answers', async () => {

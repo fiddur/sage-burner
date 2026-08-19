@@ -30,6 +30,7 @@ import type { ProviderAsks, ProviderProfile } from '../oauth/providers.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { loginAddressConnection, providerConnection } from '../connections.ts'
 import { isUniqueViolation } from '../db/errors.ts'
+import { isEmptyPatch } from '../db/patch.ts'
 import {
   account,
   accountAvatar,
@@ -44,7 +45,7 @@ import {
 import { noStore, sendError } from '../http.ts'
 import { redemptionsOf, roomInside } from '../invites.ts'
 import { anotherWayInSurvives, identitiesFor } from '../oauth/identities.ts'
-import { authorizeUrl } from '../oauth/providers.ts'
+import { authorizeUrl, providerShapes } from '../oauth/providers.ts'
 import { usableOauthSetting } from '../oauth/settings.ts'
 import { originOf } from '../shell.ts'
 import { digestOf } from '../tokens.ts'
@@ -57,6 +58,21 @@ export interface OAuthDeps extends GuardDeps {
 }
 
 export const STATE_TTL_SECONDS = 300
+
+const realNameOf = (provider: OAuthProvider, profile: ProviderProfile): string | null =>
+  providerShapes[provider].names_the_person ? (profile.name ?? null) : null
+
+const landingAfterSignUp = (invited: boolean, name: string | null): string => {
+  if (!invited) return applyPage()
+
+  return name === null ? detailsPage() : homePage()
+}
+
+const calledBy = ({ profile_url, name, handle }: ProviderProfile) => ({
+  ...(profile_url === undefined ? {} : { profile_url }),
+  ...(name === undefined ? {} : { name }),
+  ...(handle === undefined ? {} : { handle }),
+})
 
 export const OAUTH_NONCE_COOKIE = 'sage_oauth'
 
@@ -283,20 +299,14 @@ export const registerOauthRoutes = (
     if (inviteHash !== null && invite === undefined) return back(reply, loginPage('refused'))
 
     const accountId = randomUUID()
+    const name = realNameOf(provider, profile)
 
     let admitted: boolean
     try {
       admitted = db.transaction((tx) => {
         if (invite !== undefined && !roomInside(tx, invite)) return false
 
-        tx.insert(account)
-          .values({
-            id: accountId,
-            email,
-            name: profile.name ?? null,
-            created_at: now().toISOString(),
-          })
-          .run()
+        tx.insert(account).values({ id: accountId, email, name, created_at: now().toISOString() }).run()
 
         tx.insert(accountConnection).values(loginAddressConnection(accountId, email)).run()
 
@@ -306,7 +316,7 @@ export const registerOauthRoutes = (
             account_id: accountId,
             provider,
             subject: profile.subject,
-            profile_url: profile.profile_url ?? null,
+            ...calledBy(profile),
             created_at: now().toISOString(),
           })
           .run()
@@ -336,7 +346,7 @@ export const registerOauthRoutes = (
       cookieHeader(sessions.issue(accountId), config, config.session_ttl_seconds),
     )
 
-    return back(reply, invite === undefined ? applyPage() : homePage())
+    return back(reply, landingAfterSignUp(invite !== undefined, name))
   }
 
   const admitOnInvite = async (request: FastifyRequest, accountId: string, inviteHash: string) => {
@@ -379,13 +389,11 @@ export const registerOauthRoutes = (
 
     if (inviteHash !== null) await admitOnInvite(request, identity.account_id, inviteHash)
 
-    if (profile.profile_url !== undefined) {
+    const answered = calledBy(profile)
+    if (!isEmptyPatch(answered)) {
       try {
-        await db
-          .update(accountIdentity)
-          .set({ profile_url: profile.profile_url })
-          .where(eq(accountIdentity.id, identity.id))
-      } catch {} // swallowed: a stale profile URL must not cost somebody the sign-in
+        await db.update(accountIdentity).set(answered).where(eq(accountIdentity.id, identity.id))
+      } catch {} // swallowed: a stale name or profile URL must not cost somebody the sign-in
     }
 
     void reply.header(
@@ -430,7 +438,7 @@ export const registerOauthRoutes = (
         account_id: accountId,
         provider,
         subject: profile.subject,
-        profile_url: profile.profile_url ?? null,
+        ...calledBy(profile),
         created_at: now().toISOString(),
       })
     } catch {

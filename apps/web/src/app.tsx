@@ -1,4 +1,5 @@
 import {
+  ADMIN_ACCOUNT_PATTERN,
   changelogPage,
   forgottenPage,
   formattingPage,
@@ -26,6 +27,7 @@ import { StaleData } from './components/StaleData.tsx'
 import { createFreshness, freshnessAt } from './freshness.ts'
 import { FetchedInstallationProvider, InstallationProvider } from './installation.tsx'
 import { Admin } from './pages/Admin.tsx'
+import { AdminAccount } from './pages/AdminAccount.tsx'
 import { AdminAllergies } from './pages/AdminAllergies.tsx'
 import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
@@ -109,6 +111,8 @@ export type RoutesApi = Pick<
   | 'resetPassword'
   | 'updateWelcome'
   | 'getAdminAccounts'
+  | 'getAdminAccount'
+  | 'updateAdminAccount'
   | 'setAccountRoles'
   | 'setAccountPassword'
   | 'setMyAvatar'
@@ -272,6 +276,11 @@ export type AppApi = RoutesApi & BellApi & ShownApi & Pick<ApiClient, 'getMe' | 
 export const Routes = ({ api }: { api: RoutesApi }) => {
   const LoginRoute = useMemo(() => () => <Login api={api} />, [api])
   const AdminRoute = useMemo(() => () => <Admin api={api} />, [api])
+  const AdminAccountRoute = useMemo(
+    () =>
+      ({ accountId }: { accountId?: string }) => <AdminAccount api={api} accountId={accountId ?? ''} />,
+    [api],
+  )
   const AdminEventsRoute = useMemo(() => () => <AdminEvents api={api} />, [api])
   const AdminAllergiesRoute = useMemo(() => () => <AdminAllergies api={api} />, [api])
   const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
@@ -351,6 +360,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path={forgottenPage()} component={ForgottenRoute} />
       <Route path={RESET_PATTERN} component={ResetRoute} />
       <Route path="/admin" component={AdminRoute} />
+      <Route path={ADMIN_ACCOUNT_PATTERN} component={AdminAccountRoute} />
       <Route path="/admin/events" component={AdminEventsRoute} />
       <Route path="/admin/allergies" component={AdminAllergiesRoute} />
       <Route path="/admin/questions" component={AdminQuestionsRoute} />

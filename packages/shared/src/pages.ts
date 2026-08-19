@@ -111,3 +111,8 @@ export const INVITE_PATTERN = '/invite/:token'
 export const invitePage = (token: string): string => `/invite/${encodeURIComponent(token)}`
 
 export const homePage = (): string => '/'
+
+export const ADMIN_ACCOUNT_PATTERN = '/admin/accounts/:accountId'
+
+export const adminAccountPage = (accountId: string): string =>
+  `/admin/accounts/${encodeURIComponent(accountId)}`

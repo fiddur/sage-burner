@@ -12,7 +12,16 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole } from '../db/schema.ts'
+import {
+  account,
+  accountAllergy,
+  accountIdentity,
+  accountRole,
+  allergyItem,
+  passkey,
+  passwordReset,
+} from '../db/schema.ts'
+import { digestOf } from '../tokens.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -321,5 +330,260 @@ describe('an admin setting somebody’s password', () => {
     expect(
       (await setPassword(server, admin.cookie, other.id, { password: 'a-new-password' })).statusCode,
     ).toBe(204)
+  })
+})
+
+describe('an admin reading one account', () => {
+  const read = (server: FastifyInstance, cookie: string | undefined, accountId: string) =>
+    server.inject({
+      method: 'GET',
+      url: `/api/admin/accounts/${accountId}`,
+      headers: cookie === undefined ? {} : { cookie },
+    })
+
+  it('answers the person and how they can get in, without the password hash', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    await db()
+      .update(account)
+      .set({ name: 'Wren', password_hash: 'hashed' })
+      .where(eq(account.id, someone.id))
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: someone.id,
+      provider: 'discord',
+      subject: 'discord-1',
+      created_at: NOW,
+    })
+    await db().insert(passkey).values({
+      id: randomUUID(),
+      account_id: someone.id,
+      credential_id: 'cred-1',
+      public_key: 'pk',
+      label: 'phone',
+      created_at: NOW,
+    })
+
+    const response = await read(server, admin.cookie, someone.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({
+      account: {
+        id: someone.id,
+        email: `${someone.id}@example.org`,
+        name: 'Wren',
+        roles: ['member'],
+        created_at: NOW,
+        has_password: true,
+        passkeys: 1,
+        identities: ['discord'],
+        allergies_notes: null,
+        allergy_item_ids: [],
+      },
+    })
+    expect(response.body).not.toContain('hashed')
+  })
+
+  it('says when there is no password, which is what an admin setting one wants to know', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount([])
+
+    expect((await read(server, admin.cookie, someone.id)).json().account).toMatchObject({
+      has_password: false,
+      passkeys: 0,
+      identities: [],
+      roles: [],
+    })
+  })
+
+  it('carries the allergies, ticks and notes both', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    const nuts = randomUUID()
+    await db().insert(allergyItem).values({ id: nuts, order: 0, label: 'Nuts' })
+    await db().insert(accountAllergy).values({ account_id: someone.id, item_id: nuts })
+    await db().update(account).set({ allergies_notes: 'and kiwi' }).where(eq(account.id, someone.id))
+
+    expect((await read(server, admin.cookie, someone.id)).json().account).toMatchObject({
+      allergies_notes: 'and kiwi',
+      allergy_item_ids: [nuts],
+    })
+  })
+
+  it('is admin only, and 404 for an account that does not exist', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const member = await givenAccount(['member'])
+
+    expect((await read(server, member.cookie, member.id)).statusCode).toBe(403)
+    expect((await read(server, undefined, member.id)).statusCode).toBe(401)
+    expect((await read(server, admin.cookie, randomUUID())).statusCode).toBe(404)
+  })
+})
+
+describe('an admin editing somebody’s details', () => {
+  const edit = (
+    server: FastifyInstance,
+    cookie: string | undefined,
+    accountId: string,
+    payload: Record<string, unknown>,
+  ) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/admin/accounts/${accountId}`,
+      headers: cookie === undefined ? {} : { cookie },
+      payload,
+    })
+
+  const rowOf = async (accountId: string) =>
+    (await db().select().from(account).where(eq(account.id, accountId)))[0]
+
+  it('writes the name and answers the account as it now is', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+
+    const response = await edit(server, admin.cookie, someone.id, { name: 'Wren Real' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().account).toMatchObject({ id: someone.id, name: 'Wren Real', roles: ['member'] })
+    expect((await rowOf(someone.id))?.name).toBe('Wren Real')
+  })
+
+  it('changes the login address, folded to lowercase, and they sign in with it', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    await db()
+      .update(account)
+      .set({ password_hash: await hashPassword('a-password', cheap) })
+      .where(eq(account.id, someone.id))
+
+    const response = await edit(server, admin.cookie, someone.id, { email: '  New.Address@Example.org ' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().account.email).toBe('new.address@example.org')
+    const login = await server.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'new.address@example.org', password: 'a-password' },
+    })
+    expect(login.statusCode).toBe(200)
+  })
+
+  it('refuses an address another account holds, with 409', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    const other = await givenAccount(['member'])
+
+    const response = await edit(server, admin.cookie, someone.id, { email: `${other.id}@example.org` })
+
+    expect(response.statusCode).toBe(409)
+    expect((await rowOf(someone.id))?.email).toBe(`${someone.id}@example.org`)
+  })
+
+  it('drops an outstanding password reset when the address changes, since the link went to the old one', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    await db()
+      .insert(passwordReset)
+      .values({
+        token_hash: digestOf('a-token'),
+        account_id: someone.id,
+        expires_at: '2026-07-03T00:00:00.000Z',
+        created_at: NOW,
+      })
+
+    await edit(server, admin.cookie, someone.id, { name: 'Still Wren' })
+    expect(await db().select().from(passwordReset)).toHaveLength(1)
+
+    await edit(server, admin.cookie, someone.id, { email: 'elsewhere@example.org' })
+    expect(await db().select().from(passwordReset)).toHaveLength(0)
+  })
+
+  it('writes the allergies, ticks and notes, replacing the ticks rather than adding', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    const nuts = randomUUID()
+    const gluten = randomUUID()
+    await db()
+      .insert(allergyItem)
+      .values([
+        { id: nuts, order: 0, label: 'Nuts' },
+        { id: gluten, order: 1, label: 'Gluten' },
+      ])
+    await db().insert(accountAllergy).values({ account_id: someone.id, item_id: nuts })
+
+    const response = await edit(server, admin.cookie, someone.id, {
+      allergy_item_ids: [gluten],
+      allergies_notes: 'kiwi',
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().account).toMatchObject({ allergy_item_ids: [gluten], allergies_notes: 'kiwi' })
+  })
+
+  it('clears the notes with null, which is how free text becomes a tick', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    await db().update(account).set({ allergies_notes: 'nuts' }).where(eq(account.id, someone.id))
+
+    const response = await edit(server, admin.cookie, someone.id, { allergies_notes: null })
+
+    expect(response.json().account.allergies_notes).toBeNull()
+  })
+
+  it('refuses a tick for an item that does not exist', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+
+    expect(
+      (await edit(server, admin.cookie, someone.id, { allergy_item_ids: [randomUUID()] })).statusCode,
+    ).toBe(400)
+  })
+
+  it('refuses an empty name, a bad address, and a stray key', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+
+    expect((await edit(server, admin.cookie, someone.id, { name: '  ' })).statusCode).toBe(400)
+    expect((await edit(server, admin.cookie, someone.id, { email: 'not-an-address' })).statusCode).toBe(400)
+    expect((await edit(server, admin.cookie, someone.id, { password: 'x' })).statusCode).toBe(400)
+    expect((await edit(server, admin.cookie, someone.id, { roles: ['admin'] })).statusCode).toBe(400)
+  })
+
+  it('is admin only, and 404 for an account that does not exist', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const member = await givenAccount(['member'])
+
+    expect((await edit(server, member.cookie, member.id, { name: 'Me' })).statusCode).toBe(403)
+    expect((await edit(server, undefined, member.id, { name: 'Me' })).statusCode).toBe(401)
+    expect((await edit(server, admin.cookie, randomUUID(), { name: 'Me' })).statusCode).toBe(404)
+  })
+
+  it('lists the name on the accounts page', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    await edit(server, admin.cookie, someone.id, { name: 'Wren' })
+
+    const list = await server.inject({
+      method: 'GET',
+      url: '/api/admin/accounts',
+      headers: { cookie: admin.cookie },
+    })
+    const listed = list.json().accounts.find((row: { id: string }) => row.id === someone.id)
+
+    expect(listed).toMatchObject({ name: 'Wren', email: `${someone.id}@example.org` })
   })
 })

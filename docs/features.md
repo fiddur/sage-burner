@@ -34,8 +34,11 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   somebody who found the link in that group already signs in everywhere else. An
   applicant admitted that way has their application answered by the arrival, so the
   review queue holds only the people it can still decide about.
-- The review card says which door an applicant signed up through — the provider and
-  the name used there, with a link to their profile where the provider gives one.
+- The review card says which door an applicant signed up through — the provider, the
+  name and username used there, with a link to their profile where the provider gives
+  one — and links to their account.
+- Signing up through Facebook takes the name from there; through Discord it does not, since
+  a Discord name is rarely a real one. Every sign-up form asks for the real name.
 - Forgotten your password? The login page posts a link to the address on the account,
   good once and for two hours; following it sets a new password and signs you in. Offered
   only where an admin has set a mail server up and told the app its own address, and it never
@@ -44,7 +47,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   and per device, several per account, alongside a password or instead of one —
   removing the last passkey off an account with no password is refused.
 - The first admin comes from the CLI (`admin:create`); after that, admins grant
-  roles and set passwords from the accounts list.
+  roles from the accounts list, and each name there opens the account: its real name,
+  login address, allergies, and a password to set. See [accounts.md](./accounts.md).
 - Two roles, `admin` and `member`, independent — organising without attending is
   coherent.
 

@@ -386,7 +386,7 @@ export const Invite = ({
         </label>
 
         <label class="field">
-          <span>Your name</span>
+          <span>Your real name</span>
           <input
             type="text"
             name="name"

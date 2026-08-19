@@ -1,5 +1,6 @@
 import type {
   ActiveEventResponse,
+  AdminAccountDetailResponse,
   AdminAccountResponse,
   AdminAccountsResponse,
   AdminInvitesResponse,
@@ -374,6 +375,15 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     getAdminAccounts: (signal?: AbortSignal) =>
       request<AdminAccountsResponse>(apiRoutes.getAdminAccounts.path(), { signal }),
+
+    getAdminAccount: (accountId: string, signal?: AbortSignal) =>
+      request<AdminAccountDetailResponse>(apiRoutes.getAdminAccount.path(accountId), { signal }),
+
+    updateAdminAccount: (accountId: string, body: BodyOf<'updateAdminAccount'>) =>
+      request<AdminAccountDetailResponse>(apiRoutes.updateAdminAccount.path(accountId), {
+        method: apiRoutes.updateAdminAccount.method,
+        body,
+      }),
 
     getActiveEvent: (signal?: AbortSignal) =>
       request<ActiveEventResponse>(apiRoutes.getActiveEvent.path(), { signal, version: 'active-event' }),

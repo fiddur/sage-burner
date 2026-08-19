@@ -26,12 +26,10 @@ const renderAdmin = (
   viewer: Viewer = ADMIN,
   setAccountRoles: AdminApi['setAccountRoles'] = () =>
     Promise.reject(new Error('setAccountRoles is not stubbed here')),
-  setAccountPassword: AdminApi['setAccountPassword'] = () =>
-    Promise.reject(new Error('setAccountPassword is not stubbed here')),
 ) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Admin api={{ getAdminAccounts, setAccountRoles, setAccountPassword }} />
+      <Admin api={{ getAdminAccounts, setAccountRoles }} />
     </ViewerProvider>,
   )
 
@@ -53,8 +51,20 @@ describe('Admin', () => {
   it('lists the accounts it was given', async () => {
     renderAdmin(
       roster([
-        { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
-        { id: 'a-2', email: 'grace@example.org', roles: ['member'], created_at: '2026-01-02T00:00:00.000Z' },
+        {
+          id: 'a-1',
+          email: 'ada@example.org',
+          name: null,
+          roles: ['admin'],
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'a-2',
+          email: 'grace@example.org',
+          name: null,
+          roles: ['member'],
+          created_at: '2026-01-02T00:00:00.000Z',
+        },
       ]),
     )
 
@@ -62,10 +72,44 @@ describe('Admin', () => {
     expect(screen.getByText('grace@example.org')).toBeTruthy()
   })
 
+  it('names each account, the name opening its own page, and says when there is none yet', async () => {
+    renderAdmin(
+      roster([
+        {
+          id: 'a-1',
+          email: 'ada@example.org',
+          name: 'Ada',
+          roles: ['admin'],
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'a-2',
+          email: 'grace@example.org',
+          name: null,
+          roles: [],
+          created_at: '2026-01-02T00:00:00.000Z',
+        },
+      ]),
+    )
+
+    expect((await screen.findByRole('link', { name: 'Ada' })).getAttribute('href')).toBe(
+      '/admin/accounts/a-1',
+    )
+    expect(screen.getByRole('link', { name: 'Name not filled in yet' }).getAttribute('href')).toBe(
+      '/admin/accounts/a-2',
+    )
+  })
+
   it('shows which roles an account holds', async () => {
     renderAdmin(
       roster([
-        { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
+        {
+          id: 'a-1',
+          email: 'ada@example.org',
+          name: null,
+          roles: ['admin'],
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
       ]),
     )
 
@@ -81,12 +125,19 @@ describe('Admin', () => {
 
   it('grants a role, sending the whole set rather than a delta', async () => {
     const accounts = livingRoster([
-      { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
+      {
+        id: 'a-1',
+        email: 'ada@example.org',
+        name: null,
+        roles: ['admin'],
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
     ])
     const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() => {
       const account = {
         id: 'a-1',
         email: 'ada@example.org',
+        name: null,
         roles: ['admin', 'member'] as const,
         created_at: '2026-01-01T00:00:00.000Z',
       }
@@ -111,6 +162,7 @@ describe('Admin', () => {
       {
         id: 'a-1',
         email: 'ada@example.org',
+        name: null,
         roles: ['admin', 'member'],
         created_at: '2026-01-01T00:00:00.000Z',
       },
@@ -119,6 +171,7 @@ describe('Admin', () => {
       const account = {
         id: 'a-1',
         email: 'ada@example.org',
+        name: null,
         roles: ['member' as const],
         created_at: '2026-01-01T00:00:00.000Z',
       }
@@ -135,7 +188,13 @@ describe('Admin', () => {
   it('explains a refused last-admin change rather than saying try again', async () => {
     renderAdmin(
       roster([
-        { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
+        {
+          id: 'a-1',
+          email: 'ada@example.org',
+          name: null,
+          roles: ['admin'],
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
       ]),
       ADMIN,
       () => Promise.reject(apiError(409, 'conflict', 'nope')),
@@ -201,6 +260,7 @@ describe('the window between a write and the re-read', () => {
     const ada = {
       id: 'a-1',
       email: 'ada@example.org',
+      name: null,
       created_at: '2026-01-01T00:00:00.000Z',
     }
     const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() =>
@@ -225,71 +285,5 @@ describe('the window between a write and the re-read', () => {
         false,
       ),
     )
-  })
-})
-
-describe('setting somebody’s password', () => {
-  const ONE = { id: 'a-9', email: 'ada@example.org', roles: [], created_at: '2026-01-01T00:00:00.000Z' }
-
-  it('sends what was typed, for that account', async () => {
-    const setAccountPassword = vi.fn<AdminApi['setAccountPassword']>(() => Promise.resolve(undefined))
-    renderAdmin(roster([ONE]), ADMIN, undefined, setAccountPassword)
-
-    fireEvent.input(await screen.findByLabelText('New password for ada@example.org'), {
-      target: { value: 'a-new-password' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Set it' }))
-
-    await waitFor(() =>
-      expect(setAccountPassword).toHaveBeenCalledWith('a-9', { password: 'a-new-password' }),
-    )
-  })
-
-  it('clears the field and says so, since nobody can read it back', async () => {
-    renderAdmin(roster([ONE]), ADMIN, undefined, () => Promise.resolve(undefined))
-
-    fireEvent.input(await screen.findByLabelText('New password for ada@example.org'), {
-      target: { value: 'a-new-password' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Set it' }))
-
-    expect((await screen.findByRole('status')).textContent).toContain('Tell them what it is')
-    expect(screen.getByLabelText('New password for ada@example.org')).toHaveProperty('value', '')
-  })
-
-  it('will not send an empty one', async () => {
-    const setAccountPassword = vi.fn<AdminApi['setAccountPassword']>(() => Promise.resolve(undefined))
-    renderAdmin(roster([ONE]), ADMIN, undefined, setAccountPassword)
-
-    await screen.findByLabelText('New password for ada@example.org')
-
-    expect(screen.getByRole('button', { name: 'Set it' })).toHaveProperty('disabled', true)
-    expect(setAccountPassword).not.toHaveBeenCalled()
-  })
-
-  it('says when it did not work, and keeps what was typed', async () => {
-    renderAdmin(roster([ONE]), ADMIN, undefined, () => Promise.reject(new Error('nope')))
-
-    fireEvent.input(await screen.findByLabelText('New password for ada@example.org'), {
-      target: { value: 'a-new-password' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Set it' }))
-
-    expect((await screen.findByRole('alert')).textContent).toContain('Could not set that password')
-    expect(screen.getByLabelText('New password for ada@example.org')).toHaveProperty(
-      'value',
-      'a-new-password',
-    )
-  })
-
-  it('keeps each row’s field to itself', async () => {
-    const second = { ...ONE, id: 'a-8', email: 'bea@example.org' }
-    renderAdmin(roster([ONE, second]), ADMIN, undefined, () => Promise.resolve(undefined))
-
-    fireEvent.input(await screen.findByLabelText('New password for ada@example.org'), {
-      target: { value: 'for-ada' },
-    })
-
-    expect(screen.getByLabelText('New password for bea@example.org')).toHaveProperty('value', '')
   })
 })

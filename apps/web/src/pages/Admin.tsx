@@ -1,7 +1,6 @@
 import type { AccountRole, AdminAccount } from '@sage-burner/shared'
 
-import { accountRoles, MIN_PASSWORD } from '@sage-burner/shared'
-import { useState } from 'preact/hooks'
+import { accountRoles, adminAccountPage } from '@sage-burner/shared'
 
 import type { ApiClient } from '../api/client.ts'
 
@@ -12,7 +11,7 @@ import { Table } from '../components/Table.tsx'
 import { errorMessage, useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles' | 'setAccountPassword'>
+export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles'>
 
 const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolean): AccountRole[] =>
   held ? [...new Set([...roles, role])] : roles.filter((entry) => entry !== role)
@@ -88,18 +87,21 @@ export const Admin = ({ api }: { api: AdminApi }) => {
         <Table>
           <thead>
             <tr>
+              <th scope="col">Name</th>
               <th scope="col">Email</th>
               {accountRoles.map((role) => (
                 <th key={role} scope="col">
                   {role}
                 </th>
               ))}
-              <th scope="col">Password</th>
             </tr>
           </thead>
           <tbody>
             {roster.data.accounts.map((entry) => (
               <tr key={entry.id}>
+                <td>
+                  <a href={adminAccountPage(entry.id)}>{entry.name ?? 'Name not filled in yet'}</a>
+                </td>
                 <td>{entry.email}</td>
                 {accountRoles.map((role) => (
                   <td key={role}>
@@ -114,9 +116,6 @@ export const Admin = ({ api }: { api: AdminApi }) => {
                     />
                   </td>
                 ))}
-                <td>
-                  <SetPassword api={api} email={entry.email} accountId={entry.id} />
-                </td>
               </tr>
             ))}
           </tbody>
@@ -126,67 +125,8 @@ export const Admin = ({ api }: { api: AdminApi }) => {
       <p class="form-note">
         An account with neither is normal — an applicant, or someone invited who has not finished. Member
         opens someone&rsquo;s own details and saying they are coming; admin opens this page. Most people here
-        want both.
+        want both. The name opens the account: its details, allergies, address and password.
       </p>
     </GuardedPage>
-  )
-}
-
-const SetPassword = ({
-  api,
-  email,
-  accountId,
-}: {
-  api: Pick<ApiClient, 'setAccountPassword'>
-  email: string
-  accountId: string
-}) => {
-  const [password, setPassword] = useState('')
-  const [state, setState] = useState<'done' | 'failed' | 'idle' | 'saving'>('idle')
-
-  const save = async () => {
-    setState('saving')
-    try {
-      await api.setAccountPassword(accountId, { password })
-      setPassword('')
-      setState('done')
-    } catch {
-      setState('failed')
-    }
-  }
-
-  return (
-    <span class="row">
-      <input
-        type="text"
-        autocomplete="off"
-        aria-label={`New password for ${email}`}
-        placeholder={`New password (${MIN_PASSWORD}+)`}
-        minLength={MIN_PASSWORD}
-        value={password}
-        disabled={state === 'saving'}
-        onInput={(inputEvent) => {
-          setPassword(inputEvent.currentTarget.value)
-          setState('idle')
-        }}
-      />
-      <button
-        type="button"
-        disabled={state === 'saving' || password.length < MIN_PASSWORD}
-        onClick={() => void save()}
-      >
-        Set it
-      </button>
-      {state === 'done' && (
-        <span class="form-note" role="status">
-          Set. Tell them what it is — nobody else can read it back.
-        </span>
-      )}
-      {state === 'failed' && (
-        <span class="form-error" role="alert">
-          Could not set that password.
-        </span>
-      )}
-    </span>
   )
 }

@@ -1076,6 +1076,8 @@ export const accountIdentity = sqliteTable(
     provider: text('provider', { enum: oauthProviders }).notNull(),
     subject: text('subject').notNull(),
     profile_url: text('profile_url'),
+    name: text('name'),
+    handle: text('handle'),
     created_at: text('created_at').notNull(),
   },
   (table) => [
