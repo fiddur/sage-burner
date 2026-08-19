@@ -184,10 +184,10 @@ describe('ProfilePage', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('says the email cannot be changed here, rather than offering a field that fails', async () => {
+  it('says the email is changed by an admin, rather than offering a field that fails', async () => {
     renderPage(stub())
 
-    expect(await screen.findByText(/not possible yet/)).toBeTruthy()
+    expect(await screen.findByText(/ask someone with admin/)).toBeTruthy()
     expect(screen.queryByLabelText(/email/i)).toBeNull()
   })
 

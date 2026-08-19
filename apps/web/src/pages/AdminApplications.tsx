@@ -1,6 +1,6 @@
 import type { ApplicantIdentity, ApplicationMessage, Invite, InviteDelivery } from '@sage-burner/shared'
 
-import { oauthProviderInfo } from '@sage-burner/shared'
+import { adminAccountPage, oauthProviderInfo } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -30,37 +30,48 @@ const answerText = (value: string | boolean) => {
   return value === '' ? '—' : value
 }
 
+const calledThere = ({ name, handle }: ApplicantIdentity): string | undefined => {
+  if (name !== null && handle !== null) return `${name} (${handle})`
+
+  return name ?? handle ?? undefined
+}
+
 const Doors = ({
   identities,
-  applicantName,
+  accountId,
 }: {
   identities: readonly ApplicantIdentity[]
-  applicantName: string
+  accountId: string | null
 }) => {
-  if (identities.length === 0) return null
+  if (accountId === null) return null
 
   return (
     <p class="form-note">
       {identities.map((identity) => {
         const label = oauthProviderInfo[identity.provider].label
-        const named = identity.name !== null && identity.name !== applicantName ? ` — ${identity.name}` : ''
+        const called = calledThere(identity)
 
         return (
           <span key={identity.provider} class="chip is-on">
             via {label}
             {identity.profile_url === null ? (
-              named
+              called === undefined ? (
+                ''
+              ) : (
+                ` — ${called}`
+              )
             ) : (
               <>
                 {' — '}
                 <a href={identity.profile_url} rel="noreferrer noopener" target="_blank">
-                  {identity.name ?? 'their profile'}
+                  {called ?? 'their profile'}
                 </a>
               </>
             )}
           </span>
         )
-      })}
+      })}{' '}
+      <a href={adminAccountPage(accountId)}>Their account</a>
     </p>
   )
 }
@@ -135,7 +146,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
               {entry.applicant_email} · applied {entry.submitted_at.slice(0, 10)} · {entry.status}
             </p>
 
-            <Doors identities={entry.identities} applicantName={entry.applicant_name} />
+            <Doors identities={entry.identities} accountId={entry.account_id} />
 
             <dl>
               {entry.answers.map((answer) => (

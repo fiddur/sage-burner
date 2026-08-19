@@ -116,8 +116,15 @@ phone" means 360px.
       leaves the link unspent, membership already being theirs.
 - [ ] Their application now reads approved in ⚙️ → Applications, dated today, with no
       Approve or Reject left to press — where before it sat among the people still waiting.
-- [ ] An application from a provider signup shows which door on the review card, with
-      a profile link only where the provider gave one.
+- [ ] An application from a provider signup shows which door on the review card — for
+      Discord the display name and the username in brackets — with a profile link only
+      where the provider gave one, and a link to the account.
+- [ ] Sign up through Discord: the apply form's "Your real name" starts empty rather
+      than holding the Discord name; through Facebook it is filled in.
+- [ ] Open that account from ⚙️ → Accounts (the name in the list): correct the name, change
+      the login address, tick an allergy and clear the free text, set a password. Saved
+      values survive a reload, the login form takes the new address, and the "Ways in" line
+      says a password is there now.
 - [ ] The admin's bell rings for the application. From the applications list,
       send the applicant a message; the applicant is notified and can reply.
       The exchange stays private to the two of them.
@@ -143,8 +150,9 @@ phone" means 360px.
       newest link being live.
 - [ ] Open `/reset/nonsense`: it says the link is not recognised, and asks nobody for a
       password.
-- [ ] Ask for a link, then set that member's password from ⚙️ → Accounts: the link stops
-      working, which is what an admin reset is for.
+- [ ] Ask for a link, then set that member's password from their account under ⚙️ → Accounts:
+      the link stops working, which is what an admin reset is for. Changing their login
+      address there does the same.
 - [ ] `grep` the backend's log output for the token you were sent: it is `[redacted]` on the
       request line, and the same holds for an invite link.
 

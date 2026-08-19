@@ -119,7 +119,7 @@ const tick = (label: string) => {
 }
 
 const identify = () => {
-  fill('Your name', 'Fredrik')
+  fill('Your real name', 'Fredrik')
   fill('Your email address', 'fredrik@example.org')
 }
 
@@ -415,7 +415,7 @@ describe('Apply', () => {
     renderPage(stub({ submitApplication }))
 
     await ready()
-    fill('Your name', '   ')
+    fill('Your real name', '   ')
     fill('Your email address', 'fredrik@example.org')
     send()
 
@@ -439,7 +439,7 @@ describe('Apply', () => {
     await ready()
     expect(labelled('Why?').getAttribute('maxlength')).toBe(String(MAX_ANSWER_LENGTH))
     expect(labelled('Dust name').getAttribute('maxlength')).toBe(String(MAX_ANSWER_LENGTH))
-    expect(labelled('Your name').getAttribute('maxlength')).toBe(String(MAX_APPLICANT_NAME_LENGTH))
+    expect(labelled('Your real name').getAttribute('maxlength')).toBe(String(MAX_APPLICANT_NAME_LENGTH))
     expect(labelled('Your email address').getAttribute('maxlength')).toBe(String(MAX_APPLICANT_EMAIL_LENGTH))
   })
 
@@ -448,7 +448,7 @@ describe('Apply', () => {
     renderPage(stub({ submitApplication }))
 
     await ready()
-    fill('Your name', '  Fredrik  ')
+    fill('Your real name', '  Fredrik  ')
     fill('Your email address', '  fredrik@example.org ')
     send()
 
@@ -467,7 +467,7 @@ describe('Apply', () => {
     renderPage(stub({ submitApplication }))
 
     await ready()
-    fill('Your name', 'Fredrik')
+    fill('Your real name', 'Fredrik')
     send()
 
     await waitFor(() =>
@@ -502,7 +502,7 @@ describe('Apply', () => {
     renderPage(stub())
 
     await ready()
-    fill('Your name', 'Fredrik')
+    fill('Your real name', 'Fredrik')
     fill('Your email address', 'not-an-address')
     submitPastTheFields()
 
@@ -517,7 +517,7 @@ describe('Apply', () => {
     )
 
     await ready()
-    fill('Your name', 'Fredrik')
+    fill('Your real name', 'Fredrik')
     send()
 
     expect(await screen.findByRole('heading', { name: 'Application sent' })).toBeTruthy()
@@ -532,7 +532,7 @@ describe('Apply', () => {
     )
 
     await ready()
-    fill('Your name', 'Fredrik')
+    fill('Your real name', 'Fredrik')
     send()
 
     expect((await screen.findByRole('alert')).textContent).toContain('nothing to apply for')
@@ -681,7 +681,7 @@ describe('the way in, before the form', () => {
     )
     renderPage(stub({ signUp }), { status: 'signed-out' })
 
-    fill('Your name', 'Fredrik')
+    fill('Your real name', 'Fredrik')
     fill('Your email address', 'fredrik@example.org')
     fill('A password', 'a-long-enough-password')
     fireEvent.click(await screen.findByRole('button', { name: 'Sign up' }))
@@ -701,7 +701,7 @@ describe('the way in, before the form', () => {
       status: 'signed-out',
     })
 
-    fill('Your name', 'Fredrik')
+    fill('Your real name', 'Fredrik')
     fill('Your email address', 'fredrik@example.org')
     fill('A password', 'a-long-enough-password')
     fireEvent.click(await screen.findByRole('button', { name: 'Sign up' }))
@@ -714,7 +714,7 @@ describe('the way in, before the form', () => {
       status: 'signed-out',
     })
 
-    fill('Your name', 'Fredrik')
+    fill('Your real name', 'Fredrik')
     fill('Your email address', 'fredrik@example.org')
     fill('A password', 'a-long-enough-password')
     fireEvent.click(await screen.findByRole('button', { name: 'Sign up' }))
@@ -755,7 +755,7 @@ describe('where an application already stands', () => {
     renderPage(stub())
 
     await screen.findByRole('button', { name: 'Send application' })
-    expect(labelled('Your name')).toHaveProperty('value', 'Fredrik')
+    expect(labelled('Your real name')).toHaveProperty('value', 'Fredrik')
   })
 
   it('says so once it has been accepted, and names the burn they are on', async () => {

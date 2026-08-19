@@ -402,7 +402,7 @@ const ApplicationForm = ({
         {loadFailed && <ErrorText message="Could not load the questions. Please reload the page." />}
 
         <label class="field">
-          <span>Your name</span>
+          <span>Your real name</span>
           <input
             name="applicant_name"
             type="text"

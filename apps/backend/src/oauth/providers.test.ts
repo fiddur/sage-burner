@@ -136,4 +136,25 @@ describe('reading what Discord answered', () => {
     expect(read?.reach).toBeUndefined()
     expect(read?.subject).toBe('discord-1')
   })
+
+  it('keeps the display name as the name and the username as the handle, and names nobody', () => {
+    const read = providerShapes.discord.read(answer({ global_name: 'ȐJaƔ' }))
+
+    expect(read?.name).toBe('ȐJaƔ')
+    expect(read?.handle).toBe('wren')
+    expect(providerShapes.discord.names_the_person).toBe(false)
+  })
+
+  it('leaves the name empty where Discord has no display name, rather than using the handle for it', () => {
+    expect(providerShapes.discord.read(answer())?.name).toBeUndefined()
+  })
+})
+
+describe('whose name is the person’s', () => {
+  it('is Facebook, whose names are mostly real, and not Discord', () => {
+    expect(providerShapes.facebook.names_the_person).toBe(true)
+    expect(
+      providerShapes.facebook.read({ id: 'app-scoped-1', name: 'Wren', picture: { data: {} } })?.name,
+    ).toBe('Wren')
+  })
 })

@@ -99,7 +99,9 @@ _is_ the stamp. Nothing else about `signUpThrough` changes: the same address rul
 **What the invite adds is `member`**, in the same transaction as the account, so there is no
 window where somebody exists without the role their link granted. Without an invite the handler
 is exactly what it was — an account with no roles, landing on `/apply`. With one, the account
-lands on the start page, already in.
+lands on the start page, already in — or on Your details where the provider gave no real name
+(see "The name comes with it" below), since a member arriving that way has nothing else asking
+them for one.
 
 A link that has gone stale answers `refused` on the login page rather than naming what was wrong
 with it, because only the digest survives the round trip: the page cannot be linked back to, and
@@ -158,22 +160,24 @@ rebuilding `invite_token` would mean dropping a table two others hold foreign ke
 ### Which door an applicant came in through (#513)
 
 `GET /api/admin/applications` joins the account's `account_identity` rows, so the review card says
-"via Facebook" or "via Discord" beside the account's own name. An admin vetting somebody against a
-community they already know is cross-checking exactly that by eye, and it was the one thing the
-review page did not show.
+"via Facebook" or "via Discord" beside what that provider calls the person. An admin vetting
+somebody against a community they already know is cross-checking exactly that by eye, and it was
+the one thing the review page did not show.
 
-**The name is `account.name`, not the provider's**, because `account_identity` carries no name
-column — only the provider, the subject and a profile URL. It arrives from the provider at
-sign-up, so for most people it is the same string, but it is editable afterwards and two linked
-providers on one account render it twice. Storing the provider's own name on the identity row is
-what would make the card say what it appears to say; until then this is the account's name shown
-beside the door it came in through.
+**The name is the provider's, not `account.name`.** `account_identity` carries `name` and
+`handle` — Discord's display name and username, Facebook's name and nothing — written at sign-up
+and at linking and refreshed on every sign-in, each column only where the provider answered it.
+The card says `ȐJaƔ (robby5859)`, which is what identifies somebody in a Discord server, where
+`account.name` is what they typed as their real name and may well be the same string as
+`applicant_name` one line above. An identity written before the columns existed says only the
+door until its owner signs in through it again; the account's own name is not substituted,
+because a card that sometimes means one thing and sometimes the other is not worth reading.
 
 The link is offered **only where `profile_url` holds one**. Discord has no profile URL to give;
 Facebook's `public_profile` answers an app-scoped id that identifies nobody outside this
 installation's Meta app, so a real link exists only where the app has been approved for
-`user_link`. The account's name shows beside the form's `applicant_name` where the two differ — the form name
-is what the person typed into the application, the account name is what they signed up as.
+`user_link`. Beside the doors is a link to the account itself, under ⚙️ → Accounts, which is
+where an admin who has worked out who this is corrects the name.
 
 The admin's row is its own schema, `adminApplicationSchema`, rather than a field that is sometimes
 present: the applicant's own view of their application has no use for the doors, and a shape that
@@ -346,15 +350,42 @@ then fail the write, reporting an address conflict to somebody who has no accoun
 **No address, no account**: the sign-up page says so and asks for one, and an address that is not
 one is the same answer.
 
-**The name comes with it where the provider gives one** — Discord's display name or username,
-Facebook's `name` — because `account` carries the person, and without one `displayName` answers
+**The name comes with it where the provider's names are people's names** — Facebook's `name`,
+and not Discord's. `account` carries the person, and without a name `displayName` answers
 "Somebody" on the feed card, in the `member_joined` push to every attendee, and in the Members
-list. Where a provider gives none, submitting the application fills it in from the name the form
-asked for: `updateMyProfile` is behind `requireApproved`, so an applicant cannot do it themselves
-while they wait. **An address somebody
+list; Facebook names are mostly real, so that one is taken. A Discord display name is `ȐJaƔ` as
+often as it is anybody's name, and seeding it wrote a handle into the one field every member is
+known by, so `names_the_person` on the provider's shape is `false` there and the account starts
+nameless. What Discord calls them is kept on the identity instead, for the review card. A
+nameless account is filled in from the name the application form asks for — "your real name",
+which is what every sign-up form now says — and `updateMyProfile` is behind `requireApproved`,
+so an applicant cannot do it themselves while they wait; a nameless member off a group link is
+landed on Your details instead, where the field is. **An address somebody
 already holds** is refused too, and pointedly — matching accounts by address is account takeover
 the moment a provider hands over one it has not verified. The path is signing in the other way and
 linking under Your details, and that is the sentence the login page shows.
+
+### An admin correcting an account
+
+`GET`/`PATCH /api/admin/accounts/:accountId` and the page behind the name on ⚙️ → Accounts. The
+name, the login address and the allergies — ticks and notes both — and the password setter that
+used to sit in the accounts table. Personal details stay the person's own everywhere else, and
+this is the one exception: the person who signed up through Discord as `ȐJaƔ`, whose real name
+the admin has since worked out; the address somebody mistyped and cannot now receive a reset
+link at; the free-text "nuts and gluten" an admin moves onto the ticks the meal plan counts.
+`contact` and the introduction are not here, because nobody but the person has any business
+rewriting how they want to be reached or what they say about themselves.
+
+**The address is the login identity and nothing else.** Changing it moves where mail goes and
+what they type at the login form, folded to lowercase through `emailSchema` as everywhere, and a
+409 where another account holds it. It does not touch the `email` row among their connections,
+which is theirs to keep or change. It **drops an outstanding reset link**, since that was posted
+to the old address and a link in the wrong inbox that still sets the password is exactly what a
+change of address is meant to end.
+
+The read answers `has_password`, a passkey count and the linked providers — never the hash —
+because "set a password" is a different act on an account that has none, and the admin doing it
+should know which.
 
 ### Talking to an applicant
 

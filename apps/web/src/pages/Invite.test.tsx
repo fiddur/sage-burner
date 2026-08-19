@@ -91,7 +91,7 @@ const fill = (label: string, value: string) => {
 const complete = () => {
   fill('Email', 'fredrik@example.org')
   fill('Password', 'a-password')
-  fill('Your name', 'Fredrik')
+  fill('Your real name', 'Fredrik')
 }
 
 const join = () => screen.getByRole('button', { name: 'Join' }).click()
@@ -313,7 +313,7 @@ describe('Invite', () => {
 
     await screen.findByRole('button', { name: 'Join' })
     complete()
-    fill('Your name', '   ')
+    fill('Your real name', '   ')
     join()
 
     const alert = await screen.findByRole('alert')
@@ -328,7 +328,7 @@ describe('Invite', () => {
 
     await screen.findByRole('button', { name: 'Join' })
     complete()
-    fill('Your name', '   ')
+    fill('Your real name', '   ')
     join()
 
     const alert = await screen.findByRole('alert')
@@ -345,13 +345,13 @@ describe('Invite', () => {
 
     await screen.findByRole('button', { name: 'Join' })
     complete()
-    fill('Your name', '   ')
+    fill('Your real name', '   ')
     join()
     await screen.findByRole('alert')
 
-    const nameBox = screen.getByLabelText('Your name')
+    const nameBox = screen.getByLabelText('Your real name')
     nameBox.focus()
-    fill('Your name', 'Fredrik')
+    fill('Your real name', 'Fredrik')
 
     expect(document.activeElement).toBe(nameBox)
   })
@@ -362,7 +362,7 @@ describe('Invite', () => {
 
     await screen.findByRole('button', { name: 'Join' })
     complete()
-    fill('Your name', '   ')
+    fill('Your real name', '   ')
     join()
 
     expect(await screen.findByRole('alert')).toBeTruthy()
@@ -460,7 +460,7 @@ describe('the name the applicant already gave', () => {
       }),
     )
 
-    expect(await screen.findByLabelText('Your name', { exact: false })).toHaveProperty('value', 'Ada')
+    expect(await screen.findByLabelText('Your real name', { exact: false })).toHaveProperty('value', 'Ada')
   })
 
   it('starts the address from it too, since the invite arrived there', async () => {
@@ -488,7 +488,7 @@ describe('the name the applicant already gave', () => {
   it('leaves it blank for an invite nobody applied for', async () => {
     renderPage(stub())
 
-    expect(await screen.findByLabelText('Your name', { exact: false })).toHaveProperty('value', '')
+    expect(await screen.findByLabelText('Your real name', { exact: false })).toHaveProperty('value', '')
   })
 
   it('is still the reader’s to change', async () => {
@@ -499,11 +499,11 @@ describe('the name the applicant already gave', () => {
       }),
     )
 
-    fireEvent.input(await screen.findByLabelText('Your name', { exact: false }), {
+    fireEvent.input(await screen.findByLabelText('Your real name', { exact: false }), {
       target: { value: 'Ada Lovelace' },
     })
 
-    expect(screen.getByLabelText('Your name', { exact: false })).toHaveProperty('value', 'Ada Lovelace')
+    expect(screen.getByLabelText('Your real name', { exact: false })).toHaveProperty('value', 'Ada Lovelace')
   })
 })
 
@@ -717,7 +717,7 @@ describe('the welcome for somebody who did not join a burn', () => {
 
   it('offers no members-only link on a page nobody has an account on yet', async () => {
     renderPage(withBurn())
-    await screen.findByLabelText('Your name')
+    await screen.findByLabelText('Your real name')
 
     expect(screen.queryByRole('link', { name: /Looking for a lift/ })).toBeNull()
   })

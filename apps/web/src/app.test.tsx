@@ -71,6 +71,8 @@ const clientWith = (
     Promise.reject(new Error('withdrawSupportForComment is not stubbed in this file')),
   login: () => Promise.reject(new Error('login is not stubbed in this file')),
   getAdminAccounts: () => Promise.reject(new Error('getAdminAccounts is not stubbed in this file')),
+  getAdminAccount: () => Promise.reject(new Error('getAdminAccount is not stubbed in this file')),
+  updateAdminAccount: () => Promise.reject(new Error('updateAdminAccount is not stubbed in this file')),
   setAccountRoles: () => Promise.reject(new Error('setAccountRoles is not stubbed in this file')),
   setAccountPassword: () => Promise.reject(new Error('setAccountPassword is not stubbed in this file')),
   setMyAvatar: () => Promise.reject(new Error('setMyAvatar is not stubbed in this file')),

@@ -34,6 +34,11 @@ Only if you choose to link one, and only ever as an extra way in beside your pas
 
 - **An identifier that provider gives us for you.** It is meaningless to anyone else and is
   never shown to anybody, including other members.
+- **What you are called there** — your Discord display name and username, or your Facebook
+  name — kept beside that identifier and refreshed each time you sign in that way. The
+  organisers see it on your application, so they can tell who is asking; other members do not.
+  Your Facebook name also becomes your name here unless you change it; your Discord name does
+  not, since it is rarely anybody's real one.
 - **A copy of your profile picture**, once, and only if you have not already chosen a picture
   here. After that it is an ordinary picture on your account, which you can change or remove.
 - **A link to your Facebook page**, if the organisers set their app up to ask for it — shown on
@@ -57,8 +62,9 @@ We ask for nothing beyond that profile. We do not ask for your email address, yo
 your posts, or anything you have done anywhere else, and we cannot see any of it.
 
 **Getting rid of it takes one button.** Under **Your details**, beside the provider under
-_Other ways to sign in_, _Take it off_ deletes that identifier and that link straight away and
-for good, and takes the name it put in your contact list back out with them. Two things it does
+_Other ways to sign in_, _Take it off_ deletes that identifier, what you are called there and
+that link straight away and for good, and takes the name it put in your contact list back out
+with them. Two things it does
 not undo. The copied picture stays, because by then it is an ordinary picture on your account:
 remove or replace it under **Your details** as you would any other. And a contact row you have
 since edited yourself stays too — once you have changed it, it is yours rather than something

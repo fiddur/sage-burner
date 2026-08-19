@@ -1,6 +1,7 @@
 import type { FeedKind } from './enums.ts'
 import type {
   AccountRolesUpdate,
+  AdminAccountUpdate,
   AdminPasswordReset,
   AllergyItemCreate,
   AllergyItemOrder,
@@ -373,6 +374,11 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/admin/events/active/roster',
     path: () => '/api/admin/events/active/roster',
+  },
+  getAdminAccount: {
+    method: 'GET',
+    fastify: '/api/admin/accounts/:accountId',
+    path: (accountId: string) => `/api/admin/accounts/${encodeURIComponent(accountId)}`,
   },
   getAdminAccounts: {
     method: 'GET',
@@ -1071,6 +1077,11 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/attendance/me',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/attendance/me`,
   },
+  updateAdminAccount: {
+    method: 'PATCH',
+    fastify: '/api/admin/accounts/:accountId',
+    path: (accountId: string) => `/api/admin/accounts/${encodeURIComponent(accountId)}`,
+  },
   updateAllergyItem: {
     method: 'PATCH',
     fastify: '/api/admin/allergy-items/:id',
@@ -1235,6 +1246,7 @@ export interface RouteBodies {
   updateMyNotificationSettings: NotificationSettings
   updateMyProfile: ProfileUpdate
   updateMyStay: AttendanceUpdate
+  updateAdminAccount: AdminAccountUpdate
   updateAllergyItem: AllergyItemUpdate
   updatePlace: PlaceUpdate
   updatePost: PostUpdate

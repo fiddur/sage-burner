@@ -170,7 +170,28 @@ const list = (server: FastifyInstance, cookie: string) =>
   server.inject({ method: 'GET', url: '/api/admin/applications', headers: { cookie } })
 
 describe('which door an applicant came in through', () => {
-  it('names the provider and the name it gave, so an admin can cross-check by eye (#513)', async () => {
+  it('names the provider and what it calls the person, so an admin can cross-check by eye (#513)', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const applicant = await givenApplicant('Wren')
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: applicant.id,
+      provider: 'discord',
+      subject: 'd-1',
+      name: 'ȐJaƔ',
+      handle: 'robby5859',
+      profile_url: null,
+      created_at: '2026-07-02T00:00:00Z',
+    })
+
+    const [row] = (await list(server, cookie)).json().applications
+    expect(row.identities).toEqual([
+      { provider: 'discord', name: 'ȐJaƔ', handle: 'robby5859', profile_url: null },
+    ])
+  })
+
+  it('says nothing for an identity written before the name was kept, rather than the account’s own', async () => {
     const server = await build()
     const { cookie } = await givenAdmin()
     const applicant = await givenApplicant('Wren')
@@ -179,12 +200,11 @@ describe('which door an applicant came in through', () => {
       account_id: applicant.id,
       provider: 'facebook',
       subject: 'fb-1',
-      profile_url: null,
       created_at: '2026-07-02T00:00:00Z',
     })
 
     const [row] = (await list(server, cookie)).json().applications
-    expect(row.identities).toEqual([{ provider: 'facebook', name: 'Wren', profile_url: null }])
+    expect(row.identities).toEqual([{ provider: 'facebook', name: null, handle: null, profile_url: null }])
   })
 
   it('carries the profile link where the provider gave one', async () => {
