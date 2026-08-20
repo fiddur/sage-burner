@@ -59,16 +59,7 @@ describe('the panel a dream and a meal open in', () => {
 })
 
 describe('the way out of a panel that covers a phone whole', () => {
-  it('offers a ✕ named for what it closes, a notification landing straight in one (#755)', () => {
-    const onClose = vi.fn()
-    panel({ onClose })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Close Sauna at dawn' }))
-
-    expect(onClose).toHaveBeenCalledTimes(1)
-  })
-
-  it('closes outright even where Escape only goes back, so the ✕ always means out', () => {
+  it('offers a ✕ named for what it closes, and closes outright even where Escape goes back', () => {
     const onBack = vi.fn()
     const onClose = vi.fn()
     panel({ onBack, onClose })

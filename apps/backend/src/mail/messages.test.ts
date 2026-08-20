@@ -249,9 +249,36 @@ describe('what a letter about an application says at the foot', () => {
       link,
     })
 
-  it('names no switch, an applicant having no page to press one on', () => {
+  it('names no switch to a rejected applicant, who has no page to press one on', () => {
     expect(settled('https://burn.example.org/apply').text).not.toContain('Your details')
     expect(settled('https://burn.example.org/apply').text).toContain('because you applied to join')
+  })
+
+  it('names the switch to somebody approved, the role granted a moment earlier reaching it', () => {
+    const welcomed = decisionMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      name: 'Ada',
+      approved: true,
+      link: 'https://burn.example.org/',
+    })
+
+    expect(welcomed.text).toContain('Your details → Notifications')
+  })
+
+  it('promises a rejected applicant nothing further, which a new member cannot be promised', () => {
+    expect(settled(undefined).text.replaceAll('\n', ' ')).toContain(
+      'Nothing else is sent to you unless you ask for it',
+    )
+    expect(
+      decisionMessage({
+        installation: 'The Burning Sage',
+        to: 'ada@example.org',
+        name: 'Ada',
+        approved: true,
+        link: 'https://burn.example.org/',
+      }).text,
+    ).not.toContain('Nothing else is sent to you')
   })
 
   it('ends the rejection on a full stop where there is no page to point at', () => {

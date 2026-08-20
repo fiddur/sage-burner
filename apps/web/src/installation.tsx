@@ -190,7 +190,7 @@ export const useInstallationSendsEmail = () => useContext(InstallationContext).s
 
 export const useCanResetPassword = (): boolean | undefined => {
   const { sendsEmail, knowsOwnAddress, unreachable } = useContext(InstallationContext)
-  if (unreachable === true) return false
+  if (unreachable) return false
   if (sendsEmail === undefined || knowsOwnAddress === undefined) return undefined
 
   return sendsEmail && knowsOwnAddress

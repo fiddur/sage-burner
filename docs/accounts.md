@@ -1397,11 +1397,20 @@ is one address for everything about an application.
 The invite mail on the legacy path — an application from before #476, with no account — still goes
 out directly, since there is no account to notify.
 
-**Neither letter names the notification switches** (#747), which every other notification email
-does. An applicant cannot reach them: `/profile` needs a role they have not been given yet, so
-`OFF_SWITCH` would point at a page that answers them nothing. They say why the mail arrived
-instead, and that nothing else follows unless they ask for it — which is true, every other
-category's email column being off until somebody turns it on.
+**A rejection and a reply name no notification switches** (#747), which every other notification
+email does. Their reader cannot reach them: `/profile` needs a role, so `OFF_SWITCH` would point
+at a page that answers them nothing. They say why the mail arrived instead, and that nothing else
+follows unless they ask for it — true for somebody with no role, every other category's email
+column being off until they turn it on.
+
+**The approval is the exception, because by the time it is written the reader is a member.**
+`settle('approved')` inserts the `member` row in the transaction, and `tellApplicant` runs after
+it — so they can open the settings page, and they are in `approvedAccounts`, which is what
+`dueForDigest` filters on. `account.digest` is null, `DEFAULT_DIGEST` is daily, and
+`last_active_at` is null for somebody who has not signed in yet, so a newly approved member who
+does not come back gets a digest the next day. Promising them nothing else was going to arrive
+would have been false in both directions at once, so that one carries `OFF_SWITCH` like every
+other notification email.
 
 **A letter gets `to` and `name` per recipient and may ignore them.** Both of these do: the
 address for anything about an application is `applicant_email`, which is what the form says will

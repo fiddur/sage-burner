@@ -99,7 +99,7 @@ export const decisionMessage = ({
           : `${REJECTED}${link === undefined ? '.' : ':'}`,
       },
       ...action(link, approved ? 'See the burn' : 'Your page'),
-      { note: WHY_YOU_GOT_THIS },
+      { note: approved ? OFF_SWITCH : WHY_YOU_GOT_THIS },
     ],
   })
 
