@@ -33,12 +33,19 @@ export const MealDialog = ({
   onIdea: (idea: string) => void
   onRename: (changes: MealUpdate) => void
 }) => {
+  const phone = usePhone()
   const [renaming, setRenaming] = useState(false)
   const [label, setLabel] = useState(meal.label)
   const [idea, setIdea] = useState(meal.food_idea)
 
   return (
-    <DreamPanel label={meal.label} error={error} page={usePhone()} onClose={onClose}>
+    <DreamPanel
+      label={meal.label}
+      error={error}
+      page={phone}
+      askBeforeClosing={renaming ? 'Throw this renaming away?' : undefined}
+      onClose={onClose}
+    >
       <h2>{meal.label}</h2>
       <p class="form-note">
         {meal.date} · {meal.at}

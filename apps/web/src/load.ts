@@ -15,6 +15,9 @@ export type Loaded<T> =
   | { status: 'ready'; data: T }
   | { status: 'failed'; message: string }
 
+export const heldOr = <T>(loaded: Loaded<T>, fallback: T): T =>
+  loaded.status === 'ready' ? loaded.data : fallback
+
 export const errorMessage = (failure: unknown, fallback: string) =>
   isApiError(failure) ? failure.message : fallback
 

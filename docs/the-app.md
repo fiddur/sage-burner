@@ -253,6 +253,22 @@ that scrolled away with the heading would not be there when they did. `.dream-pa
 up its top padding for that — `.panel-bar` supplies it, so the bar can stick flush to the
 scrollport's top edge instead of a padding's worth down with content sliding past above it.
 
+**Becoming the page is a page arrival** (#766). Opening changes the query and not the path, so
+none of what preact-iso does on a route change happens: the window kept the list's scroll and
+`useHidingBar` kept the bar it had hidden on the way down, so a dream opened from the bottom of a
+long list arrived with the top bar scrolled off and the tabs still away — a page with the
+navigation taken off it, which is the picture #757 exists to stop. The panel scrolls the window to
+the top and fires a `scroll` so the hiding bar recomputes.
+
+**Only the dialog takes focus** (#767). As a page there is nothing to move focus into and no trap
+to begin, and a cold arrival — no pointer yet, which is exactly the notification case — matched
+`:focus-visible` on the container, so the global focus rule drew an ember ring around the whole
+page: a card-shaped box where the card had just been taken away.
+
+**The page keeps its own heading.** Schedule always did, Dreams did not, so a dream that was the
+page had no `<h1>` at all and the document started at `<h2>`. Matching Schedule is the smaller of
+the two answers and gives the dream's title a correct level under the name of where you are.
+
 **On a phone it is not a modal at all** (#757). A covering overlay is a page with the navigation
 taken off it, and that is what somebody arriving on a notification got. Under `(max-width: 45rem)`
 the panel drops its backdrop, its `role="dialog"`, its `aria-modal` and `useOverlay` — the scroll
@@ -267,9 +283,18 @@ from a notification, Back left the app. Opening pushes and closing replaces: a p
 would leave the open panel one Back press away again. `?meal=` does the same on the schedule, and
 closing a dream there keeps an open meal in the query rather than dropping it.
 
-**The offer-a-dream form stays a modal at every width**, and that is the exception. It carries a
-lane and an hour rather than a dream, so there is nothing to link to, and a half-written form is
-the one thing that must not be one Back press from gone.
+**The offer-a-dream form stays a modal at every width**, and that is the exception: it carries a
+lane and an hour rather than a dream, so there is nothing to link to.
+
+**It is not protected from Back, and #757 said it was** (#768). Keeping the form out of the query
+does not give it a history entry to swallow the press — Back simply leaves the page and takes the
+form with it. It survives only when the entry behind happens to be the same page, which is the
+`openedFrom` branch that keeps a `new` form through a query that names no dream. The edit form is
+the same half-written text and has never been protected either (#761). What both have now is that
+**the ✕, Escape and the backdrop ask before discarding** — the rule the rest of the app follows for
+anything that cannot be undone. The question remembers what it interrupted, so answering it does
+that and not something else: Escape on an open edit goes back to the dream, the ✕ closes the panel. Back is the browser's and is not ours to intercept; #768 is where
+giving these forms a history entry of their own is tracked.
 
 **The ✕ always closes, where Escape sometimes goes back.** `onBack` is what stops a stray
 tap on the backdrop discarding a half-written dream, and while an edit is open Escape means

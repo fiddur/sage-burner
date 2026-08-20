@@ -70,3 +70,102 @@ describe('the way out of a panel that covers a phone whole', () => {
     expect(onBack).not.toHaveBeenCalled()
   })
 })
+
+describe('closing a panel that holds something nobody else has', () => {
+  const asking = (over: Partial<Parameters<typeof DreamPanel>[0]> = {}) =>
+    panel({ askBeforeClosing: 'Throw this dream away?', ...over })
+
+  it('asks rather than closing on the ✕', () => {
+    const onClose = vi.fn()
+    asking({ onClose })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Sauna at dawn' }))
+
+    expect(screen.getByText('Throw this dream away?')).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('closes once the question is answered', () => {
+    const onClose = vi.fn()
+    asking({ onClose })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Sauna at dawn' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Throw it away' }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('puts the question away again on Keep writing, leaving the panel up', () => {
+    const onClose = vi.fn()
+    asking({ onClose })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Sauna at dawn' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep writing' }))
+
+    expect(screen.queryByText('Throw this dream away?')).toBeNull()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('asks on Escape, which loses it just as thoroughly', () => {
+    const onClose = vi.fn()
+    asking({ onClose })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Throw this dream away?')).toBeTruthy()
+  })
+
+  it('asks on the backdrop too', () => {
+    const onClose = vi.fn()
+    asking({ onClose })
+
+    fireEvent.click(document.querySelector('.dream-modal') ?? document.body)
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Throw this dream away?')).toBeTruthy()
+  })
+
+  it('asks where Escape would otherwise go back, an edit being text nobody else has', () => {
+    const onBack = vi.fn()
+    const onClose = vi.fn()
+    asking({ onBack, onClose })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onBack).not.toHaveBeenCalled()
+    expect(screen.getByText('Throw this dream away?')).toBeTruthy()
+  })
+
+  it('does what was interrupted once it is answered, so Escape goes back and the ✕ closes', () => {
+    const onBack = vi.fn()
+    const onClose = vi.fn()
+    asking({ onBack, onClose })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Throw it away' }))
+
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('puts the question away when what it interrupted leaves the panel up', () => {
+    const onBack = vi.fn()
+    asking({ onBack, onClose: () => undefined })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Throw it away' }))
+
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Throw this dream away?')).toBeNull()
+  })
+
+  it('asks nothing where there is nothing to lose', () => {
+    const onClose = vi.fn()
+    panel({ onClose })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Sauna at dawn' }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})

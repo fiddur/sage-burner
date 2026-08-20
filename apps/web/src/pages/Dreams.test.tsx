@@ -613,6 +613,38 @@ describe('an opened dream on a phone, which is a page rather than something over
     expect(screen.getByText('Loading…')).toBeTruthy()
   })
 
+  it('arrives at the top of the window, the way following a link to a page does', async () => {
+    onAPhone()
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+    await screen.findByRole('button', { name: 'Open Sunrise yoga' })
+    globalThis.scrollTo(0, 745)
+    expect(globalThis.scrollY, 'a list that never scrolled would pass this without a fix').toBe(745)
+
+    await openDream('Sunrise yoga')
+
+    await waitFor(() => {
+      expect(globalThis.scrollY).toBe(0)
+    })
+  })
+
+  it('takes no focus, so a cold arrival draws no ring around the whole page', async () => {
+    onAPhone()
+    renderPageAt('/dreams?dream=s-1', stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await screen.findByRole('region', { name: 'Sunrise yoga' })
+
+    expect(document.activeElement).not.toBe(screen.getByRole('region', { name: 'Sunrise yoga' }))
+  })
+
+  it('keeps the page\u2019s own heading, so the document does not start at h2', async () => {
+    onAPhone()
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openDream('Sunrise yoga')
+
+    expect(screen.getByRole('heading', { name: /Dreams/, level: 1 })).toBeTruthy()
+  })
+
   it('stays a dialog above the breakpoint, the grid behind it being the context there', async () => {
     onADesktop()
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))

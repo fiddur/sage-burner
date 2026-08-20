@@ -64,6 +64,7 @@ export const DreamDetails = ({
       label={dream.title}
       error={error}
       page={phone}
+      askBeforeClosing={editing ? 'Throw these changes away?' : undefined}
       onBack={editing ? onCancelEdit : undefined}
       onClose={onClose}
     >
