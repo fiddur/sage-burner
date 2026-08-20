@@ -360,6 +360,40 @@ describe('a password set another way', () => {
     expect((await stateOf(server, token)).json()).toEqual({ status: 'unknown' })
   })
 
+  it('leaves the link alone when an admin saves the account without moving the address', async () => {
+    const server = await build()
+    await givenMailServer()
+    const id = await givenAccount()
+    const admin = await givenSignedInAdmin()
+    const token = await tokenPosted(server)
+
+    await server.inject({
+      method: apiRoutes.updateAdminAccount.method,
+      url: apiRoutes.updateAdminAccount.path(id),
+      headers: { cookie: admin.cookie },
+      payload: { name: 'Ada Again', email: 'ada@example.org' },
+    })
+
+    expect((await stateOf(server, token)).json()).toEqual({ status: 'outstanding' })
+  })
+
+  it('drops it when the address does move, the link having gone to the old one', async () => {
+    const server = await build()
+    await givenMailServer()
+    const id = await givenAccount()
+    const admin = await givenSignedInAdmin()
+    const token = await tokenPosted(server)
+
+    await server.inject({
+      method: apiRoutes.updateAdminAccount.method,
+      url: apiRoutes.updateAdminAccount.path(id),
+      headers: { cookie: admin.cookie },
+      payload: { email: 'somewhere-else@example.org' },
+    })
+
+    expect((await stateOf(server, token)).json()).toEqual({ status: 'unknown' })
+  })
+
   it('leaves the link alone when the account it names does not exist', async () => {
     const server = await build()
     await givenMailServer()

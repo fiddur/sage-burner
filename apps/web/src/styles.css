@@ -1543,11 +1543,6 @@ a.person-badge:focus-visible span:last-child {
   border: 1px solid var(--line);
 }
 
-/*
-  The panel covers a phone whole, and somebody arriving on a notification has no bar to go back
-  to (#755). Sticky rather than absolute so the ✕ is still there part-way down a long dream —
-  which is where the person who cannot find a way out has already scrolled to.
-*/
 .panel-bar {
   position: sticky;
   top: 0;
@@ -1564,7 +1559,6 @@ a.person-badge:focus-visible span:last-child {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 44px: a touch target somebody stabs at without looking. */
   min-width: 2.75rem;
   min-height: 2.75rem;
   padding: 0;

@@ -201,7 +201,7 @@ export const Login = ({
           {canReset ? (
             <a href={forgottenPage()}>Forgotten your password?</a>
           ) : (
-            'If you have lost your password, ask someone with admin — this installation cannot send you a link.'
+            'If you have lost your password, ask someone with admin — no link can be sent from here just now.'
           )}
         </p>
       )}

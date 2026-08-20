@@ -149,6 +149,7 @@ export const FetchedInstallationProvider = ({
         setSendsEmail(response.installation.sends_email)
         setKnowsOwnAddress(response.installation.knows_own_address)
         setSocialLogins(response.installation.social_logins)
+        setUnreachable(false)
       })
       .catch(() => {
         if (!controller.signal.aborted) setUnreachable(true)
