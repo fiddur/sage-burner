@@ -9,8 +9,6 @@ import { htmlFrom, textFrom } from './template.ts'
 
 const OFF_SWITCH = 'You can turn these emails off under Your details → Notifications.'
 
-// Not OFF_SWITCH: an applicant cannot reach that page — `/profile` needs a role they have not
-// been given yet — so it would name a switch they cannot press.
 const WHY_YOU_GOT_THIS =
   'You are getting this because you applied to join. Nothing else is sent to you unless you ask for it.'
 

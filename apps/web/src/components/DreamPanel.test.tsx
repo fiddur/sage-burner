@@ -63,7 +63,7 @@ describe('the way out of a panel that covers a phone whole', () => {
     const onClose = vi.fn()
     panel({ onClose })
 
-    screen.getByRole('button', { name: 'Close Sauna at dawn' }).click()
+    fireEvent.click(screen.getByRole('button', { name: 'Close Sauna at dawn' }))
 
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -73,7 +73,7 @@ describe('the way out of a panel that covers a phone whole', () => {
     const onClose = vi.fn()
     panel({ onBack, onClose })
 
-    screen.getByRole('button', { name: 'Close Sauna at dawn' }).click()
+    fireEvent.click(screen.getByRole('button', { name: 'Close Sauna at dawn' }))
 
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(onBack).not.toHaveBeenCalled()
