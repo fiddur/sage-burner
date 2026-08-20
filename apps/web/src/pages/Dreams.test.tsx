@@ -83,7 +83,6 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
 const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) => {
-  // The page reads `?dream=` now, so a URL left behind by `renderPageAt` would open a panel.
   history.replaceState(null, '', '/dreams')
 
   return render(
@@ -598,6 +597,20 @@ describe('an opened dream on a phone, which is a page rather than something over
     await openDream('Sunrise yoga')
 
     expect(screen.queryByRole('button', { name: 'Open Sunrise yoga' })).toBeNull()
+  })
+
+  it('keeps the list when the asked dream is not among them, rather than emptying the page', async () => {
+    onAPhone()
+    renderPageAt('/dreams?dream=gone', stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    expect(await screen.findByRole('button', { name: 'Open Sunrise yoga' })).toBeTruthy()
+  })
+
+  it('keeps the list up while the dreams are still loading, so nothing blinks empty', async () => {
+    onAPhone()
+    renderPageAt('/dreams?dream=s-1', stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    expect(screen.getByText('Loading…')).toBeTruthy()
   })
 
   it('stays a dialog above the breakpoint, the grid behind it being the context there', async () => {

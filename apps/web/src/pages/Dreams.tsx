@@ -15,7 +15,7 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
 import { joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
-import { dreamIdOf, openedFrom, useOpenedInUrl, usePanelAsPage } from '../panel-url.ts'
+import { dreamIdOf, openedFrom, showsAsPage, useOpenedInUrl, usePanelAsPage } from '../panel-url.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
@@ -129,7 +129,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
   const talk = useDreamThread({ api, threadId: threadOf(dreams, opened), run })
 
-  const asPage = usePanelAsPage(opened)
+  const asPage = usePanelAsPage(showsAsPage(dreams, opened))
 
   return (
     <GuardedPage title="Dreams" require="approved">

@@ -23,7 +23,7 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
-import { dreamIdOf, openedFrom, usePanelAsPage, usePanelsInUrl } from '../panel-url.ts'
+import { dreamIdOf, openedFrom, showsAsPage, usePanelAsPage, usePanelsInUrl } from '../panel-url.ts'
 import { pinchedZoom, touchGap } from '../pinch.ts'
 import {
   endFor,
@@ -255,7 +255,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened, viewerId })
   const talk = useDreamThread({ api, threadId: threadOf(sessions, opened), run })
 
-  const asPage = usePanelAsPage(opened, shownMeal)
+  const asPage = usePanelAsPage(showsAsPage(sessions, opened, shownMeal))
 
   const offer = ({ title = '', ...fields }: SessionUpdate) => {
     run(

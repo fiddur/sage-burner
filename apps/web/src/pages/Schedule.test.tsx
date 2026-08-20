@@ -98,7 +98,6 @@ const stub = (
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
 const renderPage = (api: ScheduleApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) => {
-  // The page reads `?dream=` and `?meal=` now, so a URL left over would open a panel.
   history.replaceState(null, '', '/schedule')
 
   return render(
