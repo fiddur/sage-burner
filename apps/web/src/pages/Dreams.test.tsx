@@ -9,6 +9,7 @@ import type { DreamsApi } from './Dreams.tsx'
 
 import { apiError } from '../api/client.ts'
 import { BurnProvider } from '../burn.tsx'
+import { onADesktop, onAPhone } from '../testing/viewport.ts'
 import { ViewerProvider } from '../viewer.tsx'
 import { Dreams } from './Dreams.tsx'
 
@@ -81,16 +82,22 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
 
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
-const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) =>
-  render(
-    <ViewerProvider viewer={viewer}>
-      <BurnProvider
-        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
-      >
-        <Dreams api={api} />
-      </BurnProvider>
-    </ViewerProvider>,
+const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) => {
+  // The page reads `?dream=` now, so a URL left behind by `renderPageAt` would open a panel.
+  history.replaceState(null, '', '/dreams')
+
+  return render(
+    <LocationProvider>
+      <ViewerProvider viewer={viewer}>
+        <BurnProvider
+          value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+        >
+          <Dreams api={api} />
+        </BurnProvider>
+      </ViewerProvider>
+    </LocationProvider>,
   )
+}
 
 const renderPageAt = (at: string, api: DreamsApi) => {
   history.replaceState(null, '', at)
@@ -568,5 +575,71 @@ describe('Dreams', () => {
 
     await screen.findByText('Sunrise yoga')
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+describe('an opened dream on a phone, which is a page rather than something over one', () => {
+  afterEach(onADesktop)
+
+  it('is a region and not a dialog, there being nothing modal about a page', async () => {
+    onAPhone()
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openDream('Sunrise yoga')
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Sunrise yoga' })).toBeTruthy()
+  })
+
+  it('takes the list off the page rather than sitting over it', async () => {
+    onAPhone()
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openDream('Sunrise yoga')
+
+    expect(screen.queryByRole('button', { name: 'Open Sunrise yoga' })).toBeNull()
+  })
+
+  it('stays a dialog above the breakpoint, the grid behind it being the context there', async () => {
+    onADesktop()
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openDream('Sunrise yoga')
+
+    expect(screen.getByRole('dialog', { name: 'Sunrise yoga' })).toBeTruthy()
+  })
+})
+
+describe('which dream is open lives in the query, so Back closes it', () => {
+  it('names the opened dream in the URL', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openDream('Sunrise yoga')
+
+    expect(new URL(window.location.href).searchParams.get('dream')).toBe('s-1')
+  })
+
+  it('takes it off again on closing', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openDream('Sunrise yoga')
+    fireEvent.click(screen.getByRole('button', { name: 'Close Sunrise yoga' }))
+
+    await waitFor(() => {
+      expect(new URL(window.location.href).searchParams.get('dream')).toBeNull()
+    })
+  })
+
+  it('closes the panel when the query loses the dream, which is what Back does', async () => {
+    renderPageAt('/dreams?dream=s-1', stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    expect(await screen.findByRole('heading', { name: 'Sunrise yoga', level: 2 })).toBeTruthy()
+
+    history.replaceState(null, '', '/dreams')
+    globalThis.dispatchEvent(new PopStateEvent('popstate'))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Sunrise yoga', level: 2 })).toBeNull()
+    })
   })
 })

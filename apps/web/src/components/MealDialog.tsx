@@ -3,6 +3,7 @@ import type { EventAttendeesResponse, Meal, MealUpdate } from '@sage-burner/shar
 import { MAX_OPTION_LABEL } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
+import { usePhone } from '../viewport.ts'
 import { DreamPanel } from './DreamPanel.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
 import { Icon } from './Icon.tsx'
@@ -37,7 +38,7 @@ export const MealDialog = ({
   const [idea, setIdea] = useState(meal.food_idea)
 
   return (
-    <DreamPanel label={meal.label} error={error} onClose={onClose}>
+    <DreamPanel label={meal.label} error={error} page={usePhone()} onClose={onClose}>
       <h2>{meal.label}</h2>
       <p class="form-note">
         {meal.date} · {meal.at}

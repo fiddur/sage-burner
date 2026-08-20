@@ -1580,6 +1580,25 @@ a.person-badge:focus-visible span:last-child {
   background: var(--line);
 }
 
+/*
+  On a phone the panel is the page (#757), so it gives up everything that made it a card: the
+  window scrolls it, not an inner scrollport, which is what puts the bars back within reach.
+  `.panel-bar` keeps its `sticky`, now against the viewport rather than against the panel.
+*/
+.dream-panel.is-page {
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  padding-inline: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.dream-panel.is-page .panel-bar {
+  margin-inline: 0;
+}
+
 .dream-panel h2 {
   margin-top: 0;
 }

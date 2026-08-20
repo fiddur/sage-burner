@@ -1,7 +1,7 @@
 import type { EventAttendeesResponse, Meal, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
-import { dayName } from '@sage-burner/shared'
+import { dayName, schedulePage } from '@sage-burner/shared'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -23,6 +23,7 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
+import { dreamIdOf, openedFrom, usePanelAsPage, usePanelsInUrl } from '../panel-url.ts'
 import { pinchedZoom, touchGap } from '../pinch.ts'
 import {
   endFor,
@@ -123,14 +124,23 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   const { busy, error, run, setError } = useAction(reload)
 
+  const { showDreamInUrl, showMealInUrl } = usePanelsInUrl(
+    (open) => (burn === undefined ? undefined : schedulePage(burn.event.id, open)),
+    openedMeal,
+    (asked) => setOpenedPanel((held) => openedFrom(held, asked)),
+    setOpenedMealPanel,
+  )
+
   const setOpened = (next: Opened | undefined) => {
     setError(undefined)
     setOpenedPanel(next)
+    showDreamInUrl(dreamIdOf(next))
   }
 
   const setOpenedMeal = (next: string | undefined) => {
     setError(undefined)
     setOpenedMealPanel(next)
+    showMealInUrl(next)
   }
 
   const move = (id: string, changes: Parameters<ScheduleApi['updateSession']>[1]) => {
@@ -245,6 +255,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened, viewerId })
   const talk = useDreamThread({ api, threadId: threadOf(sessions, opened), run })
 
+  const asPage = usePanelAsPage(opened, shownMeal)
+
   const offer = ({ title = '', ...fields }: SessionUpdate) => {
     run(
       async () => {
@@ -257,60 +269,64 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   return (
     <Framed api={api} eventId={event.id} refreshing={refreshing}>
-      {error !== undefined && opened === undefined && shownMeal === undefined && (
-        <ErrorText message={error} link={joinLink(error)} />
+      {!asPage && (
+        <>
+          {error !== undefined && opened === undefined && shownMeal === undefined && (
+            <ErrorText message={error} link={joinLink(error)} />
+          )}
+
+          <div class="schedule">
+            <Pool
+              dreams={unscheduled}
+              people={people}
+              busy={busy}
+              onDragStart={dragDream}
+              onDragEnd={endDrag}
+              onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
+              onOffer={() =>
+                setOpened({ kind: 'new', place_id: null, time_slot_start: null, time_slot_end: null })
+              }
+              onSupport={support}
+              onResize={resize}
+              onDrop={() => {
+                if (dragged === undefined) return
+                move(dragged, { place_id: null, time_slot_start: null, time_slot_end: null })
+                setDragged(undefined)
+              }}
+            />
+
+            <Timetable
+              rows={rows}
+              places={places}
+              blocks={blocks}
+              onOpenMeal={setOpenedMeal}
+              onDragMeal={dragMeal}
+              onDropInKitchen={(row) => {
+                const to = draggedMeal && mealMovedTo(draggedMeal.part, row)
+                setDraggedMeal(undefined)
+                if (to) run(() => api.updateMeal(draggedMeal.meal_id, to), 'Could not move that meal.')
+              }}
+              dreams={sessions}
+              people={people}
+              busy={busy}
+              onDragStart={dragDream}
+              onDragEnd={endDrag}
+              onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
+              onOfferAt={(row, placeId) =>
+                setOpened({
+                  kind: 'new',
+                  place_id: placeId,
+                  time_slot_start: fromLocalInput(row),
+                  time_slot_end: endFor(row, { time_slot_start: null, time_slot_end: null }),
+                })
+              }
+              onSupport={support}
+              onResize={resize}
+              onDrop={dropInto}
+            />
+          </div>
+        </>
       )}
-
-      <div class="schedule">
-        <Pool
-          dreams={unscheduled}
-          people={people}
-          busy={busy}
-          onDragStart={dragDream}
-          onDragEnd={endDrag}
-          onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
-          onOffer={() =>
-            setOpened({ kind: 'new', place_id: null, time_slot_start: null, time_slot_end: null })
-          }
-          onSupport={support}
-          onResize={resize}
-          onDrop={() => {
-            if (dragged === undefined) return
-            move(dragged, { place_id: null, time_slot_start: null, time_slot_end: null })
-            setDragged(undefined)
-          }}
-        />
-
-        <Timetable
-          rows={rows}
-          places={places}
-          blocks={blocks}
-          onOpenMeal={setOpenedMeal}
-          onDragMeal={dragMeal}
-          onDropInKitchen={(row) => {
-            const to = draggedMeal && mealMovedTo(draggedMeal.part, row)
-            setDraggedMeal(undefined)
-            if (to) run(() => api.updateMeal(draggedMeal.meal_id, to), 'Could not move that meal.')
-          }}
-          dreams={sessions}
-          people={people}
-          busy={busy}
-          onDragStart={dragDream}
-          onDragEnd={endDrag}
-          onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
-          onOfferAt={(row, placeId) =>
-            setOpened({
-              kind: 'new',
-              place_id: placeId,
-              time_slot_start: fromLocalInput(row),
-              time_slot_end: endFor(row, { time_slot_start: null, time_slot_end: null }),
-            })
-          }
-          onSupport={support}
-          onResize={resize}
-          onDrop={dropInto}
-        />
-      </div>
 
       <OpenedMeal
         meal={shownMeal}

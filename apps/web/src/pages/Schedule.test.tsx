@@ -1,6 +1,7 @@
 import type { Event, Meal, MyBurn, Place, Session } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -9,6 +10,7 @@ import type { ScheduleApi } from './Schedule.tsx'
 import { apiError } from '../api/client.ts'
 import { BurnProvider } from '../burn.tsx'
 import { NAMELESS } from '../components/PersonBadge.tsx'
+import { onADesktop, onAPhone } from '../testing/viewport.ts'
 import { ViewerProvider } from '../viewer.tsx'
 import { Schedule } from './Schedule.tsx'
 
@@ -95,16 +97,22 @@ const stub = (
 
 const CHOSEN: MyBurn = { event: BURN, attendance: null }
 
-const renderPage = (api: ScheduleApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) =>
-  render(
-    <ViewerProvider viewer={viewer}>
-      <BurnProvider
-        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
-      >
-        <Schedule api={api} />
-      </BurnProvider>
-    </ViewerProvider>,
+const renderPage = (api: ScheduleApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) => {
+  // The page reads `?dream=` and `?meal=` now, so a URL left over would open a panel.
+  history.replaceState(null, '', '/schedule')
+
+  return render(
+    <LocationProvider>
+      <ViewerProvider viewer={viewer}>
+        <BurnProvider
+          value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+        >
+          <Schedule api={api} />
+        </BurnProvider>
+      </ViewerProvider>
+    </LocationProvider>,
   )
+}
 
 const cell = (rowLabel: string, column: number) => {
   const header = [...document.querySelectorAll('.schedule-grid th[scope="row"]')].find((node) =>
@@ -1257,6 +1265,31 @@ describe('the kitchen', () => {
 
     const panel = await screen.findByRole('dialog', { name: 'Dinner' })
     expect(within(panel).getByLabelText('Food idea for Dinner')).toHaveProperty('value', 'Vegan bolognese')
+  })
+
+  it('names the opened meal in the query on any width, so Back closes it', async () => {
+    renderPage(withMeals([aMeal()]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cooking · Dinner' }))
+
+    await waitFor(() => {
+      expect(new URL(window.location.href).searchParams.get('meal')).toBeTruthy()
+    })
+  })
+
+  it('takes the grid off the page on a phone rather than sitting over it', async () => {
+    onAPhone()
+    try {
+      renderPage(withMeals([aMeal()]))
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Open Cooking · Dinner' }))
+
+      await waitFor(() => {
+        expect(document.querySelector('.schedule-grid')).toBeNull()
+      })
+    } finally {
+      onADesktop()
+    }
   })
 
   it('moves the meal so the block lands where it was dropped', async () => {

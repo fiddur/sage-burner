@@ -10,12 +10,14 @@ import { Icon } from './Icon.tsx'
 export const DreamPanel = ({
   label,
   error,
+  page = false,
   onBack,
   onClose,
   children,
 }: {
   label: string
   error: string | undefined
+  page?: boolean
   onBack?: () => void
   onClose: () => void
   children: ComponentChildren
@@ -23,7 +25,7 @@ export const DreamPanel = ({
   const panel = useRef<HTMLDivElement>(null)
   const dismiss = onBack ?? onClose
 
-  useOverlay(panel)
+  useOverlay(panel, !page)
 
   useEffect(() => {
     panel.current?.focus()
@@ -39,26 +41,32 @@ export const DreamPanel = ({
     return () => document.removeEventListener('keydown', onKey)
   }, [dismiss])
 
+  const inside = (
+    <div
+      class={page ? 'dream-panel is-page' : 'dream-panel'}
+      role={page ? 'region' : 'dialog'}
+      aria-modal={page ? undefined : 'true'}
+      aria-label={label}
+      tabIndex={-1}
+      ref={panel}
+      onClick={(clickEvent) => clickEvent.stopPropagation()}
+    >
+      <p class="panel-bar">
+        <button type="button" class="panel-close" aria-label={`Close ${label}`} onClick={onClose}>
+          <Icon name="close" />
+        </button>
+      </p>
+
+      <ErrorText message={error} link={joinLink(error)} />
+      {children}
+    </div>
+  )
+
+  if (page) return inside
+
   return (
     <div class="dream-modal" onClick={dismiss}>
-      <div
-        class="dream-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
-        tabIndex={-1}
-        ref={panel}
-        onClick={(clickEvent) => clickEvent.stopPropagation()}
-      >
-        <p class="panel-bar">
-          <button type="button" class="panel-close" aria-label={`Close ${label}`} onClick={onClose}>
-            <Icon name="close" />
-          </button>
-        </p>
-
-        <ErrorText message={error} link={joinLink(error)} />
-        {children}
-      </div>
+      {inside}
     </div>
   )
 }

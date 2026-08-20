@@ -297,8 +297,16 @@ phone" means 360px.
       scrolled to the bottom of a long one. Pressing it closes the panel; the pen and the bin
       are alone in their row, with no word beside them to press by mistake. The same ✕ is on
       the offer-a-dream form and on a meal dialog.
-- [ ] Follow a dream's push notification from a cold start: the panel opens, and the ✕ is the
-      way back to a page with navigation on it.
+- [ ] At phone width the opened dream is a **page**: the bar is above it and the bottom nav below
+      it, the list is gone rather than behind it, and the page scrolls as one. Widen past 45rem
+      with it open and it becomes the panel over the grid again.
+- [ ] Back closes it, and the address bar loses `?dream=` when you press the ✕. Open a dream,
+      close it, and press Back: it does not reopen.
+- [ ] The same holds for a meal block on the schedule (`?meal=`), and for a dream opened there.
+- [ ] Tap an empty slot to offer a dream: that one is still a dialog at phone width, and Back
+      does not throw the half-written form away.
+- [ ] Follow a dream's push notification from a cold start: the dream is the page, with the
+      navigation on it.
 - [ ] Take a song out: it asks first, saying where the song goes; restore it
       from "Recently taken out".
 - [ ] The song's card is on the feed; song news notifies only those who turned
