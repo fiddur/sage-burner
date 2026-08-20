@@ -25,31 +25,27 @@ export const DreamPanel = ({
   children: ComponentChildren
 }) => {
   const panel = useRef<HTMLDivElement>(null)
-  const [asking, setAsking] = useState(false)
+  const [pending, setPending] = useState<{ go: () => void } | undefined>(undefined)
 
-  const leave = () => {
+  const guard = (go: () => void) => () => {
     if (askBeforeClosing === undefined) {
-      onClose()
+      go()
 
       return
     }
 
-    setAsking(true)
+    setPending({ go })
   }
 
-  const dismiss = onBack ?? leave
+  const dismiss = guard(onBack ?? onClose)
+  const leave = guard(onClose)
 
   useOverlay(panel, !page)
 
-  // Only the dialog takes focus. As a page there is nothing to move focus into and no trap to
-  // start, and a cold arrival matched `:focus-visible` on the container — an ember ring drawn
-  // around the whole page, where the card had just been taken away.
   useEffect(() => {
     if (!page) panel.current?.focus()
   }, [page])
 
-  // Opening changes the query and not the path, so nothing does what a page arrival does: the
-  // window keeps the list's scroll and `useHidingBar` keeps the bar it hid on the way down.
   useEffect(() => {
     if (!page) return
 
@@ -78,13 +74,13 @@ export const DreamPanel = ({
       onClick={(clickEvent) => clickEvent.stopPropagation()}
     >
       <p class="panel-bar">
-        {asking && askBeforeClosing !== undefined && (
+        {pending !== undefined && askBeforeClosing !== undefined && (
           <span class="panel-asking">
             <span>{askBeforeClosing}</span>
-            <button type="button" onClick={onClose}>
+            <button type="button" onClick={pending.go}>
               Throw it away
             </button>
-            <button type="button" onClick={() => setAsking(false)}>
+            <button type="button" onClick={() => setPending(undefined)}>
               Keep writing
             </button>
           </span>

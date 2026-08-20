@@ -292,7 +292,8 @@ form with it. It survives only when the entry behind happens to be the same page
 `openedFrom` branch that keeps a `new` form through a query that names no dream. The edit form is
 the same half-written text and has never been protected either (#761). What both have now is that
 **the ✕, Escape and the backdrop ask before discarding** — the rule the rest of the app follows for
-anything that cannot be undone. Back is the browser's and is not ours to intercept; #768 is where
+anything that cannot be undone. The question remembers what it interrupted, so answering it does
+that and not something else: Escape on an open edit goes back to the dream, the ✕ closes the panel. Back is the browser's and is not ours to intercept; #768 is where
 giving these forms a history entry of their own is tracked.
 
 **The ✕ always closes, where Escape sometimes goes back.** `onBack` is what stops a stray

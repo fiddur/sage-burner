@@ -71,7 +71,7 @@ describe('reading what a load is holding', () => {
   })
 
   it('gives the fallback while it is not, so a hook above the guards has something to read', () => {
-    expect(heldOr({ status: 'loading' }, 'nothing')).toBe('nothing')
-    expect(heldOr({ status: 'failed' }, 'nothing')).toBe('nothing')
+    expect(heldOr<string>({ status: 'loading' }, 'nothing')).toBe('nothing')
+    expect(heldOr<string>({ status: 'failed', message: 'no' }, 'nothing')).toBe('nothing')
   })
 })

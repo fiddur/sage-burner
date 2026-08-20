@@ -1583,7 +1583,7 @@ describe('leaving a dream’s edit form', () => {
     return screen.findByRole('dialog', { name: 'Cacao ceremony' })
   }
 
-  it('takes Escape as leaving the form, and only then as closing the panel', async () => {
+  it('asks before Escape leaves the form, and only then takes it as closing the panel', async () => {
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     const panel = await open()
@@ -1591,6 +1591,8 @@ describe('leaving a dream’s edit form', () => {
     expect(screen.getByLabelText('Title of Cacao ceremony')).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByLabelText('Title of Cacao ceremony'), 'the form stays up while it asks').toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Throw it away' }))
 
     expect(screen.queryByLabelText('Title of Cacao ceremony')).toBeNull()
     expect(screen.queryByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
@@ -1600,7 +1602,7 @@ describe('leaving a dream’s edit form', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('takes a stray backdrop click the same way', async () => {
+  it('asks before a stray backdrop click takes the form', async () => {
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     const panel = await open()
@@ -1610,9 +1612,25 @@ describe('leaving a dream’s edit form', () => {
     if (backdrop === null) throw new Error('the panel is open, so there is a backdrop')
 
     fireEvent.click(backdrop)
+    fireEvent.click(screen.getByRole('button', { name: 'Throw it away' }))
 
     expect(screen.queryByLabelText('Title of Cacao ceremony')).toBeNull()
     expect(screen.queryByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
+  })
+
+  it('keeps a stray backdrop click from taking the edit at all', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    const panel = await open()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Edit Cacao ceremony' }))
+
+    const backdrop = document.querySelector('.dream-modal')
+    if (backdrop === null) throw new Error('the panel is open, so there is a backdrop')
+
+    fireEvent.click(backdrop)
+    fireEvent.click(screen.getByRole('button', { name: 'Keep writing' }))
+
+    expect(screen.getByLabelText('Title of Cacao ceremony')).toBeTruthy()
   })
 
   it('closes on the first Escape when nothing is being edited', async () => {

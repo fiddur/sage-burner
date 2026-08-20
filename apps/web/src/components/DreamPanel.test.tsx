@@ -106,14 +106,47 @@ describe('closing a panel that holds something nobody else has', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('asks on Escape and on the backdrop too, which lose it just as thoroughly', () => {
+  it('asks on Escape, which loses it just as thoroughly', () => {
     const onClose = vi.fn()
     asking({ onClose })
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(onClose).not.toHaveBeenCalled()
 
+    expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByText('Throw this dream away?')).toBeTruthy()
+  })
+
+  it('asks on the backdrop too', () => {
+    const onClose = vi.fn()
+    asking({ onClose })
+
+    fireEvent.click(document.querySelector('.dream-modal') ?? document.body)
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Throw this dream away?')).toBeTruthy()
+  })
+
+  it('asks where Escape would otherwise go back, an edit being text nobody else has', () => {
+    const onBack = vi.fn()
+    const onClose = vi.fn()
+    asking({ onBack, onClose })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onBack).not.toHaveBeenCalled()
+    expect(screen.getByText('Throw this dream away?')).toBeTruthy()
+  })
+
+  it('does what was interrupted once it is answered, so Escape goes back and the ✕ closes', () => {
+    const onBack = vi.fn()
+    const onClose = vi.fn()
+    asking({ onBack, onClose })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Throw it away' }))
+
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('asks nothing where there is nothing to lose', () => {
