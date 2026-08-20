@@ -36,8 +36,8 @@ export const Forgotten = ({ api }: { api: ForgottenApi }) => {
       <section class="page column">
         <h1>Forgotten your password?</h1>
         <p>
-          This installation cannot post you a link — it has no mail server set up, or does not know its own
-          address. Ask an organiser to set a new password for you.
+          No link can be sent from here just now — this installation has no mail server set up, does not know
+          its own address, or could not be asked. An organiser can set a new password for you.
         </p>
         <BackToLogin />
       </section>

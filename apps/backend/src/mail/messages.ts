@@ -12,6 +12,13 @@ const OFF_SWITCH = 'You can turn these emails off under Your details → Notific
 const WHY_YOU_GOT_THIS =
   'You are getting this because you applied to join. Nothing else is sent to you unless you ask for it.'
 
+/**
+ * Which of the two an application's mail ends with is the reader's role and never which letter it
+ * is (#758): a member can open the settings page and is already due a digest, and somebody with no
+ * role can do neither. `docs/accounts.md` has the rest.
+ */
+const footerFor = (member: boolean): string => (member ? OFF_SWITCH : WHY_YOU_GOT_THIS)
+
 const REJECTED =
   'Your application has not been accepted this time. If you would like to know more, the organisers are the people to ask — their names and how to reach them are on your page'
 
@@ -99,7 +106,7 @@ export const decisionMessage = ({
           : `${REJECTED}${link === undefined ? '.' : ':'}`,
       },
       ...action(link, approved ? 'See the burn' : 'Your page'),
-      { note: approved ? OFF_SWITCH : WHY_YOU_GOT_THIS },
+      { note: footerFor(approved) },
     ],
   })
 
@@ -109,12 +116,14 @@ export const replyMessage = ({
   name,
   said,
   link,
+  member,
 }: {
   installation: string
   to: string
   name: string | null
   said: string
   link: string | undefined
+  member: boolean
 }): Message =>
   written({
     installation,
@@ -125,7 +134,7 @@ export const replyMessage = ({
       { paragraph: 'The organisers wrote on your application:' },
       { quote: said },
       ...action(link, 'Reply'),
-      { note: WHY_YOU_GOT_THIS },
+      { note: footerFor(member) },
     ],
   })
 

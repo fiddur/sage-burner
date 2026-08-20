@@ -155,8 +155,13 @@ phone" means 360px.
 - [ ] Ask for a link, then set that member's password from their account under ⚙️ → Accounts:
       the link stops working, which is what an admin reset is for. Changing their login
       address there does the same.
-- [ ] `grep` the backend's log output for the token you were sent: it is `[redacted]` on the
-      request line, and the same holds for an invite link.
+- [ ] `grep` the backend's log output for the token you were sent — including the request for
+      **the link you followed from the mail**, which is the page path and not an API call: it is
+      `[redacted]` on every line, and the same holds for an invite link.
+- [ ] Use the link, then open it again the way a second device would: it says it may have been
+      used already, not that you mistyped it.
+- [ ] Ask for a link, then edit that member under ⚙️ → Accounts without touching the address:
+      the link still works. Change the address and it stops.
 
 ## Setting a burn up (admin)
 

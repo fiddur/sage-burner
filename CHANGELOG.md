@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-20
 
+- **A reset link you have already used says so.** It used to tell you to check you had copied the
+  whole thing, which is not what happened.
+
+- **Editing somebody's details no longer cancels a reset link they are holding.** Only actually
+  changing their login address does that, which is the case the link cannot survive.
+
 - **A dream opened from far down the list arrives at the top of it, with the navigation in place.**
   It was keeping the scroll you were at, so the first thing you saw was a page with no bar above
   and no tabs below — the thing that page was meant to stop.

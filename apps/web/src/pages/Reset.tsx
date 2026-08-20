@@ -29,7 +29,7 @@ const messageForFailure = (failure: unknown): string => {
 const explanationFor = (status: Exclude<ResetStatus, 'outstanding'>): string =>
   status === 'expired'
     ? 'This link has run out. Ask for a fresh one and it will be with you in a moment.'
-    : 'We do not recognise this link. Check you copied all of it, or ask for a fresh one.'
+    : 'We do not recognise this link — it may have been used already, or run out. Ask for a fresh one and it will be with you in a moment.'
 
 export const Reset = ({ api, token }: { api: ResetApi; token: string }) => {
   const setViewer = useSetViewer()

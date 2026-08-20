@@ -14,6 +14,14 @@ describe('what a logged URL keeps', () => {
     expect(maskedUrl(apiRoutes.getInviteState.path('a-secret-token'))).toBe(`/api/invites/${REDACTED}`)
   })
 
+  it('takes it out of the reset page, which is the link the mail actually points at', () => {
+    expect(maskedUrl('/reset/a-secret-token')).toBe(`/reset/${REDACTED}`)
+  })
+
+  it('takes it out of the invite page for the same reason', () => {
+    expect(maskedUrl('/invite/a-secret-token')).toBe(`/invite/${REDACTED}`)
+  })
+
   it('keeps the segments past the token, so a redeem still says what it was', () => {
     expect(maskedUrl(apiRoutes.redeemInvite.path('a-secret-token'))).toBe(`/api/invites/${REDACTED}/redeem`)
   })

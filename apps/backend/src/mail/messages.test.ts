@@ -290,6 +290,20 @@ describe('what a letter about an application says at the foot', () => {
     expect(settled('https://burn.example.org/apply').text).toContain('are on your page:')
   })
 
+  it('names the switch on a reply to somebody who is already a member', () => {
+    const reply = replyMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      name: 'Ada',
+      said: 'One more thing.',
+      link: undefined,
+      member: true,
+    })
+
+    expect(reply.text).toContain('Your details → Notifications')
+    expect(reply.text.replaceAll('\n', ' ')).not.toContain('Nothing else is sent to you')
+  })
+
   it('says the same of a reply, which the applicant cannot switch off either', () => {
     const reply = replyMessage({
       installation: 'The Burning Sage',
@@ -297,6 +311,7 @@ describe('what a letter about an application says at the foot', () => {
       name: 'Ada',
       said: 'Who are you coming with?',
       link: undefined,
+      member: false,
     })
 
     expect(reply.text).toContain('because you applied to join')

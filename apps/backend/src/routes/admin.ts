@@ -145,11 +145,17 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
       let found: boolean
       try {
         found = db.transaction((tx) => {
-          const [row] = tx.select({ id: account.id }).from(account).where(eq(account.id, accountId)).all()
+          const [row] = tx
+            .select({ id: account.id, email: account.email })
+            .from(account)
+            .where(eq(account.id, accountId))
+            .all()
           if (row === undefined) return false
 
           if (!isEmptyPatch(columns)) tx.update(account).set(columns).where(eq(account.id, accountId)).run()
-          if (columns.email !== undefined) dropResets(tx, accountId)
+          // The link went to the address that was there, so only a move invalidates it — and the
+          // page posts every field on every save, so `!== undefined` would be any edit at all.
+          if (columns.email !== undefined && columns.email !== row.email) dropResets(tx, accountId)
           if (ticks !== undefined) writeAllergyTicks(tx, accountId, ticks)
 
           return true
