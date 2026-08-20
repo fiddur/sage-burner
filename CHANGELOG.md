@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-20
 
+- **A reset link you have already used says so.** It used to tell you to check you had copied the
+  whole thing, which is not what happened.
+
+- **Editing somebody's details no longer cancels a reset link they are holding.** Only actually
+  changing their login address does that, which is the case the link cannot survive.
+
 - **On a phone, an opened dream or meal is a page rather than something laid over one.** The bar
   is above it and the tabs below it, so there is somewhere to go from it — and Back closes it,
   which it never did before. The address bar names which one is open, so a link to a dream is a

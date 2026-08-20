@@ -1,10 +1,12 @@
-import { apiRoutes } from '@sage-burner/shared'
+import { apiRoutes, INVITE_PATTERN, RESET_PATTERN } from '@sage-burner/shared'
 
 const prefixOf = (fastify: string): string => `${fastify.split('/:')[0] ?? fastify}/`
 
 const CARRIES_A_TOKEN: readonly string[] = [
   prefixOf(apiRoutes.getPasswordResetState.fastify),
   prefixOf(apiRoutes.getInviteState.fastify),
+  prefixOf(RESET_PATTERN),
+  prefixOf(INVITE_PATTERN),
 ]
 
 export const REDACTED = '[redacted]'

@@ -273,6 +273,11 @@ export const registerApplicationReviewRoutes = (
 
     if (found.account_id !== null) {
       const origin = originOf(request, config)
+      const roles = await db
+        .select({ role: accountRole.role })
+        .from(accountRole)
+        .where(eq(accountRole.account_id, found.account_id))
+      const member = roles.length > 0
 
       await notify(found.account_id, {
         category: 'application_news',
@@ -285,6 +290,7 @@ export const registerApplicationReviewRoutes = (
             name: found.applicant_name,
             said: body.body,
             link: absolute(origin, '/apply'),
+            member,
           }),
       }).catch((failure: unknown) => {
         request.log.error({ err: failure }, 'telling an applicant of a reply')

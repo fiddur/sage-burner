@@ -990,6 +990,12 @@ Host: evil.example
 the real host. Account takeover, admin accounts included, from an unauthenticated request.
 With `PUBLIC_ORIGIN` unset nothing is minted and nothing is posted; the log says why.
 
+**A moved address drops one too, and an unchanged one does not** (#754). The link went to the
+address that was on the account, so moving it invalidates the link — but the admin's account page
+posts every field on every save, so testing whether the body _carries_ an address made correcting
+a name or ticking an allergy kill a link somebody was holding. The stored address is read in the
+same transaction and compared.
+
 **A password set any other way drops an outstanding link** (#743). Minting drops the account's
 earlier row and spending deletes it, so the link is single-use against itself — but an admin
 setting the password from ⚙️'s accounts list used to leave one live for up to two hours, which is
@@ -997,10 +1003,13 @@ exactly the case that reset exists for. `dropResets` is the one function both ca
 transaction that writes the hash. The opportunistic rehash on login deliberately does not: it
 writes the same password, so nothing about the account changed and there is nothing to invalidate.
 
-**The token never reaches a log line** (#744). It travels in the path, so `req.url` carried it
-into anything reading the container's output — for two hours, the same as holding the mail.
-`requestSerializer` masks the token segment of the two token-carrying routes, this one and the
-invite's, which had always had the same exposure.
+**The token never reaches a log line** (#744, #751). It travels in the path, so `req.url` carried
+it into anything reading the container's output — for two hours, the same as holding the mail.
+`requestSerializer` masks the token segment of the four routes that carry one: the two API reads,
+and — the half #744 missed — the two **page** paths the mail actually links to. `/reset/<token>`
+is a full page load of the shell, so following the link from an inbox wrote the live credential
+into the log on the one request every recipient makes. `RESET_PATTERN` and `INVITE_PATTERN` are in
+`CARRIES_A_TOKEN` beside the API spellings, which is what #742 put in `pages.ts` for.
 
 **Where the installation cannot post one there is no offer at all.** `GET /api/installation`
 carries `sends_email` and, since this, `knows_own_address` — the two halves of being able to
@@ -1402,6 +1411,12 @@ email does. Their reader cannot reach them: `/profile` needs a role, so `OFF_SWI
 at a page that answers them nothing. They say why the mail arrived instead, and that nothing else
 follows unless they ask for it — true for somebody with no role, every other category's email
 column being off until they turn it on.
+
+**Which footer a letter ends with is the reader's role, never which letter it is** (#758).
+`footerFor(member)` is the one rule: `replyMessage` had `WHY_YOU_GOT_THIS` unconditionally, and a
+reply is reachable after approval — `Conversation` renders for any application with an account
+whatever its status — so an organiser writing on a thread after admitting somebody told a member
+that nothing else would arrive, with a digest due the next morning.
 
 **The approval is the exception, because by the time it is written the reader is a member.**
 `settle('approved')` inserts the `member` row in the transaction, and `tellApplicant` runs after

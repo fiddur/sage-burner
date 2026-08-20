@@ -69,7 +69,7 @@ describe('asking for a link to a new password', () => {
     renderPage({ requestPasswordReset: ask }, { sendsEmail: false })
 
     expect(screen.queryByLabelText('Email')).toBeNull()
-    expect(screen.getByText(/cannot post you a link/)).toBeTruthy()
+    expect(screen.getByText(/No link can be sent from here/)).toBeTruthy()
     expect(ask).not.toHaveBeenCalled()
   })
 
@@ -91,7 +91,7 @@ describe('asking for a link to a new password', () => {
     )
 
     expect(screen.queryByLabelText('Email')).toBeNull()
-    expect(screen.queryByText(/cannot post you a link/)).toBeNull()
+    expect(screen.queryByText(/No link can be sent from here/)).toBeNull()
   })
 
   it('falls back to ask-an-organiser when the installation cannot be read at all', () => {
@@ -103,7 +103,7 @@ describe('asking for a link to a new password', () => {
       </LocationProvider>,
     )
 
-    expect(screen.getByText(/cannot post you a link/)).toBeTruthy()
+    expect(screen.getByText(/No link can be sent from here/)).toBeTruthy()
     expect(screen.queryByText('One moment…')).toBeNull()
   })
 
