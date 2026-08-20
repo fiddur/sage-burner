@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Opened } from './components/OpenedDream.tsx'
 
-import { dreamIdOf, heldOr, openedFrom, panelIsShowing } from './panel-url.ts'
+import { dreamIdOf, openedFrom, panelIsShowing } from './panel-url.ts'
 
 const NEW_FORM: Opened = { kind: 'new', place_id: null, time_slot_start: null, time_slot_end: null }
 const A_DREAM: Opened = { kind: 'dream', id: 's-1', editing: false }
@@ -35,8 +35,6 @@ describe('what the query does to the panel that is open', () => {
   })
 
   it('leaves the offer form alone when the query names no dream, which is what it never does', () => {
-    // The form is deliberately not in the query (#757), so a query without a dream must not be
-    // read as "close it" — that is what keeps a half-written form through a same-page entry.
     expect(openedFrom(NEW_FORM, undefined)).toBe(NEW_FORM)
   })
 })
@@ -62,16 +60,5 @@ describe('whether a panel is actually showing', () => {
 
   it('is true for an opened meal whatever the dreams say', () => {
     expect(panelIsShowing([], undefined, { id: 'm-1' })).toBe(true)
-  })
-})
-
-describe('reading what a load is holding', () => {
-  it('gives the data once it is ready', () => {
-    expect(heldOr({ status: 'ready', data: 'the burn' }, 'nothing')).toBe('the burn')
-  })
-
-  it('gives the fallback while it is not, so a hook above the guards has something to read', () => {
-    expect(heldOr<string>({ status: 'loading' }, 'nothing')).toBe('nothing')
-    expect(heldOr<string>({ status: 'failed', message: 'no' }, 'nothing')).toBe('nothing')
   })
 })

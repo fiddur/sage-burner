@@ -39,7 +39,13 @@ export const MealDialog = ({
   const [idea, setIdea] = useState(meal.food_idea)
 
   return (
-    <DreamPanel label={meal.label} error={error} page={phone} onClose={onClose}>
+    <DreamPanel
+      label={meal.label}
+      error={error}
+      page={phone}
+      askBeforeClosing={renaming ? 'Throw this renaming away?' : undefined}
+      onClose={onClose}
+    >
       <h2>{meal.label}</h2>
       <p class="form-note">
         {meal.date} · {meal.at}

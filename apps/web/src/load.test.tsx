@@ -8,7 +8,7 @@ import type { Loaded } from './load.ts'
 import type { Remembered } from './remembered.tsx'
 
 import { apiError, isApiError } from './api/client.ts'
-import { errorMessage, useAction, useLoad, useLoadInto } from './load.ts'
+import { errorMessage, heldOr, useAction, useLoad, useLoadInto } from './load.ts'
 import { createRemembered, RememberedProvider } from './remembered.tsx'
 
 afterEach(cleanup)
@@ -789,5 +789,16 @@ describe('a write refused because somebody else got there first', () => {
 
     expect(screen.getByTestId('error').textContent).toBe('Give it a name.')
     expect(screen.getByTestId('failure').textContent).toBe('none')
+  })
+})
+
+describe('reading what a load is holding', () => {
+  it('gives the data once it is ready', () => {
+    expect(heldOr({ status: 'ready', data: 'the burn' }, 'nothing')).toBe('the burn')
+  })
+
+  it('gives the fallback while it is not, so a hook above the guards has something to read', () => {
+    expect(heldOr<string>({ status: 'loading' }, 'nothing')).toBe('nothing')
+    expect(heldOr<string>({ status: 'failed', message: 'no' }, 'nothing')).toBe('nothing')
   })
 })

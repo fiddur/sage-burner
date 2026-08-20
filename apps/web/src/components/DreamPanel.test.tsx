@@ -149,6 +149,17 @@ describe('closing a panel that holds something nobody else has', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
+  it('puts the question away when what it interrupted leaves the panel up', () => {
+    const onBack = vi.fn()
+    asking({ onBack, onClose: () => undefined })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'Throw it away' }))
+
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Throw this dream away?')).toBeNull()
+  })
+
   it('asks nothing where there is nothing to lose', () => {
     const onClose = vi.fn()
     panel({ onClose })

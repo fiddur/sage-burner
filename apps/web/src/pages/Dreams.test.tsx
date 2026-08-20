@@ -618,6 +618,7 @@ describe('an opened dream on a phone, which is a page rather than something over
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
     await screen.findByRole('button', { name: 'Open Sunrise yoga' })
     globalThis.scrollTo(0, 745)
+    expect(globalThis.scrollY, 'a list that never scrolled would pass this without a fix').toBe(745)
 
     await openDream('Sunrise yoga')
 

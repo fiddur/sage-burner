@@ -22,15 +22,8 @@ import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../componen
 import { Refreshing } from '../components/Refreshing.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { joinFirst, joinLink } from '../joining.ts'
-import { useAction, useLoad } from '../load.ts'
-import {
-  dreamIdOf,
-  heldOr,
-  openedFrom,
-  panelIsShowing,
-  usePanelAsPage,
-  usePanelsInUrl,
-} from '../panel-url.ts'
+import { heldOr, useAction, useLoad } from '../load.ts'
+import { dreamIdOf, openedFrom, panelIsShowing, usePanelAsPage, usePanelsInUrl } from '../panel-url.ts'
 import { pinchedZoom, touchGap } from '../pinch.ts'
 import {
   endFor,

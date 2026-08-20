@@ -37,6 +37,14 @@ export const DreamPanel = ({
     setPending({ go })
   }
 
+  // Answering clears the question: what it interrupted may leave the panel mounted — cancelling
+  // an edit does — and a question still up would then be asked again before anything was asked.
+  const answer = () => {
+    const held = pending
+    setPending(undefined)
+    held?.go()
+  }
+
   const dismiss = guard(onBack ?? onClose)
   const leave = guard(onClose)
 
@@ -45,6 +53,10 @@ export const DreamPanel = ({
   useEffect(() => {
     if (!page) panel.current?.focus()
   }, [page])
+
+  useEffect(() => {
+    if (askBeforeClosing === undefined) setPending(undefined)
+  }, [askBeforeClosing])
 
   useEffect(() => {
     if (!page) return
@@ -77,7 +89,7 @@ export const DreamPanel = ({
         {pending !== undefined && askBeforeClosing !== undefined && (
           <span class="panel-asking">
             <span>{askBeforeClosing}</span>
-            <button type="button" onClick={pending.go}>
+            <button type="button" onClick={answer}>
               Throw it away
             </button>
             <button type="button" onClick={() => setPending(undefined)}>

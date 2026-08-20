@@ -3,7 +3,6 @@ import { useLocation } from 'preact-iso'
 import { useEffect, useRef } from 'preact/hooks'
 
 import type { Opened } from './components/OpenedDream.tsx'
-import type { Loaded } from './load.ts'
 
 import { usePhone } from './viewport.ts'
 
@@ -65,6 +64,3 @@ export const panelIsShowing = (
 
   return meal !== undefined || dreams.some((dream) => dream.id === wanted)
 }
-
-export const heldOr = <T>(loaded: Loaded<T>, fallback: T): T =>
-  loaded.status === 'ready' ? loaded.data : fallback
