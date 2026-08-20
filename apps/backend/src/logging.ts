@@ -42,11 +42,8 @@ const text = (value: unknown): string | undefined => (typeof value === 'string' 
 
 const whole = (value: unknown): number | undefined => (typeof value === 'number' ? value : undefined)
 
-/**
- * Fastify types this as taking the *raw* `IncomingMessage` while passing its own request, so the
- * fields it wants — `ip`, `host` — are not on the declared type. `unknown` and a reader is what
- * makes that honest rather than a cast.
- */
+// Fastify types this as the raw `IncomingMessage` but passes its own request, so `ip` and
+// `host` are not on the declared type — `unknown` and a reader rather than a cast.
 export const requestSerializer = (request: unknown): Logged => {
   const url = text(at(request, 'url'))
 

@@ -57,3 +57,25 @@ describe('the panel a dream and a meal open in', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 })
+
+describe('the way out of a panel that covers a phone whole', () => {
+  it('offers a ✕ named for what it closes, a notification landing straight in one (#755)', () => {
+    const onClose = vi.fn()
+    panel({ onClose })
+
+    screen.getByRole('button', { name: 'Close Sauna at dawn' }).click()
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes outright even where Escape only goes back, so the ✕ always means out', () => {
+    const onBack = vi.fn()
+    const onClose = vi.fn()
+    panel({ onBack, onClose })
+
+    screen.getByRole('button', { name: 'Close Sauna at dawn' }).click()
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onBack).not.toHaveBeenCalled()
+  })
+})

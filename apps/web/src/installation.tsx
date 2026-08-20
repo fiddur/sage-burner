@@ -13,6 +13,7 @@ interface InstallationContextValue {
   icon?: string | null
   sendsEmail?: boolean
   knowsOwnAddress?: boolean
+  unreachable?: boolean
   socialLogins?: readonly OAuthProvider[]
   setTitle: (title: string) => void
   setBanner: (banner: string | null) => void
@@ -35,6 +36,7 @@ const Provide = ({
   icon,
   sendsEmail,
   knowsOwnAddress,
+  unreachable,
   socialLogins,
   children,
 }: {
@@ -43,6 +45,7 @@ const Provide = ({
   icon?: string | null
   sendsEmail?: boolean
   knowsOwnAddress?: boolean
+  unreachable?: boolean
   socialLogins?: readonly OAuthProvider[]
   children: ComponentChildren
 }) => {
@@ -65,6 +68,7 @@ const Provide = ({
         icon: iconOverride === undefined ? icon : iconOverride,
         sendsEmail: mailOverride ?? sendsEmail,
         knowsOwnAddress,
+        unreachable,
         socialLogins: loginsOverride ?? socialLogins,
         setTitle: setOverride,
         setBanner: setBannerOverride,
@@ -92,6 +96,7 @@ export const InstallationProvider = ({
   icon,
   sendsEmail,
   knowsOwnAddress,
+  unreachable,
   socialLogins,
 }: {
   children: ComponentChildren
@@ -100,6 +105,7 @@ export const InstallationProvider = ({
   icon?: string | null
   sendsEmail?: boolean
   knowsOwnAddress?: boolean
+  unreachable?: boolean
   socialLogins?: readonly OAuthProvider[]
 }) => (
   <Provide
@@ -108,6 +114,7 @@ export const InstallationProvider = ({
     icon={icon}
     sendsEmail={sendsEmail}
     knowsOwnAddress={knowsOwnAddress}
+    unreachable={unreachable}
     socialLogins={socialLogins}
   >
     {children}
@@ -126,6 +133,7 @@ export const FetchedInstallationProvider = ({
   const [icon, setIcon] = useState<string | null | undefined>(undefined)
   const [sendsEmail, setSendsEmail] = useState<boolean | undefined>(undefined)
   const [knowsOwnAddress, setKnowsOwnAddress] = useState<boolean | undefined>(undefined)
+  const [unreachable, setUnreachable] = useState(false)
   const [socialLogins, setSocialLogins] = useState<readonly OAuthProvider[] | undefined>(undefined)
 
   useEffect(() => {
@@ -142,7 +150,9 @@ export const FetchedInstallationProvider = ({
         setKnowsOwnAddress(response.installation.knows_own_address)
         setSocialLogins(response.installation.social_logins)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!controller.signal.aborted) setUnreachable(true)
+      })
 
     return () => {
       controller.abort()
@@ -156,6 +166,7 @@ export const FetchedInstallationProvider = ({
       icon={icon}
       sendsEmail={sendsEmail}
       knowsOwnAddress={knowsOwnAddress}
+      unreachable={unreachable}
       socialLogins={socialLogins}
     >
       {children}
@@ -178,7 +189,8 @@ export const useSetInstallationIcon = () => useContext(InstallationContext).setI
 export const useInstallationSendsEmail = () => useContext(InstallationContext).sendsEmail
 
 export const useCanResetPassword = (): boolean | undefined => {
-  const { sendsEmail, knowsOwnAddress } = useContext(InstallationContext)
+  const { sendsEmail, knowsOwnAddress, unreachable } = useContext(InstallationContext)
+  if (unreachable === true) return false
   if (sendsEmail === undefined || knowsOwnAddress === undefined) return undefined
 
   return sendsEmail && knowsOwnAddress

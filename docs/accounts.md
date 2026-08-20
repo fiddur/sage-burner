@@ -1397,6 +1397,20 @@ is one address for everything about an application.
 The invite mail on the legacy path — an application from before #476, with no account — still goes
 out directly, since there is no account to notify.
 
+**Neither letter names the notification switches** (#747), which every other notification email
+does. An applicant cannot reach them: `/profile` needs a role they have not been given yet, so
+`OFF_SWITCH` would point at a page that answers them nothing. They say why the mail arrived
+instead, and that nothing else follows unless they ask for it — which is true, every other
+category's email column being off until somebody turns it on.
+
+**A letter gets `to` and `name` per recipient and may ignore them.** Both of these do: the
+address for anything about an application is `applicant_email`, which is what the form says will
+reach them, and the name is the one they typed rather than the one on the account. That is safe
+here because both go to one person. **A letter used from a fan-out must build its address from
+`about.to`** — `tellAttendees`, `tellApproved` and `notifyAdmins` spread one `Told` over every
+recipient, so a hardcoded address there would post the same mail to it N times. Nothing does
+that today and no type stops it.
+
 **The digest is the one exception, and it is deliberately one** (#620). The rule above is
 about the per-category channel — an instant copy of each notification, which is somebody
 choosing to be reached that way. The digest is a different thing: **the feed, and only when

@@ -9,6 +9,14 @@ import { htmlFrom, textFrom } from './template.ts'
 
 const OFF_SWITCH = 'You can turn these emails off under Your details → Notifications.'
 
+// Not OFF_SWITCH: an applicant cannot reach that page — `/profile` needs a role they have not
+// been given yet — so it would name a switch they cannot press.
+const WHY_YOU_GOT_THIS =
+  'You are getting this because you applied to join. Nothing else is sent to you unless you ask for it.'
+
+const REJECTED =
+  'Your application has not been accepted this time. If you would like to know more, the organisers are the people to ask — their names and how to reach them are on your page'
+
 const DIGEST_SWITCH = 'You can change how often this arrives, or stop it, under Your details → Notifications.'
 
 const DIGEST_SWITCH_LINKED = 'You can change how often this arrives, or stop it:'
@@ -90,10 +98,10 @@ export const decisionMessage = ({
       {
         paragraph: approved
           ? `Your application has been accepted — you are a member of ${installation}, and you are on the list for the next burn.`
-          : 'Your application has not been accepted this time. If you would like to know more, the organisers are the people to ask — their names and how to reach them are on your page:',
+          : `${REJECTED}${link === undefined ? '.' : ':'}`,
       },
       ...action(link, approved ? 'See the burn' : 'Your page'),
-      { note: installation },
+      { note: WHY_YOU_GOT_THIS },
     ],
   })
 
@@ -119,7 +127,7 @@ export const replyMessage = ({
       { paragraph: 'The organisers wrote on your application:' },
       { quote: said },
       ...action(link, 'Reply'),
-      { note: installation },
+      { note: WHY_YOU_GOT_THIS },
     ],
   })
 

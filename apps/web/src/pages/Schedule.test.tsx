@@ -559,11 +559,11 @@ describe('Schedule', () => {
     expect(await screen.findByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
   })
 
-  it('closes the details again', async () => {
+  it('closes the details again, from the ✕ rather than a word beside the bin', async () => {
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close Cacao ceremony' }))
 
     expect(screen.queryByRole('dialog')).toBeNull()
   })

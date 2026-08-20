@@ -138,9 +138,6 @@ export const DreamDetails = ({
           <p class="row">
             <IconButton icon="edit" label={`Edit ${dream.title}`} disabled={busy} onClick={onEdit} />
             <WithdrawDream title={dream.title} busy={busy} onWithdraw={onRemove} />
-            <button type="button" class="link-button" onClick={onClose}>
-              Close
-            </button>
           </p>
 
           <h3>Talk</h3>

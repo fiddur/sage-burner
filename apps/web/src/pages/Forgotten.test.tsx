@@ -94,6 +94,19 @@ describe('asking for a link to a new password', () => {
     expect(screen.queryByText(/cannot post you a link/)).toBeNull()
   })
 
+  it('falls back to ask-an-organiser when the installation cannot be read at all', () => {
+    render(
+      <LocationProvider>
+        <InstallationProvider unreachable>
+          <Forgotten api={{ requestPasswordReset: () => Promise.resolve() }} />
+        </InstallationProvider>
+      </LocationProvider>,
+    )
+
+    expect(screen.getByText(/cannot post you a link/)).toBeTruthy()
+    expect(screen.queryByText('One moment…')).toBeNull()
+  })
+
   it('says how long to wait when it has been asked too often', async () => {
     renderPage({ requestPasswordReset: () => Promise.reject(apiError(429, 'rate_limited', 'Too many.')) })
 

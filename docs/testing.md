@@ -86,6 +86,8 @@ phone" means 360px.
       row is the short sentence, without it. Nobody has ticked anything.
 - [ ] Approve, then (on a second applicant) reject: **one** mail each, and it is the decision
       mail rather than the one-line copy. ⚙️ → Notifications sent counts one email for it.
+- [ ] Read the foot of any of those three mails: it says why it arrived, and names no
+      settings page — an applicant cannot reach one.
 - [ ] The confirmation says whether anything will be emailed, matching whether
       SMTP is configured.
 - [ ] The new applicant, signed in, reaches their own application and their bell
@@ -291,6 +293,12 @@ phone" means 360px.
       takes the name off again.
 - [ ] Autoscroll moves at the slowest speed setting, and the controls stay
       reachable at the foot of the viewport mid-song.
+- [ ] Open a dream from the schedule at phone width: a ✕ sits top right, and it is still there
+      scrolled to the bottom of a long one. Pressing it closes the panel; the pen and the bin
+      are alone in their row, with no word beside them to press by mistake. The same ✕ is on
+      the offer-a-dream form and on a meal dialog.
+- [ ] Follow a dream's push notification from a cold start: the panel opens, and the ✕ is the
+      way back to a page with navigation on it.
 - [ ] Take a song out: it asks first, saying where the song goes; restore it
       from "Recently taken out".
 - [ ] The song's card is on the feed; song news notifies only those who turned

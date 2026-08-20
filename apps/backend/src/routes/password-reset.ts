@@ -83,7 +83,7 @@ export const registerPasswordResetRoutes = (
 
     db.transaction((tx) => {
       tx.delete(passwordReset).where(lte(passwordReset.expires_at, at.toISOString())).run()
-      tx.delete(passwordReset).where(eq(passwordReset.account_id, who.id)).run()
+      dropResets(tx, who.id)
       tx.insert(passwordReset)
         .values({
           token_hash: minted.token_hash,
@@ -179,7 +179,6 @@ export const registerPasswordResetRoutes = (
       if (claimed === undefined) return undefined
 
       tx.update(account).set({ password_hash }).where(eq(account.id, claimed.account_id)).run()
-      dropResets(tx, claimed.account_id)
 
       return claimed.account_id
     })
