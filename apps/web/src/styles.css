@@ -1575,6 +1575,21 @@ a.person-badge:focus-visible span:last-child {
   cursor: pointer;
 }
 
+/* The question takes the bar's width, so the ✕ it replaces the meaning of stays beside it. */
+.panel-asking {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--sans, inherit);
+  font-size: 0.95rem;
+}
+
+.panel-bar {
+  gap: 0.5rem;
+}
+
 .panel-close:hover,
 .panel-close:focus-visible {
   background: var(--line);

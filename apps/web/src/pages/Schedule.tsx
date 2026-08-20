@@ -23,7 +23,14 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
-import { dreamIdOf, openedFrom, showsAsPage, usePanelAsPage, usePanelsInUrl } from '../panel-url.ts'
+import {
+  dreamIdOf,
+  heldOr,
+  openedFrom,
+  panelIsShowing,
+  usePanelAsPage,
+  usePanelsInUrl,
+} from '../panel-url.ts'
 import { pinchedZoom, touchGap } from '../pinch.ts'
 import {
   endFor,
@@ -84,6 +91,8 @@ const span = (dream: Session) =>
 
 const dayOf = (row: string) => row.slice(0, 10)
 
+const NOTHING_YET: Timetable = { event: null, places: [], sessions: [], attendees: [], meals: [] }
+
 export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
   const viewerId = viewer.account?.id
@@ -96,7 +105,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const burn = useSelectedBurn()
   const { loaded, refreshing, reload } = useLoad<Timetable>(
     async (signal) => {
-      if (burn === undefined) return { event: null, places: [], sessions: [], attendees: [], meals: [] }
+      if (burn === undefined) return NOTHING_YET
 
       const [places, dreams, attendees, plan] = await Promise.all([
         api.getPlaces(burn.event.id, signal),
@@ -146,6 +155,11 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const move = (id: string, changes: Parameters<ScheduleApi['updateSession']>[1]) => {
     run(() => api.updateSession(id, changes), 'Could not move that dream.')
   }
+
+  const held = heldOr(loaded, NOTHING_YET)
+  const shownMeal = held.meals.find((meal) => meal.id === openedMeal)
+  const talk = useDreamThread({ api, threadId: threadOf(held.sessions, opened), run })
+  const asPage = usePanelAsPage(panelIsShowing(held.sessions, opened, shownMeal))
 
   if (viewer.status === 'loading') return <Framed api={api}>{<p class="form-note">One moment…</p>}</Framed>
 
@@ -250,12 +264,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   }
 
   const blocks = meals.flatMap((meal) => mealBlocks(meal))
-  const shownMeal = meals.find((meal) => meal.id === openedMeal)
 
   const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened, viewerId })
-  const talk = useDreamThread({ api, threadId: threadOf(sessions, opened), run })
-
-  const asPage = usePanelAsPage(showsAsPage(sessions, opened, shownMeal))
 
   const offer = ({ title = '', ...fields }: SessionUpdate) => {
     run(

@@ -55,12 +55,15 @@ export const dreamIdOf = (opened: Opened | undefined): string | undefined =>
 
 export const usePanelAsPage = (showing: boolean): boolean => usePhone() && showing
 
-export const showsAsPage = (
+export const panelIsShowing = (
   dreams: readonly { id: string }[],
   opened: Opened | undefined,
-  meal?: unknown,
+  meal?: { id: string },
 ): boolean => {
   const wanted = dreamIdOf(opened)
 
   return meal !== undefined || dreams.some((dream) => dream.id === wanted)
 }
+
+export const heldOr = <T>(loaded: { status: string; data?: T }, fallback: T): T =>
+  loaded.status === 'ready' && loaded.data !== undefined ? loaded.data : fallback

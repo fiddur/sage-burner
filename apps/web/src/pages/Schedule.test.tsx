@@ -1266,13 +1266,21 @@ describe('the kitchen', () => {
     expect(within(panel).getByLabelText('Food idea for Dinner')).toHaveProperty('value', 'Vegan bolognese')
   })
 
-  it('names the opened meal in the query on any width, so Back closes it', async () => {
-    renderPage(withMeals([aMeal()]))
+  it('names that meal in the query, and Back closes it', async () => {
+    const meal = aMeal()
+    renderPage(withMeals([meal]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cooking · Dinner' }))
 
     await waitFor(() => {
-      expect(new URL(window.location.href).searchParams.get('meal')).toBeTruthy()
+      expect(new URL(window.location.href).searchParams.get('meal')).toBe(meal.id)
+    })
+
+    history.replaceState(null, '', '/schedule')
+    globalThis.dispatchEvent(new PopStateEvent('popstate'))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Dinner' })).toBeNull()
     })
   })
 

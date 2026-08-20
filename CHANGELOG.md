@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-20
 
+- **A dream opened from far down the list arrives at the top of it, with the navigation in place.**
+  It was keeping the scroll you were at, so the first thing you saw was a page with no bar above
+  and no tabs below — the thing that page was meant to stop.
+
+- **Closing a half-written dream asks first.** The ✕ used to throw away whatever you had typed.
+
 - **On a phone, an opened dream or meal is a page rather than something laid over one.** The bar
   is above it and the tabs below it, so there is somewhere to go from it — and Back closes it,
   which it never did before. The address bar names which one is open, so a link to a dream is a

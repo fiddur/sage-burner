@@ -303,8 +303,12 @@ phone" means 360px.
 - [ ] Back closes it, and the address bar loses `?dream=` when you press the ✕. Open a dream,
       close it, and press Back: it does not reopen.
 - [ ] The same holds for a meal block on the schedule (`?meal=`), and for a dream opened there.
-- [ ] Tap an empty slot to offer a dream: that one is still a dialog at phone width, and Back
-      does not throw the half-written form away.
+- [ ] Tap an empty slot to offer a dream: that one is still a dialog at phone width. Type
+      something and press the ✕ — it asks before throwing it away. **Back still loses it**, which
+      is #768.
+- [ ] Open a dream from the bottom of a long list: it arrives at the top, with the bar above and
+      the tabs below, rather than keeping the list's scroll.
+- [ ] Follow a dream's notification into a cold tab: no ember rectangle is drawn around the page.
 - [ ] Follow a dream's push notification from a cold start: the dream is the page, with the
       navigation on it.
 - [ ] Take a song out: it asks first, saying where the song goes; restore it

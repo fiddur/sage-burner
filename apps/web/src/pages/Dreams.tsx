@@ -15,7 +15,14 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
 import { joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
-import { dreamIdOf, openedFrom, showsAsPage, useOpenedInUrl, usePanelAsPage } from '../panel-url.ts'
+import {
+  dreamIdOf,
+  heldOr,
+  openedFrom,
+  panelIsShowing,
+  useOpenedInUrl,
+  usePanelAsPage,
+} from '../panel-url.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
@@ -70,7 +77,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
   const burn = useSelectedBurn()
   const { loaded, refreshing, reload } = useLoad(
     async (signal) => {
-      if (burn === undefined) return { sessions: [], places: [], attendees: [] }
+      if (burn === undefined) return EMPTY
 
       const [dreams, places, attendees] = await Promise.all([
         api.getSessions(burn.event.id, signal),
@@ -124,21 +131,21 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     }, 'Could not offer that.')
   }
 
-  const held = loaded.status === 'ready' ? loaded.data : EMPTY
+  const held = heldOr(loaded, EMPTY)
   const { sessions: dreams, places, attendees } = held
 
   const talk = useDreamThread({ api, threadId: threadOf(dreams, opened), run })
 
-  const asPage = usePanelAsPage(showsAsPage(dreams, opened))
+  const asPage = usePanelAsPage(panelIsShowing(dreams, opened))
 
   return (
     <GuardedPage title="Dreams" require="approved">
+      <h1>
+        Dreams <Refreshing on={refreshing} />
+      </h1>
+
       {!asPage && (
         <>
-          <h1>
-            Dreams <Refreshing on={refreshing} />
-          </h1>
-
           <p class="form-note">
             Workshops, ceremonies, happenings — whatever you want to offer. Say what it is now and work out
             when later; most dreams have no time until quite close to the burn.

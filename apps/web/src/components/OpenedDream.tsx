@@ -196,7 +196,12 @@ export const OpenedDream = ({
     if (onOffer === undefined) return null
 
     return (
-      <DreamPanel label="Offer a dream" error={error} onClose={onClose} onBack={() => undefined}>
+      <DreamPanel
+        label="Offer a dream"
+        error={error}
+        askBeforeClosing="Throw this dream away?"
+        onClose={onClose}
+      >
         <h2>Offer a dream</h2>
         <DreamFields
           dream={{
