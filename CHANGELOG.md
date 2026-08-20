@@ -7,6 +7,19 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-20
+
+- **A dream, a meal or the offer-a-dream form closes with a ✕ in its top right.** Opened from a
+  notification, one of these fills a phone with no navigation anywhere, and the only marked way
+  out was a _Close_ sitting between the pen and the bin. The ✕ stays put as you scroll, and that
+  row is now just the pen and the bin.
+
+- **Setting somebody's password stops a reset link they were already sent.** If they asked for
+  one and an organiser set a new password instead, the link they hold no longer works.
+
+- **Mail about your application says why it reached you.** It used to end with the installation's
+  name and nothing else.
+
 # 2026-08-19
 
 - **Signing up through Discord no longer copies the Discord name into your name.** A Discord

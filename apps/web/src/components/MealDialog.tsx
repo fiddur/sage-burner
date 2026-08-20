@@ -138,13 +138,8 @@ export const MealDialog = ({
         onStand={onStand}
       />
 
-      <p class="row">
-        <button type="button" class="link-button" onClick={onClose}>
-          Close
-        </button>
-        <span class="form-note">
-          The whole plan is on <a href="/meals">Meals</a>.
-        </span>
+      <p class="form-note">
+        The whole plan is on <a href="/meals">Meals</a>.
       </p>
     </DreamPanel>
   )

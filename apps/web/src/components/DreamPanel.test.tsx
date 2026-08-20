@@ -57,3 +57,16 @@ describe('the panel a dream and a meal open in', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 })
+
+describe('the way out of a panel that covers a phone whole', () => {
+  it('offers a ✕ named for what it closes, and closes outright even where Escape goes back', () => {
+    const onBack = vi.fn()
+    const onClose = vi.fn()
+    panel({ onBack, onClose })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Sauna at dawn' }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onBack).not.toHaveBeenCalled()
+  })
+})

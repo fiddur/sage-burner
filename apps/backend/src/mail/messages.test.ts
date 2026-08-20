@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   absolute,
+  decisionMessage,
   digestMessage,
   inviteMessage,
   notificationMessage,
+  replyMessage,
   resetMessage,
   testMessage,
 } from './messages.ts'
@@ -234,5 +236,70 @@ describe('the digest', () => {
 
     expect(digest.text).toContain('and 7 more')
     expect(digest.text).not.toContain('http')
+  })
+})
+
+describe('what a letter about an application says at the foot', () => {
+  const settled = (link: string | undefined) =>
+    decisionMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      name: 'Ada',
+      approved: false,
+      link,
+    })
+
+  it('names no switch to a rejected applicant, who has no page to press one on', () => {
+    expect(settled('https://burn.example.org/apply').text).not.toContain('Your details')
+    expect(settled('https://burn.example.org/apply').text).toContain('because you applied to join')
+  })
+
+  it('names the switch to somebody approved, the role granted a moment earlier reaching it', () => {
+    const welcomed = decisionMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      name: 'Ada',
+      approved: true,
+      link: 'https://burn.example.org/',
+    })
+
+    expect(welcomed.text).toContain('Your details → Notifications')
+  })
+
+  it('promises a rejected applicant nothing further, which a new member cannot be promised', () => {
+    expect(settled(undefined).text.replaceAll('\n', ' ')).toContain(
+      'Nothing else is sent to you unless you ask for it',
+    )
+    expect(
+      decisionMessage({
+        installation: 'The Burning Sage',
+        to: 'ada@example.org',
+        name: 'Ada',
+        approved: true,
+        link: 'https://burn.example.org/',
+      }).text,
+    ).not.toContain('Nothing else is sent to you')
+  })
+
+  it('ends the rejection on a full stop where there is no page to point at', () => {
+    expect(settled(undefined).text).toContain('are on your page.')
+    expect(settled(undefined).text).not.toContain('are on your page:')
+  })
+
+  it('keeps the colon where the button follows it', () => {
+    expect(settled('https://burn.example.org/apply').text).toContain('are on your page:')
+  })
+
+  it('says the same of a reply, which the applicant cannot switch off either', () => {
+    const reply = replyMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      name: 'Ada',
+      said: 'Who are you coming with?',
+      link: undefined,
+    })
+
+    expect(reply.text).toContain('because you applied to join')
+    expect(reply.text).toContain('> Who are you coming with?')
   })
 })

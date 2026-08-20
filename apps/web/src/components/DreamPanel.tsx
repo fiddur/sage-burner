@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'preact/hooks'
 import { joinLink } from '../joining.ts'
 import { useOverlay } from '../overlay.ts'
 import { ErrorText } from './ErrorText.tsx'
+import { Icon } from './Icon.tsx'
 
 export const DreamPanel = ({
   label,
@@ -49,6 +50,12 @@ export const DreamPanel = ({
         ref={panel}
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
+        <p class="panel-bar">
+          <button type="button" class="panel-close" aria-label={`Close ${label}`} onClick={onClose}>
+            <Icon name="close" />
+          </button>
+        </p>
+
         <ErrorText message={error} link={joinLink(error)} />
         {children}
       </div>

@@ -1533,11 +1533,51 @@ a.person-badge:focus-visible span:last-child {
   max-width: 32rem;
   max-height: 90vh;
   overflow-y: auto;
-  padding: 1rem 1.25rem;
+  /* No top padding: `.panel-bar` supplies it, so the bar can stick flush to the scrollport's
+     top edge. With padding here the bar would stick a padding's worth down, leaving a strip of
+     content scrolling past above it. */
+  padding: 0 1.25rem 1rem;
   border-radius: 0.5rem;
   background: var(--paper);
   color: var(--ink);
   border: 1px solid var(--line);
+}
+
+/*
+  The panel covers a phone whole, and somebody arriving on a notification has no bar to go back
+  to (#755). Sticky rather than absolute so the ✕ is still there part-way down a long dream —
+  which is where the person who cannot find a way out has already scrolled to.
+*/
+.panel-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 -1.25rem 0.25rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 44px: a touch target somebody stabs at without looking. */
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.4rem;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.panel-close:hover,
+.panel-close:focus-visible {
+  background: var(--line);
 }
 
 .dream-panel h2 {

@@ -238,6 +238,26 @@ scroll and Tab cannot reach into it — `useOverlay`, which the dream panel uses
 an overlay that covers the page while the page scrolls under it, or hands focus to a
 control behind an opaque backdrop, is telling two stories about what is interactive.
 
+**The dream panel wants the same ✕, and wanted it more** (#755). It is `position: fixed;
+inset: 0` with the bars underneath, so a push notification opening `/dreams?burn=…&dream=…`
+put somebody straight inside an overlay with no navigation and no visible way out. It was
+dismissable — 1rem of backdrop around it, or Escape — but a phone has no keyboard and that
+strip is not something anybody finds. The only visible way out was a text **Close** in the
+row beside the pen and the bin, which is two-thirds a row of things that change or destroy
+the dream.
+
+So the ✕ is in `DreamPanel`, which is the one component behind all three overlays — the
+dream, the offer-a-dream form and the meal dialog. It is **sticky rather than absolute**:
+the person who cannot find a way out has already scrolled looking for one, and a control
+that scrolled away with the heading would not be there when they did. `.dream-panel` gives
+up its top padding for that — `.panel-bar` supplies it, so the bar can stick flush to the
+scrollport's top edge instead of a padding's worth down with content sliding past above it.
+
+**The ✕ always closes, where Escape sometimes goes back.** `onBack` is what stops a stray
+tap on the backdrop discarding a half-written dream, and while an edit is open Escape means
+cancel-the-edit. A ✕ that sometimes shut the panel and sometimes did not would be the same
+control telling two stories, so it is `onClose` every time.
+
 There is no ☰ at all when it would open onto nothing — a signed-out visitor may follow
 none of it.
 
