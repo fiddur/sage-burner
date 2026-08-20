@@ -1,8 +1,7 @@
 import type { Place, Session } from '@sage-burner/shared'
 
-import { DREAM_PARAM, MAX_TITLE } from '@sage-burner/shared'
-import { useLocation } from 'preact-iso'
-import { useEffect, useState } from 'preact/hooks'
+import { DREAM_PARAM, dreamsPage, MAX_TITLE } from '@sage-burner/shared'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { Opened } from '../components/OpenedDream.tsx'
@@ -16,6 +15,7 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
 import { joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
+import { dreamIdOf, openedFrom, showsAsPage, useOpenedInUrl, usePanelAsPage } from '../panel-url.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
@@ -59,6 +59,8 @@ const when = (dream: Session) => {
   return `${day} ${clock}`
 }
 
+const EMPTY = { sessions: [], places: [], attendees: [] }
+
 export const Dreams = ({ api }: { api: DreamsApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
@@ -92,6 +94,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
   const setOpened = (next: Opened | undefined) => {
     setError(undefined)
     setOpenedPanel(next)
+    showInUrl(dreamIdOf(next))
   }
 
   const { support, help, facilitate, save, remove } = dreamActions({
@@ -101,11 +104,12 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     viewerId: viewer.account?.id,
   })
 
-  const asked: string | undefined = useLocation().query?.[DREAM_PARAM]
-
-  useEffect(() => {
-    if (asked !== undefined) setOpenedPanel({ kind: 'dream', id: asked, editing: false })
-  }, [asked])
+  const showInUrl = useOpenedInUrl(
+    DREAM_PARAM,
+    (id) =>
+      burn === undefined ? undefined : dreamsPage(burn.event.id, id === undefined ? {} : { dream: id }),
+    (asked) => setOpenedPanel((held) => openedFrom(held, asked)),
+  )
 
   const offerByTitle = () => {
     if (title.trim() === '') {
@@ -120,84 +124,91 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     }, 'Could not offer that.')
   }
 
-  const dreams = loaded.status === 'ready' ? loaded.data.sessions : []
-  const places = loaded.status === 'ready' ? loaded.data.places : []
-  const attendees = loaded.status === 'ready' ? loaded.data.attendees : []
+  const held = loaded.status === 'ready' ? loaded.data : EMPTY
+  const { sessions: dreams, places, attendees } = held
 
   const talk = useDreamThread({ api, threadId: threadOf(dreams, opened), run })
 
+  const asPage = usePanelAsPage(showsAsPage(dreams, opened))
+
   return (
     <GuardedPage title="Dreams" require="approved">
-      <h1>
-        Dreams <Refreshing on={refreshing} />
-      </h1>
+      {!asPage && (
+        <>
+          <h1>
+            Dreams <Refreshing on={refreshing} />
+          </h1>
 
-      <p class="form-note">
-        Workshops, ceremonies, happenings — whatever you want to offer. Say what it is now and work out when
-        later; most dreams have no time until quite close to the burn.
-      </p>
+          <p class="form-note">
+            Workshops, ceremonies, happenings — whatever you want to offer. Say what it is now and work out
+            when later; most dreams have no time until quite close to the burn.
+          </p>
 
-      {error !== undefined && opened === undefined && <ErrorText message={error} link={joinLink(error)} />}
+          {error !== undefined && opened === undefined && (
+            <ErrorText message={error} link={joinLink(error)} />
+          )}
 
-      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+          {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
+          {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {loaded.status === 'ready' && dreams.length === 0 && (
-        <p class="form-note">Nobody has offered a dream yet. Yours can be the first.</p>
-      )}
+          {loaded.status === 'ready' && dreams.length === 0 && (
+            <p class="form-note">Nobody has offered a dream yet. Yours can be the first.</p>
+          )}
 
-      <ol class="dream-list">
-        {dreams.map((dream) => (
-          <li key={dream.id} class="dream-row">
-            <button
-              type="button"
-              class="dream-row-open"
-              aria-label={`Open ${dream.title}`}
-              disabled={busy}
-              onClick={() => setOpened({ kind: 'dream', id: dream.id, editing: false })}
-            >
-              <span class="dream-title">
-                {dream.title}
-                {dream.repeatable && (
-                  <span class="dream-repeats">
-                    <Icon name="repeats" />
-                    <span class="visually-hidden">Can be planned more than once</span>
+          <ol class="dream-list">
+            {dreams.map((dream) => (
+              <li key={dream.id} class="dream-row">
+                <button
+                  type="button"
+                  class="dream-row-open"
+                  aria-label={`Open ${dream.title}`}
+                  disabled={busy}
+                  onClick={() => setOpened({ kind: 'dream', id: dream.id, editing: false })}
+                >
+                  <span class="dream-title">
+                    {dream.title}
+                    {dream.repeatable && (
+                      <span class="dream-repeats">
+                        <Icon name="repeats" />
+                        <span class="visually-hidden">Can be planned more than once</span>
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <span class="dream-when">{when(dream) ?? 'not scheduled yet'}</span>
-              <span class="dream-place">{placeLabel(places, dream.place_id) ?? '—'}</span>
+                  <span class="dream-when">{when(dream) ?? 'not scheduled yet'}</span>
+                  <span class="dream-place">{placeLabel(places, dream.place_id) ?? '—'}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+
+          <form
+            class="form"
+            onSubmit={(submitEvent) => {
+              submitEvent.preventDefault()
+              offerByTitle()
+            }}
+          >
+            <h2>Offer a dream</h2>
+
+            <label class="field">
+              <span>What is it?</span>
+              <input
+                type="text"
+                name="title"
+                maxLength={MAX_TITLE}
+                aria-required
+                value={title}
+                onInput={(inputEvent) => setTitle(inputEvent.currentTarget.value)}
+              />
+            </label>
+
+            <button type="submit" disabled={busy}>
+              Offer it
             </button>
-          </li>
-        ))}
-      </ol>
-
-      <form
-        class="form"
-        onSubmit={(submitEvent) => {
-          submitEvent.preventDefault()
-          offerByTitle()
-        }}
-      >
-        <h2>Offer a dream</h2>
-
-        <label class="field">
-          <span>What is it?</span>
-          <input
-            type="text"
-            name="title"
-            maxLength={MAX_TITLE}
-            aria-required
-            value={title}
-            onInput={(inputEvent) => setTitle(inputEvent.currentTarget.value)}
-          />
-        </label>
-
-        <button type="submit" disabled={busy}>
-          Offer it
-        </button>
-      </form>
+          </form>
+        </>
+      )}
 
       <OpenedDream
         opened={opened}

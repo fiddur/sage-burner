@@ -253,6 +253,24 @@ that scrolled away with the heading would not be there when they did. `.dream-pa
 up its top padding for that — `.panel-bar` supplies it, so the bar can stick flush to the
 scrollport's top edge instead of a padding's worth down with content sliding past above it.
 
+**On a phone it is not a modal at all** (#757). A covering overlay is a page with the navigation
+taken off it, and that is what somebody arriving on a notification got. Under `(max-width: 45rem)`
+the panel drops its backdrop, its `role="dialog"`, its `aria-modal` and `useOverlay` — the scroll
+lock and the focus trap are both **wrong** once the bars are reachable, since they say the page
+behind is not there when it is — and the page gives its own content up instead of hiding behind
+it. `usePanelAsPage` and the panel both read `usePhone()`; if those two ever disagreed the result
+would be a blank page or the grid behind an overlay with no edges.
+
+**Which panel is open is the query, not `useState`** (#757). It always seeded from `?dream=` on
+arrival and never wrote back, so tapping a dream changed no URL and **Back did not close it** —
+from a notification, Back left the app. Opening pushes and closing replaces: a push on the way out
+would leave the open panel one Back press away again. `?meal=` does the same on the schedule, and
+closing a dream there keeps an open meal in the query rather than dropping it.
+
+**The offer-a-dream form stays a modal at every width**, and that is the exception. It carries a
+lane and an hour rather than a dream, so there is nothing to link to, and a half-written form is
+the one thing that must not be one Back press from gone.
+
 **The ✕ always closes, where Escape sometimes goes back.** `onBack` is what stops a stray
 tap on the backdrop discarding a half-written dream, and while an edit is open Escape means
 cancel-the-edit. A ✕ that sometimes shut the panel and sometimes did not would be the same

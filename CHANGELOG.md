@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-20
 
+- **On a phone, an opened dream or meal is a page rather than something laid over one.** The bar
+  is above it and the tabs below it, so there is somewhere to go from it — and Back closes it,
+  which it never did before. The address bar names which one is open, so a link to a dream is a
+  link to a dream. On a wide screen it is still a panel over the schedule, where the grid behind
+  it is the point.
+
 - **A dream, a meal or the offer-a-dream form closes with a ✕ in its top right.** Opened from a
   notification, one of these fills a phone with no navigation anywhere, and the only marked way
   out was a _Close_ sitting between the pen and the bin. The ✕ stays put as you scroll, and that

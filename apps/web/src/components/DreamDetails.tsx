@@ -6,6 +6,7 @@ import type { DreamTalk } from './OpenedDream.tsx'
 
 import { toLocalInput } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
+import { usePhone } from '../viewport.ts'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
 import { DreamThread } from './DreamThread.tsx'
@@ -56,11 +57,13 @@ export const DreamDetails = ({
   onRemove: () => void
 }) => {
   const place = places.find((lane) => lane.id === dream.place_id)
+  const phone = usePhone()
 
   return (
     <DreamPanel
       label={dream.title}
       error={error}
+      page={phone}
       onBack={editing ? onCancelEdit : undefined}
       onClose={onClose}
     >

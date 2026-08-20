@@ -6,8 +6,22 @@ export const BURN_PARAM = 'burn'
 
 export const DREAM_PARAM = 'dream'
 
-export const dreamPage = (eventId: string, dreamId: string): string =>
-  `/dreams?${BURN_PARAM}=${encodeURIComponent(eventId)}&${DREAM_PARAM}=${encodeURIComponent(dreamId)}`
+export const MEAL_PARAM = 'meal'
+
+const opening = (eventId: string, open: { dream?: string; meal?: string }): string =>
+  [
+    `${BURN_PARAM}=${encodeURIComponent(eventId)}`,
+    ...(open.dream === undefined ? [] : [`${DREAM_PARAM}=${encodeURIComponent(open.dream)}`]),
+    ...(open.meal === undefined ? [] : [`${MEAL_PARAM}=${encodeURIComponent(open.meal)}`]),
+  ].join('&')
+
+export const dreamsPage = (eventId: string, open: { dream?: string } = {}): string =>
+  `/dreams?${opening(eventId, open)}`
+
+export const dreamPage = (eventId: string, dreamId: string): string => dreamsPage(eventId, { dream: dreamId })
+
+export const schedulePage = (eventId: string, open: { dream?: string; meal?: string } = {}): string =>
+  `/schedule?${opening(eventId, open)}`
 
 export const BRING_PARAM = 'item'
 
