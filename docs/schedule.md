@@ -283,6 +283,23 @@ it after the first thing you did, which is when you most want it.
 The panel edits and withdraws as well as reads. **✏️** swaps in `DreamFields`, and
 **🗑️** withdraws behind a confirmation, for scheduled and unscheduled dreams alike.
 
+### Withdrawing a dream
+
+A withdrawal stamps `session.withdrawn_at` rather than deleting the row — the songbook's
+`deleted_at` shape, adopted here after a dream deleted for real took its whole conversation
+with it. Everything the dream had gathered — comments, helpers, hearts, its slot and place —
+sits untouched under the stamp, so bringing it back is clearing one column, and
+`POST /api/sessions/:id/restore` is exactly that. The Dreams page lists what was withdrawn in
+the last thirty days under "Recently withdrawn" with one button, the songbook's
+`recentlyGone` deciding the window; any approved member can restore, since any could withdraw.
+A withdrawn dream is off the grid, out of the pool, out of the ICS feed and its feed card
+reads gone; editing, helping and hearting answer 404, exactly as when the row was deleted.
+The stamp keeps the slot, so a dream restored months later can sit on a slot another has
+since taken — the grid draws overlaps rather than refusing them, and whoever restores is
+looking at the schedule anyway. Rows deleted before the stamp existed left orphaned threads;
+the migration resurrects each as a withdrawn dream — title from the thread, description and
+the rest lost with the original row.
+
 **The Dreams page opens this same panel** (#342), through `OpenedDream` — the state,
 the writes and the markup are one thing rather than two. It used to swap a row for an
 edit form of its own, so a dream had two ways to be read and two to be edited, and

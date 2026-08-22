@@ -10,6 +10,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Icon } from '../components/Icon.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
@@ -17,6 +18,7 @@ import { joinLink } from '../joining.ts'
 import { heldOr, useAction, useLoad } from '../load.ts'
 import { dreamIdOf, openedFrom, panelIsShowing, useOpenedInUrl, usePanelAsPage } from '../panel-url.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
+import { recentlyGone } from './Songs.tsx'
 
 export type DreamsApi = Pick<
   ApiClient,
@@ -24,6 +26,7 @@ export type DreamsApi = Pick<
   | 'offerSession'
   | 'updateSession'
   | 'withdrawSession'
+  | 'restoreSession'
   | 'getPlaces'
   | 'getEventAttendees'
   | 'helpWithSession'
@@ -125,7 +128,9 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
   }
 
   const held = heldOr(loaded, EMPTY)
-  const { sessions: dreams, places, attendees } = held
+  const { places, attendees } = held
+  const dreams = held.sessions.filter((dream) => dream.withdrawn_at === null)
+  const gone = held.sessions.filter((dream) => recentlyGone(dream.withdrawn_at, Date.now()))
 
   const talk = useDreamThread({ api, threadId: threadOf(dreams, opened), run })
 
@@ -207,6 +212,29 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
               Offer it
             </button>
           </form>
+
+          {gone.length > 0 && (
+            <section>
+              <h2>Recently withdrawn</h2>
+              <p class="form-note">
+                Anybody can withdraw a dream and anybody can bring it back, with its comments and helpers
+                still on it.
+              </p>
+              <ul class="dream-list">
+                {gone.map((dream) => (
+                  <li key={dream.id} class="dream-row is-gone">
+                    <span class="dream-title">{dream.title}</span>
+                    <IconButton
+                      icon="restore"
+                      label={`Bring ${dream.title} back`}
+                      disabled={busy}
+                      onClick={() => run(() => api.restoreSession(dream.id), 'Could not bring that back.')}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
 

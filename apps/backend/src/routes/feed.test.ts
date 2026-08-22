@@ -257,6 +257,28 @@ describe('the feed', () => {
     expect(await cards(server, ada.cookie)).toEqual([])
   })
 
+  it('puts the card back when the dream is brought back', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${dream}`,
+      headers: { cookie: ada.cookie },
+    })
+    await server.inject({
+      method: 'POST',
+      url: `/api/sessions/${dream}/restore`,
+      headers: { cookie: ada.cookie },
+    })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card).toMatchObject({ title: 'Sauna at dawn', gone: false })
+  })
+
   it('keeps the conversation the withdrawal ended, which the thread still answers', async () => {
     const server = await build()
     await givenBurn()

@@ -48,6 +48,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
   time_slot_start: null,
   time_slot_end: null,
   place_id: null,
+  withdrawn_at: null,
   helpers: [],
   supporters: [],
   support_count: 0,
@@ -153,6 +154,24 @@ describe('Schedule', () => {
     expect(await screen.findByRole('columnheader', { name: /Temple/ })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: /Sauna/ })).toBeTruthy()
     expect(document.querySelectorAll('.schedule-grid th[scope="row"]')).toHaveLength(48)
+  })
+
+  it('shows a withdrawn dream nowhere, neither in the grid nor in the pool', async () => {
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Sauna at dawn',
+          time_slot_start: '2026-08-01T10:00:00.000Z',
+          time_slot_end: '2026-08-01T11:00:00.000Z',
+          place_id: 'p-1',
+          withdrawn_at: '2026-07-02T00:00:00.000Z',
+        }),
+      ]),
+    )
+
+    await screen.findByRole('columnheader', { name: /Temple/ })
+    expect(screen.queryByText('Sauna at dawn')).toBeNull()
   })
 
   it('lists an unplaced dream in the pool rather than in the grid', async () => {

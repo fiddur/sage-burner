@@ -26,7 +26,7 @@ import {
   songPage,
   withMentionNames,
 } from '@sage-burner/shared'
-import { and, asc, count, desc, eq, gt, inArray, lte, max, ne, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, inArray, isNull, lte, max, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -472,6 +472,7 @@ export const readThreads = async (
       entity_id: thread.entity_id,
       title: thread.title,
       dream: session.id,
+      dream_withdrawn_at: session.withdrawn_at,
       stay: attendance.id,
       subject: account.id,
       subject_name: account.name,
@@ -641,6 +642,7 @@ interface CardRow {
   entity_id: string
   title: string
   dream: string | null
+  dream_withdrawn_at: string | null
   stay: string | null
   subject: string | null
   subject_name: string | null
@@ -675,12 +677,16 @@ type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
 
 const written = (body: string | null): string | null => (body?.trim() === '' ? null : body)
 
-const dreamFacts = (row: CardRow): CardFacts => ({
-  title: row.title,
-  link: row.dream === null || row.event_id === null ? null : dreamPage(row.event_id, row.entity_id),
-  body: null,
-  gone: row.dream === null,
-})
+const dreamFacts = (row: CardRow): CardFacts => {
+  const gone = row.dream === null || row.dream_withdrawn_at !== null
+
+  return {
+    title: row.title,
+    link: gone || row.event_id === null ? null : dreamPage(row.event_id, row.entity_id),
+    body: null,
+    gone,
+  }
+}
 
 const personFacts = (row: CardRow): CardFacts => ({
   title: row.subject_name ?? row.title,
@@ -1120,7 +1126,7 @@ export const registerThreadRoutes = (
       const [dream] = await db
         .select({ id: session.id })
         .from(session)
-        .where(eq(session.id, found.entity_id))
+        .where(and(eq(session.id, found.entity_id), isNull(session.withdrawn_at)))
         .limit(1)
 
       if (dream === undefined) return sendError(reply, 404)

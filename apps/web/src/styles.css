@@ -1218,6 +1218,19 @@ a.person-badge:focus-visible span:last-child {
   background: color-mix(in srgb, var(--sage) 8%, transparent);
 }
 
+.dream-row.is-gone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.dream-row.is-gone .dream-title {
+  color: var(--muted);
+  text-decoration-line: line-through;
+}
+
 .dream-title {
   flex: 1;
   min-width: 10rem;

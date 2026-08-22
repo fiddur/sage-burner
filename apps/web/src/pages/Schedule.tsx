@@ -110,7 +110,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
       return {
         event: burn.event,
         places: places.places,
-        sessions: dreams.sessions,
+        sessions: dreams.sessions.filter((dream) => dream.withdrawn_at === null),
         attendees: attendees.attendees,
         meals: plan.meals,
       }
