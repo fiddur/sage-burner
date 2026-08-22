@@ -246,6 +246,7 @@ export type RoutesApi = Pick<
   | 'updateSession'
   | 'withdrawSession'
   | 'restoreSession'
+  | 'mergeSession'
   | 'helpWithSession'
   | 'stopHelpingWithSession'
   | 'supportSession'

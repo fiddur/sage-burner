@@ -15,13 +15,14 @@ import {
   hasValidTimeSlot,
   helperSchema,
   sessionCreateSchema,
+  sessionMergeSchema,
   sessionUpdateSchema,
 } from '@sage-burner/shared'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
-import type { Database } from '../db/index.ts'
+import type { Database, Transaction } from '../db/index.ts'
 import type { Notifier } from '../push/notify.ts'
 
 import { attendanceFor } from '../attendances.ts'
@@ -38,12 +39,14 @@ import {
   sessionHelper,
   sessionSupport,
   thread,
+  threadEntry,
+  threadFollow,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow } from './events.ts'
-import { addEntry, renameThread, tellHeartedDream, threadFor, threadIdFor } from './threads.ts'
+import { addEntry, openWith, renameThread, tellHeartedDream, threadFor, threadIdFor } from './threads.ts'
 
 export interface SessionDeps extends GuardDeps {
   now: () => Date
@@ -66,6 +69,7 @@ const dreamColumns = {
   time_slot_end: session.time_slot_end,
   place_id: session.place_id,
   withdrawn_at: session.withdrawn_at,
+  merged_into_id: session.merged_into_id,
   thread_id: thread.id,
 }
 
@@ -140,6 +144,7 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
   time_slot_end: row.time_slot_end,
   place_id: row.place_id,
   withdrawn_at: row.withdrawn_at,
+  merged_into_id: row.merged_into_id,
   thread_id: row.thread_id,
   helpers: helpers.get(row.id) ?? [],
   supporters: support.get(row.id)?.people ?? [],
@@ -355,6 +360,7 @@ export const registerSessionRoutes = (
         event_id: open.id,
         facilitator_account_id: wanted ?? null,
         withdrawn_at: null,
+        merged_into_id: null,
         thread_id: null,
       }
 
@@ -523,6 +529,7 @@ export const registerSessionRoutes = (
 
       const [existing] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
       if (existing === undefined) return sendError(reply, 404)
+      if (existing.merged_into_id !== null) return sendError(reply, 409)
 
       const open = await openEventNow(db, now, existing.event_id)
       if (open === undefined) return sendError(reply, 404)
@@ -541,6 +548,164 @@ export const registerSessionRoutes = (
       const mine = await mineAt(request, existing.event_id)
 
       return { session: await oneDream(db, row, mine) } satisfies SessionResponse
+    },
+  )
+
+  const resequenced = (tx: Transaction, threadId: string) => {
+    const held = tx
+      .select({ id: threadEntry.id, created_at: threadEntry.created_at, seq: threadEntry.seq })
+      .from(threadEntry)
+      .where(eq(threadEntry.thread_id, threadId))
+      .all()
+
+    const ordered = [...held].sort(
+      (one, other) =>
+        one.created_at.localeCompare(other.created_at) ||
+        one.seq - other.seq ||
+        one.id.localeCompare(other.id),
+    )
+
+    ordered.forEach((row, index) => {
+      tx.update(threadEntry)
+        .set({ seq: index + 1 })
+        .where(eq(threadEntry.id, row.id))
+        .run()
+    })
+  }
+
+  const foldPeople = (tx: Transaction, from: DreamRow, into: DreamRow) => {
+    const helpers = tx
+      .select({ attendance_id: sessionHelper.attendance_id })
+      .from(sessionHelper)
+      .where(eq(sessionHelper.session_id, from.id))
+      .all()
+    for (const row of helpers) {
+      tx.insert(sessionHelper)
+        .values({ session_id: into.id, attendance_id: row.attendance_id })
+        .onConflictDoNothing()
+        .run()
+    }
+    tx.delete(sessionHelper).where(eq(sessionHelper.session_id, from.id)).run()
+
+    const hearts = tx
+      .select({ attendance_id: sessionSupport.attendance_id })
+      .from(sessionSupport)
+      .where(eq(sessionSupport.session_id, from.id))
+      .all()
+    for (const row of hearts) {
+      tx.insert(sessionSupport)
+        .values({ session_id: into.id, attendance_id: row.attendance_id })
+        .onConflictDoNothing()
+        .run()
+    }
+    tx.delete(sessionSupport).where(eq(sessionSupport.session_id, from.id)).run()
+  }
+
+  const foldFollows = (tx: Transaction, from: string, into: string) => {
+    const follows = tx.select().from(threadFollow).where(eq(threadFollow.thread_id, from)).all()
+    for (const row of follows) {
+      tx.insert(threadFollow)
+        .values({ thread_id: into, account_id: row.account_id, enabled: row.enabled })
+        .onConflictDoNothing()
+        .run()
+    }
+    tx.delete(threadFollow).where(eq(threadFollow.thread_id, from)).run()
+  }
+
+  const foldDream = (dream: DreamRow, target: DreamRow, by: string | undefined): void => {
+    db.transaction((tx) => {
+      const from = threadIdFor(tx, { type: 'session', ...dream })
+      const into = threadIdFor(tx, { type: 'session', ...target })
+
+      tx.update(threadEntry).set({ thread_id: into }).where(eq(threadEntry.thread_id, from)).run()
+      resequenced(tx, into)
+      foldFollows(tx, from, into)
+      foldPeople(tx, dream, target)
+
+      tx.update(session)
+        .set({ withdrawn_at: now().toISOString(), merged_into_id: target.id })
+        .where(eq(session.id, dream.id))
+        .run()
+
+      openWith(
+        tx,
+        {
+          thread_id: into,
+          kind: 'added',
+          author_account_id: by ?? null,
+          body: `folded “${dream.title}” into this dream`,
+        },
+        now(),
+      )
+      openWith(
+        tx,
+        {
+          thread_id: from,
+          kind: 'withdrawn',
+          author_account_id: by ?? null,
+          body: `folded this dream into “${target.title}”`,
+        },
+        now(),
+      )
+    })
+  }
+
+  const helpersOf = async (dreamId: string) =>
+    (
+      await db
+        .select({ account_id: attendance.account_id })
+        .from(sessionHelper)
+        .innerJoin(attendance, eq(attendance.id, sessionHelper.attendance_id))
+        .where(eq(sessionHelper.session_id, dreamId))
+    ).map((row) => row.account_id)
+
+  const tellTheFolded = async (
+    theirs: readonly (string | null)[],
+    dream: DreamRow,
+    target: DreamRow,
+    by: string | undefined,
+  ) => {
+    const told = new Set(theirs.flatMap((id) => (id === null || id === by ? [] : [id])))
+
+    for (const accountId of told) {
+      await tell(by, accountId, `“${dream.title}” was folded into “${target.title}”`)
+    }
+  }
+
+  app.post<{ Params: { id: string } }>(
+    apiRoutes.mergeSession.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const body = bodyOf(sessionMergeSchema, request)
+      if (body === undefined) return sendError(reply, 400)
+
+      const found = await onOpenBurn(request)
+      if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
+
+      if (body.into === found.dream.id) return sendError(reply, 400)
+
+      const [target] = await dreamRows(
+        db,
+        allOf(
+          eq(session.id, body.into),
+          eq(session.event_id, found.dream.event_id),
+          isNull(session.withdrawn_at),
+        ),
+      ).limit(1)
+      if (target === undefined) return sendError(reply, 400)
+
+      const theirs = [found.dream.facilitator_account_id, ...(await helpersOf(found.dream.id))]
+
+      foldDream(found.dream, target, found.callerId)
+
+      await tellTheFolded(theirs, found.dream, target, found.callerId)
+
+      const [after] = await dreamRows(db, eq(session.id, target.id)).limit(1)
+      if (after === undefined) return sendError(reply, 404)
+
+      return { session: await oneDream(db, after, found.mine) } satisfies SessionResponse
     },
   )
 

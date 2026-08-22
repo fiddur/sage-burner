@@ -46,6 +46,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
   time_slot_end: null,
   place_id: null,
   withdrawn_at: null,
+  merged_into_id: null,
   helpers: [],
   supporters: [],
   support_count: 0,
@@ -68,6 +69,7 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   withdrawSupportForComment: () => Promise.reject(new Error('withdrawSupportForComment is not stubbed here')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
   restoreSession: () => Promise.reject(new Error('restoreSession is not stubbed here')),
+  mergeSession: () => Promise.reject(new Error('mergeSession is not stubbed here')),
   getEventAttendees: () =>
     Promise.resolve({
       attendees: [
@@ -623,6 +625,58 @@ describe('Dreams', () => {
 
     await screen.findByText('Sunrise yoga')
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+describe('folding one dream into another', () => {
+  const two = () => [
+    aDream({ id: 's-1', title: 'Sunrise yoga' }),
+    aDream({ id: 's-2', title: 'Morning yoga' }),
+  ]
+
+  it('asks which dream, says what will happen, and only then folds', async () => {
+    const mergeSession = vi.fn<DreamsApi['mergeSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Sunrise yoga' }) }),
+    )
+    renderPage(stub({ mergeSession }, two()))
+
+    await openDream('Morning yoga')
+    fireEvent.click(await screen.findByRole('button', { name: 'Fold into another dream…' }))
+
+    const confirm = screen.getByRole('button', { name: 'Fold it in' })
+    expect(confirm).toHaveProperty('disabled', true)
+
+    fireEvent.change(screen.getByLabelText('Fold Morning yoga into'), { target: { value: 's-1' } })
+
+    expect(screen.getByText(/Everything said on “Morning yoga” moves onto “Sunrise yoga”/)).toBeTruthy()
+    expect(screen.getByText(/helpers and hearts count there/)).toBeTruthy()
+    expect(screen.getByText(/cannot be undone/)).toBeTruthy()
+    expect(mergeSession).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fold it in' }))
+
+    await waitFor(() => expect(mergeSession).toHaveBeenCalledWith('s-2', { into: 's-1' }))
+  })
+
+  it('keeps them apart on the other button, calling nothing', async () => {
+    const mergeSession = vi.fn<DreamsApi['mergeSession']>()
+    renderPage(stub({ mergeSession }, two()))
+
+    await openDream('Morning yoga')
+    fireEvent.click(await screen.findByRole('button', { name: 'Fold into another dream…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it apart' }))
+
+    expect(screen.queryByRole('button', { name: 'Fold it in' })).toBeNull()
+    expect(mergeSession).not.toHaveBeenCalled()
+  })
+
+  it('offers no folding when there is nothing to fold into', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openDream('Sunrise yoga')
+
+    expect(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Fold into another dream…' })).toBeNull()
   })
 })
 

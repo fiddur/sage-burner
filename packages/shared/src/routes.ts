@@ -73,6 +73,7 @@ import type {
   RideCreate,
   RideUpdate,
   SessionCreateInput,
+  SessionMerge,
   SessionUpdate,
   SignUpRequest,
   SongCategoryCreateInput,
@@ -839,6 +840,11 @@ export const apiRoutes = {
     fastify: '/api/admin/song-categories/order',
     path: () => '/api/admin/song-categories/order',
   },
+  mergeSession: {
+    method: 'POST',
+    fastify: '/api/sessions/:id/merge',
+    path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/merge`,
+  },
   restoreSession: {
     method: 'POST',
     fastify: '/api/sessions/:id/restore',
@@ -1217,6 +1223,7 @@ export interface RouteBodies {
   reorderFaq: IdOrder
   reorderPlaces: PlaceOrder
   reorderQuestions: FormQuestionOrder
+  mergeSession: SessionMerge
   setAccountPassword: AdminPasswordReset
   setAccountRoles: AccountRolesUpdate
   setLeadRoleLead: LeadRoleLead

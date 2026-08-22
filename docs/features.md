@@ -106,6 +106,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   repeat, and everything a dream needs is editable without leaving the grid.
 - Withdrawing a dream is soft, like taking a song out: for thirty days the Dreams
   page offers to bring it back, comments, helpers and hearts intact.
+- Two dreams that turn out to be one can be folded together — the conversations
+  interleave on the one that stays, helpers and hearts move across, and the other
+  is withdrawn pointing at it.
 - The schedule grid: lanes are places (with emoji and colour), the hours come
   from the burn, blocks drag and resize, and the whole thing pinches on a
   phone. A timetable view reads it as a list.

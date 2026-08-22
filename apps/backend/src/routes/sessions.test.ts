@@ -810,6 +810,212 @@ describe('bringing a withdrawn dream back', () => {
   })
 })
 
+describe('folding one dream into another', () => {
+  const fold = (server: FastifyInstance, cookie: string | undefined, id: string, into: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/sessions/${id}/merge`,
+      headers: cookie === undefined ? {} : { cookie },
+      payload: { into },
+    })
+
+  const comment = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/threads/${threadId}/comments`,
+      headers: { cookie },
+      payload: { body },
+    })
+
+  const givenTwo = async (server: FastifyInstance, cookie: string) => {
+    const kept = (await offer(server, cookie, { title: 'Sunrise yoga' })).json().session
+    const given = (await offer(server, cookie, { title: 'Morning yoga' })).json().session
+    return { kept, given }
+  }
+
+  it('interleaves the two conversations by when things were said', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+    const at = (hour: number) => `2026-07-01T0${hour}:00:00.000Z`
+    const said = async (threadId: string, body: string, created_at: string, seq: number) => {
+      await db().insert(threadEntry).values({
+        id: randomUUID(),
+        thread_id: threadId,
+        kind: 'comment',
+        seq,
+        author_account_id: ada.id,
+        body,
+        created_at,
+      })
+    }
+    await said(kept.thread_id, 'first, on the kept one', at(1), 91)
+    await said(given.thread_id, 'second, on the folded one', at(2), 99)
+    await said(kept.thread_id, 'third, on the kept one', at(3), 92)
+
+    await fold(server, ada.cookie, given.id, kept.id)
+
+    const ordered = await db()
+      .select({ body: threadEntry.body })
+      .from(threadEntry)
+      .innerJoin(thread, eq(thread.id, threadEntry.thread_id))
+      .where(and(eq(thread.entity_type, 'session'), eq(thread.entity_id, kept.id)))
+      .orderBy(threadEntry.seq)
+    const talk = ordered.map((row) => row.body).filter((body) => body.includes('on the'))
+
+    expect(talk).toEqual(['first, on the kept one', 'second, on the folded one', 'third, on the kept one'])
+  })
+
+  it('moves everything said on both onto the one that stays', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+    await comment(server, ada.cookie, given.thread_id, 'sounds like the same thing')
+    await comment(server, ada.cookie, kept.thread_id, 'see you at dawn')
+
+    const response = await fold(server, ada.cookie, given.id, kept.id)
+
+    expect(response.statusCode).toBe(200)
+    const bodies = (await threadEntries(kept.id)).map((entry) => entry.body)
+    expect(bodies).toContain('sounds like the same thing')
+    expect(bodies).toContain('see you at dawn')
+    expect(bodies).toContain('folded “Morning yoga” into this dream')
+    expect(bodies.filter((body) => body === 'offered this dream')).toHaveLength(2)
+  })
+
+  it('leaves one note where the folded dream was, for whoever follows a stale link', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+
+    await fold(server, ada.cookie, given.id, kept.id)
+
+    expect(await threadEntries(given.id)).toEqual([
+      expect.objectContaining({ kind: 'withdrawn', body: 'folded this dream into “Sunrise yoga”' }),
+    ])
+  })
+
+  it('stamps the folded dream withdrawn, pointing at where it went', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+
+    await fold(server, ada.cookie, given.id, kept.id)
+
+    const [row] = await db().select().from(session).where(eq(session.id, given.id))
+    expect(row).toMatchObject({ withdrawn_at: NOW, merged_into_id: kept.id })
+  })
+
+  it('moves helpers and hearts across, counting nobody twice', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const bea = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+    await helping(server, ada, kept.id, 'POST')
+    await helping(server, ada, given.id, 'POST')
+    await helping(server, bea, given.id, 'POST')
+    await selfService(server, ada.cookie, kept.id, 'support', 'POST')
+    await selfService(server, ada.cookie, given.id, 'support', 'POST')
+    await selfService(server, bea.cookie, given.id, 'support', 'POST')
+
+    const response = await fold(server, ada.cookie, given.id, kept.id)
+
+    const after = response.json().session
+    expect(after.helpers.map((helper: { account_id: string }) => helper.account_id).toSorted()).toEqual(
+      [ada.id, bea.id].toSorted(),
+    )
+    expect(after.support_count).toBe(2)
+  })
+
+  it('tells whoever held a hand up on the folded one, and never the caller', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const server = await build(deliver)
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const bea = await givenAttending(OPEN_BURN)
+    await givenSubscribed(ada.id)
+    await givenSubscribed(bea.id)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+    await helping(server, bea, given.id, 'POST', bea.id)
+    deliver.mockClear()
+
+    await fold(server, ada.cookie, given.id, kept.id)
+
+    expect(messagesFrom(deliver)).toEqual(['“Morning yoga” was folded into “Sunrise yoga”'])
+  })
+
+  it('answers the dream that stays, whole', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+
+    const response = await fold(server, ada.cookie, given.id, kept.id)
+
+    expect(response.json().session).toMatchObject({ id: kept.id, title: 'Sunrise yoga', withdrawn_at: null })
+  })
+
+  it('refuses folding a dream into itself, into a stranger burn’s, or into one that is gone', async () => {
+    const server = await build()
+    const other = randomUUID()
+    await givenEvent()
+    await givenEvent({ id: other, start_date: '2026-12-01', end_date: '2026-12-05' })
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+    const elsewhere = (await offer(server, ada.cookie, { title: 'Winter sauna' }, other)).json().session
+    await drop(server, ada.cookie, kept.id)
+
+    expect((await fold(server, ada.cookie, given.id, given.id)).statusCode).toBe(400)
+    expect((await fold(server, ada.cookie, given.id, elsewhere.id)).statusCode).toBe(400)
+    expect((await fold(server, ada.cookie, given.id, kept.id)).statusCode).toBe(400)
+    expect((await fold(server, ada.cookie, given.id, randomUUID())).statusCode).toBe(400)
+  })
+
+  it('refuses folding a dream that is already withdrawn, and anybody signed out', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+    await drop(server, ada.cookie, given.id)
+
+    expect((await fold(server, ada.cookie, given.id, kept.id)).statusCode).toBe(404)
+    expect((await fold(server, undefined, given.id, kept.id)).statusCode).toBe(401)
+  })
+
+  it('refuses a body with anything else in it', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+
+    const response = await server.inject({
+      method: 'POST',
+      url: `/api/sessions/${given.id}/merge`,
+      headers: { cookie: ada.cookie },
+      payload: { into: kept.id, also: 'this' },
+    })
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('will not bring a folded dream back, whose conversation has moved on', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const { kept, given } = await givenTwo(server, ada.cookie)
+    await fold(server, ada.cookie, given.id, kept.id)
+
+    expect((await restore(server, ada.cookie, given.id)).statusCode).toBe(409)
+
+    const [row] = await db().select().from(session).where(eq(session.id, given.id))
+    expect(row?.withdrawn_at).toBe(NOW)
+  })
+})
+
 describe('helping with a dream', () => {
   it('adds the caller, by name, and takes them off again', async () => {
     const server = await build()
