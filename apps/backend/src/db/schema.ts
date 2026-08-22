@@ -522,6 +522,7 @@ export const session = sqliteTable(
     // unscheduled; `places.ts` unschedules the withdrawn ones inside the delete.
     place_id: text('place_id').references(() => place.id),
     withdrawn_at: text('withdrawn_at'),
+    merged_into_id: text('merged_into_id').references((): AnySQLiteColumn => session.id),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),

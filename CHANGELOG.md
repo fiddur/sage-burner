@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-22
 
+- **Two dreams that turn out to be one can be folded together.** When the same idea is
+  offered twice, open the copy and press "Fold into another dream…" — everything said on it
+  moves onto the other's conversation in the order it was said, its helpers and hearts count
+  there, and the copy is withdrawn with a note saying where the talk went. Folding cannot be
+  undone, which the confirmation says before you press it.
+
 - **A withdrawn dream can be brought back.** Withdrawing used to delete it outright — the
   conversation under it went too, and there was no way back. Now the dream is set aside
   instead: for thirty days the Dreams page lists it under "Recently withdrawn", and one press

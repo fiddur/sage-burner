@@ -43,6 +43,7 @@ export const sessionFields = z.object({
 export const sessionSchema = withValidTimeSlot(
   sessionFields.extend({
     withdrawn_at: dateTimeSchema.nullable(),
+    merged_into_id: idSchema.nullable(),
     helpers: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
     supporters: z.array(
       z.object({ account_id: idSchema, name: z.string().nullable(), avatar: z.string().nullable() }),
@@ -88,6 +89,9 @@ export const sessionCreateSchema = withValidTimeSlot(
 export type SessionCreate = z.infer<typeof sessionCreateSchema>
 
 export type SessionCreateInput = z.input<typeof sessionCreateSchema>
+
+export const sessionMergeSchema = z.object({ into: idSchema }).strict()
+export type SessionMerge = z.infer<typeof sessionMergeSchema>
 
 export const sessionUpdateSchema = withValidTimeSlot(
   sessionFields.omit({ id: true, event_id: true }).partial().strict(),

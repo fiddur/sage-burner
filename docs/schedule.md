@@ -283,6 +283,28 @@ it after the first thing you did, which is when you most want it.
 The panel edits and withdraws as well as reads. **✏️** swaps in `DreamFields`, and
 **🗑️** withdraws behind a confirmation, for scheduled and unscheduled dreams alike.
 
+### Folding one dream into another
+
+Two people offer the same dream under two names, each gathers comments, and withdrawing
+either throws half the conversation away — so `POST /api/sessions/:id/merge` folds one into
+the other instead. The entries of both threads end up on the survivor, **interleaved by when
+things were said** (re-sequenced on `created_at`, ties broken by the old `seq`), with a note
+marking that the fold happened; helpers, hearts and thread follows move across, deduplicated
+by the unique keys that already exist. The folded dream is stamped withdrawn with
+`merged_into_id` pointing at the survivor, and one entry stays on its old thread so a stale
+bell link says where the talk went.
+
+**A folded dream cannot be restored** — its conversation has moved, so a restore would
+resurrect a husk; the route answers 409 and the trashcan row says "folded into …" instead of
+offering the button. The survivor keeps its own facilitator and schedule; folding is about
+the conversation, not the logistics. Whoever held a hand up on the folded dream — helper or
+facilitator — is told it was folded and into what, never the person who pressed the button.
+
+Any approved member can fold, since any can withdraw, and the panel's confirmation spells
+out every effect before the press: what moves, what is withdrawn, and that it cannot be
+undone. The action lands on the dream being given up — "Fold into another dream…" beside
+🗑️ — because that is where somebody stands when they spot the duplicate.
+
 ### Withdrawing a dream
 
 A withdrawal stamps `session.withdrawn_at` rather than deleting the row — the songbook's

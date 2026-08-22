@@ -223,6 +223,10 @@ phone" means 360px.
 - [ ] Withdraw a dream that has comments and a helper: it leaves the list, the grid and
       the feed, and turns up under "Recently withdrawn" on the Dreams page. Bring it back:
       it returns where it sat, comments and helper intact, and the thread says both acts.
+- [ ] Offer two dreams, comment on both, and fold one into the other from its panel: the
+      confirmation names both dreams and what moves; afterwards the survivor's talk holds
+      both conversations in time order plus a "folded" note, the helper is told, and the
+      folded one sits under "Recently withdrawn" saying where it went, with no way back.
 - [ ] Hand the facilitator role to somebody coming; their initials show on the
       block and they are notified. A hand up as helper notifies nobody for
       their own click.

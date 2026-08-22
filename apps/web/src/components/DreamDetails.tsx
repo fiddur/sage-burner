@@ -11,12 +11,14 @@ import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
 import { DreamThread } from './DreamThread.tsx'
 import { Faces } from './Faces.tsx'
+import { FoldDream } from './FoldDream.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
 import { IconButton } from './IconButton.tsx'
 import { WithdrawDream } from './WithdrawDream.tsx'
 
 export const DreamDetails = ({
   dream,
+  others,
   places,
   attendees,
   facilitator,
@@ -35,8 +37,10 @@ export const DreamDetails = ({
   onSupport,
   onSave,
   onRemove,
+  onFold,
 }: {
   dream: Session
+  others: readonly Session[]
   places: readonly Place[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
   facilitator: Person | undefined
@@ -55,6 +59,7 @@ export const DreamDetails = ({
   onSupport: (supporting: boolean) => void
   onSave: (changes: SessionUpdate) => void
   onRemove: () => void
+  onFold: (into: string) => void
 }) => {
   const place = places.find((lane) => lane.id === dream.place_id)
   const phone = usePhone()
@@ -142,6 +147,7 @@ export const DreamDetails = ({
           <p class="row">
             <IconButton icon="edit" label={`Edit ${dream.title}`} disabled={busy} onClick={onEdit} />
             <WithdrawDream title={dream.title} busy={busy} onWithdraw={onRemove} />
+            <FoldDream dream={dream} others={others} busy={busy} onFold={onFold} />
           </p>
 
           <h3>Talk</h3>

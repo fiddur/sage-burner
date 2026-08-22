@@ -15,6 +15,7 @@ export type OpenedDreamApi = Pick<
   ApiClient,
   | 'updateSession'
   | 'withdrawSession'
+  | 'mergeSession'
   | 'helpWithSession'
   | 'stopHelpingWithSession'
   | 'supportSession'
@@ -72,6 +73,13 @@ export const dreamActions = ({
       await api.withdrawSession(id)
       setOpened(undefined)
     }, 'Could not withdraw that.')
+  },
+
+  fold: (id: string, into: string) => {
+    run(async () => {
+      await api.mergeSession(id, { into })
+      setOpened({ kind: 'dream', id: into, editing: false })
+    }, 'Could not fold that in.')
   },
 })
 
@@ -169,6 +177,7 @@ export const OpenedDream = ({
   onSave,
   onOffer,
   onRemove,
+  onFold,
 }: {
   opened: Opened | undefined
   dreams: readonly Session[]
@@ -189,6 +198,7 @@ export const OpenedDream = ({
   onSave: (id: string, changes: SessionUpdate) => void
   onOffer?: (fields: SessionUpdate) => void
   onRemove: (id: string) => void
+  onFold: (id: string, into: string) => void
 }) => {
   if (opened === undefined) return null
 
@@ -234,6 +244,7 @@ export const OpenedDream = ({
   return (
     <DreamDetails
       dream={dream}
+      others={dreams.filter((candidate) => candidate.id !== dream.id)}
       places={places}
       attendees={attendees}
       facilitator={
@@ -256,6 +267,7 @@ export const OpenedDream = ({
       onSupport={(supporting) => onSupport(dream.id, supporting)}
       onSave={(changes) => onSave(dream.id, changes)}
       onRemove={() => onRemove(dream.id)}
+      onFold={(into) => onFold(dream.id, into)}
     />
   )
 }

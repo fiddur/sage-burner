@@ -1231,6 +1231,12 @@ a.person-badge:focus-visible span:last-child {
   text-decoration-line: line-through;
 }
 
+.fold-dream {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+}
+
 .dream-title {
   flex: 1;
   min-width: 10rem;

@@ -27,6 +27,7 @@ export type DreamsApi = Pick<
   | 'updateSession'
   | 'withdrawSession'
   | 'restoreSession'
+  | 'mergeSession'
   | 'getPlaces'
   | 'getEventAttendees'
   | 'helpWithSession'
@@ -100,7 +101,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     showInUrl(dreamIdOf(next))
   }
 
-  const { support, help, facilitate, save, remove } = dreamActions({
+  const { support, help, facilitate, save, remove, fold } = dreamActions({
     api,
     run,
     setOpened,
@@ -224,12 +225,21 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
                 {gone.map((dream) => (
                   <li key={dream.id} class="dream-row is-gone">
                     <span class="dream-title">{dream.title}</span>
-                    <IconButton
-                      icon="restore"
-                      label={`Bring ${dream.title} back`}
-                      disabled={busy}
-                      onClick={() => run(() => api.restoreSession(dream.id), 'Could not bring that back.')}
-                    />
+                    {dream.merged_into_id === null ? (
+                      <IconButton
+                        icon="restore"
+                        label={`Bring ${dream.title} back`}
+                        disabled={busy}
+                        onClick={() => run(() => api.restoreSession(dream.id), 'Could not bring that back.')}
+                      />
+                    ) : (
+                      <span class="form-note">
+                        folded into “
+                        {held.sessions.find((one) => one.id === dream.merged_into_id)?.title ??
+                          'another dream'}
+                        ”
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -257,6 +267,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         onSupport={support}
         onSave={save}
         onRemove={remove}
+        onFold={fold}
       />
     </GuardedPage>
   )

@@ -49,6 +49,7 @@ export type ScheduleApi = Pick<
   | 'supportSession'
   | 'withdrawSupportForSession'
   | 'withdrawSession'
+  | 'mergeSession'
   | 'getMeals'
   | 'updateMeal'
   | 'setMealLead'
@@ -258,7 +259,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   const blocks = meals.flatMap((meal) => mealBlocks(meal))
 
-  const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened, viewerId })
+  const { support, help, facilitate, save, remove, fold } = dreamActions({ api, run, setOpened, viewerId })
 
   const offer = ({ title = '', ...fields }: SessionUpdate) => {
     run(
@@ -362,6 +363,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         onSave={save}
         onOffer={offer}
         onRemove={remove}
+        onFold={fold}
       />
     </Framed>
   )
