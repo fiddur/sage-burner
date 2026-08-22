@@ -294,8 +294,9 @@ the last thirty days under "Recently withdrawn" with one button, the songbook's
 `recentlyGone` deciding the window; any approved member can restore, since any could withdraw.
 A withdrawn dream is off the grid, out of the pool, out of the ICS feed and its feed card
 reads gone; editing, helping and hearting answer 404, exactly as when the row was deleted.
-The stamp keeps the slot, so a dream restored months later can sit on a slot another has
-since taken — the grid draws overlaps rather than refusing them, and whoever restores is
+The stamp keeps the slot — unless the lane it stood in is deleted meanwhile, which
+unschedules it — so a dream restored months later can sit on a slot another has since
+taken; the grid draws overlaps rather than refusing them, and whoever restores is
 looking at the schedule anyway. Rows deleted before the stamp existed left orphaned threads;
 the migration resurrects each as a withdrawn dream — title from the thread, description and
 the rest lost with the original row.
@@ -389,10 +390,13 @@ testing-library builds is not cancelable and its return value says nothing.
 
 `session.location` was free text; it is now `place_id`, referencing #78's places.
 The scheduling grid draws one column per place, and a column cannot be spelled
-three ways. The column has no `onDelete`, so **deleting a place a dream stands in
+three ways. The column has no `onDelete`, so **deleting a place a live dream stands in
 is refused with a 409** rather than quietly unscheduling it; `places.ts`
-translates the foreign key failure. Not a pre-read, which would be check-then-act
-— the dream can be created between the read and the delete.
+translates the foreign key failure. A withdrawn dream does not hold the lane —
+the delete unschedules it in the same transaction, since a refusal over a lane
+that looks empty points at nothing an organiser can see. Not a pre-read, which
+would be check-then-act — the dream can be created between the read and the
+delete.
 
 ### The slot rule, applied to the row as it would be
 
