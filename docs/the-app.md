@@ -527,9 +527,8 @@ empty.
 ### Something taken back is off the page (#617)
 
 The feed is what is going on, and a tombstone is not. A card whose thing has been taken back is
-dropped from the read, wherever its date would have put it — an announcement or a bring item with a
-`withdrawn_at`, a song with a `deleted_at`, a dream whose `session` row is gone, a stay somebody
-left. A meeting and a talking point delete their thread outright (#608), so they never reach it.
+dropped from the read, wherever its date would have put it — an announcement, a bring item or a
+dream with a `withdrawn_at`, a song with a `deleted_at`, a stay somebody left. A meeting and a talking point delete their thread outright (#608), so they never reach it.
 
 **One definition of gone, and it is `factsFor`'s.** The route reads the cards and drops the ones
 `readThreads` marks `gone`, rather than repeating each entity's rule as a `where` clause — a second
@@ -548,9 +547,10 @@ it did, which is what the soft withdrawal is for and how the tests read one. The
 `gone`, because a card on a page already open can be withdrawn under it — but no load will bring one
 back.
 
-**What it costs.** A withdrawn dream's conversation is now reachable from nowhere in the app: the
-panel went with the dream, and the card was the last door. The rows are all there; a page for a
-thread of its own is a separate thing to want.
+**What it costs.** A withdrawn dream's conversation is off the page while the dream is: the panel
+went with the dream, and the card was the last door. The rows are all there, and since the dream's
+withdrawal became a stamp, "Recently withdrawn" on the Dreams page is a door back — restoring the
+dream restores its card and everything said on it.
 
 **And a page already open finds out from a 404** (#614). Every other disappearance here is soft, so
 until #608 a thread could not vanish under a page that was showing it; a meeting or a point deleted
@@ -927,8 +927,8 @@ something moved; the dream says when.
 ### Talking, and being told about it
 
 `GET /api/threads/:id`, `POST /api/threads/:id/comments`, `PATCH|DELETE
-/api/comments/:id`. Keyed by thread id rather than by the dream's, because a withdrawn
-dream has no id left to ask by. A comment is the author's to rewrite and the author's or
+/api/comments/:id`. Keyed by thread id rather than by the dream's — a thread outlives
+what it is about, and the thread id is what every card already carries. A comment is the author's to rewrite and the author's or
 an admin's to take down — an admin may take a comment off but not put words in somebody's
 mouth, since a deletion says who did it and an edit would not. A line the app wrote is
 nobody's to edit.
