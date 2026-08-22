@@ -839,6 +839,11 @@ export const apiRoutes = {
     fastify: '/api/admin/song-categories/order',
     path: () => '/api/admin/song-categories/order',
   },
+  restoreSession: {
+    method: 'POST',
+    fastify: '/api/sessions/:id/restore',
+    path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/restore`,
+  },
   restoreSong: {
     method: 'POST',
     fastify: '/api/songs/:id/restore',

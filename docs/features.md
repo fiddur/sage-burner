@@ -104,6 +104,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - A dream carries a facilitator (assignable, must be coming), helpers with a
   hand-up control, and hearts from the people looking forward to it. A dream can
   repeat, and everything a dream needs is editable without leaving the grid.
+- Withdrawing a dream is soft, like taking a song out: for thirty days the Dreams
+  page offers to bring it back, comments, helpers and hearts intact.
 - The schedule grid: lanes are places (with emoji and colour), the hours come
   from the burn, blocks drag and resize, and the whole thing pinches on a
   phone. A timetable view reads it as a list.

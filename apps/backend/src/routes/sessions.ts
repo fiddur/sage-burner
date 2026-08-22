@@ -27,6 +27,7 @@ import type { Notifier } from '../push/notify.ts'
 import { attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
+import { allOf } from '../db/conditions.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import {
   account,
@@ -64,6 +65,7 @@ const dreamColumns = {
   time_slot_start: session.time_slot_start,
   time_slot_end: session.time_slot_end,
   place_id: session.place_id,
+  withdrawn_at: session.withdrawn_at,
   thread_id: thread.id,
 }
 
@@ -137,6 +139,7 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
   time_slot_start: row.time_slot_start,
   time_slot_end: row.time_slot_end,
   place_id: row.place_id,
+  withdrawn_at: row.withdrawn_at,
   thread_id: row.thread_id,
   helpers: helpers.get(row.id) ?? [],
   supporters: support.get(row.id)?.people ?? [],
@@ -351,6 +354,7 @@ export const registerSessionRoutes = (
         id: randomUUID(),
         event_id: open.id,
         facilitator_account_id: wanted ?? null,
+        withdrawn_at: null,
         thread_id: null,
       }
 
@@ -418,7 +422,10 @@ export const registerSessionRoutes = (
       const body = bodyOf(sessionUpdateSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
-      const [existing] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
+      const [existing] = await dreamRows(
+        db,
+        allOf(eq(session.id, request.params.id), isNull(session.withdrawn_at)),
+      ).limit(1)
 
       const open = existing === undefined ? undefined : await openEventNow(db, now, existing.event_id)
       if (existing === undefined || open === undefined) {
@@ -478,7 +485,7 @@ export const registerSessionRoutes = (
       void noStore(reply)
 
       const [existing] = await db
-        .select({ event_id: session.event_id, title: session.title })
+        .select({ event_id: session.event_id, title: session.title, withdrawn_at: session.withdrawn_at })
         .from(session)
         .where(eq(session.id, request.params.id))
         .limit(1)
@@ -488,23 +495,52 @@ export const registerSessionRoutes = (
       const open = await openEventNow(db, now, existing.event_id)
       if (open === undefined) return sendError(reply, 404)
 
-      const deleted = await db
-        .delete(session)
-        .where(and(eq(session.id, request.params.id), eq(session.event_id, open.id)))
-        .returning({ id: session.id })
+      if (existing.withdrawn_at === null) {
+        await db
+          .update(session)
+          .set({ withdrawn_at: now().toISOString() })
+          .where(and(eq(session.id, request.params.id), eq(session.event_id, open.id)))
 
-      if (deleted.length === 0) return sendError(reply, 404)
+        const viewer = await viewerFor(request, { db, sessions })
 
-      const viewer = await viewerFor(request, { db, sessions })
-
-      await noteOnDream(
-        { id: request.params.id, event_id: open.id, title: existing.title },
-        'withdrawn',
-        viewer?.account_id,
-        'withdrew this dream',
-      )
+        await noteOnDream(
+          { id: request.params.id, event_id: open.id, title: existing.title },
+          'withdrawn',
+          viewer?.account_id,
+          'withdrew this dream',
+        )
+      }
 
       return reply.code(204).send()
+    },
+  )
+
+  app.post<{ Params: { id: string } }>(
+    apiRoutes.restoreSession.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const [existing] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
+      if (existing === undefined) return sendError(reply, 404)
+
+      const open = await openEventNow(db, now, existing.event_id)
+      if (open === undefined) return sendError(reply, 404)
+
+      if (existing.withdrawn_at !== null) {
+        await db.update(session).set({ withdrawn_at: null }).where(eq(session.id, existing.id))
+
+        const viewer = await viewerFor(request, { db, sessions })
+
+        await noteOnDream(existing, 'restored', viewer?.account_id, 'brought this dream back')
+      }
+
+      const [row] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
+      if (row === undefined) return sendError(reply, 404)
+
+      const mine = await mineAt(request, existing.event_id)
+
+      return { session: await oneDream(db, row, mine) } satisfies SessionResponse
     },
   )
 
@@ -512,7 +548,7 @@ export const registerSessionRoutes = (
     request: FastifyRequest<{ Params: { id: string } }>,
   ): Promise<Refusal | Arranging> => {
     const [dream] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
-    if (dream === undefined) return { code: 404, error: 'not_found' }
+    if (dream === undefined || dream.withdrawn_at !== null) return { code: 404, error: 'not_found' }
 
     const open = await openEventNow(db, now, dream.event_id)
     if (open === undefined) return { code: 404, error: 'not_found' }

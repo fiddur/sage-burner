@@ -398,6 +398,7 @@ describe('sessionSchema', () => {
     time_slot_start: '2026-10-03T09:00:00Z',
     time_slot_end: '2026-10-03T10:30:00Z',
     place_id: OTHER_ID,
+    withdrawn_at: null,
     helpers: [{ account_id: ID, name: 'Ada' }],
     supporters: [{ account_id: ID, name: 'Ada', avatar: null }],
     support_count: 3,

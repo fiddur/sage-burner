@@ -8,7 +8,7 @@ import {
   placeOrderSchema,
   placeUpdateSchema,
 } from '@sage-burner/shared'
-import { and, asc, eq, gte } from 'drizzle-orm'
+import { and, asc, eq, gte, isNotNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -18,7 +18,7 @@ import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { nextOrder, reorder } from '../db/ordered.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
-import { event, place } from '../db/schema.ts'
+import { event, place, session } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { copySourcesFor } from './copy-sources.ts'
@@ -126,7 +126,14 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions, now }:
 
       let deleted
       try {
-        deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })
+        deleted = db.transaction((tx) => {
+          tx.update(session)
+            .set({ place_id: null, time_slot_start: null, time_slot_end: null })
+            .where(and(eq(session.place_id, request.params.id), isNotNull(session.withdrawn_at)))
+            .run()
+
+          return tx.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id }).all()
+        })
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return sendError(reply, 409)
         throw failure

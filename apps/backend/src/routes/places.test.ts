@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import { placeResponseSchema } from '@sage-burner/shared'
+import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -11,7 +12,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, event, place } from '../db/schema.ts'
+import { account, accountRole, event, place, session } from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 
 const SECRET = 's'.repeat(40)
@@ -502,6 +503,84 @@ describe('a burn that has ended', () => {
     expect(await names(server, gone)).toEqual(['Temple', 'Sauna'])
     expect((await copyFrom(server, admin.cookie, next, gone)).statusCode).toBe(201)
     expect(await names(server, next)).toEqual(['Temple', 'Sauna'])
+  })
+
+  it('refuses to remove a lane a live dream is planned into', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const temple = (await add(server, admin.cookie, eventId, TEMPLE)).json().place.id
+
+    await db().insert(session).values({
+      id: randomUUID(),
+      event_id: eventId,
+      title: 'Sunrise yoga',
+      time_slot_start: '2026-08-02T18:00:00.000Z',
+      time_slot_end: '2026-08-02T20:00:00.000Z',
+      place_id: temple,
+    })
+
+    expect((await remove(server, admin.cookie, temple)).statusCode).toBe(409)
+  })
+
+  it('removes a lane whose only dream was withdrawn, unscheduling the withdrawn dream', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const temple = (await add(server, admin.cookie, eventId, TEMPLE)).json().place.id
+    const dreamId = randomUUID()
+
+    await db().insert(session).values({
+      id: dreamId,
+      event_id: eventId,
+      title: 'Sunrise yoga',
+      time_slot_start: '2026-08-02T18:00:00.000Z',
+      time_slot_end: '2026-08-02T20:00:00.000Z',
+      place_id: temple,
+      withdrawn_at: NOW,
+    })
+
+    expect((await remove(server, admin.cookie, temple)).statusCode).toBe(204)
+
+    const [held] = await db().select().from(session).where(eq(session.id, dreamId))
+    expect(held).toMatchObject({
+      place_id: null,
+      time_slot_start: null,
+      time_slot_end: null,
+      withdrawn_at: NOW,
+    })
+  })
+
+  it('leaves a live dream planned elsewhere alone when a withdrawn one frees its lane', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const temple = (await add(server, admin.cookie, eventId, TEMPLE)).json().place.id
+    const sauna = (await add(server, admin.cookie, eventId, SAUNA)).json().place.id
+
+    await db().insert(session).values({
+      id: randomUUID(),
+      event_id: eventId,
+      title: 'Withdrawn one',
+      place_id: temple,
+      time_slot_start: '2026-08-02T18:00:00.000Z',
+      time_slot_end: '2026-08-02T20:00:00.000Z',
+      withdrawn_at: NOW,
+    })
+    const living = randomUUID()
+    await db().insert(session).values({
+      id: living,
+      event_id: eventId,
+      title: 'Living one',
+      place_id: sauna,
+      time_slot_start: '2026-08-02T18:00:00.000Z',
+      time_slot_end: '2026-08-02T20:00:00.000Z',
+    })
+
+    expect((await remove(server, admin.cookie, temple)).statusCode).toBe(204)
+
+    const [held] = await db().select().from(session).where(eq(session.id, living))
+    expect(held?.place_id).toBe(sauna)
   })
 
   it('counts a burn ending today as still open, so the last day is not too late', async () => {

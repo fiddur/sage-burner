@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,7 +12,17 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, place, pushSubscription, session } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  attendance,
+  event,
+  place,
+  pushSubscription,
+  session,
+  thread,
+  threadEntry,
+} from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 
 const SECRET = 's'.repeat(40)
@@ -186,6 +196,20 @@ const helping = (
     ...(method === 'POST' ? { payload: { account_id: accountId } } : {}),
   })
 }
+
+const threadEntries = async (dreamId: string) =>
+  await db()
+    .select({ body: threadEntry.body, kind: threadEntry.kind })
+    .from(threadEntry)
+    .innerJoin(thread, eq(thread.id, threadEntry.thread_id))
+    .where(and(eq(thread.entity_type, 'session'), eq(thread.entity_id, dreamId)))
+
+const restore = (server: FastifyInstance, cookie: string | undefined, id: string) =>
+  server.inject({
+    method: 'POST',
+    url: `/api/sessions/${id}/restore`,
+    headers: cookie === undefined ? {} : { cookie },
+  })
 
 describe('dreams', () => {
   it('is empty before anyone offers one', async () => {
@@ -487,14 +511,42 @@ describe('dreams', () => {
     expect((await drop(server, member.cookie, randomUUID())).statusCode).toBe(404)
   })
 
-  it('withdraws one', async () => {
+  it('withdraws one by stamping it rather than deleting it, so it can come back', async () => {
     const server = await build()
     await givenEvent()
     const member = await givenAccount(['member'])
     const id = (await offer(server, member.cookie, { title: 'Sunrise yoga' })).json().session.id
 
     expect((await drop(server, member.cookie, id)).statusCode).toBe(204)
-    expect((await list(server, member.cookie)).json().sessions).toEqual([])
+
+    const [held] = (await list(server, member.cookie)).json().sessions
+    expect(held).toMatchObject({ id, withdrawn_at: NOW })
+    expect((await db().select().from(session)).map((row) => row.id)).toEqual([id])
+  })
+
+  it('withdraws it once, a second press changing nothing', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+    const id = (await offer(server, member.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    await drop(server, member.cookie, id)
+    expect((await drop(server, member.cookie, id)).statusCode).toBe(204)
+
+    const notes = await threadEntries(id)
+    expect(notes.filter((entry) => entry.body === 'withdrew this dream')).toHaveLength(1)
+  })
+
+  it('refuses to edit, help with, or heart a withdrawn dream, exactly as when it was deleted', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+    await drop(server, ada.cookie, id)
+
+    expect((await editDream(server, ada.cookie, id, { title: 'Renamed' })).statusCode).toBe(404)
+    expect((await helping(server, ada, id, 'POST')).statusCode).toBe(404)
+    expect((await selfService(server, ada.cookie, id, 'support', 'POST')).statusCode).toBe(404)
   })
 
   it('lets any member arrange the schedule, not only whoever offered it', async () => {
@@ -683,6 +735,78 @@ describe('a dream belongs to the burn it names', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json().sessions.map((dream: { title: string }) => dream.title)).toEqual(['Last summer'])
+  })
+})
+
+describe('bringing a withdrawn dream back', () => {
+  it('clears the stamp, and the dream is whole again — comments, helpers and hearts included', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+    await helping(server, ada, id, 'POST')
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+    await drop(server, ada.cookie, id)
+
+    const response = await restore(server, ada.cookie, id)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session).toMatchObject({
+      id,
+      withdrawn_at: null,
+      support_count: 1,
+      helpers: [{ account_id: ada.id, name: null }],
+    })
+    expect((await editDream(server, ada.cookie, id, { title: 'Renamed' })).statusCode).toBe(200)
+  })
+
+  it('says so on the thread, once, a second press changing nothing', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+    const id = (await offer(server, member.cookie, { title: 'Sunrise yoga' })).json().session.id
+    await drop(server, member.cookie, id)
+
+    await restore(server, member.cookie, id)
+    expect((await restore(server, member.cookie, id)).statusCode).toBe(200)
+
+    const notes = await threadEntries(id)
+    expect(notes.filter((entry) => entry.kind === 'restored')).toHaveLength(1)
+  })
+
+  it('keeps where it sat in the schedule', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    const temple = await givenPlace(eventId)
+    const id = (
+      await offer(server, member.cookie, { title: 'Sunrise yoga', ...SLOT, place_id: temple })
+    ).json().session.id
+    await drop(server, member.cookie, id)
+
+    const back = (await restore(server, member.cookie, id)).json().session
+
+    expect(back).toMatchObject({ ...SLOT, place_id: temple })
+  })
+
+  it('answers 404 for a dream that never was, and for anybody signed out', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+
+    expect((await restore(server, member.cookie, randomUUID())).statusCode).toBe(404)
+    expect((await restore(server, undefined, randomUUID())).statusCode).toBe(401)
+  })
+
+  it('refuses at a burn that has ended, whose dreams are its record', async () => {
+    const server = await build()
+    const ended = randomUUID()
+    await givenEvent({ id: ended, start_date: '2025-08-01', end_date: '2025-08-05' })
+    const member = await givenAccount(['member'])
+    const id = randomUUID()
+    await db().insert(session).values({ id, event_id: ended, title: 'Last summer', withdrawn_at: NOW })
+
+    expect((await restore(server, member.cookie, id)).statusCode).toBe(404)
   })
 })
 

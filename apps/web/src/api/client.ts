@@ -712,6 +712,11 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     withdrawSession: (id: string) =>
       request<undefined>(apiRoutes.withdrawSession.path(id), { method: apiRoutes.withdrawSession.method }),
 
+    restoreSession: (id: string) =>
+      request<SessionResponse>(apiRoutes.restoreSession.path(id), {
+        method: apiRoutes.restoreSession.method,
+      }),
+
     helpWithSession: (id: string, body: BodyOf<'helpWithSession'>) =>
       request<SessionResponse>(apiRoutes.helpWithSession.path(id), {
         method: apiRoutes.helpWithSession.method,

@@ -220,6 +220,9 @@ phone" means 360px.
 
 - [ ] The member offers a dream with no time — it lists as offered, not as an
       error. Another member drags it onto the grid; any member may move it.
+- [ ] Withdraw a dream that has comments and a helper: it leaves the list, the grid and
+      the feed, and turns up under "Recently withdrawn" on the Dreams page. Bring it back:
+      it returns where it sat, comments and helper intact, and the thread says both acts.
 - [ ] Hand the facilitator role to somebody coming; their initials show on the
       block and they are notified. A hand up as helper notifies nobody for
       their own click.

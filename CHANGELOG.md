@@ -7,6 +7,15 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-22
+
+- **A withdrawn dream can be brought back.** Withdrawing used to delete it outright — the
+  conversation under it went too, and there was no way back. Now the dream is set aside
+  instead: for thirty days the Dreams page lists it under "Recently withdrawn", and one press
+  brings it back with its comments, helpers, hearts and place in the schedule. Dreams deleted
+  before this reappear there too, though only the name and the conversation could be saved —
+  the description needs writing again.
+
 # 2026-08-20
 
 - **A reset link you have already used says so.** It used to tell you to check you had copied the

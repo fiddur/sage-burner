@@ -42,6 +42,7 @@ export const sessionFields = z.object({
 
 export const sessionSchema = withValidTimeSlot(
   sessionFields.extend({
+    withdrawn_at: dateTimeSchema.nullable(),
     helpers: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
     supporters: z.array(
       z.object({ account_id: idSchema, name: z.string().nullable(), avatar: z.string().nullable() }),

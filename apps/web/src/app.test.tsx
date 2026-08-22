@@ -196,6 +196,7 @@ const clientWith = (
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed in this file')),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed in this file')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed in this file')),
+  restoreSession: () => Promise.reject(new Error('restoreSession is not stubbed in this file')),
   getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [] }),
   updateMeal: () => Promise.reject(new Error('updateMeal is not stubbed in this file')),
   setMealLead: () => Promise.reject(new Error('setMealLead is not stubbed in this file')),

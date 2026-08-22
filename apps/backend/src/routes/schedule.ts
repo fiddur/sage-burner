@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, meetingEnds, publicMeetingSchema, publicSessionSchema } from '@sage-burner/shared'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { CalendarEvent } from '../ics.ts'
@@ -40,7 +40,7 @@ export const registerScheduleRoutes = (app: FastifyInstance, { db, now }: Schedu
       })
       .from(session)
       .leftJoin(place, eq(session.place_id, place.id))
-      .where(eq(session.event_id, found.id))
+      .where(and(eq(session.event_id, found.id), isNull(session.withdrawn_at)))
       .orderBy(asc(session.time_slot_start), asc(session.title))
 
     const events: CalendarEvent[] = rows.flatMap((row) => {

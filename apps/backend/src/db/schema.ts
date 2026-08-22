@@ -518,8 +518,10 @@ export const session = sqliteTable(
     repeatable: integer('repeatable', { mode: 'boolean' }).notNull().default(false),
     time_slot_start: text('time_slot_start'),
     time_slot_end: text('time_slot_end'),
-    // No `onDelete`: a place with dreams in it is refused rather than quietly unscheduled.
+    // No `onDelete`: a place with live dreams in it is refused rather than quietly
+    // unscheduled; `places.ts` unschedules the withdrawn ones inside the delete.
     place_id: text('place_id').references(() => place.id),
+    withdrawn_at: text('withdrawn_at'),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),

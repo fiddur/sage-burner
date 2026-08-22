@@ -45,6 +45,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
   time_slot_start: null,
   time_slot_end: null,
   place_id: null,
+  withdrawn_at: null,
   helpers: [],
   supporters: [],
   support_count: 0,
@@ -66,6 +67,7 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   supportComment: () => Promise.reject(new Error('supportComment is not stubbed here')),
   withdrawSupportForComment: () => Promise.reject(new Error('withdrawSupportForComment is not stubbed here')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
+  restoreSession: () => Promise.reject(new Error('restoreSession is not stubbed here')),
   getEventAttendees: () =>
     Promise.resolve({
       attendees: [
@@ -126,6 +128,53 @@ describe('Dreams', () => {
     renderPage(stub())
 
     expect(await screen.findByText(/Nobody has offered a dream yet/)).toBeTruthy()
+  })
+
+  it('keeps a withdrawn dream out of the list and offers to bring it back', async () => {
+    renderPage(
+      stub({}, [
+        aDream({ id: 's-1', title: 'Sunrise yoga' }),
+        aDream({ id: 's-2', title: 'Sauna at dawn', withdrawn_at: new Date().toISOString() }),
+      ]),
+    )
+
+    expect(await screen.findByRole('button', { name: 'Open Sunrise yoga' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Open Sauna at dawn' })).toBeNull()
+    expect(screen.getByText('Recently withdrawn')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Bring Sauna at dawn back' })).toBeTruthy()
+  })
+
+  it('brings one back and reloads, the dream taking its place in the list again', async () => {
+    const first = [aDream({ id: 's-2', title: 'Sauna at dawn', withdrawn_at: new Date().toISOString() })]
+    const then = [aDream({ id: 's-2', title: 'Sauna at dawn' })]
+    let restored = false
+    const restoreSession = vi.fn(() => {
+      restored = true
+      return Promise.resolve({ session: then[0] as Session })
+    })
+    renderPage(
+      stub({ restoreSession, getSessions: () => Promise.resolve({ sessions: restored ? then : first }) }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Bring Sauna at dawn back' }))
+
+    await waitFor(() => expect(restoreSession).toHaveBeenCalledWith('s-2'))
+    expect(await screen.findByRole('button', { name: 'Open Sauna at dawn' })).toBeTruthy()
+    expect(screen.queryByText('Recently withdrawn')).toBeNull()
+  })
+
+  it('lets go of a dream withdrawn more than thirty days ago', async () => {
+    const longAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString()
+    renderPage(
+      stub({}, [
+        aDream({ id: 's-1', title: 'Sunrise yoga' }),
+        aDream({ id: 's-2', title: 'Sauna at dawn', withdrawn_at: longAgo }),
+      ]),
+    )
+
+    await screen.findByRole('button', { name: 'Open Sunrise yoga' })
+    expect(screen.queryByText('Recently withdrawn')).toBeNull()
+    expect(screen.queryByText('Sauna at dawn')).toBeNull()
   })
 
   it('shows an unscheduled dream as unscheduled rather than blank', async () => {

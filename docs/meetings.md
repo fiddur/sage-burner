@@ -88,11 +88,11 @@ delete started removing the thread in the same transaction. `thread_entry`, `thr
 `thread_follow` all cascade from `thread`, so that is the whole cleanup.
 
 A meeting and a talking point are the only two that need it, which is not the same as being the only
-hard deletes: a withdrawn dream deletes its `session` row too, and leaving a burn deletes an
-`attendance`. Those keep their thread on purpose — the dream's conversation outlives the dream, and
-a rejoin re-points the person's card at the new stay. Neither is on the feed any more either
-(#617); the difference is that there is still something to read behind the one and nothing behind
-these two.
+disappearances: a withdrawn dream keeps its `session` row under a `withdrawn_at` stamp, and leaving
+a burn deletes an `attendance`. Those keep their thread on purpose — the dream's conversation
+outlives the withdrawal and comes back with a restore, and a rejoin re-points the person's card at
+the new stay. Neither is on the feed any more either (#617); the difference is that there is still
+something to read behind the one and nothing behind these two.
 
 **And one for a meeting written before cards existed** (#616). Between #592 and #603 a scheduled
 meeting wrote an `activity` line — a row in the table #610 has since dropped — and no thread;

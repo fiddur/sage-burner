@@ -183,6 +183,16 @@ describe('the public calendar feed', () => {
     expect(response.body).toContain('BEGIN:VCALENDAR')
   })
 
+  it('leaves a withdrawn dream out, though its slot is still on the row', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const host = await givenHost()
+    const id = await givenDream(eventId, host)
+    await db().update(session).set({ withdrawn_at: '2026-07-02T00:00:00.000Z' }).where(eq(session.id, id))
+
+    expect((await feed(server, eventId)).body).not.toContain(`UID:${id}@sage-burner`)
+  })
+
   it('carries a scheduled dream, with its place and colour', async () => {
     const server = await build()
     const eventId = await givenEvent()
