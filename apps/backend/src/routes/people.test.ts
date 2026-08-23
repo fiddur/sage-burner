@@ -11,7 +11,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountConnection, accountIdentity, accountRole } from '../db/schema.ts'
+import { account, accountConnection, accountIdentity, accountRole, event, thread } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -92,6 +92,7 @@ describe('somebody, as the rest of the community sees them', () => {
       introduction: null,
       facebook: 'https://facebook.com/wren',
       connections: [expect.objectContaining({ kind: 'messenger', value: 'wren' })],
+      card_thread_ids: [],
     })
   })
 
@@ -125,6 +126,7 @@ describe('somebody, as the rest of the community sees them', () => {
     expect(Object.keys(body.json().person).toSorted()).toEqual([
       'account_id',
       'avatar',
+      'card_thread_ids',
       'connections',
       'contact',
       'facebook',
@@ -276,5 +278,74 @@ describe('somebody, as the rest of the community sees them', () => {
     const reader = await givenAccount()
 
     expect((await fetchProfile(server, reader.cookie, wren.id)).headers['cache-control']).toBe('no-store')
+  })
+})
+
+describe('the conversations held about somebody', () => {
+  const givenBurn = async (slug: string, start: string) => {
+    const id = randomUUID()
+    await db()
+      .insert(event)
+      .values({ id, name: slug, slug, start_date: start, end_date: start, member_cap: 42, created_at: NOW })
+    return id
+  }
+
+  const givenCard = async (subjectId: string, eventId: string) => {
+    const id = randomUUID()
+    await db().insert(thread).values({
+      id,
+      event_id: eventId,
+      entity_type: 'attendance',
+      entity_id: randomUUID(),
+      subject_account_id: subjectId,
+      title: 'Wren Aldertide',
+    })
+    return id
+  }
+
+  it('carries the card threads, the freshest burn first', async () => {
+    const server = await build()
+    const asker = await givenAccount()
+    const wren = await givenAccount()
+    const earlier = await givenBurn('spring-2026', '2026-05-01')
+    const later = await givenBurn('autumn-2026', '2026-10-01')
+    const earlierCard = await givenCard(wren.id, earlier)
+    const laterCard = await givenCard(wren.id, later)
+
+    const response = await fetchProfile(server, asker.cookie, wren.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().person.card_thread_ids).toEqual([laterCard, earlierCard])
+  })
+
+  it('carries nothing for somebody without a card', async () => {
+    const server = await build()
+    const asker = await givenAccount()
+    const wren = await givenAccount()
+
+    const response = await fetchProfile(server, asker.cookie, wren.id)
+
+    expect(response.json().person.card_thread_ids).toEqual([])
+  })
+
+  it('leaves other people and other kinds of thread out', async () => {
+    const server = await build()
+    const asker = await givenAccount()
+    const wren = await givenAccount()
+    const other = await givenAccount()
+    const burn = await givenBurn('summer-2026', '2026-07-01')
+    await givenCard(other.id, burn)
+    await db().insert(thread).values({
+      id: randomUUID(),
+      event_id: burn,
+      entity_type: 'session',
+      entity_id: randomUUID(),
+      subject_account_id: wren.id,
+      title: 'Sauna at dawn',
+    })
+
+    const response = await fetchProfile(server, asker.cookie, wren.id)
+
+    expect(response.json().person.card_thread_ids).toEqual([])
   })
 })

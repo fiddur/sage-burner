@@ -2206,7 +2206,12 @@ private as the attendee list it is reached from, and no more.
 safety property rather than tidiness: this is the route every member reads about every other
 member, so a column added to `account` reaches it only when somebody names it in
 `personProfileSchema`. It carries `account_id`, `name`, `avatar`, the introduction, the
-connections in their order, and `contact`. What is absent is absent because something else
+connections in their order, `contact`, and `card_thread_ids` — the person's feed-card
+threads, one per burn and the freshest burn first, which the page reads through
+`GET /api/threads/:id` and renders with the feed's own thread component. A notification
+about a comment on somebody's card links to this page, so the conversation it is about has
+to be here rather than only on a card that scrolls away; saying something goes through the
+same comment routes the feed uses. What is absent is absent because something else
 already decided it —
 `email` is the login identity (#159), allergies belong to the roster where whoever cooks
 reads them as a list, `payment_status` says something about the burn rather than the person,
