@@ -7,6 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { PersonApi } from './Person.tsx'
 
 import { apiError } from '../api/client.ts'
+import { createRemembered, RememberedProvider } from '../remembered.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { nameOf, Person } from './Person.tsx'
 
@@ -298,6 +299,42 @@ describe('what people say about them', () => {
 
     expect(await screen.findByText('Welcome home')).toBeTruthy()
     expect(postComment).toHaveBeenCalledWith('th-1', { body: 'Welcome home' })
+  })
+
+  it('never shows one person\u2019s conversation under the next person\u2019s page', async () => {
+    const held = new Promise<never>(() => undefined)
+    const api = stub(aPerson(), {
+      getAccountProfile: (accountId: string) =>
+        Promise.resolve({
+          person:
+            accountId === 'a-2'
+              ? aPerson({ card_thread_ids: ['th-1'] })
+              : aPerson({ account_id: 'a-3', name: 'Bea Marsh', card_thread_ids: ['th-2'] }),
+        }),
+      getThread: (id: string) =>
+        id === 'th-1'
+          ? Promise.resolve({ thread: aCard([anEntry({ id: 'c-1', body: 'Lovely to meet you' })]) })
+          : held,
+    })
+
+    const remembered = createRemembered()
+    const at = (accountId: string) => (
+      <RememberedProvider remembered={remembered}>
+        <ViewerProvider viewer={ANNA}>
+          <Person api={api} accountId={accountId} />
+        </ViewerProvider>
+      </RememberedProvider>
+    )
+
+    const shown = render(at('a-3'))
+    await waitFor(() => expect(screen.getByText('Bea Marsh')).toBeTruthy())
+
+    shown.rerender(at('a-2'))
+    expect(await screen.findByText('Lovely to meet you')).toBeTruthy()
+
+    shown.rerender(at('a-3'))
+    await waitFor(() => expect(screen.getByText('Bea Marsh')).toBeTruthy())
+    expect(screen.queryByText('Lovely to meet you')).toBeNull()
   })
 
   it('holds no talk section for somebody nothing was ever said about', async () => {

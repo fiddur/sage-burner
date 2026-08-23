@@ -150,7 +150,9 @@ const Talks = ({ api, cardIds }: { api: PersonApi; cardIds: readonly string[] })
       ),
   }
 
-  const cards = said.status === 'ready' ? said.data : []
+  // `useLoad` keeps the last successful data across a key change, so A’s conversations would
+  // render under B’s page for one round trip.
+  const cards = (said.status === 'ready' ? said.data : []).filter((card) => cardIds.includes(card.id))
 
   if (cardIds.length === 0) return null
 
