@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-23
 
+- **What people said about somebody is on their page.** A member's page now shows the
+  conversations from their feed cards — the comments on their introduction and their
+  joining, burn by burn — and you can say something right there. The notification about
+  a comment already led to the page; now the comment is on it.
+
 - **You stay signed in.** A session now lasts six months from your last visit rather than
   two weeks from signing in — using the app renews it, so only staying away half a year
   signs you out.

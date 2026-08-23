@@ -1,20 +1,33 @@
-import type { Connection, PersonProfile } from '@sage-burner/shared'
+import type { Connection, PersonProfile, Thread } from '@sage-burner/shared'
 
 import { connectionHref, connectionKindInfo } from '@sage-burner/shared'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { Avatar } from '../components/Avatar.tsx'
 import { CopyButton } from '../components/CopyButton.tsx'
+import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NAMELESS } from '../components/PersonBadge.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
-import { useLoad } from '../load.ts'
+import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
-import { isApproved, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
-export type PersonApi = Pick<ApiClient, 'getAccountProfile'>
+export type PersonApi = Pick<
+  ApiClient,
+  | 'getAccountProfile'
+  | 'getThread'
+  | 'postComment'
+  | 'updateComment'
+  | 'deleteComment'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
+  | 'uploadImage'
+  | 'getApprovedAccounts'
+>
 
 export const nameOf = (row: Pick<Connection, 'kind' | 'label'>): string =>
   connectionKindInfo[row.kind].labelled && row.label.trim() !== ''
@@ -94,6 +107,86 @@ const Introduction = ({ written, mine, whose }: { written: string; mine: boolean
   )
 }
 
+const Talks = ({ api, cardIds }: { api: PersonApi; cardIds: readonly string[] }) => {
+  const viewer = useViewer()
+
+  const { loaded: said } = useLoad<Thread[]>(
+    async (signal) => await Promise.all(cardIds.map(async (id) => (await api.getThread(id, signal)).thread)),
+    {
+      enabled: cardIds.length > 0,
+      key: cardIds.join(','),
+      fallback: 'Could not load what people have said.',
+    },
+  )
+
+  const { loaded: everybody } = useLoad(async (signal) => (await api.getApprovedAccounts(signal)).accounts, {
+    enabled: isApproved(viewer),
+    fallback: 'Could not load who can be mentioned.',
+  })
+  const people = everybody.status === 'ready' ? everybody.data : []
+
+  const [fresher, setFresher] = useState<Record<string, Thread>>({})
+  const { busy, error, run } = useAction()
+  const hold = (thread: Thread) => setFresher((sofar) => ({ ...sofar, [thread.id]: thread }))
+
+  const talk = {
+    say: (threadId: string, body: string, done: () => void) =>
+      run(async () => {
+        hold((await api.postComment(threadId, { body })).thread)
+        done()
+      }, 'Could not say that.'),
+    rewrite: (id: string, body: string, done: () => void) =>
+      run(async () => {
+        hold((await api.updateComment(id, { body })).thread)
+        done()
+      }, 'Could not save that.'),
+    remove: (id: string) =>
+      run(async () => hold((await api.deleteComment(id)).thread), 'Could not take that back.'),
+    heart: (id: string, hearting: boolean) =>
+      run(
+        async () =>
+          hold((hearting ? await api.supportComment(id) : await api.withdrawSupportForComment(id)).thread),
+        'Could not do that just now.',
+      ),
+  }
+
+  // `useLoad` keeps the last successful data across a key change, so A’s conversations would
+  // render under B’s page for one round trip.
+  const cards = (said.status === 'ready' ? said.data : []).filter((card) => cardIds.includes(card.id))
+
+  if (cardIds.length === 0) return null
+
+  return (
+    <>
+      <h2>What people say</h2>
+      {said.status === 'loading' && <p class="form-note">Loading…</p>}
+      {said.status === 'failed' && <ErrorText message={said.message} />}
+      <ErrorText message={error} />
+      {cards.map((card) => {
+        const shown = fresher[card.id] ?? card
+        return (
+          <section key={shown.id} class="person-talk">
+            {shown.burn !== null && <h3 class="person-talk-burn">{shown.burn}</h3>}
+            <DreamThread
+              thread={shown}
+              viewerId={viewer.account?.id}
+              admin={isAdmin(viewer)}
+              busy={busy}
+              more={false}
+              upload={api.uploadImage}
+              people={people}
+              onSay={(body, done) => talk.say(shown.id, body, done)}
+              onRewrite={talk.rewrite}
+              onRemove={talk.remove}
+              onHeart={talk.heart}
+            />
+          </section>
+        )
+      })}
+    </>
+  )
+}
+
 export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }) => {
   const viewer = useViewer()
   const { loaded, refreshing } = useLoad<PersonProfile>(
@@ -151,6 +244,8 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
           {person.contact !== null && person.contact.trim() !== '' && (
             <p class="form-note">Also said: {person.contact}</p>
           )}
+
+          <Talks api={api} cardIds={person.card_thread_ids} />
         </>
       )}
     </GuardedPage>

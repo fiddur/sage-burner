@@ -61,7 +61,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   links), allergies (ticked from a shared vocabulary, plus free text),
   an introduction, a picture, passkeys and linked providers, notification
   switches, and signing out.
-- Every member has a page other members read — introduction, picture, contacts.
+- Every member has a page other members read — introduction, picture, contacts,
+  and the conversations from their feed cards, open for saying something more.
 - The members roster per burn: names, arrival and departure, lodging, allergies
   and payment status are every member's to read; the email and the payment date
   stay admin's.

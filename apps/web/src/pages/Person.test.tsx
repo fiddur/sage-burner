@@ -1,12 +1,13 @@
-import type { Connection, PersonProfile } from '@sage-burner/shared'
+import type { Connection, PersonProfile, Thread, ThreadEntry } from '@sage-burner/shared'
 
-import { cleanup, render, screen, waitFor } from '@testing-library/preact'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
 import type { PersonApi } from './Person.tsx'
 
 import { apiError } from '../api/client.ts'
+import { createRemembered, RememberedProvider } from '../remembered.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { nameOf, Person } from './Person.tsx'
 
@@ -32,11 +33,51 @@ const aPerson = (over: Partial<PersonProfile> = {}): PersonProfile => ({
   contact: null,
   introduction: null,
   facebook: null,
+  card_thread_ids: [],
   ...over,
+})
+
+const anEntry = (over: Partial<ThreadEntry> & Pick<ThreadEntry, 'id' | 'body'>): ThreadEntry => ({
+  kind: 'comment',
+  author: { account_id: 'a-1', name: 'Anna' },
+  created_at: '2026-08-07T18:00:00.000Z',
+  edited_at: null,
+  supporters: [],
+  support_count: 0,
+  supported_by_me: false,
+  ...over,
+})
+
+const aCard = (entries: ThreadEntry[]): Thread => ({
+  id: 'th-1',
+  event_id: 'e-1',
+  burn: 'Summer burn',
+  entity_type: 'attendance',
+  entity_id: 'at-1',
+  title: 'Wren Aldertide',
+  link: '/members/a-2',
+  body: null,
+  own: false,
+  gone: false,
+  entry_count: entries.length,
+  supporters: [],
+  support_count: 0,
+  supported_by_me: false,
+  followed_by_me: false,
+  last_at: '2026-08-07T18:00:00.000Z',
+  entries,
 })
 
 const stub = (person: PersonProfile, over: Partial<PersonApi> = {}): PersonApi => ({
   getAccountProfile: () => Promise.resolve({ person }),
+  getApprovedAccounts: () => Promise.resolve({ accounts: [] }),
+  getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
+  updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
+  deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),
+  supportComment: () => Promise.reject(new Error('supportComment is not stubbed here')),
+  withdrawSupportForComment: () => Promise.reject(new Error('withdrawSupportForComment is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   ...over,
 })
 
@@ -224,5 +265,82 @@ describe('somebody’s page', () => {
     show(stub(aPerson(), { getAccountProfile: () => Promise.reject(new Error('boom')) }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('account may be gone')
+  })
+})
+
+describe('what people say about them', () => {
+  it('shows the conversation from their card, labeled with the burn', async () => {
+    const api = stub(aPerson({ card_thread_ids: ['th-1'] }), {
+      getThread: () =>
+        Promise.resolve({ thread: aCard([anEntry({ id: 'c-1', body: 'Lovely to meet you' })]) }),
+    })
+
+    show(api)
+
+    expect(await screen.findByText('Lovely to meet you')).toBeTruthy()
+    expect(screen.getByText('What people say')).toBeTruthy()
+    expect(screen.getByText('Summer burn')).toBeTruthy()
+  })
+
+  it('lets you say something, on the thread the comment belongs to', async () => {
+    const postComment = vi
+      .fn()
+      .mockResolvedValue({ thread: aCard([anEntry({ id: 'c-9', body: 'Welcome home' })]) })
+    const api = stub(aPerson({ card_thread_ids: ['th-1'] }), {
+      getThread: () => Promise.resolve({ thread: aCard([]) }),
+      postComment,
+    })
+
+    show(api)
+
+    const box = await screen.findByLabelText('Say something about Wren Aldertide')
+    fireEvent.input(box, { target: { value: 'Welcome home' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    expect(await screen.findByText('Welcome home')).toBeTruthy()
+    expect(postComment).toHaveBeenCalledWith('th-1', { body: 'Welcome home' })
+  })
+
+  it('never shows one person\u2019s conversation under the next person\u2019s page', async () => {
+    const held = new Promise<never>(() => undefined)
+    const api = stub(aPerson(), {
+      getAccountProfile: (accountId: string) =>
+        Promise.resolve({
+          person:
+            accountId === 'a-2'
+              ? aPerson({ card_thread_ids: ['th-1'] })
+              : aPerson({ account_id: 'a-3', name: 'Bea Marsh', card_thread_ids: ['th-2'] }),
+        }),
+      getThread: (id: string) =>
+        id === 'th-1'
+          ? Promise.resolve({ thread: aCard([anEntry({ id: 'c-1', body: 'Lovely to meet you' })]) })
+          : held,
+    })
+
+    const remembered = createRemembered()
+    const at = (accountId: string) => (
+      <RememberedProvider remembered={remembered}>
+        <ViewerProvider viewer={ANNA}>
+          <Person api={api} accountId={accountId} />
+        </ViewerProvider>
+      </RememberedProvider>
+    )
+
+    const shown = render(at('a-3'))
+    await waitFor(() => expect(screen.getByText('Bea Marsh')).toBeTruthy())
+
+    shown.rerender(at('a-2'))
+    expect(await screen.findByText('Lovely to meet you')).toBeTruthy()
+
+    shown.rerender(at('a-3'))
+    await waitFor(() => expect(screen.getByText('Bea Marsh')).toBeTruthy())
+    expect(screen.queryByText('Lovely to meet you')).toBeNull()
+  })
+
+  it('holds no talk section for somebody nothing was ever said about', async () => {
+    show(stub(aPerson()))
+
+    await waitFor(() => expect(screen.getByText('Wren Aldertide')).toBeTruthy())
+    expect(screen.queryByText('What people say')).toBeNull()
   })
 })

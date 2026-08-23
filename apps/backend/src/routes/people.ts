@@ -2,12 +2,12 @@ import type { ApprovedAccountsResponse, PersonProfile, PersonProfileResponse } f
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, facebookProfileUrl } from '@sage-burner/shared'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { account, accountAvatar, accountIdentity, accountRole } from '../db/schema.ts'
+import { account, accountAvatar, accountIdentity, accountRole, event, thread } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { connectionsFor } from './connections.ts'
 
@@ -53,6 +53,13 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
 
       const connections = await connectionsFor(db, accountId)
 
+      const cards = await db
+        .select({ thread_id: thread.id })
+        .from(thread)
+        .leftJoin(event, eq(event.id, thread.event_id))
+        .where(and(eq(thread.entity_type, 'attendance'), eq(thread.subject_account_id, accountId)))
+        .orderBy(desc(event.start_date), asc(thread.id))
+
       const messenger = connections.find((connection) => connection.kind === 'messenger')
 
       const linked =
@@ -77,6 +84,7 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
         contact: row.contact,
         facebook:
           messenger === undefined ? (linked?.profile_url ?? null) : facebookProfileUrl(messenger.value),
+        card_thread_ids: cards.map((card) => card.thread_id),
       }
 
       return { person } satisfies PersonProfileResponse

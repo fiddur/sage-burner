@@ -11,6 +11,7 @@ export const personProfileSchema = z.object({
   contact: z.string().nullable(),
   introduction: z.string().nullable(),
   facebook: z.string().nullable(),
+  card_thread_ids: z.array(idSchema),
 })
 
 export type PersonProfile = z.infer<typeof personProfileSchema>
