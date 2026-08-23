@@ -108,8 +108,8 @@ describe('createConfig', () => {
       }
     })
 
-    it('defaults the session lifetime to two weeks', () => {
-      expect(createConfig({}).session_ttl_seconds).toBe(60 * 60 * 24 * 14)
+    it('defaults the session lifetime to six months', () => {
+      expect(createConfig({}).session_ttl_seconds).toBe(60 * 60 * 24 * 183)
     })
   })
 

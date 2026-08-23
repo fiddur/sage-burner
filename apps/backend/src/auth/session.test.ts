@@ -108,3 +108,49 @@ describe('createSessions', () => {
     ).toThrow(/32/)
   })
 })
+
+describe('slid', () => {
+  const issued = '2026-07-29T12:00:00.000Z'
+
+  it('leaves a token younger than a day alone', () => {
+    const token = sessions({ now: at(issued) }).issue('acct-1')
+
+    expect(sessions({ now: at('2026-07-30T11:59:59.000Z') }).slid(token)).toBeUndefined()
+  })
+
+  it('renews a token a full day old, readable for the same account', () => {
+    const token = sessions({ now: at(issued) }).issue('acct-1')
+    const later = sessions({ now: at('2026-07-30T12:00:00.000Z') })
+
+    const fresh = later.slid(token)
+
+    expect(fresh).toBeDefined()
+    expect(fresh).not.toBe(token)
+    expect(later.read(fresh ?? '')).toEqual({ account_id: 'acct-1' })
+  })
+
+  it('pushes the expiry out from the renewal, not the original issue', () => {
+    const ttlSeconds = 60 * 60 * 24 * 14
+    const token = sessions({ now: at(issued), ttlSeconds }).issue('acct-1')
+
+    const fresh = sessions({ now: at('2026-08-10T12:00:00.000Z'), ttlSeconds }).slid(token) ?? ''
+
+    const wellPastOriginalExpiry = sessions({ now: at('2026-08-20T12:00:00.000Z'), ttlSeconds })
+    expect(wellPastOriginalExpiry.read(token)).toBeUndefined()
+    expect(wellPastOriginalExpiry.read(fresh)).toEqual({ account_id: 'acct-1' })
+  })
+
+  it('gives nothing for a token already expired', () => {
+    const token = sessions({ now: at(issued), ttlSeconds: 3600 }).issue('acct-1')
+
+    expect(sessions({ now: at('2026-07-29T13:00:01.000Z'), ttlSeconds: 3600 }).slid(token)).toBeUndefined()
+  })
+
+  it('gives nothing for garbage or a foreign signature', () => {
+    const later = sessions({ now: at('2026-08-05T12:00:00.000Z') })
+    const foreign = sessions({ secret: 'b'.repeat(32), now: at(issued) }).issue('acct-1')
+
+    expect(later.slid('nonsense')).toBeUndefined()
+    expect(later.slid(foreign)).toBeUndefined()
+  })
+})

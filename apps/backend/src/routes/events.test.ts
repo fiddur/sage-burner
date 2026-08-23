@@ -27,13 +27,16 @@ afterEach(async () => {
   handle = undefined
 })
 
+let clock = new Date('2026-06-01T12:00:00.000Z')
+
 const build = async (today = '2026-06-01') => {
+  clock = new Date(`${today}T12:00:00.000Z`)
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
-    now: () => new Date(`${today}T12:00:00.000Z`),
+    now: () => clock,
   })
   return app
 }
@@ -56,7 +59,7 @@ const givenAccount = async (roles: ('admin' | 'member')[]) => {
     })
   for (const role of roles) await db().insert(accountRole).values({ account_id: id, role })
 
-  const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
+  const sessions = createSessions({ secret: SECRET, now: () => clock, ttlSeconds: 3600 })
   return `${SESSION_COOKIE}=${sessions.issue(id)}`
 }
 

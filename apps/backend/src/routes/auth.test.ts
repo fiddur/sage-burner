@@ -803,3 +803,74 @@ describe('signing up', () => {
     expect(retryAfter(refused)).toBeGreaterThan(50)
   })
 })
+
+describe('session sliding', () => {
+  const at = (iso: string) => new Date(iso)
+
+  const signedInOn = async (server: FastifyInstance) => {
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+    const cookie = cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))
+    const token = readSessionCookie(cookie)
+    if (token === undefined) throw new Error('no session cookie from login')
+    return `${SESSION_COOKIE}=${token}`
+  }
+
+  it('renews the cookie on a request a day or more after it was issued', async () => {
+    let clock = at('2026-08-01T12:00:00.000Z')
+    const server = await build({}, { now: () => clock })
+    const cookie = await signedInOn(server)
+
+    clock = at('2026-08-03T12:00:00.000Z')
+    const response = await server.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })
+
+    const renewed = cookieFrom(response)
+    expect(renewed).toContain(`${SESSION_COOKIE}=`)
+    expect(renewed).toContain('HttpOnly')
+    expect(readSessionCookie(renewed)).not.toBe(readSessionCookie(cookie))
+  })
+
+  it('gives the renewed cookie the configured lifetime again', async () => {
+    let clock = at('2026-08-01T12:00:00.000Z')
+    const server = await build({ SESSION_TTL_SECONDS: '604800' }, { now: () => clock })
+    const cookie = await signedInOn(server)
+
+    clock = at('2026-08-03T12:00:00.000Z')
+    const response = await server.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })
+
+    expect(cookieFrom(response)).toContain('Max-Age=604800')
+  })
+
+  it('leaves a cookie younger than a day alone', async () => {
+    let clock = at('2026-08-01T12:00:00.000Z')
+    const server = await build({}, { now: () => clock })
+    const cookie = await signedInOn(server)
+
+    clock = at('2026-08-01T18:00:00.000Z')
+    const response = await server.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })
+
+    expect(cookieFrom(response)).toBeUndefined()
+    expect(response.headers['set-cookie']).toBeUndefined()
+  })
+
+  it('sets nothing for a visitor without a session', async () => {
+    const server = await build()
+
+    const response = await server.inject({ method: 'GET', url: '/api/auth/me' })
+
+    expect(response.headers['set-cookie']).toBeUndefined()
+  })
+
+  it('lets logout clear the cookie rather than renewing it', async () => {
+    let clock = at('2026-08-01T12:00:00.000Z')
+    const server = await build({}, { now: () => clock })
+    const cookie = await signedInOn(server)
+
+    clock = at('2026-08-03T12:00:00.000Z')
+    const response = await server.inject({ method: 'POST', url: '/api/auth/logout', headers: { cookie } })
+
+    const header = response.headers['set-cookie']
+    expect(typeof header).toBe('string')
+    expect(header).toContain(`${SESSION_COOKIE}=;`)
+    expect(header).toContain('Max-Age=0')
+  })
+})

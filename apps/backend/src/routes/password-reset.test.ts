@@ -115,7 +115,7 @@ const givenSignedInAdmin = async () => {
     .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
   await db().insert(accountRole).values({ account_id: id, role: 'admin' })
 
-  const sessions = createSessions({ secret: 's'.repeat(40), now: () => new Date(), ttlSeconds: 3600 })
+  const sessions = createSessions({ secret: 's'.repeat(40), now: () => new Date(NOW), ttlSeconds: 3600 })
 
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
@@ -251,7 +251,19 @@ describe('asking for a password reset', () => {
   })
 
   it('answers before the mail has gone, so a slow mail server cannot hold the request', async () => {
-    const server = await build()
+    let release = () => undefined as void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const server = await build(
+      {},
+      {
+        send: async (_transport, message) => {
+          await held
+          posted.push(message)
+        },
+      },
+    )
     await givenMailServer()
     await givenAccount()
 
@@ -260,6 +272,7 @@ describe('asking for a password reset', () => {
     expect(posted).toHaveLength(0)
     expect(response.statusCode).toBe(204)
 
+    release()
     await settled()
     expect(posted).toHaveLength(1)
   })

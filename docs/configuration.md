@@ -36,7 +36,7 @@ expands to an empty string rather than to nothing.
 | `WEB_ROOT`            | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it                                                                                                      |
 | `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                                                                          |
 | `SESSION_SECRET`      | _(none)_                    | **Required if `NODE_ENV=production`, `HOST` is not loopback, or `WEB_ROOT` is set.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48`                 |
-| `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                                                                     |
+| `SESSION_TTL_SECONDS` | `15811200`                  | How long a session lasts after its last use. Six months — a signed-in request more than a day after the cookie was issued answers with a fresh one                      |
 | `PUBLIC_ORIGIN`       | _(unset)_                   | Where a browser reaches this installation, e.g. `https://burn.example.org`. Password resets require it; passkeys, the share card and links in email read it — see below |
 
 Invalid configuration fails at boot with every problem listed, rather than

@@ -55,7 +55,7 @@ services:
       # No default: the app refuses to start in production without it, which is
       # the intended failure. A default here would defeat that check.
       - SESSION_SECRET=${SESSION_SECRET}
-      - SESSION_TTL_SECONDS=${SESSION_TTL_SECONDS:-1209600}
+      - SESSION_TTL_SECONDS=${SESSION_TTL_SECONDS:-15811200}
       # No default, and an empty value is treated as unset: a passkey is bound to
       # whatever domain is named here, and a wrong guess is worse than no guess —
       # it would register credentials nobody can then sign in with.
