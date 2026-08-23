@@ -77,7 +77,11 @@ const givenAccount = async (name: string, roles: ('admin' | 'member')[] = ['memb
     .values({ id, email: `${id}@example.org`, name, password_hash: null, created_at: NOW })
   for (const role of roles) await db().insert(accountRole).values({ account_id: id, role })
 
-  const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
+  const sessions = createSessions({
+    secret: SECRET,
+    now: () => new Date(stamp),
+    ttlSeconds: 60 * 60 * 24 * 365,
+  })
   return { id, name, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 

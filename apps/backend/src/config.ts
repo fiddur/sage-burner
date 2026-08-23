@@ -50,7 +50,7 @@ export const envSchema = z.object({
       .number()
       .int()
       .positive()
-      .default(60 * 60 * 24 * 14),
+      .default(60 * 60 * 24 * 183),
   ),
 })
 

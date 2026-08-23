@@ -12,6 +12,8 @@ export interface SessionDeps {
 
 const MIN_SECRET_LENGTH = 32
 
+const SLIDE_AFTER_SECONDS = 60 * 60 * 24
+
 interface WireFormat {
   sub: string
   exp: number
@@ -30,6 +32,7 @@ const isWireFormat = (value: unknown): value is Pick<WireFormat, 'sub' | 'exp'> 
 export interface Sessions {
   issue: (accountId: string) => string
   read: (token: string) => SessionPayload | undefined
+  slid: (token: string) => string | undefined
 }
 
 export const createSessions = ({ secret, now, ttlSeconds }: SessionDeps): Sessions => {
@@ -44,40 +47,57 @@ export const createSessions = ({ secret, now, ttlSeconds }: SessionDeps): Sessio
     return `${encoded}.${signatureFor(encoded)}`
   }
 
+  const issue = (accountId: string) =>
+    sign(
+      JSON.stringify({
+        sub: accountId,
+        exp: Math.floor(now().getTime() / 1000) + ttlSeconds,
+        jti: randomBytes(9).toString('base64url'),
+      } satisfies WireFormat),
+    )
+
+  const verified = (token: string): Pick<WireFormat, 'sub' | 'exp'> | undefined => {
+    const parts = token.split('.')
+    if (parts.length !== 2) return undefined
+
+    const [encoded, signature] = parts
+    if (encoded === undefined || signature === undefined || encoded === '' || signature === '') {
+      return undefined
+    }
+
+    const expected = Buffer.from(signatureFor(encoded), 'utf8')
+    const actual = Buffer.from(signature, 'utf8')
+    if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return undefined
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
+    } catch {
+      return undefined
+    }
+
+    if (!isWireFormat(parsed)) return undefined
+    if (parsed.exp * 1000 <= now().getTime()) return undefined
+
+    return parsed
+  }
+
   return {
-    issue: (accountId) =>
-      sign(
-        JSON.stringify({
-          sub: accountId,
-          exp: Math.floor(now().getTime() / 1000) + ttlSeconds,
-          jti: randomBytes(9).toString('base64url'),
-        } satisfies WireFormat),
-      ),
+    issue,
 
     read: (token) => {
-      const parts = token.split('.')
-      if (parts.length !== 2) return undefined
+      const parsed = verified(token)
+      return parsed === undefined ? undefined : { account_id: parsed.sub }
+    },
 
-      const [encoded, signature] = parts
-      if (encoded === undefined || signature === undefined || encoded === '' || signature === '') {
-        return undefined
-      }
+    slid: (token) => {
+      const parsed = verified(token)
+      if (parsed === undefined) return undefined
 
-      const expected = Buffer.from(signatureFor(encoded), 'utf8')
-      const actual = Buffer.from(signature, 'utf8')
-      if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return undefined
+      const issuedAt = parsed.exp - ttlSeconds
+      if (Math.floor(now().getTime() / 1000) - issuedAt < SLIDE_AFTER_SECONDS) return undefined
 
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
-      } catch {
-        return undefined
-      }
-
-      if (!isWireFormat(parsed)) return undefined
-      if (parsed.exp * 1000 <= now().getTime()) return undefined
-
-      return { account_id: parsed.sub }
+      return issue(parsed.sub)
     },
   }
 }

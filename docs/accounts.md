@@ -216,6 +216,15 @@ just next-login.
 **Sessions** are a signed value in an `HttpOnly`, `SameSite=Lax` cookie — not a
 database row.
 
+**The lifetime slides from the last visit, not from login.** The token carries its expiry
+(`SESSION_TTL_SECONDS`, six months by default), and any signed-in API request more than a
+day after the token was issued answers with a freshly issued cookie — so a member is only
+signed out after staying away a whole `SESSION_TTL_SECONDS`, however long ago they last
+typed a password. The day of slack keeps the renewal off every response; a response that
+sets its own cookie (login, logout, an OAuth callback) is left alone, so a logout is never
+raced by its own renewal. Renewal extends a token's reach, so the paragraph below about
+revocation is worth reading with that in mind.
+
 `Secure` is decided once in `config.ts` as `secure_cookies`, on exactly the same
 predicate as the `SESSION_SECRET` requirement: `production`, a non-loopback
 `HOST`, or a set `WEB_ROOT`. The image is all three, so **every containerised

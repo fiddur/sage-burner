@@ -20,7 +20,7 @@ import type { Delivery, VapidKeys } from './push/push.ts'
 import { markActive } from './auth/active.ts'
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
-import { createSessions } from './auth/session.ts'
+import { createSessions, type Sessions } from './auth/session.ts'
 import {
   APPLICATION_MESSAGES,
   createThrottle,
@@ -46,7 +46,7 @@ import { registerAllergyRoutes } from './routes/allergies.ts'
 import { registerApplicationReviewRoutes } from './routes/application-review.ts'
 import { registerApplicationRoutes } from './routes/applications.ts'
 import { registerAttendanceRoutes } from './routes/attendance.ts'
-import { registerAuthRoutes } from './routes/auth.ts'
+import { cookieHeader, registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
 import { registerBringRoutes } from './routes/bring.ts'
@@ -169,9 +169,9 @@ const helmetOptions = (): FastifyHelmetOptions => ({
   xFrameOptions: { action: 'deny' },
 })
 
-const sessionDeps = (config: Config) => ({
+const sessionDeps = (config: Config, now: () => Date) => ({
   secret: config.session_secret,
-  now: () => new Date(),
+  now,
   ttlSeconds: config.session_ttl_seconds,
 })
 
@@ -204,6 +204,22 @@ const registerActivityHook = (app: FastifyInstance, deps: GuardDeps & { now: () 
     } catch (failure: unknown) {
       request.log.warn({ err: failure }, 'recording that somebody has been here')
     }
+  })
+}
+
+const registerSessionSlideHook = (app: FastifyInstance, deps: { sessions: Sessions; config: Config }) => {
+  app.addHook('onSend', async (request, reply) => {
+    const pattern = request.routeOptions.url
+    if (pattern === undefined || !isApiRequest(pattern)) return
+    if (reply.getHeader('set-cookie') !== undefined) return
+
+    const token = readSessionCookie(request.headers.cookie)
+    if (token === undefined) return
+
+    const fresh = deps.sessions.slid(token)
+    if (fresh === undefined) return
+
+    void reply.header('set-cookie', cookieHeader(fresh, deps.config, deps.config.session_ttl_seconds))
   })
 }
 
@@ -263,7 +279,7 @@ export const createApp = async ({
   registerVersionRoutes(app, { config })
   registerDocumentRoutes(app, { changelog, privacy, terms })
 
-  const sessions = createSessions(sessionDeps(config))
+  const sessions = createSessions(sessionDeps(config, now))
 
   const gate = suppliedGate ?? createGate(SCRYPT_GATE)
 
@@ -271,6 +287,7 @@ export const createApp = async ({
 
   registerAdminPrefixGuard(app, { db, sessions })
   registerActivityHook(app, { db, sessions, now })
+  registerSessionSlideHook(app, { sessions, config })
 
   const push = { db, deliver, now, mintKeys }
 

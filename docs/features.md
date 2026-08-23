@@ -46,6 +46,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Signing in: password, passkey, or a linked provider. Passkeys are usernameless
   and per device, several per account, alongside a password or instead of one —
   removing the last passkey off an account with no password is refused.
+- Signing in sticks: a session lasts six months from the last visit and using the
+  app renews it, so only staying away that long signs you out.
 - The first admin comes from the CLI (`admin:create`); after that, admins grant
   roles from the accounts list, and each name there opens the account: its real name,
   login address, allergies, and a password to set. See [accounts.md](./accounts.md).

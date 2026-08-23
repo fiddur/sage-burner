@@ -7,6 +7,12 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-23
+
+- **You stay signed in.** A session now lasts six months from your last visit rather than
+  two weeks from signing in — using the app renews it, so only staying away half a year
+  signs you out.
+
 # 2026-08-22
 
 - **Two dreams that turn out to be one can be folded together.** When the same idea is
