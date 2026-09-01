@@ -16,7 +16,7 @@
     "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix"
   },
   "dependencies": {
-    "zod": "^4.3.5"
+    "zod": "^4.5.2"
   },
   "devDependencies": {
     "vitest": "^4"
