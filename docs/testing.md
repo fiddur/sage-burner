@@ -599,9 +599,11 @@ phone" means 360px.
       slug-conflict check.
 - [ ] The top bar slides away scrolling down a page and returns on the first
       scroll up.
-- [ ] ☰ opens the drawer over the page (Songbook, Rideshares, Bring list, the
-      map when one is set); backdrop, ✕ and Escape all close it and focus
-      returns to ☰.
+- [ ] ☰ opens the drawer over the page, naming every page in the sidebar's
+      order: Feed, Members, Schedule, Leads, Meals and FAQ first, matching the
+      bottom bar left to right, then Songbook, Rideshares, Bring list, Meetings
+      and the map when one is set. The page you are on is marked. Backdrop, ✕
+      and Escape all close it and focus returns to ☰.
 - [ ] At 360px nothing anywhere scrolls the page sideways.
 
 ## Installing, offline, and the installation's face

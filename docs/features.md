@@ -228,7 +228,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   name, the burn's dates and a banner into the shell for crawlers.
 - Getting around: on a wide screen every page is a column down the left, marked with
   the page you are on — ‹ hides it, ☰ brings it back, and the browser remembers which.
-  On a phone the six member pages are a bar along the bottom and the rest are behind ☰.
+  On a phone the six member pages are a bar of icons along the bottom, and ☰ opens every
+  page by name — those six in the bar's order, then the rest.
 - The app installs to a home screen and works offline from its cache; signing
   out deletes the cached data.
 - `/changelog` says what each deploy changed, in the members' words, and the

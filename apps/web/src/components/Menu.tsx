@@ -101,7 +101,7 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
       {showing && (
         <>
           <div class="menu-backdrop" onPointerDown={close} />
-          <nav id="menu-drawer" ref={drawer} class="menu-drawer" aria-label="More">
+          <nav id="menu-drawer" ref={drawer} class="menu-drawer" aria-label="All pages">
             {pages.map((page) => (
               <MenuEntry
                 key={page.href}

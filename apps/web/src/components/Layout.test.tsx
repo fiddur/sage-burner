@@ -169,6 +169,32 @@ describe('the shape of the bar', () => {
 })
 
 describe('the menu at the edge of the bar', () => {
+  const MAP = 'https://maps.example.org/the-field'
+
+  const withTheMap: LayoutApi = { ...noBell, getMapLink: () => Promise.resolve({ map: { url: MAP } }) }
+
+  const startedAt = `${globalThis.location.pathname}${globalThis.location.search}`
+
+  afterEach(() => history.replaceState(null, '', startedAt))
+
+  const inTheDrawer = () => [...document.querySelectorAll('.menu-drawer .menu-entry')].map(nameOf)
+
+  const renderNavAt = (at: string) => {
+    history.replaceState(null, '', at)
+
+    return render(
+      <LocationProvider>
+        <InstallationProvider title="Sage Burner">
+          <ViewerProvider viewer={signedInAs('member')}>
+            <Layout api={noBell}>
+              <p>the page</p>
+            </Layout>
+          </ViewerProvider>
+        </InstallationProvider>
+      </LocationProvider>,
+    )
+  }
+
   it('carries the pages the bar has no room for', async () => {
     onAPhone()
     renderNav(signedInAs('member'))
@@ -177,6 +203,56 @@ describe('the menu at the edge of the bar', () => {
 
     expect((await screen.findByRole('link', { name: /Rideshares/ })).getAttribute('href')).toBe('/rides')
     expect(screen.getByRole('link', { name: /Bring list/ }).getAttribute('href')).toBe('/bring')
+  })
+
+  it('names every page, in the order the bar puts the first six in', async () => {
+    onAPhone()
+    renderNav(signedInAs('member'), withTheMap)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    await screen.findByRole('link', { name: /Map of area/ })
+
+    expect(inTheDrawer()).toEqual([
+      'Feed',
+      'Members',
+      'Schedule',
+      'Leads',
+      'Meals',
+      'FAQ',
+      'Songbook',
+      'Rideshares',
+      'Bring list',
+      'Meetings',
+      'Map of area',
+    ])
+  })
+
+  it('gives each icon along the bottom a twin with its name', async () => {
+    onAPhone()
+    renderNav(signedInAs('member'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    await screen.findByRole('link', { name: /Songbook/ })
+
+    const tabs = [...document.querySelectorAll('.bottom-tab')].map(nameOf)
+    const drawer = inTheDrawer()
+
+    expect(tabs).toEqual(['Feed', 'Members', 'Schedule', 'Leads', 'Meals', 'FAQ'])
+    for (const label of tabs) expect(drawer, `${label} should be named in the drawer`).toContain(label)
+  })
+
+  it('marks the page somebody is on, as the bar does', async () => {
+    onAPhone()
+    renderNavAt('/feed')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    await screen.findByRole('link', { name: /Songbook/ })
+
+    const marked = [...document.querySelectorAll('.menu-drawer .menu-entry')]
+      .filter((entry) => entry.getAttribute('aria-current') === 'page')
+      .map(nameOf)
+
+    expect(marked).toEqual(['Feed'])
   })
 
   it('is offered on a phone as well, where the bar is fullest', () => {
