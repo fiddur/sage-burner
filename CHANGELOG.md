@@ -7,6 +7,13 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-16
+
+- **The phone's ☰ menu now lists every page by name.** The six icons along the bottom of
+  the screen have their names in the menu, in the same order they sit in the bar — so
+  when you cannot tell what one of them means, ☰ says. Songbook, Rideshares, Bring list,
+  Meetings and the map of the area are still there below them.
+
 # 2026-08-23
 
 - **What people said about somebody is on their page.** A member's page now shows the

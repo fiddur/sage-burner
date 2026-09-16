@@ -165,11 +165,21 @@ has been reached from the page it belongs to. That worked until a page belonged 
 other page: the rideshare board is linked from a form that only renders for a burn you
 have already joined, so somebody who has not joined one could not get there at all.
 
-**☰ is where those live** — 🎵 Songbook, 🛻 Rideshares and 🎁 Bring list. Beside the logo rather than on
-it: the logo goes home, which is a convention worth more than the space a second target
-costs. **Ahead of the logo**, at the edge its drawer slides in from — a control that
-opens from the left, sitting to the right of something else, reads as belonging to that
-something else.
+**☰ is where those live** — 🎵 Songbook, 🛻 Rideshares, 🎁 Bring list and 🗣️ Meetings, and the
+map of the area where one is set.
+
+**It holds every page, though, not only those.** The drawer takes the same `everyPage`
+list the sidebar gets on a wide screen, in the same order: the six the bottom bar shows,
+then the rest, the map last. The bottom bar is icons and nothing else —
+there is no room across a phone for six words — so nowhere on a phone said that 🕴️ is
+Leads or 📜 is the Feed, and a new member had no way to find out but pressing them. The
+drawer is that legend as well as a way to the rest: a name per icon costs a line each,
+and keeping the bar's order means the name sits where the icon does.
+
+**Beside the logo rather than on it**: the logo goes home, which is a convention worth
+more than the space a second target costs. **Ahead of the logo**, at the edge its drawer
+slides in from — a control that opens from the left, sitting to the right of something
+else, reads as belonging to that something else.
 
 ### One column of pages on a wide screen (#681)
 
@@ -209,7 +219,8 @@ moving focus would take it off whatever the page put it on.
 **A phone is untouched.** The bottom bar and the overlay drawer are what that viewport
 gets, and `usePhone` is what picks — the sidebar and the bottom bar are never both
 rendered, which is why both navs can be called _Pages_ without ever colliding. The drawer
-is _More_, and shares a name with neither.
+is _All pages_, and shares a name with neither — it lists the same pages the bottom bar
+does and more, so a name of its own still has to be a name neither nav uses.
 
 **The drawer slides over the page, and the page does not move.** Pushing the site aside
 would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve

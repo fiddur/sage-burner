@@ -76,7 +76,7 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
     <div class={classesFor({ bottomBar, aside })}>
       <header class="site-header">
         {phone ? (
-          <Menu pages={approved ? withMap(menuPages, mapUrl) : []} />
+          <Menu pages={everyPage} />
         ) : (
           everyPage.length > 0 &&
           sidebar.hidden && (

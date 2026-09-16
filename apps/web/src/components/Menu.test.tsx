@@ -25,7 +25,7 @@ const opened = async (pages: readonly NavPage[] = RIDES, at = '/') => {
 }
 
 describe('the menu ahead of the logo', () => {
-  it('opens on ☰ and lists what the bar has no room for', async () => {
+  it('opens on ☰ and lists the pages it is handed', async () => {
     expect((await opened()).getAttribute('href')).toBe('/rides')
   })
 
