@@ -1539,6 +1539,7 @@ describe('the ingredients of a sitting, in the panel', () => {
               counted_by: null,
               counted_by_name: null,
               counted_at: null,
+              need_more: null,
               withdrawn_at: null,
               created_at: '2026-07-01T00:00:00.000Z',
               allergies: [],

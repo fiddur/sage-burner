@@ -374,6 +374,9 @@ phone" means 360px.
 - [ ] `pnpm --filter sage-burner-backend pantry:import <file.tsv>`, whose first line names
       `name`, `kind`, `unit` and `where`: it says how many were added and how many updated, a row already
       on the list keeps its count, and a file with a kind nobody named is refused naming the line.
+- [ ] The same file with a fifth column, `need more`, and a word in one row's cell: that row comes
+      back from the import with **Need more** lit and no name beside it, and nothing else on the
+      list is flagged.
 - [ ] Meals, as a member who has joined the burn: below the plan are **What do you want for
       breakfast?**, **Snacks** and **Around the house**, each thing with the faces of who
       hearted it and the count, most wanted first. Press a heart: the count goes up and your
@@ -385,8 +388,8 @@ phone" means 360px.
       With no burn in the bar there is no heart anywhere on the page.
 - [ ] Meals → **Shopping list**, or ☰ → Shopping list: every hearted thing that is not
       _plenty_ is there with how many want it, what the pantry says is in the house and where
-      it lives. Nothing unhearted is listed. **Show the n things there is enough of** unfolds
-      the _plenty_ ones and hides them again.
+      it lives. Nothing nobody asked for is listed. **Show the n things there is enough of**
+      unfolds the _plenty_ ones and hides them again.
 - [ ] Tick something off in one browser with a second browser open on the page: within a
       minute it is under **Bought** in both, with who bought it and when. Untick it in the
       second: it is back on the list in both. Two browsers ticking the same thing name the
@@ -428,6 +431,13 @@ phone" means 360px.
 - [ ] Write something under **Other** in a member's allergies: the sitting gains one line
       below the warning saying how many more wrote something, linking to the Members page —
       and what they wrote is nowhere on the sitting.
+- [ ] ☰ → Pantry: press **Need more** on a row nobody has hearted. It lights in ember and
+      "Need more, asked by <you> · <when>" appears under the name; the count beside it is
+      untouched. Press it again and both go. It is there with no burn chosen in the bar.
+- [ ] Count that same row **Plenty** and press **Need more** on it: the shopping list has it
+      under **From the pantry** saying "the pantry says: need more", rather than folded away
+      under **Show the n things there is enough of**. Tick it bought and reload the Pantry
+      page — the flag is gone, and unticking it does not bring the flag back.
 - [ ] Type "cash" in the sitting's add box: the **Nuts** mark shows beside the match.
 - [ ] The shopping list on a wide screen: the _Asked for by_ cell of Cashew says "1 cannot
       eat this".

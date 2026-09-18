@@ -32,12 +32,14 @@ import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 export type PantryApi = Pick<
   ApiClient,
   | 'addPantryItem'
+  | 'flagPantryNeedMore'
   | 'getAllergyItems'
   | 'getEventPantry'
   | 'getPantry'
   | 'heartPantryItem'
   | 'restorePantryItem'
   | 'setPantryStock'
+  | 'unflagPantryNeedMore'
   | 'unheartPantryItem'
   | 'updatePantryItem'
   | 'withdrawPantryItem'
@@ -127,6 +129,13 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
     run(
       () => api.setPantryStock(item.id, { amount: level === 'some' ? amount : null, level }),
       'Could not save that count.',
+    )
+  }
+
+  const asking = (item: PantryItem) => {
+    run(
+      () => (item.need_more === null ? api.flagPantryNeedMore(item.id) : api.unflagPantryNeedMore(item.id)),
+      'Could not save that.',
     )
   }
 
@@ -226,6 +235,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
                       hearts={hearts.get(item.id)}
                       onHeart={(hearting) => wanting(item.id, hearting)}
                       onCount={(level, amount) => count(item, level, amount)}
+                      onNeedMore={() => asking(item)}
                       onEdit={() => setEditing(item.id)}
                       onWithdraw={() =>
                         run(() => api.withdrawPantryItem(item.id), 'Could not take that off.')
@@ -339,6 +349,16 @@ const countedBy = (item: PantryItem): string | undefined => {
   return `Counted by ${who} · ${localMoment(item.counted_at)}`
 }
 
+const askedFor = (item: PantryItem): string | undefined => {
+  if (item.need_more === null) return undefined
+
+  const when = localMoment(item.need_more.at)
+
+  return item.need_more.by === null
+    ? `Need more · ${when}`
+    : `Need more, asked by ${item.need_more.by_name ?? NAMELESS} · ${when}`
+}
+
 const Row = ({
   item,
   admin,
@@ -347,6 +367,7 @@ const Row = ({
   onCount,
   onEdit,
   onHeart,
+  onNeedMore,
   onWithdraw,
 }: {
   item: PantryItem
@@ -356,9 +377,11 @@ const Row = ({
   onCount: (level: null | StockLevel, amount: number | null) => void
   onEdit: () => void
   onHeart: (hearting: boolean) => void
+  onNeedMore: () => void
   onWithdraw: () => void
 }) => {
   const said = countedBy(item)
+  const asked = askedFor(item)
 
   return (
     <>
@@ -383,25 +406,41 @@ const Row = ({
 
       {item.where !== '' && <p class="form-note">{item.where}</p>}
       {said !== undefined && <p class="form-note">{said}</p>}
+      {asked !== undefined && <p class="form-note">{asked}</p>}
 
-      <p class="stock-choice" role="group" aria-label={`How much ${item.name} is left`}>
-        {stockLevels.map((level) => (
+      <div class="stock-choice">
+        <p class="stock-steps" role="group" aria-label={`How much ${item.name} is left`}>
+          {stockLevels.map((level) => (
+            <button
+              key={level}
+              type="button"
+              class={item.stock_level === level ? 'stock-step is-on' : 'stock-step'}
+              aria-pressed={item.stock_level === level}
+              disabled={busy}
+              onClick={() => onCount(item.stock_level === level ? null : level, item.stock_amount)}
+            >
+              {stockLevelLabel[level]}
+            </button>
+          ))}
+
+          {item.stock_level === 'some' && (
+            <Amount item={item} busy={busy} onAmount={(amount) => onCount('some', amount)} />
+          )}
+        </p>
+
+        <p class="stock-steps">
           <button
-            key={level}
             type="button"
-            class={item.stock_level === level ? 'stock-step is-on' : 'stock-step'}
-            aria-pressed={item.stock_level === level}
+            class={item.need_more === null ? 'stock-step' : 'stock-step is-on'}
+            aria-pressed={item.need_more !== null}
+            aria-label={`${item.need_more === null ? 'Ask for more' : 'Stop asking for more'} ${item.name}`}
             disabled={busy}
-            onClick={() => onCount(item.stock_level === level ? null : level, item.stock_amount)}
+            onClick={onNeedMore}
           >
-            {stockLevelLabel[level]}
+            Need more
           </button>
-        ))}
-
-        {item.stock_level === 'some' && (
-          <Amount item={item} busy={busy} onAmount={(amount) => onCount('some', amount)} />
-        )}
-      </p>
+        </p>
+      </div>
 
       {admin && (
         <p class="pantry-actions">

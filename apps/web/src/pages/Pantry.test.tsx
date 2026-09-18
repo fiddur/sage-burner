@@ -35,6 +35,7 @@ const thing = (over: Partial<PantryItem> = {}): PantryItem => ({
   counted_by: null,
   counted_by_name: null,
   counted_at: null,
+  need_more: null,
   withdrawn_at: null,
   created_at: '2026-09-01T00:00:00.000Z',
   allergies: [],
@@ -78,6 +79,8 @@ const stub = (over: Partial<PantryApi> = {}, items: PantryItem[] = ITEMS): Pantr
     Promise.resolve({
       items: [wanted(items[0] ?? thing(), 3, true), ...items.slice(1).map((one) => wanted(one, 0, false))],
     }),
+  flagPantryNeedMore: () => Promise.reject(new Error('flagPantryNeedMore is not stubbed here')),
+  unflagPantryNeedMore: () => Promise.reject(new Error('unflagPantryNeedMore is not stubbed here')),
   heartPantryItem: () => Promise.reject(new Error('heartPantryItem is not stubbed here')),
   unheartPantryItem: () => Promise.reject(new Error('unheartPantryItem is not stubbed here')),
   setPantryStock: () => Promise.reject(new Error('setPantryStock is not stubbed here')),
@@ -340,6 +343,64 @@ describe('the pantry page', () => {
     fireEvent.click(await screen.findByLabelText('Put Marmite back on the list'))
 
     await waitFor(() => expect(restorePantryItem).toHaveBeenCalledWith('p-9'))
+  })
+})
+
+describe('asking for more of something from the cellar', () => {
+  it('offers the ask on every row, burn or no burn', async () => {
+    renderPage(stub())
+
+    expect(await screen.findByRole('button', { name: 'Ask for more Oatmeal' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ask for more Cumin' })).toBeTruthy()
+  })
+
+  it('writes the ask', async () => {
+    const flagPantryNeedMore = vi.fn<PantryApi['flagPantryNeedMore']>(() => Promise.resolve(undefined))
+    renderPage(stub({ flagPantryNeedMore }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask for more Cumin' }))
+
+    await waitFor(() => expect(flagPantryNeedMore).toHaveBeenCalledWith('p-2'))
+  })
+
+  it('lights the button and names who asked and when', async () => {
+    renderPage(
+      stub({}, [thing({ need_more: { by: 'a-9', by_name: 'Cleo', at: '2026-09-17T08:00:00.000Z' } })]),
+    )
+
+    const asked = await screen.findByRole('button', { name: 'Stop asking for more Oatmeal' })
+
+    expect(asked.className).toContain('is-on')
+    expect(screen.getByText(/^Need more, asked by Cleo · /)).toBeTruthy()
+  })
+
+  it('names nobody where nobody asked, which is what an import leaves', async () => {
+    renderPage(stub({}, [thing({ need_more: { by: null, by_name: null, at: '2026-09-17T08:00:00.000Z' } })]))
+
+    expect(await screen.findByText(/^Need more · /)).toBeTruthy()
+  })
+
+  it('takes the ask back when the lit button is pressed', async () => {
+    const unflagPantryNeedMore = vi.fn<PantryApi['unflagPantryNeedMore']>(() => Promise.resolve(undefined))
+    renderPage(
+      stub({ unflagPantryNeedMore }, [
+        thing({ need_more: { by: 'a-9', by_name: 'Cleo', at: '2026-09-17T08:00:00.000Z' } }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop asking for more Oatmeal' }))
+
+    await waitFor(() => expect(unflagPantryNeedMore).toHaveBeenCalledWith('p-1'))
+  })
+
+  it('keeps the ask out of the group that says how much is left', async () => {
+    renderPage(stub())
+
+    await screen.findByText('Oatmeal')
+
+    const counting = screen.getByRole('group', { name: 'How much Oatmeal is left' })
+    expect(counting.textContent).toContain('Out')
+    expect(counting.textContent).not.toContain('Need more')
   })
 })
 

@@ -1070,6 +1070,8 @@ export const pantryItem = sqliteTable(
     stock_amount: real('stock_amount'),
     counted_by: text('counted_by').references(() => account.id, { onDelete: 'set null' }),
     counted_at: text('counted_at'),
+    need_more_by: text('need_more_by').references(() => account.id, { onDelete: 'set null' }),
+    need_more_at: text('need_more_at'),
     withdrawn_at: text('withdrawn_at'),
     created_at: text('created_at').notNull(),
   },

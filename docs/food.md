@@ -6,7 +6,8 @@ tabs, which were two tabs of the same shape — a thing, a place, a rough amount
 On top of it sit the hearts — what people want at one burn — and the shopping
 list they fill (#806), and on top of that the ingredients of each sitting, which
 are what turns that list into amounts (#807) and what the allergy warning reads
-(#808). Together they are what
+(#808), and beside the count a flag anybody can raise to put a thing on the list
+(#813). Together they are what
 [#804](https://github.com/fiddur/sage-burner/issues/804) calls food.
 
 [← back to the README](../README.md)
@@ -51,6 +52,46 @@ Pressing the lit answer again clears the count, and clearing it also forgets who
 counted and when. Nothing was counted then, and a row reading "counted by Ada
 yesterday" above no answer is a worse record than no record.
 
+## Need more: a request, not a fourth answer
+
+_Out_ is a fact about the shelf and **Need more** is a request, and the two come
+apart in both directions. Saffron can be out with nobody needing any until
+somebody cooks with it; there can be four kilos of rice in the cellar and the
+buyer should still bring a sack, because forty people eat through four kilos in a
+weekend. A fourth button on the count would have forced one answer to two
+questions, and whichever one it recorded the other would be lost.
+
+So `need_more_at` is its own column — flagged is "not null" — with `need_more_by`
+beside it saying who asked. There is **no CHECK tying the two together**: the
+account may go while the request stays, exactly as `bought_by` / `bought_at` do on
+a purchase, and the importer writes one with no `by` at all. That is why the page
+says "Need more · when" with nobody named rather than the "somebody who has left"
+the count uses — here a missing name is the ordinary case, not a departure.
+
+**The flag outranks the count on the shopping list.** A flagged thing is listed
+under _From the pantry_ whether or not anybody hearted it, and a flagged _plenty_
+thing stays on the list rather than folding away with the rest: somebody looked at
+the shelf **after** the count was taken, and a page that quietly hid what they
+asked for would teach them to stop asking. It brings no amount with it — a
+request says "bring some", not how much, the same as a heart — so a sitting is
+still the only thing that can put a figure beside it.
+
+**Ticking it bought clears it, in the same request.** Buying it is what was asked
+for, and the next count starts clean. Unticking does not bring it back: the tick
+was a mistake, the request had already been answered, and somebody standing in
+the cellar can raise it again in one press. Like a heart, it tells nobody and
+writes no card — #247 is about a role somebody else can change, and nothing here
+is done to anybody.
+
+The flag is **global, like the count**: it is the house that is low on rice, not
+one burn, so the routes are `PUT` and `DELETE /api/pantry/:id/need-more` under
+`requireApproved` and take no event id. Asking for something already asked for
+keeps the first asker, because the question it answers is "has somebody asked for
+this", not "who last pressed it" — the purchase tick's rule. Asking for a
+withdrawn row is a 404, as counting one is: it is not on the list. Taking the ask
+back answers 204 whatever was there, withdrawn or never flagged, since a clear
+that can fail is one the page would have to reason about.
+
 ## Counting is everybody's; the list is the admin's, for now
 
 Any approved member may count anything: `requireApproved` on
@@ -91,7 +132,8 @@ it is not on the list, and the page does not offer it.
 ## Importing a sheet
 
 `pnpm --filter sage-burner-backend pantry:import <file.tsv>` takes a
-tab-separated file whose first line names `name`, `kind`, `unit` and `where`, and upserts by name,
+tab-separated file whose first line names `name`, `kind`, `unit` and `where` — and
+may end with a fifth, `need more`, which is the spreadsheet's own column — and upserts by name,
 case-insensitively: a thing already on the list has its kind, unit and place
 updated, a new one is added, and **nothing touches the count**. A spreadsheet
 knows what the house keeps; it knows nothing about what is in the cellar today.
@@ -101,6 +143,12 @@ guesses: a kind nobody named, a missing column or a line with no name stops the
 import and names the line number. An empty unit cell becomes `pcs`, which is the
 same default the form has. The import does not restore a withdrawn row either —
 that is a decision about the list, and the file is not where it should be made.
+
+A non-empty cell under `need more` raises the flag, with nobody named; an empty
+one leaves whatever is there alone, and a row already flagged keeps the name and
+the moment it has. Re-importing the sheet must not overwrite "asked by Cleo this
+morning" with "asked by nobody", and a column the sheet left blank is not the
+same statement as somebody pressing the button again.
 
 The spreadsheet's four room columns become one `where` line, joined with a spaced
 middot, **before** the import. That is a minute with a spreadsheet formula, against a
@@ -156,12 +204,12 @@ The row records who ticked it and when, and a second tick on the same thing
 **keeps the first**, because the question it answers is "has somebody bought
 this", not "who last pressed it".
 
-**Nothing unhearted is listed.** The pantry is a catalogue of what the house
-keeps, not a list of what to buy; without that rule the page would open on a
-hundred and fifty rows with nothing to choose between them. What there is
-**plenty** of is hearted but not bought, so it folds away behind a line saying
-how many — hidden rather than absent, because a buyer standing in the shop may
-well want to check.
+**Nothing gets on the list by sitting in the pantry.** A row is there because
+somebody hearted it, a sitting cooks with it, or the pantry says more is needed;
+without that rule the page would open on a hundred and fifty rows with nothing to
+choose between them. What there is **plenty** of and nobody has asked for folds
+away behind a line saying how many — hidden rather than absent, because a buyer
+standing in the shop may well want to check.
 
 The split is `shoppingSections` in `packages/shared/src/shopping.ts`, a pure
 function with no Zod in it, the way `roster.ts` draws the line between a place

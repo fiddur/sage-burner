@@ -11,6 +11,7 @@ import { importPantry, readPantryTsv } from './pantry-import.ts'
 const NOW = '2026-09-18T10:00:00.000Z'
 
 const HEADER = 'name\tkind\tunit\twhere'
+const WIDER = `${HEADER}\tneed more`
 
 let handle: DbHandle | undefined
 
@@ -42,13 +43,19 @@ const problem = (text: string) => {
 describe('reading a sheet somebody exported', () => {
   it('takes a header and the rows under it', () => {
     expect(lines(`${HEADER}\nOatmeal\tbreakfast\tkg\tHallway bucket · cellar I`)).toEqual([
-      { kind: 'breakfast', name: 'Oatmeal', unit: 'kg', where: 'Hallway bucket · cellar I' },
+      {
+        kind: 'breakfast',
+        name: 'Oatmeal',
+        unit: 'kg',
+        where: 'Hallway bucket · cellar I',
+        need_more: false,
+      },
     ])
   })
 
   it('steps over blank lines, which every exported sheet has', () => {
     expect(lines(`\n${HEADER}\n\nDates\tsnack\tkg\t\n\n`)).toEqual([
-      { kind: 'snack', name: 'Dates', unit: 'kg', where: '' },
+      { kind: 'snack', name: 'Dates', unit: 'kg', where: '', need_more: false },
     ])
   })
 
@@ -68,6 +75,22 @@ describe('reading a sheet somebody exported', () => {
     expect(problem(`${HEADER}\n \tsnack\tkg\t`)).toContain('Line 2')
   })
 
+  it('takes a fifth column saying more is needed, and reads any word in it as yes', () => {
+    expect(lines(`${WIDER}\nRice\tstaple\tkg\tCellar I\tx`)[0]?.need_more).toBe(true)
+  })
+
+  it('reads an empty fifth cell as saying nothing', () => {
+    expect(lines(`${WIDER}\nRice\tstaple\tkg\tCellar I\t `)[0]?.need_more).toBe(false)
+  })
+
+  it('wants the fifth cell on every line once the header names it', () => {
+    expect(problem(`${WIDER}\nRice\tstaple\tkg\tCellar I`)).toContain('Line 2')
+  })
+
+  it('refuses a fifth column nobody named', () => {
+    expect(problem(`${HEADER}\tmuch\nRice\tstaple\tkg\tCellar I\tx`)).toContain('Line 1')
+  })
+
   it('refuses a file whose first line is not the header', () => {
     expect(problem('Dates\tsnack\tkg\t')).toContain('Line 1')
   })
@@ -83,7 +106,7 @@ describe('importing what was read', () => {
 
     const done = await importPantry(
       db,
-      [{ kind: 'spice', name: 'Cumin', unit: 'g', where: 'Spice shelf' }],
+      [{ kind: 'spice', name: 'Cumin', unit: 'g', where: 'Spice shelf', need_more: false }],
       () => new Date(NOW),
     )
 
@@ -98,7 +121,7 @@ describe('importing what was read', () => {
 
     const done = await importPantry(
       db,
-      [{ kind: 'breakfast', name: 'oatmeal', unit: 'kg', where: 'Hallway bucket' }],
+      [{ kind: 'breakfast', name: 'oatmeal', unit: 'kg', where: 'Hallway bucket', need_more: false }],
       () => new Date(NOW),
     )
 
@@ -128,7 +151,7 @@ describe('importing what was read', () => {
 
     await importPantry(
       db,
-      [{ kind: 'spice', name: 'Cumin', unit: 'pkt', where: 'Spice shelf' }],
+      [{ kind: 'spice', name: 'Cumin', unit: 'pkt', where: 'Spice shelf', need_more: false }],
       () => new Date(NOW),
     )
 
@@ -136,5 +159,71 @@ describe('importing what was read', () => {
     expect(row?.unit).toBe('pkt')
     expect(row?.stock_level).toBe('some')
     expect(row?.stock_amount).toBe(3)
+  })
+
+  it('flags a thing the sheet asks for, naming nobody', async () => {
+    const db = build()
+
+    await importPantry(
+      db,
+      [{ kind: 'staple', name: 'Rice', unit: 'kg', where: 'Cellar I', need_more: true }],
+      () => new Date(NOW),
+    )
+
+    const [row] = await db.select().from(pantryItem).where(eq(pantryItem.name, 'Rice'))
+    expect(row?.need_more_at).toBe(NOW)
+    expect(row?.need_more_by).toBeNull()
+  })
+
+  it('leaves a flag already on a row alone, whoever asked for it', async () => {
+    const db = build()
+    const id = randomUUID()
+    const asked = '2026-09-17T08:00:00.000Z'
+    await db.insert(pantryItem).values({
+      id,
+      kind: 'staple',
+      name: 'Rice',
+      unit: 'kg',
+      where: '',
+      need_more_at: asked,
+      created_at: asked,
+    })
+
+    await importPantry(
+      db,
+      [{ kind: 'staple', name: 'Rice', unit: 'kg', where: 'Cellar I', need_more: true }],
+      () => new Date(NOW),
+    )
+
+    const [row] = await db.select().from(pantryItem).where(eq(pantryItem.id, id))
+    expect(row?.need_more_at).toBe(asked)
+  })
+
+  it('leaves an unasked-for row unflagged, and one flag alone, when the cell is empty', async () => {
+    const db = build()
+    const id = randomUUID()
+    await db.insert(pantryItem).values({
+      id,
+      kind: 'staple',
+      name: 'Rice',
+      unit: 'kg',
+      where: '',
+      need_more_at: NOW,
+      created_at: NOW,
+    })
+
+    await importPantry(
+      db,
+      [
+        { kind: 'staple', name: 'Rice', unit: 'kg', where: 'Cellar I', need_more: false },
+        { kind: 'staple', name: 'Lentils', unit: 'kg', where: '', need_more: false },
+      ],
+      () => new Date(NOW),
+    )
+
+    const [rice] = await db.select().from(pantryItem).where(eq(pantryItem.id, id))
+    const [lentils] = await db.select().from(pantryItem).where(eq(pantryItem.name, 'Lentils'))
+    expect(rice?.need_more_at).toBe(NOW)
+    expect(lentils?.need_more_at).toBeNull()
   })
 })

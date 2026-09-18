@@ -3311,6 +3311,17 @@ a.song-row:hover .song-what {
   margin: 0.5rem 0 0;
 }
 
+/* Two groups rather than one: Need more is a request, not a fourth answer to
+   "how much is left", so it must sit outside that group's label while staying on
+   the same line as Out. */
+.stock-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
 .stock-step {
   min-height: 44px;
   min-width: 5rem;

@@ -655,6 +655,16 @@ export const apiRoutes = {
     path: (eventId: string, itemId: string) =>
       `/api/events/${encodeURIComponent(eventId)}/pantry/${encodeURIComponent(itemId)}/bought`,
   },
+  flagPantryNeedMore: {
+    method: 'PUT',
+    fastify: '/api/pantry/:id/need-more',
+    path: (id: string) => `/api/pantry/${encodeURIComponent(id)}/need-more`,
+  },
+  unflagPantryNeedMore: {
+    method: 'DELETE',
+    fastify: '/api/pantry/:id/need-more',
+    path: (id: string) => `/api/pantry/${encodeURIComponent(id)}/need-more`,
+  },
   updateMealIngredient: {
     method: 'PATCH',
     fastify: '/api/meal-ingredients/:id',
