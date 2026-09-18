@@ -244,13 +244,13 @@ _out_ and never counted as nothing — and what is left is rounded **up** by
 `roundUp`: to a tenth for `kg` and `l`, to a whole for everything else. Rounding
 up, because coming home short is a meal that does not happen and coming home long
 is a sack in the cellar; to the whole for pieces and packets, because shops do not
-sell 2.4 packets. Rounding happens once, on the sum, so four onions at three
-sittings for eleven people is fourteen to buy rather than the fifteen that rounding
-each sitting first would ask for — the per-sitting figures beside the row are
-rounded for reading, and are not what is added up.
+sell 2.4 packets. Rounding happens once, on the sum: four onions written for ten,
+at three sittings with eleven people there, is fourteen to buy rather than the
+fifteen that rounding each sitting first would ask for. The per-sitting figures
+beside the row are rounded for reading and are not what is added up.
 
-A thing the house has enough of folds away under the same line as phase 2's
-_plenty_ ones, because a buyer in the shop may still want to check. A hearted
+A thing the house has enough of folds away under the same line as the _plenty_
+ones above, because a buyer in the shop may still want to check. A hearted
 thing nobody cooks with keeps exactly the row it had: no amount is invented for
 it, since a heart says "I want this here" and nothing about how much.
 
