@@ -20,8 +20,11 @@ import {
   mealSlot,
   pantryItem,
   pantryItemAllergy,
+  pantryItemPlace,
 } from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
+
+const HALLWAY = 'fa0d0001-0000-4000-8000-000000000002'
 
 const SECRET = 'i'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -128,10 +131,10 @@ const givenPantryItem = async (name: string, over: { unit?: string; withdrawn_at
       kind: 'staple',
       name,
       unit: over.unit ?? 'kg',
-      where: 'Hallway bucket',
       withdrawn_at: over.withdrawn_at ?? null,
       created_at: NOW,
     })
+  await db().insert(pantryItemPlace).values({ item_id: id, place_id: HALLWAY, spot: 'bucket' })
 
   return id
 }
@@ -204,7 +207,7 @@ describe('how many a sitting feeds', () => {
 })
 
 describe('the ingredients of a sitting', () => {
-  it('takes a pantry pick, and resolves its name, unit and place from the pantry', async () => {
+  it('takes a pantry pick, and resolves its name, unit and rooms from the pantry', async () => {
     const { server, ada, mealId } = await setUp()
     const lentils = await givenPantryItem('Lentils, red')
 
@@ -218,7 +221,7 @@ describe('the ingredients of a sitting', () => {
         unit: 'kg',
         amount: 1,
         bought: null,
-        pantry: { where: 'Hallway bucket', stock_level: null },
+        pantry: { places: [{ place_id: HALLWAY, name: 'Hallway', spot: 'bucket' }], stock_level: null },
       },
     ])
   })

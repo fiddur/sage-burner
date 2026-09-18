@@ -1,4 +1,4 @@
-import type { AllergyTag, MealIngredient } from '@sage-burner/shared'
+import type { AllergyTag, MealIngredient, PantryPlacing } from '@sage-burner/shared'
 
 import { asc, eq, inArray, sql } from 'drizzle-orm'
 
@@ -6,6 +6,7 @@ import type { Database } from './db/index.ts'
 
 import { account, mealIngredient, pantryItem } from './db/schema.ts'
 import { tagsFor } from './pantry-allergies.ts'
+import { placesFor } from './pantry-places.ts'
 
 const lines = (db: Database) =>
   db
@@ -21,7 +22,6 @@ const lines = (db: Database) =>
       bought_at: mealIngredient.bought_at,
       pantry_name: pantryItem.name,
       pantry_unit: pantryItem.unit,
-      where: pantryItem.where,
       stock_level: pantryItem.stock_level,
       stock_amount: pantryItem.stock_amount,
     })
@@ -31,7 +31,11 @@ const lines = (db: Database) =>
 
 type Line = Awaited<ReturnType<typeof lines>>[number]
 
-const asIngredient = (row: Line, tags: ReadonlyMap<string, AllergyTag[]>): MealIngredient => ({
+const asIngredient = (
+  row: Line,
+  tags: ReadonlyMap<string, AllergyTag[]>,
+  places: ReadonlyMap<string, PantryPlacing[]>,
+): MealIngredient => ({
   id: row.id,
   pantry_item_id: row.pantry_item_id,
   name: row.pantry_name ?? row.written_name ?? '',
@@ -43,7 +47,7 @@ const asIngredient = (row: Line, tags: ReadonlyMap<string, AllergyTag[]>): MealI
     row.pantry_item_id === null
       ? null
       : {
-          where: row.where ?? '',
+          places: places.get(row.pantry_item_id) ?? [],
           stock_level: row.stock_level,
           stock_amount: row.stock_amount,
           allergies: tags.get(row.pantry_item_id) ?? [],
@@ -61,12 +65,12 @@ export const ingredientsFor = async (
     .where(inArray(mealIngredient.meal_id, [...mealIds]))
     .orderBy(asc(mealIngredient.created_at), sql`"meal_ingredient"."rowid"`)
 
-  const tags = await tagsFor(
-    db,
-    rows.map((row) => row.pantry_item_id).filter((id) => id !== null),
-  )
+  const picked = rows.map((row) => row.pantry_item_id).filter((id) => id !== null)
+  const [tags, places] = await Promise.all([tagsFor(db, picked), placesFor(db, picked)])
 
-  for (const row of rows) held.set(row.meal_id, [...(held.get(row.meal_id) ?? []), asIngredient(row, tags)])
+  for (const row of rows) {
+    held.set(row.meal_id, [...(held.get(row.meal_id) ?? []), asIngredient(row, tags, places)])
+  }
 
   return held
 }

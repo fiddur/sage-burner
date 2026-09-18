@@ -39,7 +39,7 @@ const thing = (over: Partial<EventPantryItem> = {}): EventPantryItem => ({
   kind: 'breakfast',
   name: 'Oatmeal',
   unit: 'kg',
-  where: 'hallway, left white box',
+  places: [{ place_id: 'pl-2', name: 'Hallway', spot: 'left white box' }],
   stock_level: null,
   stock_amount: null,
   counted_by: null,
@@ -59,7 +59,7 @@ const ITEMS: EventPantryItem[] = [
   thing({
     id: 'p-2',
     name: 'Rice',
-    where: '',
+    places: [],
     stock_level: 'plenty',
     hearts: { count: 2, people: [], mine: false },
   }),
@@ -67,7 +67,7 @@ const ITEMS: EventPantryItem[] = [
     id: 'p-3',
     name: 'Candles, tea lights',
     kind: 'household',
-    where: '',
+    places: [],
     hearts: { count: 5, people: [], mine: false },
     bought: { by: 'a-2', by_name: 'Bo', at: '2026-07-30T09:00:00.000Z' },
   }),
@@ -75,7 +75,7 @@ const ITEMS: EventPantryItem[] = [
     id: 'p-4',
     name: 'Lentils, red',
     kind: 'staple',
-    where: 'Hallway bucket',
+    places: [{ place_id: 'pl-2', name: 'Hallway', spot: 'bucket' }],
     hearts: { count: 0, people: [], mine: false },
   }),
 ]
@@ -87,7 +87,12 @@ const line = (over: Partial<MealIngredient> = {}): MealIngredient => ({
   unit: 'kg',
   amount: 1,
   bought: null,
-  pantry: { where: 'Hallway bucket', stock_level: null, stock_amount: null, allergies: [] },
+  pantry: {
+    places: [{ place_id: 'pl-2', name: 'Hallway', spot: 'bucket' }],
+    stock_level: null,
+    stock_amount: null,
+    allergies: [],
+  },
   ...over,
 })
 
@@ -191,7 +196,7 @@ describe('the shopping list on a phone', () => {
     renderPage(stub())
 
     expect(await screen.findByText('Oatmeal')).toBeTruthy()
-    expect(screen.getByText('not counted · hallway, left white box')).toBeTruthy()
+    expect(screen.getByText('not counted · Hallway left white box')).toBeTruthy()
     expect(screen.getByText('14 want it')).toBeTruthy()
   })
 
@@ -440,7 +445,7 @@ describe('the list as text', () => {
 
     expect(writeText).toHaveBeenCalledWith(
       '- Lentils, red · 2 kg · Sat 1 Dinner 2 kg · Ada · Hallway bucket\n' +
-        '- Oatmeal · 14 want it · hallway, left white box',
+        '- Oatmeal · 14 want it · Hallway left white box',
     )
   })
 })

@@ -14,7 +14,7 @@ const item = (over: Partial<PantryItem> = {}): PantryItem => ({
   kind: 'staple',
   name: 'Lemon',
   unit: 'pcs',
-  where: 'Kitchen fridge',
+  places: [{ place_id: 'pl-1', name: 'Kitchen', spot: 'fridge' }],
   stock_level: 'some',
   stock_amount: 6,
   counted_by: null,
@@ -41,7 +41,12 @@ const line = (over: Partial<MealIngredient> = {}): MealIngredient => ({
   unit: 'kg',
   amount: 1.2,
   bought: null,
-  pantry: { where: 'Hallway bucket', stock_level: 'plenty', stock_amount: null, allergies: [] },
+  pantry: {
+    places: [{ place_id: 'pl-2', name: 'Hallway', spot: 'bucket' }],
+    stock_level: 'plenty',
+    stock_amount: null,
+    allergies: [],
+  },
   ...over,
 })
 
@@ -347,7 +352,12 @@ const cashew = (over: Partial<MealIngredient> = {}) =>
     name: 'Cashew',
     unit: 'g',
     amount: 200,
-    pantry: { where: 'Hallway bucket', stock_level: null, stock_amount: null, allergies: [NUTS] },
+    pantry: {
+      places: [{ place_id: 'pl-2', name: 'Hallway', spot: 'bucket' }],
+      stock_level: null,
+      stock_amount: null,
+      allergies: [NUTS],
+    },
     ...over,
   })
 

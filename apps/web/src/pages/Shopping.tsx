@@ -16,6 +16,7 @@ import {
   placesSaid,
   shoppingSections,
   shoppingText,
+  whereSaid,
 } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
@@ -63,6 +64,7 @@ interface Filling {
 
 const asShoppable = (item: EventPantryItem): Shoppable => ({
   ...item,
+  where: whereSaid(item.places),
   need_more: item.need_more !== null,
 })
 

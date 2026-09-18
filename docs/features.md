@@ -180,8 +180,14 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Counting is every member's and takes one tap a row: plenty, some (with a rough
   amount in the thing's own unit) or out, with who counted it and when beside it.
   Deciding what is on the list is admin's, and a thing taken off can be put back.
-- A sheet of things can be imported from the command line, which updates what is
-  already there by name and leaves every count alone.
+- Every thing lives in rooms — Kitchen, Hallway, Cellar, Party kitchen to start
+  with, an admin's list under ⚙️ — with a box or a shelf named in each. Choosing a
+  room on the Pantry page walks it box by box, in box order, where any member can
+  write where something has moved to, take it out of that room, or put something
+  found on the floor into it. The room stays in the address, so a reload in the
+  cellar keeps the cellar.
+- A sheet of things can be imported from the command line, one column per room,
+  which updates what is already there by name and leaves every count alone.
 - Hearts say what you want at a burn: on the Meals page for breakfast, snacks and
   the house, on the Pantry page for everything else. The count is of the people
   coming, so leaving the burn takes your heart with it.

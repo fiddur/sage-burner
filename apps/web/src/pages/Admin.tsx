@@ -66,6 +66,9 @@ export const Admin = ({ api }: { api: AdminApi }) => {
         <a href="/admin/allergies">Allergy list</a>
       </p>
       <p>
+        <a href="/admin/pantry-places">Pantry places</a>
+      </p>
+      <p>
         <a href="/admin/song-categories">Song categories</a>
       </p>
       <p>

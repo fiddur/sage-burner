@@ -357,24 +357,43 @@ phone" means 360px.
 ## Food
 
 - [ ] ☰ → Pantry as a member: the seeded list is there, ordered by name, with where each
-      thing lives under it. Searching narrows it as you type; the chips show one kind at a
-      time, and **Not counted** shows only what nobody has answered for.
+      thing lives under it — the room and the box, rooms apart by a middot. Searching narrows it
+      as you type; the chips show one kind at a time, and **Not counted** shows only what nobody
+      has answered for.
 - [ ] Press **Plenty** on a row: it lights, and "Counted by <you> · <when>" appears under the
       name. Press the lit one again and both the answer and the line go.
 - [ ] Press **Some**: an amount box appears with the thing's unit beside it. Type a number and
       press Enter (or leave the box) — it sticks after a reload. The box is not offered beside
       Plenty or Out.
 - [ ] As a member, there is no Add form, no pen, no bin and no **Taken off** section.
-- [ ] As an admin: add a thing, naming its kind, unit and where it lives; it appears in the
+- [ ] As an admin: add a thing, naming its kind, unit and the rooms and boxes it lives in; it appears in the
       list. Add a second one with the same name in different capitals — the page says something
       is already called that and offers renaming or restoring, rather than "could not add that".
-- [ ] As an admin, the pen turns a row into its four fields and Save puts it back changed; the
+- [ ] ⚙️ → **Pantry places** as an admin: the four seeded rooms are listed in walking order with
+      how many things each holds. Add one, rename one, drag one up. Adding a second room whose
+      name differs only in capitals is refused saying so. Removing an empty room works; removing
+      one something is in says "rename it instead" and how many things are in it.
+- [ ] Pantry as a member, with a room chip pressed: only what is in that room is listed, in box
+      order — `R2` before `R10`, and anything with no box last — with the box large beside the
+      name and the count buttons under it. Reload the page: the room is still chosen, because it
+      is in the address. Press the lit chip again to come back to the whole list.
+- [ ] Tap a box in that view and type another: it sticks after a reload. Press ✕ on a row: the
+      thing leaves that room only — it is still on the whole list, and still in any other room.
+- [ ] **Put something in the …** at the foot of that view: type a few letters, and only things
+      not already in this room are offered, each saying where it is now. Take one, name a box,
+      and it joins the walk. As a member, a name nothing is called says to ask an admin; as an
+      admin, the last row fills the Add form in with that name and this room ticked.
+- [ ] As an admin, the pen turns a row into its fields and Save puts it back changed; the
       bin asks first and then moves the row to **Taken off**, where Restore brings it back with
       its count intact. A member does not see the withdrawn row at all.
 - [ ] `pnpm --filter sage-burner-backend pantry:import <file.tsv>`, whose first line names
-      `name`, `kind`, `unit` and `where`: it says how many were added and how many updated, a row already
-      on the list keeps its count, and a file with a kind nobody named is refused naming the line.
-- [ ] The same file with a fifth column, `need more`, and a word in one row's cell: that row comes
+      `name`, `kind`, `unit` and then one column per room (`Kitchen`, `Cellar`, …): it says how
+      many were added and how many updated, a row already on the list keeps its count, the cells
+      under a room show up as boxes on that row, and a file with a kind nobody named is refused
+      naming the line.
+- [ ] The same file with a column naming no room: it is refused before anything is written, and
+      the message names that column.
+- [ ] The same file with a last column, `need more`, and a word in one row's cell: that row comes
       back from the import with **Need more** lit and no name beside it, and nothing else on the
       list is flagged.
 - [ ] Meals, as a member who has joined the burn: below the plan are **What do you want for

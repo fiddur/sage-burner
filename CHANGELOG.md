@@ -9,6 +9,17 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-18
 
+- **The pantry knows which room things are in, and you can take inventory one room at a
+  time.** Every thing now lives in rooms — Kitchen, Hallway, Cellar, Party kitchen to
+  begin with — with the box or shelf named in each, and the Pantry page has a chip per
+  room beside the kind chips. Press **Cellar** and you get only what is in the cellar, in
+  box order (R2 before R10, anything with no box last), the box large beside the name and
+  tappable to write where something has moved to; ✕ takes a thing out of that room without
+  taking it off the list. At the foot, **Put something in the Cellar** finds anything not
+  in the room yet, says where it is now, and asks which box it went into. The room is in
+  the address, so a reload in the cellar keeps the cellar. An admin keeps the list of rooms
+  under ⚙️ → **Pantry places**; a room something is still in cannot be removed, only
+  renamed.
 - **"Need more" puts a thing on the shopping list.** Standing in the cellar looking at
   an empty rice sack, press **Need more** on that row in the Pantry — it says so to
   whoever shops next, with your name and the time under it, and the thing appears on

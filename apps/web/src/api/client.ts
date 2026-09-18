@@ -66,6 +66,8 @@ import type {
   OAuthSettingsResponse,
   PantryItemResponse,
   PantryListResponse,
+  PantryPlace,
+  PantryPlacesResponse,
   PasskeysResponse,
   PersonProfileResponse,
   PlaceOrder,
@@ -838,6 +840,43 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     unflagPantryNeedMore: (id: string) =>
       request<undefined>(apiRoutes.unflagPantryNeedMore.path(id), {
         method: apiRoutes.unflagPantryNeedMore.method,
+      }),
+
+    getPantryPlaces: (signal?: AbortSignal) =>
+      request<PantryPlacesResponse>(apiRoutes.getPantryPlaces.path(), { signal }),
+
+    addPantryPlace: (body: BodyOf<'addPantryPlace'>) =>
+      request<{ place: PantryPlace }>(apiRoutes.addPantryPlace.path(), {
+        method: apiRoutes.addPantryPlace.method,
+        body,
+      }),
+
+    updatePantryPlace: (id: string, body: BodyOf<'updatePantryPlace'>) =>
+      request<{ place: PantryPlace }>(apiRoutes.updatePantryPlace.path(id), {
+        method: apiRoutes.updatePantryPlace.method,
+        body,
+      }),
+
+    deletePantryPlace: (id: string) =>
+      request<undefined>(apiRoutes.deletePantryPlace.path(id), {
+        method: apiRoutes.deletePantryPlace.method,
+      }),
+
+    reorderPantryPlaces: (ids: readonly string[]) =>
+      request<PantryPlacesResponse>(apiRoutes.reorderPantryPlaces.path(), {
+        method: apiRoutes.reorderPantryPlaces.method,
+        body: orderBody(ids) satisfies BodyOf<'reorderPantryPlaces'>,
+      }),
+
+    putPantrySpot: (id: string, placeId: string, body: BodyOf<'putPantrySpot'>) =>
+      request<PantryItemResponse>(apiRoutes.putPantrySpot.path(id, placeId), {
+        method: apiRoutes.putPantrySpot.method,
+        body,
+      }),
+
+    removePantrySpot: (id: string, placeId: string) =>
+      request<undefined>(apiRoutes.removePantrySpot.path(id, placeId), {
+        method: apiRoutes.removePantrySpot.method,
       }),
 
     getEventPantry: (eventId: string, signal?: AbortSignal) =>

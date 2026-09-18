@@ -15,6 +15,7 @@ import {
   MAX_UNIT,
   membersPage,
   profilePage,
+  whereSaid,
 } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
@@ -51,11 +52,11 @@ const shown = (amount: number | null): string => (amount === null ? '' : String(
 const idOf = (tag: AllergyTag): string => tag.id
 
 const standing = (item: {
-  where: string
+  places: PantryItem['places']
   unit: string
   stock_level: PantryItem['stock_level']
   stock_amount: number | null
-}): string => [item.where, haveSaid(item)].filter((part) => part !== '').join(' · ')
+}): string => [whereSaid(item.places), haveSaid(item)].filter((part) => part !== '').join(' · ')
 
 export const Ingredients = ({
   meal,
