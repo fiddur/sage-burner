@@ -374,6 +374,25 @@ phone" means 360px.
 - [ ] `pnpm --filter sage-burner-backend pantry:import <file.tsv>`, whose first line names
       `name`, `kind`, `unit` and `where`: it says how many were added and how many updated, a row already
       on the list keeps its count, and a file with a kind nobody named is refused naming the line.
+- [ ] Meals, as a member who has joined the burn: below the plan are **What do you want for
+      breakfast?**, **Snacks** and **Around the house**, each thing with the faces of who
+      hearted it and the count, most wanted first. Press a heart: the count goes up and your
+      own face joins it; press it again and both go. Spices and staples are not listed there.
+- [ ] From an account that has not joined the burn the heart is still offered, and pressing it
+      says to join the burn and links to the details page rather than refusing.
+- [ ] Leave the burn with hearts given: the counts drop by one.
+- [ ] ☰ → Pantry with a burn chosen in the bar: every row carries a heart, spices included.
+      With no burn in the bar there is no heart anywhere on the page.
+- [ ] Meals → **Shopping list**, or ☰ → Shopping list: every hearted thing that is not
+      _plenty_ is there with how many want it, what the pantry says is in the house and where
+      it lives. Nothing unhearted is listed. **Show the n things there is enough of** unfolds
+      the _plenty_ ones and hides them again.
+- [ ] Tick something off in one browser with a second browser open on the page: within a
+      minute it is under **Bought** in both, with who bought it and when. Untick it in the
+      second: it is back on the list in both. Two browsers ticking the same thing name the
+      first of them.
+- [ ] **Copy as text**, then paste: one line per thing to buy with its count and where it
+      lives, and nothing that is bought or already plentiful in it.
 
 ## Being told
 
@@ -599,7 +618,7 @@ phone" means 360px.
 
 - [ ] A member sees a column of pages down the left on load, with every page in it —
       Feed, Members, Schedule, Leads, Meals, FAQ, Songbook, Rideshares, Bring list,
-      Pantry, Meetings, and the map where one is set, which still opens away. The top bar carries
+      Pantry, Shopping list, Meetings, and the map where one is set, which still opens away. The top bar carries
       the brand, the burn selector and the corner, and no page links at all.
 - [ ] The page you are on is marked in that column.
 - [ ] Press ‹ at the top of it: the column goes, ☰ appears at the leading edge of the bar and
@@ -622,8 +641,8 @@ phone" means 360px.
       scroll up.
 - [ ] ☰ opens the drawer over the page, naming every page in the sidebar's
       order: Feed, Members, Schedule, Leads, Meals and FAQ first, matching the
-      bottom bar left to right, then Songbook, Rideshares, Bring list, Pantry, Meetings
-      and the map when one is set. The page you are on is marked. Backdrop, ✕
+      bottom bar left to right, then Songbook, Rideshares, Bring list, Pantry, Shopping
+      list, Meetings and the map when one is set. The page you are on is marked. Backdrop, ✕
       and Escape all close it and focus returns to ☰.
 - [ ] At 360px nothing anywhere scrolls the page sideways.
 

@@ -1,6 +1,20 @@
-import type { EventAttendeesResponse, Meal, MealsResponse } from '@sage-burner/shared'
+import type {
+  EventAttendeesResponse,
+  EventPantryItem,
+  Meal,
+  MealsResponse,
+  PantryKind,
+} from '@sage-burner/shared'
 
-import { dayName, MAX_OPTION_LABEL, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
+import {
+  bringPage,
+  byWanted,
+  dayName,
+  MAX_OPTION_LABEL,
+  MAX_WELCOME_LENGTH,
+  pantryPage,
+  shoppingPage,
+} from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -9,6 +23,7 @@ import type { UploadImage } from '../image-upload.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Heart } from '../components/Heart.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
 import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
@@ -25,6 +40,9 @@ export type MealsApi = Pick<
   ApiClient,
   | 'getMeals'
   | 'getEventAttendees'
+  | 'getEventPantry'
+  | 'heartPantryItem'
+  | 'unheartPantryItem'
   | 'setMealLead'
   | 'joinMealCrew'
   | 'leaveMealCrew'
@@ -35,7 +53,15 @@ export type MealsApi = Pick<
 
 type Person = EventAttendeesResponse['attendees'][number]
 
-type Plan = (MealsResponse & { eventId: string; attendees: readonly Person[] }) | null
+type Plan =
+  | (MealsResponse & { eventId: string; attendees: readonly Person[]; pantry: readonly EventPantryItem[] })
+  | null
+
+const wantedSections: readonly { kind: PantryKind; heading: string }[] = [
+  { kind: 'breakfast', heading: 'What do you want for breakfast?' },
+  { kind: 'snack', heading: 'Snacks' },
+  { kind: 'household', heading: 'Around the house' },
+]
 
 export const Meals = ({ api }: { api: MealsApi }) => {
   const viewer = useViewer()
@@ -46,12 +72,18 @@ export const Meals = ({ api }: { api: MealsApi }) => {
     async (signal) => {
       if (burn === undefined) return null
 
-      const [plan, attendees] = await Promise.all([
+      const [plan, attendees, pantry] = await Promise.all([
         api.getMeals(burn.event.id, signal),
         api.getEventAttendees(burn.event.id, signal),
+        api.getEventPantry(burn.event.id, signal),
       ])
 
-      return { ...plan, eventId: burn.event.id, attendees: attendees.attendees }
+      return {
+        ...plan,
+        eventId: burn.event.id,
+        attendees: attendees.attendees,
+        pantry: pantry.items,
+      }
     },
     { key: burn?.event.id ?? '', fallback: 'Could not load the meal plan.', live: true, remember: 'meals' },
   )
@@ -64,6 +96,12 @@ export const Meals = ({ api }: { api: MealsApi }) => {
       <h1>
         Meals <Refreshing on={refreshing} />
       </h1>
+
+      {plan !== null && (
+        <p class="row">
+          <a href={shoppingPage(plan.eventId)}>Shopping list</a>
+        </p>
+      )}
 
       <ErrorText message={error} link={joinLink(error)} />
 
@@ -140,6 +178,21 @@ export const Meals = ({ api }: { api: MealsApi }) => {
               }
             />
           )}
+
+          <Wanted
+            items={plan.pantry}
+            eventId={plan.eventId}
+            busy={busy}
+            onHeart={(itemId, hearting) =>
+              run(
+                () =>
+                  hearting
+                    ? api.heartPantryItem(plan.eventId, itemId)
+                    : api.unheartPantryItem(plan.eventId, itemId),
+                joinFirst('Could not save that.'),
+              )
+            }
+          />
         </>
       )}
     </GuardedPage>
@@ -345,3 +398,51 @@ const Crew = ({
     </td>
   )
 }
+
+const Wanted = ({
+  items,
+  eventId,
+  busy,
+  onHeart,
+}: {
+  items: readonly EventPantryItem[]
+  eventId: string
+  busy: boolean
+  onHeart: (itemId: string, hearting: boolean) => void
+}) => (
+  <>
+    {wantedSections.map(({ kind, heading }) => (
+      <section key={kind}>
+        <h2>{heading}</h2>
+
+        {kind === 'breakfast' && (
+          <p class="form-note">A heart says you want it there. The one shopping sees how many.</p>
+        )}
+
+        <ul class="wanted-list">
+          {items
+            .filter((item) => item.kind === kind)
+            .sort(byWanted)
+            .map((item) => (
+              <li key={item.id} class="wanted-row">
+                <span>{item.name}</span>
+                <Heart
+                  what={item.name}
+                  hearted={item.hearts.mine}
+                  count={item.hearts.count}
+                  people={item.hearts.people}
+                  busy={busy}
+                  onHeart={(hearting) => onHeart(item.id, hearting)}
+                />
+              </li>
+            ))}
+        </ul>
+      </section>
+    ))}
+
+    <p class="form-note">
+      Missing something? Ask for it on the <a href={bringPage(eventId)}>bring list</a>, or tell an admin and
+      it joins the <a href={pantryPage()}>pantry</a>.
+    </p>
+  </>
+)

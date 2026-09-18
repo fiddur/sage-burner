@@ -1,4 +1,4 @@
-import type { Meal, MyBurn } from '@sage-burner/shared'
+import type { EventPantryItem, Meal, MyBurn } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Viewer } from '../viewer.tsx'
 import type { MealsApi } from './Meals.tsx'
 
+import { apiError } from '../api/client.ts'
 import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Meals } from './Meals.tsx'
@@ -44,7 +45,40 @@ const aMeal = (over: Partial<Meal> = {}): Meal => ({
   ...over,
 })
 
-const stub = (over: Partial<MealsApi> = {}, meals: Meal[] = [aMeal()]): MealsApi => ({
+const aThing = (over: Partial<EventPantryItem> = {}): EventPantryItem => ({
+  id: 'p-1',
+  kind: 'breakfast',
+  name: 'Oatmeal',
+  unit: 'kg',
+  where: '',
+  stock_level: null,
+  stock_amount: null,
+  counted_by: null,
+  counted_by_name: null,
+  counted_at: null,
+  withdrawn_at: null,
+  created_at: '2026-07-01T00:00:00.000Z',
+  hearts: { count: 0, people: [], mine: false },
+  bought: null,
+  ...over,
+})
+
+const PANTRY: EventPantryItem[] = [
+  aThing({ id: 'p-1', name: 'Oatmeal', hearts: { count: 2, people: [], mine: true } }),
+  aThing({ id: 'p-2', name: 'Berries, frozen', hearts: { count: 9, people: [], mine: false } }),
+  aThing({ id: 'p-3', kind: 'snack', name: 'Dates' }),
+  aThing({ id: 'p-4', kind: 'household', name: 'Toilet paper' }),
+  aThing({ id: 'p-5', kind: 'staple', name: 'Rice' }),
+]
+
+const stub = (
+  over: Partial<MealsApi> = {},
+  meals: Meal[] = [aMeal()],
+  pantry: EventPantryItem[] = PANTRY,
+): MealsApi => ({
+  getEventPantry: () => Promise.resolve({ items: pantry }),
+  heartPantryItem: () => Promise.reject(new Error('heartPantryItem is not stubbed here')),
+  unheartPantryItem: () => Promise.reject(new Error('unheartPantryItem is not stubbed here')),
   getMeals: () =>
     Promise.resolve({
       intro_markdown: '',
@@ -279,5 +313,74 @@ describe('a chore that still has somebody on it', () => {
     expect(
       screen.queryByRole('button', { name: 'Take the spot on cooking at Morning cleanup on 2026-08-01' }),
     ).toBeNull()
+  })
+})
+
+describe('what people want there', () => {
+  it('asks for breakfast, snacks and the house, and leaves the cupboard staples to the pantry', async () => {
+    renderPage(stub())
+
+    expect(await screen.findByRole('heading', { name: 'What do you want for breakfast?' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Snacks' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Around the house' })).toBeTruthy()
+    expect(screen.getByText('Dates')).toBeTruthy()
+    expect(screen.queryByText('Rice')).toBeNull()
+  })
+
+  it('puts what most people want at the top of its section', async () => {
+    renderPage(stub())
+
+    await screen.findByText('Oatmeal')
+
+    const wanted = [...document.querySelectorAll('.wanted-list')][0]
+
+    expect([...(wanted?.querySelectorAll('li > span') ?? [])].map((row) => row.textContent)).toEqual([
+      'Berries, frozen',
+      'Oatmeal',
+    ])
+  })
+
+  it('hearts a thing', async () => {
+    const heartPantryItem = vi.fn<MealsApi['heartPantryItem']>(() => Promise.resolve(undefined))
+    renderPage(stub({ heartPantryItem }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Berries, frozen' }))
+
+    await waitFor(() => expect(heartPantryItem).toHaveBeenCalledWith('e-1', 'p-2'))
+  })
+
+  it('takes back a heart of your own', async () => {
+    const unheartPantryItem = vi.fn<MealsApi['unheartPantryItem']>(() => Promise.resolve(undefined))
+    renderPage(stub({ unheartPantryItem }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take back your heart for Oatmeal' }))
+
+    await waitFor(() => expect(unheartPantryItem).toHaveBeenCalledWith('e-1', 'p-1'))
+  })
+
+  it('offers the heart to somebody who has not joined, and says to join when they press it', async () => {
+    renderPage(stub({ heartPantryItem: () => Promise.reject(apiError(400, 'not_attending', 'Bad request')) }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Berries, frozen' }))
+
+    expect(await screen.findByText(/You need to join this burn/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Your details' })).toBeTruthy()
+  })
+
+  it('leads to the shopping list for this burn', async () => {
+    renderPage(stub())
+
+    const link = await screen.findByRole('link', { name: 'Shopping list' })
+
+    expect(link.getAttribute('href')).toBe('/shopping?burn=e-1')
+  })
+
+  it('says where to ask for something the pantry has not got', async () => {
+    renderPage(stub())
+
+    await screen.findByText('Oatmeal')
+
+    expect(screen.getByRole('link', { name: 'bring list' }).getAttribute('href')).toBe('/bring?burn=e-1')
+    expect(screen.getByRole('link', { name: 'pantry' }).getAttribute('href')).toBe('/pantry')
   })
 })

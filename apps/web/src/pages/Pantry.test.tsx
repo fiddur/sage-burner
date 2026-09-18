@@ -1,4 +1,4 @@
-import type { PantryItem } from '@sage-burner/shared'
+import type { EventPantryItem, MyBurn, PantryItem } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { PantryApi } from './Pantry.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { createRemembered, RememberedProvider } from '../remembered.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Pantry } from './Pantry.tsx'
@@ -45,8 +46,33 @@ const ITEMS: PantryItem[] = [
   thing({ id: 'p-3', kind: 'household', name: 'Toilet paper', unit: 'pkt', where: 'Cellar II' }),
 ]
 
+const BURN: MyBurn = {
+  event: {
+    id: 'e-1',
+    name: 'Summer burn',
+    slug: 'summer',
+    start_date: '2026-08-01',
+    end_date: '2026-08-03',
+    start_time: '00:00',
+    end_time: '23:59',
+  },
+  attendance: null,
+}
+
+const wanted = (item: PantryItem, count: number, mine: boolean): EventPantryItem => ({
+  ...item,
+  hearts: { count, people: [], mine },
+  bought: null,
+})
+
 const stub = (over: Partial<PantryApi> = {}, items: PantryItem[] = ITEMS): PantryApi => ({
   getPantry: () => Promise.resolve({ items }),
+  getEventPantry: () =>
+    Promise.resolve({
+      items: [wanted(items[0] ?? thing(), 3, true), ...items.slice(1).map((one) => wanted(one, 0, false))],
+    }),
+  heartPantryItem: () => Promise.reject(new Error('heartPantryItem is not stubbed here')),
+  unheartPantryItem: () => Promise.reject(new Error('unheartPantryItem is not stubbed here')),
   setPantryStock: () => Promise.reject(new Error('setPantryStock is not stubbed here')),
   addPantryItem: () => Promise.reject(new Error('addPantryItem is not stubbed here')),
   updatePantryItem: () => Promise.reject(new Error('updatePantryItem is not stubbed here')),
@@ -55,11 +81,13 @@ const stub = (over: Partial<PantryApi> = {}, items: PantryItem[] = ITEMS): Pantr
   ...over,
 })
 
-const renderPage = (api: PantryApi, viewer: Viewer = MEMBER) =>
+const renderPage = (api: PantryApi, viewer: Viewer = MEMBER, burn?: MyBurn) =>
   render(
     <RememberedProvider remembered={createRemembered()}>
       <ViewerProvider viewer={viewer}>
-        <Pantry api={api} />
+        <BurnProvider value={{ status: 'ready', burns: burn === undefined ? [] : [burn], selected: burn }}>
+          <Pantry api={api} />
+        </BurnProvider>
       </ViewerProvider>
     </RememberedProvider>,
   )
@@ -259,5 +287,31 @@ describe('the pantry page', () => {
     fireEvent.click(await screen.findByLabelText('Put Marmite back on the list'))
 
     await waitFor(() => expect(restorePantryItem).toHaveBeenCalledWith('p-9'))
+  })
+})
+
+describe('hearting from the pantry, where the rarer things are', () => {
+  it('offers a heart on every row once a burn is chosen', async () => {
+    renderPage(stub(), MEMBER, BURN)
+
+    expect(await screen.findByRole('button', { name: 'Take back your heart for Oatmeal' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Give a heart to Cumin' })).toBeTruthy()
+  })
+
+  it('offers none at all with no burn to want anything at', async () => {
+    renderPage(stub())
+
+    await screen.findByText('Oatmeal')
+
+    expect(screen.queryByRole('button', { name: 'Give a heart to Cumin' })).toBeNull()
+  })
+
+  it('hearts a spice nobody would list on the Meals page', async () => {
+    const heartPantryItem = vi.fn<PantryApi['heartPantryItem']>(() => Promise.resolve(undefined))
+    renderPage(stub({ heartPantryItem }), MEMBER, BURN)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Cumin' }))
+
+    await waitFor(() => expect(heartPantryItem).toHaveBeenCalledWith('e-1', 'p-2'))
   })
 })

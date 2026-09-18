@@ -1,4 +1,4 @@
-import type { PantryItem, PantryKind, StockLevel } from '@sage-burner/shared'
+import type { PantryHearts, PantryItem, PantryKind, StockLevel } from '@sage-burner/shared'
 
 import {
   isPantryKind,
@@ -15,23 +15,29 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { useSelectedBurn } from '../burn.tsx'
 import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Heart } from '../components/Heart.tsx'
 import { IconButton } from '../components/IconButton.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { NAMELESS } from '../components/PersonBadge.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localMoment } from '../datetime.ts'
+import { joinFirst, joinLink } from '../joining.ts'
 import { errorMessage, useAction, useLoad } from '../load.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type PantryApi = Pick<
   ApiClient,
   | 'addPantryItem'
+  | 'getEventPantry'
   | 'getPantry'
+  | 'heartPantryItem'
   | 'restorePantryItem'
   | 'setPantryStock'
+  | 'unheartPantryItem'
   | 'updatePantryItem'
   | 'withdrawPantryItem'
 >
@@ -77,11 +83,23 @@ const BLANK: PantryDraft = { kind: 'staple', name: '', unit: 'pcs', where: '' }
 export const Pantry = ({ api }: { api: PantryApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  const { loaded, refreshing, reload } = useLoad(async (signal) => await api.getPantry(signal), {
-    enabled: isApproved(viewer),
-    fallback: 'Could not load the pantry.',
-    remember: 'pantry',
-  })
+  const burn = useSelectedBurn()
+  const { loaded, refreshing, reload } = useLoad(
+    async (signal) => {
+      const [all, wanted] = await Promise.all([
+        api.getPantry(signal),
+        burn === undefined ? undefined : api.getEventPantry(burn.event.id, signal),
+      ])
+
+      return { items: all.items, hearts: new Map((wanted?.items ?? []).map((one) => [one.id, one.hearts])) }
+    },
+    {
+      enabled: isApproved(viewer),
+      key: burn?.event.id ?? '',
+      fallback: 'Could not load the pantry.',
+      remember: 'pantry',
+    },
+  )
   const { busy, error, setError, run } = useAction(reload)
 
   const [search, setSearch] = useState('')
@@ -90,6 +108,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
   const [draft, setDraft] = useState(BLANK)
 
   const items = loaded.status === 'ready' ? loaded.data.items : []
+  const hearts = loaded.status === 'ready' ? loaded.data.hearts : new Map<string, PantryHearts>()
   const shown = shownPantry(items, { filter, search })
   const gone = items.filter((item) => item.withdrawn_at !== null)
 
@@ -97,6 +116,16 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
     run(
       () => api.setPantryStock(item.id, { amount: level === 'some' ? amount : null, level }),
       'Could not save that count.',
+    )
+  }
+
+  const wanting = (itemId: string, hearting: boolean) => {
+    if (burn === undefined) return
+
+    run(
+      () =>
+        hearting ? api.heartPantryItem(burn.event.id, itemId) : api.unheartPantryItem(burn.event.id, itemId),
+      joinFirst('Could not save that.'),
     )
   }
 
@@ -128,7 +157,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
         is plenty, half a bucket is some, an empty box is out. It belongs to no one burn.
       </p>
 
-      <ErrorText message={error} />
+      <ErrorText message={error} link={joinLink(error)} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
@@ -182,6 +211,8 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
                       item={item}
                       admin={admin}
                       busy={busy}
+                      hearts={hearts.get(item.id)}
+                      onHeart={(hearting) => wanting(item.id, hearting)}
                       onCount={(level, amount) => count(item, level, amount)}
                       onEdit={() => setEditing(item.id)}
                       onWithdraw={() =>
@@ -300,24 +331,38 @@ const Row = ({
   item,
   admin,
   busy,
+  hearts,
   onCount,
   onEdit,
+  onHeart,
   onWithdraw,
 }: {
   item: PantryItem
   admin: boolean
   busy: boolean
+  hearts: PantryHearts | undefined
   onCount: (level: null | StockLevel, amount: number | null) => void
   onEdit: () => void
+  onHeart: (hearting: boolean) => void
   onWithdraw: () => void
 }) => {
   const said = countedBy(item)
 
   return (
     <>
-      <p class="pantry-what">
+      <div class="pantry-what">
         <strong>{item.name}</strong> <span class="pantry-kind">{pantryKindLabel[item.kind]}</span>
-      </p>
+        {hearts !== undefined && (
+          <Heart
+            what={item.name}
+            hearted={hearts.mine}
+            count={hearts.count}
+            people={hearts.people}
+            busy={busy}
+            onHeart={onHeart}
+          />
+        )}
+      </div>
 
       {item.where !== '' && <p class="form-note">{item.where}</p>}
       {said !== undefined && <p class="form-note">{said}</p>}

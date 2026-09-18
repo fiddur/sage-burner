@@ -2,9 +2,10 @@
 
 The pantry: what the house usually has, where it lives and roughly how much
 (#805). It replaces the spreadsheet's _Food inventory_ and _Spice inventory_
-tabs, which were two tabs of the same shape — a thing, a place, a rough amount —
-and the first half of what [#804](https://github.com/fiddur/sage-burner/issues/804)
-calls food.
+tabs, which were two tabs of the same shape — a thing, a place, a rough amount.
+On top of it sit the hearts — what people want at one burn — and the shopping
+list they fill (#806), which are the second half of what
+[#804](https://github.com/fiddur/sage-burner/issues/804) calls food.
 
 [← back to the README](../README.md)
 
@@ -57,8 +58,8 @@ and the clock, never from the body — the page cannot claim somebody else did i
 
 Deciding **what is on the list** is admin's, under `/api/admin/pantry`, and that
 is the reversible half of the decision. A pantry row is not content the way a
-song is; it is the vocabulary the later phases of #804 hang hearts, ingredients
-and allergy tags off, and a list forty people can add to drifts into three
+song is; it is the vocabulary the hearts below and #804's later phases hang
+ingredients and allergy tags off, and a list forty people can add to drifts into three
 spellings of oatmeal within a season. If it turns out that adding a thing wants
 to be everybody's, it is one prefix move away — the routes come out from under
 `/api/admin/`, not exempted inside it.
@@ -68,7 +69,7 @@ to be everybody's, it is one prefix move away — the routes come out from under
 A unique index on `lower(trim(name))` — so "oatmeal", "Oatmeal" and " Oatmeal "
 are one row, and a second one is refused with 409 rather than created quietly. A
 duplicate here is not untidiness: two rows for the same sack means two counts
-that disagree, and the shopping list in phase 2 would buy against the wrong one.
+that disagree, and the hearts on one of them would buy against the other.
 
 The index covers withdrawn rows too, which is deliberate and is why the 409's
 message names both ways out: rename this one, or put back the one that was taken
@@ -104,10 +105,78 @@ middot, **before** the import. That is a minute with a spreadsheet formula, agai
 column-mapping vocabulary in the importer that every future sheet would disagree
 with.
 
+## Hearts: what you want there
+
+A heart on a pantry row says "I want this at this burn", and the count is what
+the buyer reads (#806). It is the cheapest thing the app can ask of a member —
+one tap, no words — which is the point: the shopping used to be one person
+guessing what forty people eat for breakfast.
+
+`pantry_heart` is keyed on **`attendance`**, exactly as a bring-list hand is, and
+for the same reason. Leaving the burn withdraws the heart, so the count never
+outlives the person coming; and "fourteen want it" can be read as fourteen _of
+the people who will be there_, which is the only reading that helps somebody
+buying oats by the kilo. Keyed on the account it would have been a standing
+preference, which nobody would ever revise.
+
+Reading needs no attendance and writing does. Somebody who has not joined the
+burn still sees what everyone wants — the page is worth looking at before you
+decide to come — and pressing the heart meets the bring list's sentence about
+joining first rather than a hidden control. That is #184's rule: a burn-scoped
+route takes the event id, and the writes refuse a burn that has **ended** through
+`openEventNow`, since wanting something at a gathering that is over asks nobody
+for anything.
+
+**No notification and no card.** #247's rule is about a role somebody else can
+change; nothing here is done to anybody. A bell every time somebody hearts the
+tortilla chips would be forty bells a week and would teach people to ignore the
+channel.
+
+The Meals page asks for **breakfast, snacks and around the house** — the three
+kinds where wanting is the whole answer, because nobody cooks them. Staples and
+spices are hearted from the Pantry page instead, where the burn selector in the
+bar supplies the id; with no burn selected the heart is absent rather than inert.
+Listing a hundred and fifty rows under the meal plan would have buried the plan.
+
+## The shopping list
+
+`/shopping?burn=…`, in ☰ after the Pantry. It is what somebody takes into the
+shop, so the whole page is built around one thumb and a trolley: a real
+checkbox per row, the name, how many want it, what the pantry says is in the
+house, and where it lives.
+
+**A tick is a row**, `pantry_purchase`, keyed on `(event, item)`. A column on
+`pantry_item` would be wrong twice over — the item belongs to no burn, so the
+next gathering would inherit last spring's ticks — and browser state would be
+wrong once more: the list has to survive a phone dying between the dairy aisle
+and the till, and two people shopping together have to see each other's ticks.
+The row records who ticked it and when, and a second tick on the same thing
+**keeps the first**, because the question it answers is "has somebody bought
+this", not "who last pressed it".
+
+**Nothing unhearted is listed.** The pantry is a catalogue of what the house
+keeps, not a list of what to buy; without that rule the page would open on a
+hundred and fifty rows with nothing to choose between them. What there is
+**plenty** of is hearted but not bought, so it folds away behind a line saying
+how many — hidden rather than absent, because a buyer standing in the shop may
+well want to check.
+
+The split is `shoppingSections` in `packages/shared/src/shopping.ts`, a pure
+function with no Zod in it, the way `roster.ts` draws the line between a place
+and the waiting list. The page renders what it returns and decides nothing
+itself, which is what lets the ordering — most wanted first, ties by name — be a
+test rather than a claim about a component. `shoppingText` is the same list as
+plain lines for **Copy as text**, for the pasting into a chat that the app should
+not try to prevent.
+
+How **much** of each to buy is not here yet: that needs the sittings' ingredients
+and the headcount per day, which is phase 3 of
+[#804](https://github.com/fiddur/sage-burner/issues/804). The page says so rather
+than showing an amount column nobody has filled.
+
 ## What this deliberately does not have
 
 No thread, no notification, no feed card. A pantry row is furniture: nobody wants
 a bell because the flour is running low, and #804's later phases put the
-conversation where it belongs — on the sitting that needs the flour. Hearts, the
-shopping list, ingredients per sitting and allergy tags are phases 2 to 4 and are
-not here.
+conversation where it belongs — on the sitting that needs the flour. Ingredients
+per sitting and allergy tags are phases 3 and 4 and are not here.

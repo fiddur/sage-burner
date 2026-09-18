@@ -165,8 +165,8 @@ has been reached from the page it belongs to. That worked until a page belonged 
 other page: the rideshare board is linked from a form that only renders for a burn you
 have already joined, so somebody who has not joined one could not get there at all.
 
-**☰ is where those live** — 🎵 Songbook, 🛻 Rideshares, 🎁 Bring list, 🧺 Pantry and 🗣️ Meetings,
-and the map of the area where one is set.
+**☰ is where those live** — 🎵 Songbook, 🛻 Rideshares, 🎁 Bring list, 🧺 Pantry,
+🛒 Shopping list and 🗣️ Meetings, and the map of the area where one is set.
 
 **It holds every page, though, not only those.** The drawer takes the same `everyPage`
 list the sidebar gets on a wide screen, in the same order: the six the bottom bar shows,

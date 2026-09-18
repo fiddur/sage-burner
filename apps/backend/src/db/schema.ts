@@ -1088,6 +1088,34 @@ export const pantryItem = sqliteTable(
   ],
 )
 
+export const pantryHeart = sqliteTable(
+  'pantry_heart',
+  {
+    item_id: text('item_id')
+      .notNull()
+      .references(() => pantryItem.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.item_id, table.attendance_id] })],
+)
+
+export const pantryPurchase = sqliteTable(
+  'pantry_purchase',
+  {
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    item_id: text('item_id')
+      .notNull()
+      .references(() => pantryItem.id, { onDelete: 'cascade' }),
+    bought_by: text('bought_by').references(() => account.id, { onDelete: 'set null' }),
+    bought_at: text('bought_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.event_id, table.item_id] })],
+)
+
 export const oauthSetting = sqliteTable(
   'oauth_setting',
   {

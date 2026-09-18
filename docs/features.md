@@ -182,6 +182,12 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   Deciding what is on the list is admin's, and a thing taken off can be put back.
 - A sheet of things can be imported from the command line, which updates what is
   already there by name and leaves every count alone.
+- Hearts say what you want at a burn: on the Meals page for breakfast, snacks and
+  the house, on the Pantry page for everything else. The count is of the people
+  coming, so leaving the burn takes your heart with it.
+- The shopping list is what the hearts add up to — what to buy, what the house
+  already has plenty of, and a tick per thing that everybody shopping can see.
+  Copy it as text to paste anywhere.
 
 ## Meetings — [meetings.md](./meetings.md)
 

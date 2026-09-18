@@ -14,6 +14,7 @@ import {
   RESET_PATTERN,
   resetPage,
   rolesPage,
+  shoppingPage,
   signingInOutcomes,
 } from './pages.ts'
 
@@ -62,6 +63,16 @@ describe('the bring list', () => {
 
   it('encodes both, so an id cannot invent a parameter', () => {
     expect(bringPage('a&b', 'c=d')).toBe('/bring?burn=a%26b&item=c%3Dd')
+  })
+})
+
+describe('the shopping page', () => {
+  it('names the burn it is shopping for', () => {
+    expect(shoppingPage('burn-1')).toBe('/shopping?burn=burn-1')
+  })
+
+  it('encodes it, so an id cannot invent a parameter', () => {
+    expect(shoppingPage('a&b')).toBe('/shopping?burn=a%26b')
   })
 })
 

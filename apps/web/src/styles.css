@@ -3352,3 +3352,51 @@ a.song-row:hover .song-what {
   display: grid;
   gap: 0.5rem;
 }
+
+.wanted-list,
+.shopping-list {
+  list-style: none;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.wanted-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* A whole row is the tick's label, so the tap target is the row rather than the box in it. */
+.shopping-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.shopping-tick {
+  width: 22px;
+  height: 22px;
+  margin: 0.2rem 0 0;
+  flex: none;
+}
+
+.shopping-what {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.shopping-row.is-bought {
+  color: var(--muted);
+}
+
+.shopping-row.is-bought .shopping-name {
+  text-decoration: line-through;
+}

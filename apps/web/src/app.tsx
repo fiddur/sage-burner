@@ -64,6 +64,7 @@ import { Reset } from './pages/Reset.tsx'
 import { Rides } from './pages/Rides.tsx'
 import { Roles } from './pages/Roles.tsx'
 import { Schedule } from './pages/Schedule.tsx'
+import { Shopping } from './pages/Shopping.tsx'
 import { SongPage } from './pages/Song.tsx'
 import { Songs } from './pages/Songs.tsx'
 import { Terms } from './pages/Terms.tsx'
@@ -191,6 +192,11 @@ export type RoutesApi = Pick<
   | 'updateMeeting'
   | 'deleteMeeting'
   | 'getPantry'
+  | 'getEventPantry'
+  | 'heartPantryItem'
+  | 'unheartPantryItem'
+  | 'markPantryBought'
+  | 'unmarkPantryBought'
   | 'setPantryStock'
   | 'addPantryItem'
   | 'updatePantryItem'
@@ -312,6 +318,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const RidesRoute = useMemo(() => () => <Rides api={api} />, [api])
   const BringRoute = useMemo(() => () => <Bring api={api} />, [api])
   const PantryRoute = useMemo(() => () => <Pantry api={api} />, [api])
+  const ShoppingRoute = useMemo(() => () => <Shopping api={api} />, [api])
   const MeetingsRoute = useMemo(() => () => <Meetings api={api} />, [api])
   const FaqRoute = useMemo(() => () => <Faq api={api} />, [api])
   const FeedRoute = useMemo(() => () => <Feed api={api} />, [api])
@@ -362,6 +369,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/rides" component={RidesRoute} />
       <Route path="/bring" component={BringRoute} />
       <Route path={pantryPage()} component={PantryRoute} />
+      <Route path="/shopping" component={ShoppingRoute} />
       <Route path="/meetings" component={MeetingsRoute} />
       <Route path="/faq" component={FaqRoute} />
       <Route path="/feed" component={FeedRoute} />
