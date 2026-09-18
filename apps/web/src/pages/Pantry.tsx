@@ -350,7 +350,7 @@ const Row = ({
 
   return (
     <>
-      <p class="pantry-what">
+      <div class="pantry-what">
         <strong>{item.name}</strong> <span class="pantry-kind">{pantryKindLabel[item.kind]}</span>
         {hearts !== undefined && (
           <Heart
@@ -362,7 +362,7 @@ const Row = ({
             onHeart={onHeart}
           />
         )}
-      </p>
+      </div>
 
       {item.where !== '' && <p class="form-note">{item.where}</p>}
       {said !== undefined && <p class="form-note">{said}</p>}
