@@ -18,9 +18,11 @@ import {
   notificationCategories,
   oauthIntents,
   oauthProviders,
+  pantryKinds,
   paymentStatuses,
   placeColors,
   rideKinds,
+  stockLevels,
   threadEntityTypes,
   threadEntryKinds,
   tickBoxRequired,
@@ -32,6 +34,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -1050,6 +1053,38 @@ export const songInCategory = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.song_id, table.category_id] }),
     index('song_in_category_category_idx').on(table.category_id),
+  ],
+)
+
+export const pantryItem = sqliteTable(
+  'pantry_item',
+  {
+    id: text('id').notNull(),
+    kind: text('kind', { enum: pantryKinds }).notNull(),
+    name: text('name').notNull(),
+    unit: text('unit').notNull().default('pcs'),
+    where: text('where').notNull().default(''),
+    stock_level: text('stock_level', { enum: stockLevels }),
+    stock_amount: real('stock_amount'),
+    counted_by: text('counted_by').references(() => account.id, { onDelete: 'set null' }),
+    counted_at: text('counted_at'),
+    withdrawn_at: text('withdrawn_at'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    uniqueIndex('pantry_item_name_idx').on(sql`lower(trim(${table.name}))`),
+    check('pantry_item_kind_check', oneOf(table.kind, pantryKinds)),
+    check('pantry_item_name_check', sql`length(trim(${table.name})) > 0`),
+    check('pantry_item_unit_check', sql`length(trim(${table.unit})) > 0`),
+    check(
+      'pantry_item_stock_level_check',
+      sql`${table.stock_level} is null or ${oneOf(table.stock_level, stockLevels)}`,
+    ),
+    check(
+      'pantry_item_stock_amount_check',
+      sql`${table.stock_amount} is null or (${table.stock_level} is 'some' and ${table.stock_amount} >= 0)`,
+    ),
   ],
 )
 

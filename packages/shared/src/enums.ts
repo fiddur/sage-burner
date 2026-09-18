@@ -624,3 +624,29 @@ export type OAuthIntent = (typeof oauthIntents)[number]
 export const inviteKinds = ['single', 'group'] as const
 
 export type InviteKind = (typeof inviteKinds)[number]
+
+export const pantryKinds = ['breakfast', 'snack', 'staple', 'spice', 'household'] as const
+
+export type PantryKind = (typeof pantryKinds)[number]
+
+export const isPantryKind = (value: unknown): value is PantryKind => isOneOf(pantryKinds, value)
+
+export const pantryKindLabel = {
+  breakfast: 'Breakfast',
+  snack: 'Snacks',
+  staple: 'Staples',
+  spice: 'Spices',
+  household: 'Household',
+} as const satisfies Record<PantryKind, string>
+
+export const stockLevels = ['plenty', 'some', 'out'] as const
+
+export type StockLevel = (typeof stockLevels)[number]
+
+export const isStockLevel = (value: unknown): value is StockLevel => isOneOf(stockLevels, value)
+
+export const stockLevelLabel = {
+  plenty: 'Plenty',
+  some: 'Some',
+  out: 'Out',
+} as const satisfies Record<StockLevel, string>

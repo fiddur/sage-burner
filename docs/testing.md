@@ -354,6 +354,27 @@ phone" means 360px.
 - [ ] Leave the burn with a pledge outstanding: the hand is gone from the item
       and the item is not.
 
+## Food
+
+- [ ] ☰ → Pantry as a member: the seeded list is there, ordered by name, with where each
+      thing lives under it. Searching narrows it as you type; the chips show one kind at a
+      time, and **Not counted** shows only what nobody has answered for.
+- [ ] Press **Plenty** on a row: it lights, and "Counted by <you> · <when>" appears under the
+      name. Press the lit one again and both the answer and the line go.
+- [ ] Press **Some**: an amount box appears with the thing's unit beside it. Type a number and
+      press Enter (or leave the box) — it sticks after a reload. The box is not offered beside
+      Plenty or Out.
+- [ ] As a member, there is no Add form, no pen, no bin and no **Taken off** section.
+- [ ] As an admin: add a thing, naming its kind, unit and where it lives; it appears in the
+      list. Add a second one with the same name in different capitals — the page says something
+      is already called that and offers renaming or restoring, rather than "could not add that".
+- [ ] As an admin, the pen turns a row into its four fields and Save puts it back changed; the
+      bin asks first and then moves the row to **Taken off**, where Restore brings it back with
+      its count intact. A member does not see the withdrawn row at all.
+- [ ] `pnpm --filter sage-burner-backend pantry:import <file.tsv>`, whose first line names
+      `name`, `kind`, `unit` and `where`: it says how many were added and how many updated, a row already
+      on the list keeps its count, and a file with a kind nobody named is refused naming the line.
+
 ## Being told
 
 - [ ] The bell: a panel on a wide screen, a page (`/notifications`) on a phone;
@@ -578,7 +599,7 @@ phone" means 360px.
 
 - [ ] A member sees a column of pages down the left on load, with every page in it —
       Feed, Members, Schedule, Leads, Meals, FAQ, Songbook, Rideshares, Bring list,
-      Meetings, and the map where one is set, which still opens away. The top bar carries
+      Pantry, Meetings, and the map where one is set, which still opens away. The top bar carries
       the brand, the burn selector and the corner, and no page links at all.
 - [ ] The page you are on is marked in that column.
 - [ ] Press ‹ at the top of it: the column goes, ☰ appears at the leading edge of the bar and
@@ -601,7 +622,7 @@ phone" means 360px.
       scroll up.
 - [ ] ☰ opens the drawer over the page, naming every page in the sidebar's
       order: Feed, Members, Schedule, Leads, Meals and FAQ first, matching the
-      bottom bar left to right, then Songbook, Rideshares, Bring list, Meetings
+      bottom bar left to right, then Songbook, Rideshares, Bring list, Pantry, Meetings
       and the map when one is set. The page you are on is marked. Backdrop, ✕
       and Escape all close it and focus returns to ☰.
 - [ ] At 360px nothing anywhere scrolls the page sideways.

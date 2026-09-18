@@ -7,6 +7,15 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-18
+
+- **The pantry.** ☰ → Pantry is one shared list of what the house usually has, where it
+  lives and roughly how much — the spreadsheet's food and spice inventories, with the
+  same things already on it. Counting is everybody's and is one tap a row: plenty, some
+  (with a rough amount) or out, and the list says who counted each thing and when. It
+  belongs to no burn, so what you count in the spring is still there in the autumn.
+  Admins decide what is on the list, and anything taken off can be put back.
+
 # 2026-09-16
 
 - **The phone's ☰ menu now lists every page by name.** The six icons along the bottom of

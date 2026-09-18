@@ -63,6 +63,8 @@ import type {
   NotificationSettings,
   NotificationsResponse,
   OAuthSettingsResponse,
+  PantryItemResponse,
+  PantryListResponse,
   PasskeysResponse,
   PersonProfileResponse,
   PlaceOrder,
@@ -769,6 +771,36 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     getApprovedAccounts: (signal?: AbortSignal) =>
       request<ApprovedAccountsResponse>(apiRoutes.getApprovedAccounts.path(), { signal }),
+
+    getPantry: (signal?: AbortSignal) => request<PantryListResponse>(apiRoutes.getPantry.path(), { signal }),
+
+    setPantryStock: (id: string, body: BodyOf<'setPantryStock'>) =>
+      request<PantryItemResponse>(apiRoutes.setPantryStock.path(id), {
+        method: apiRoutes.setPantryStock.method,
+        body,
+      }),
+
+    addPantryItem: (body: BodyOf<'addPantryItem'>) =>
+      request<PantryItemResponse>(apiRoutes.addPantryItem.path(), {
+        method: apiRoutes.addPantryItem.method,
+        body,
+      }),
+
+    updatePantryItem: (id: string, body: BodyOf<'updatePantryItem'>) =>
+      request<PantryItemResponse>(apiRoutes.updatePantryItem.path(id), {
+        method: apiRoutes.updatePantryItem.method,
+        body,
+      }),
+
+    withdrawPantryItem: (id: string) =>
+      request<undefined>(apiRoutes.withdrawPantryItem.path(id), {
+        method: apiRoutes.withdrawPantryItem.method,
+      }),
+
+    restorePantryItem: (id: string) =>
+      request<PantryItemResponse>(apiRoutes.restorePantryItem.path(id), {
+        method: apiRoutes.restorePantryItem.method,
+      }),
 
     getSongbook: (signal?: AbortSignal) =>
       request<SongbookResponse>(apiRoutes.getSongbook.path(), { signal }),

@@ -83,3 +83,7 @@ export const MAX_DECIDED_NOTE = 200
 export const DIGEST_PREVIEW_HOURS = 24
 
 export const MOST_PREVIEW_HOURS = 24 * 90
+
+export const MAX_UNIT = 20
+
+export const MAX_WHERE = 200

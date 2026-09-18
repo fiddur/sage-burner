@@ -5,6 +5,7 @@ import {
   formattingPage,
   INVITE_PATTERN,
   notificationsPage,
+  pantryPage,
   RESET_PATTERN,
 } from '@sage-burner/shared'
 import { LocationProvider, Route, Router } from 'preact-iso'
@@ -54,6 +55,7 @@ import { Members } from './pages/Members.tsx'
 import { NotFound } from './pages/NotFound.tsx'
 import { Notifications } from './pages/Notifications.tsx'
 import { Options } from './pages/Options.tsx'
+import { Pantry } from './pages/Pantry.tsx'
 import { Person } from './pages/Person.tsx'
 import { Places } from './pages/Places.tsx'
 import { Privacy } from './pages/Privacy.tsx'
@@ -188,6 +190,12 @@ export type RoutesApi = Pick<
   | 'addMeeting'
   | 'updateMeeting'
   | 'deleteMeeting'
+  | 'getPantry'
+  | 'setPantryStock'
+  | 'addPantryItem'
+  | 'updatePantryItem'
+  | 'withdrawPantryItem'
+  | 'restorePantryItem'
   | 'getBringList'
   | 'addBringItem'
   | 'updateBringItem'
@@ -303,6 +311,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
   const RidesRoute = useMemo(() => () => <Rides api={api} />, [api])
   const BringRoute = useMemo(() => () => <Bring api={api} />, [api])
+  const PantryRoute = useMemo(() => () => <Pantry api={api} />, [api])
   const MeetingsRoute = useMemo(() => () => <Meetings api={api} />, [api])
   const FaqRoute = useMemo(() => () => <Faq api={api} />, [api])
   const FeedRoute = useMemo(() => () => <Feed api={api} />, [api])
@@ -352,6 +361,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/roles" component={RolesRoute} />
       <Route path="/rides" component={RidesRoute} />
       <Route path="/bring" component={BringRoute} />
+      <Route path={pantryPage()} component={PantryRoute} />
       <Route path="/meetings" component={MeetingsRoute} />
       <Route path="/faq" component={FaqRoute} />
       <Route path="/feed" component={FeedRoute} />

@@ -172,6 +172,17 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Whose song it is, as a field of its own: shown beside the title in the book and
   under it on the page, and the list sorts by it as well as by title.
 
+## Food — [food.md](./food.md)
+
+- The pantry: what the house usually has, where it lives and roughly how much —
+  one shared list belonging to no burn, replacing the spreadsheet's food and
+  spice inventories. It comes seeded with the list the spreadsheet had.
+- Counting is every member's and takes one tap a row: plenty, some (with a rough
+  amount in the thing's own unit) or out, with who counted it and when beside it.
+  Deciding what is on the list is admin's, and a thing taken off can be put back.
+- A sheet of things can be imported from the command line, which updates what is
+  already there by name and leaves every count alone.
+
 ## Meetings — [meetings.md](./meetings.md)
 
 - Talking points: one rolling list per burn, split into open and addressed. Raise one,

@@ -57,6 +57,8 @@ export const changelogPage = (): string => '/changelog'
 
 export const formattingPage = (): string => '/formatting'
 
+export const pantryPage = (): string => '/pantry'
+
 export const songbookPage = (): string => '/songs'
 
 export const songPage = (songId: string): string => `/songs/${encodeURIComponent(songId)}`

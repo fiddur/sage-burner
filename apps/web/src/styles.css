@@ -3267,3 +3267,88 @@ a.song-row:hover .song-what {
   white-space: pre-wrap;
   font-size: 0.85rem;
 }
+
+/* Taking inventory is one tap per row on a phone held in the other hand, so the three answers
+   are a real target rather than a chip: `min-height` keeps them at the 44px everything else
+   thumb-sized here keeps to, and the amount beside them stays on the same line so the row does
+   not jump when "Some" lights up. */
+.pantry-list {
+  list-style: none;
+  margin: 0.5rem 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.pantry-row {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.pantry-row.is-gone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: var(--muted);
+}
+
+.pantry-what {
+  margin: 0;
+}
+
+.pantry-kind {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.stock-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+}
+
+.stock-step {
+  min-height: 44px;
+  min-width: 5rem;
+  border: 1px dashed var(--line);
+  border-radius: 0.5rem;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.stock-step.is-on {
+  border-style: solid;
+  border-color: var(--ember);
+  color: var(--ink);
+}
+
+.stock-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.stock-amount input {
+  width: 5rem;
+  min-height: 44px;
+}
+
+/* As with `.bring-actions`: without the gap two emoji buttons read as one control. */
+.pantry-actions {
+  margin: 0.35rem 0 0;
+}
+
+.pantry-actions > * + * {
+  margin-inline-start: 0.6rem;
+}
+
+.pantry-edit {
+  display: grid;
+  gap: 0.5rem;
+}

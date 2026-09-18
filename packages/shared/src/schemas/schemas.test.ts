@@ -36,6 +36,7 @@ import {
   rosterResponseSchema,
   withStayOrder,
 } from './membership.ts'
+import { pantryCreateSchema, pantryStockSchema, pantryUpdateSchema } from './pantry.ts'
 import {
   publicSessionFields,
   publicSessionSchema,
@@ -861,5 +862,54 @@ describe('a song', () => {
 
     expect(parsed.success).toBe(true)
     expect(parsed.data).toEqual({ capo: 2 })
+  })
+})
+
+describe('a pantry thing', () => {
+  const aThing = (over: Record<string, unknown> = {}) => ({ kind: 'spice', name: 'Cumin', ...over })
+
+  it('needs only a name and a kind, and is counted in pieces until somebody says otherwise', () => {
+    const parsed = pantryCreateSchema.safeParse(aThing())
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toEqual({ kind: 'spice', name: 'Cumin', unit: 'pcs', where: '' })
+  })
+
+  it('refuses a kind nobody named and a name that is only spaces', () => {
+    expect(pantryCreateSchema.safeParse(aThing({ kind: 'pudding' })).success).toBe(false)
+    expect(pantryCreateSchema.safeParse(aThing({ name: '   ' })).success).toBe(false)
+  })
+
+  it('refuses a field nobody named, so a typo is not silently dropped', () => {
+    expect(pantryCreateSchema.safeParse(aThing({ place: 'Cellar' })).success).toBe(false)
+    expect(pantryUpdateSchema.safeParse({ place: 'Cellar' }).success).toBe(false)
+  })
+
+  it('lets an update carry one field alone, and fills nothing in', () => {
+    const parsed = pantryUpdateSchema.safeParse({ where: 'Cellar I' })
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toEqual({ where: 'Cellar I' })
+  })
+})
+
+describe('a count of how much is left', () => {
+  it('takes a rough amount beside some', () => {
+    expect(pantryStockSchema.safeParse({ amount: 2.5, level: 'some' }).success).toBe(true)
+  })
+
+  it('takes plenty, out and nothing counted, each without an amount', () => {
+    expect(pantryStockSchema.safeParse({ amount: null, level: 'plenty' }).success).toBe(true)
+    expect(pantryStockSchema.safeParse({ amount: null, level: 'out' }).success).toBe(true)
+    expect(pantryStockSchema.safeParse({ amount: null, level: null }).success).toBe(true)
+  })
+
+  it('refuses an amount anywhere but beside some, which is the only level that means a number', () => {
+    expect(pantryStockSchema.safeParse({ amount: 2, level: 'plenty' }).success).toBe(false)
+    expect(pantryStockSchema.safeParse({ amount: 2, level: null }).success).toBe(false)
+  })
+
+  it('refuses an amount below nothing', () => {
+    expect(pantryStockSchema.safeParse({ amount: -1, level: 'some' }).success).toBe(false)
   })
 })
