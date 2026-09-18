@@ -17,10 +17,12 @@ burn it would mean typing the same forty things in every spring, and a count
 taken in March would say nothing in July anyway — the count is a fact about
 today, which is why it is a column on the row rather than a history.
 
-What follows from that is the seed: a fresh install comes with the list the
-spreadsheet had, ids fixed in the migration so a new installation and an old one
-mean the same row by the same id. Places are left empty. Where a thing lives is
-this house's answer and the software has no business guessing it.
+What follows from that is the seed: a fresh install comes with a starter list —
+two dozen breakfast, snack and household things — with ids fixed in the migration
+so a new installation and an old one mean the same row by the same id. The
+spreadsheet's own hundred and fifty rows come in through the import below. Places
+are left empty. Where a thing lives is this house's answer and the software has
+no business guessing it.
 
 ## Three answers, not a number
 

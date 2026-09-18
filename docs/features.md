@@ -176,7 +176,7 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 
 - The pantry: what the house usually has, where it lives and roughly how much —
   one shared list belonging to no burn, replacing the spreadsheet's food and
-  spice inventories. It comes seeded with the list the spreadsheet had.
+  spice inventories. It starts with a couple of dozen everyday things on it.
 - Counting is every member's and takes one tap a row: plenty, some (with a rough
   amount in the thing's own unit) or out, with who counted it and when beside it.
   Deciding what is on the list is admin's, and a thing taken off can be put back.

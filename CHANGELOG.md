@@ -10,8 +10,8 @@ under today's heading, and make a new heading when there is none.
 # 2026-09-18
 
 - **The pantry.** ☰ → Pantry is one shared list of what the house usually has, where it
-  lives and roughly how much — the spreadsheet's food and spice inventories, with the
-  same things already on it. Counting is everybody's and is one tap a row: plenty, some
+  lives and roughly how much — the spreadsheet's food and spice inventories, with a
+  couple of dozen everyday things already on it. Counting is everybody's and is one tap a row: plenty, some
   (with a rough amount) or out, and the list says who counted each thing and when. It
   belongs to no burn, so what you count in the spring is still there in the autumn.
   Admins decide what is on the list, and anything taken off can be put back.

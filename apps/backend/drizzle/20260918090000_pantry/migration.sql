@@ -28,7 +28,7 @@ CREATE TABLE `pantry_item` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `pantry_item_name_idx` ON `pantry_item` (lower(trim("name")));--> statement-breakpoint
--- The starter list, in the spreadsheet's own words and its own order. Fixed ids so a fresh
+-- A starter list, named the way the spreadsheet names things. Fixed ids so a fresh
 -- install and an existing one agree about which row is which — these are seeded, not authored.
 -- Nowhere and nothing counted: where a thing lives is this house's answer, not the software's.
 INSERT INTO `pantry_item` (`id`, `kind`, `name`, `unit`, `where`, `created_at`) VALUES
