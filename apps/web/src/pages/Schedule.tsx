@@ -1,7 +1,17 @@
-import type { EventAttendeesResponse, Meal, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
+import type {
+  EventAttendeesResponse,
+  Meal,
+  MealIngredientCreateInput,
+  MemberRosterEntry,
+  MyBurn,
+  PantryItem,
+  Place,
+  Session,
+  SessionUpdate,
+} from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
-import { dayName, schedulePage } from '@sage-burner/shared'
+import { dayName, headcountOn, schedulePage } from '@sage-burner/shared'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -51,7 +61,12 @@ export type ScheduleApi = Pick<
   | 'withdrawSession'
   | 'mergeSession'
   | 'getMeals'
+  | 'getPantry'
+  | 'getMembers'
   | 'updateMeal'
+  | 'addMealIngredient'
+  | 'updateMealIngredient'
+  | 'deleteMealIngredient'
   | 'setMealLead'
   | 'joinMealCrew'
   | 'leaveMealCrew'
@@ -74,6 +89,9 @@ type Timetable = {
   sessions: readonly Session[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
   meals: readonly Meal[]
+  pantry: readonly PantryItem[]
+  roster: readonly MemberRosterEntry[]
+  cap: number
 }
 
 const label = (row: string) => row.slice(11)
@@ -85,7 +103,42 @@ const span = (dream: Session) =>
 
 const dayOf = (row: string) => row.slice(0, 10)
 
-const NOTHING_YET: Timetable = { event: null, places: [], sessions: [], attendees: [], meals: [] }
+const NOTHING_YET: Timetable = {
+  event: null,
+  places: [],
+  sessions: [],
+  attendees: [],
+  meals: [],
+  pantry: [],
+  roster: [],
+  cap: 0,
+}
+
+const timetableFor = async (
+  api: ScheduleApi,
+  event: MyBurn['event'],
+  signal: AbortSignal,
+): Promise<Timetable> => {
+  const [places, dreams, attendees, plan, pantry, roster] = await Promise.all([
+    api.getPlaces(event.id, signal),
+    api.getSessions(event.id, signal),
+    api.getEventAttendees(event.id, signal),
+    api.getMeals(event.id, signal),
+    api.getPantry(signal),
+    api.getMembers(event.id, signal),
+  ])
+
+  return {
+    event,
+    places: places.places,
+    sessions: dreams.sessions.filter((dream) => dream.withdrawn_at === null),
+    attendees: attendees.attendees,
+    meals: plan.meals,
+    pantry: pantry.items,
+    roster: roster.entries,
+    cap: roster.event?.member_cap ?? 0,
+  }
+}
 
 export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
@@ -98,24 +151,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   const burn = useSelectedBurn()
   const { loaded, refreshing, reload } = useLoad<Timetable>(
-    async (signal) => {
-      if (burn === undefined) return NOTHING_YET
-
-      const [places, dreams, attendees, plan] = await Promise.all([
-        api.getPlaces(burn.event.id, signal),
-        api.getSessions(burn.event.id, signal),
-        api.getEventAttendees(burn.event.id, signal),
-        api.getMeals(burn.event.id, signal),
-      ])
-
-      return {
-        event: burn.event,
-        places: places.places,
-        sessions: dreams.sessions.filter((dream) => dream.withdrawn_at === null),
-        attendees: attendees.attendees,
-        meals: plan.meals,
-      }
-    },
+    async (signal) => (burn === undefined ? NOTHING_YET : await timetableFor(api, burn.event, signal)),
     {
       enabled: approved,
       key: burn?.event.id ?? '',
@@ -175,7 +211,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const { event, places, sessions, attendees, meals } = loaded.data
+  const { event, places, sessions, attendees, meals, pantry, roster, cap } = loaded.data
   const people = new Map(attendees.map((person) => [person.account_id, person]))
 
   if (event === null) {
@@ -336,6 +372,9 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         meal={shownMeal}
         api={api}
         attendees={attendees}
+        pantry={pantry}
+        roster={roster}
+        cap={cap}
         viewerId={viewerId}
         busy={busy}
         error={error}
@@ -770,6 +809,9 @@ const OpenedMeal = ({
   meal,
   api,
   attendees,
+  pantry,
+  roster,
+  cap,
   viewerId,
   busy,
   error,
@@ -777,8 +819,21 @@ const OpenedMeal = ({
   onClose,
 }: {
   meal: Meal | undefined
-  api: Pick<ScheduleApi, 'joinMealCrew' | 'leaveMealCrew' | 'setMealIdea' | 'setMealLead' | 'updateMeal'>
+  api: Pick<
+    ScheduleApi,
+    | 'addMealIngredient'
+    | 'deleteMealIngredient'
+    | 'joinMealCrew'
+    | 'leaveMealCrew'
+    | 'setMealIdea'
+    | 'setMealLead'
+    | 'updateMeal'
+    | 'updateMealIngredient'
+  >
   attendees: readonly EventAttendeesResponse['attendees'][number][]
+  pantry: readonly PantryItem[]
+  roster: readonly MemberRosterEntry[]
+  cap: number
   viewerId: string | undefined
   busy: boolean
   error: string | undefined
@@ -791,6 +846,8 @@ const OpenedMeal = ({
     <MealDialog
       meal={meal}
       attendees={attendees}
+      pantry={pantry}
+      heads={roster.length === 0 ? null : headcountOn(roster, cap, meal.date)}
       viewerId={viewerId}
       busy={busy}
       error={error}
@@ -811,7 +868,14 @@ const OpenedMeal = ({
         )
       }
       onIdea={(food_idea) => run(() => api.setMealIdea(meal.id, { food_idea }), 'Could not save that.')}
-      onRename={(changes) => run(() => api.updateMeal(meal.id, changes), 'Could not save that.')}
+      onEdit={(changes) => run(() => api.updateMeal(meal.id, changes), 'Could not save that.')}
+      onAddIngredient={(line: MealIngredientCreateInput) =>
+        run(() => api.addMealIngredient(meal.id, line), 'Could not save that.')
+      }
+      onIngredientAmount={(id, amount) =>
+        run(() => api.updateMealIngredient(id, { amount }), 'Could not save that.')
+      }
+      onRemoveIngredient={(id) => run(() => api.deleteMealIngredient(id), 'Could not save that.')}
     />
   )
 }

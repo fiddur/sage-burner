@@ -3400,3 +3400,167 @@ a.song-row:hover .song-what {
 .shopping-row.is-bought .shopping-name {
   text-decoration: line-through;
 }
+
+.shopping-heads {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.shopping-heads input {
+  width: 5rem;
+  min-height: 44px;
+}
+
+.shopping-buy {
+  margin-inline-start: auto;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Same `separate` as `.meal-table`, and for the same reason: each cell draws its own
+   right and bottom edge so a collapsed border cannot scroll out from under a stuck row. */
+.shopping-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  width: 100%;
+}
+
+.shopping-table th,
+.shopping-table td {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 0.35rem 0.5rem;
+  text-align: start;
+  vertical-align: top;
+}
+
+.shopping-table thead th {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.shopping-table .shopping-figure {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.shopping-table tr.is-bought {
+  color: var(--muted);
+}
+
+.shopping-table tr.is-bought .shopping-name {
+  text-decoration: line-through;
+}
+
+.ingredients-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.ingredient-serves {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ingredient-serves input {
+  width: 4.5rem;
+  min-height: 44px;
+}
+
+.ingredient-list {
+  list-style: none;
+  margin: 0.5rem 0 0.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ingredient-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ingredient-what {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.ingredient-amount {
+  width: 4.5rem;
+  min-height: 44px;
+  text-align: center;
+}
+
+.ingredient-unit-input {
+  width: 5rem;
+  min-height: 44px;
+}
+
+.ingredient-unit {
+  width: 4rem;
+  flex: none;
+}
+
+.ingredient-mark {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  border: 1px solid var(--sage);
+  border-radius: 1rem;
+  color: var(--sage);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.ingredient-mark.is-special {
+  border-color: var(--ember);
+  color: var(--ember);
+}
+
+.ingredient-add {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.ingredient-matches {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ingredient-match {
+  display: grid;
+  gap: 0.1rem;
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.ingredient-match:last-child {
+  border-bottom: 0;
+}
+
+.ingredient-match.is-on {
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+}

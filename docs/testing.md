@@ -391,8 +391,31 @@ phone" means 360px.
       minute it is under **Bought** in both, with who bought it and when. Untick it in the
       second: it is back on the list in both. Two browsers ticking the same thing name the
       first of them.
-- [ ] **Copy as text**, then paste: one line per thing to buy with its count and where it
-      lives, and nothing that is bought or already plentiful in it.
+- [ ] **Copy as text**, then paste: one line per thing to buy with its amount, what asked
+      for it and where it lives, and nothing that is bought or already plentiful in it.
+- [ ] Meals: every sitting but a chore has an **Ingredients** link under its food idea, with
+      the number written so far in brackets; it opens that sitting on the Programme grid.
+- [ ] Open a sitting from the Programme grid: under the crews is **Ingredients**, with
+      **Feeds [n] people** and a line saying which day the shopping list counts for and how
+      many are there. Type a few letters in the add box: the pantry narrows as you type, each
+      match showing its unit, where it lives and what is there. Arrow down and press Enter —
+      only an amount is asked for, in the pantry's own unit.
+- [ ] Type something the pantry does not have and take **Use "…" as written**: a unit is asked
+      for as well, and the line appears marked _special buy_ rather than _pantry_.
+- [ ] Change a line's amount and leave the box (or press Enter): it sticks after a reload.
+      Leave it empty and the line reads _to taste_. The ✕ takes a line off.
+- [ ] Set **Feeds** to 10 and write 1 kg of something. On the shopping list that thing now
+      says what to buy for the people there on that sitting's day — for twenty of them, 2 kg.
+- [ ] Join the burn with an arrival date after the first sitting's day, or a departure before
+      the last: the note above the list names a different number for each day, and the amounts
+      for the sittings on the days you miss are lower than the others.
+- [ ] Type 40 into **Buying for**: every amount goes up at once; empty it and they go back.
+- [ ] A special buy from two sittings is one row under **Special for a meal**; ticking it
+      marks both, and it moves to **Bought** only once every line of it is ticked.
+- [ ] The sitting's card on the feed says the plan was edited **once**, however many lines you
+      wrote, and nobody is notified. Ticking something in the shop adds nothing to the card.
+- [ ] On a wide screen the shopping list is a table — Thing, Need, Have, Buy, where it lives,
+      what asked for it; narrow the window under about 45rem and it becomes rows again.
 
 ## Being told
 

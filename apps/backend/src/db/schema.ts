@@ -678,12 +678,14 @@ export const meal = sqliteTable(
     label: text('label').notNull(),
     kind: text('kind', { enum: mealSlotKinds }).notNull(),
     food_idea: text('food_idea').notNull().default(''),
+    serves: integer('serves').notNull().default(1),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
     index('meal_event_idx').on(table.event_id, table.date, table.at),
     uniqueIndex('meal_event_date_label_idx').on(table.event_id, table.date, table.label),
     check('meal_label_check', sql`length(trim(${table.label})) > 0`),
+    check('meal_serves_check', sql`${table.serves} >= 1`),
     check('meal_at_check', isClockTime(table.at)),
     check('meal_kind_check', oneOf(table.kind, mealSlotKinds)),
     check('meal_date_check', sql`${table.date} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
@@ -1085,6 +1087,37 @@ export const pantryItem = sqliteTable(
       'pantry_item_stock_amount_check',
       sql`${table.stock_amount} is null or (${table.stock_level} is 'some' and ${table.stock_amount} >= 0)`,
     ),
+  ],
+)
+
+export const mealIngredient = sqliteTable(
+  'meal_ingredient',
+  {
+    id: text('id').notNull(),
+    meal_id: text('meal_id')
+      .notNull()
+      .references(() => meal.id, { onDelete: 'cascade' }),
+    pantry_item_id: text('pantry_item_id').references(() => pantryItem.id),
+    name: text('name'),
+    unit: text('unit'),
+    amount: real('amount'),
+    bought_by: text('bought_by').references(() => account.id, { onDelete: 'set null' }),
+    bought_at: text('bought_at'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('meal_ingredient_meal_idx').on(table.meal_id),
+    check(
+      'meal_ingredient_picked_or_written_check',
+      sql`(${table.pantry_item_id} is null) <> (${table.name} is null)`,
+    ),
+    check(
+      'meal_ingredient_written_check',
+      sql`${table.name} is null or (length(trim(${table.name})) > 0 and length(trim(coalesce(${table.unit}, ''))) > 0)`,
+    ),
+    check('meal_ingredient_unit_check', sql`${table.pantry_item_id} is null or ${table.unit} is null`),
+    check('meal_ingredient_amount_check', sql`${table.amount} is null or ${table.amount} >= 0`),
   ],
 )
 

@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-import { mealSlotKinds } from '../enums.ts'
-import { MAX_OPTION_LABEL, MAX_WELCOME_LENGTH } from '../limits.ts'
-import { dateSchema, idSchema, nonEmptyText, timeSchema } from './common.ts'
+import { mealSlotKinds, stockLevels } from '../enums.ts'
+import { MAX_OPTION_LABEL, MAX_UNIT, MAX_WELCOME_LENGTH, MAX_WHERE } from '../limits.ts'
+import { dateSchema, dateTimeSchema, idSchema, nonEmptyText, timeSchema } from './common.ts'
 
 export const mealSlotFields = z.object({
   id: idSchema,
@@ -26,12 +26,33 @@ export const mealFields = z.object({
   label: nonEmptyText(MAX_OPTION_LABEL),
   kind: z.enum(mealSlotKinds),
   food_idea: z.string().max(MAX_OPTION_LABEL),
+  serves: z.int().min(1),
 })
+
+export const mealIngredientSchema = z.object({
+  id: idSchema,
+  pantry_item_id: idSchema.nullable(),
+  name: nonEmptyText(MAX_OPTION_LABEL),
+  unit: nonEmptyText(MAX_UNIT),
+  amount: z.number().nonnegative().nullable(),
+  bought: z
+    .object({ by: idSchema.nullable(), by_name: z.string().nullable(), at: dateTimeSchema })
+    .nullable(),
+  pantry: z
+    .object({
+      where: z.string().max(MAX_WHERE),
+      stock_level: z.enum(stockLevels).nullable(),
+      stock_amount: z.number().nonnegative().nullable(),
+    })
+    .nullable(),
+})
+export type MealIngredient = z.infer<typeof mealIngredientSchema>
 
 export const mealSchema = mealFields.extend({
   lead: personSchema.nullable(),
   helpers: z.array(personSchema),
   cleanup: z.array(personSchema),
+  ingredients: z.array(mealIngredientSchema),
 })
 export type Meal = z.infer<typeof mealSchema>
 
@@ -62,7 +83,7 @@ export type MealSlotsResponse = z.infer<typeof mealSlotsResponseSchema>
 const mealEditable = mealFields.omit({ id: true, event_id: true, food_idea: true })
 
 export const mealCreateSchema = mealEditable
-  .extend({ kind: mealEditable.shape.kind.default('meal') })
+  .extend({ kind: mealEditable.shape.kind.default('meal'), serves: mealEditable.shape.serves.default(1) })
   .strict()
 export type MealCreate = z.infer<typeof mealCreateSchema>
 export type MealCreateInput = z.input<typeof mealCreateSchema>
@@ -75,6 +96,27 @@ export type MealLead = z.infer<typeof mealLeadSchema>
 
 export const mealIdeaUpdateSchema = z.object({ food_idea: z.string().max(MAX_OPTION_LABEL) }).strict()
 export type MealIdeaUpdate = z.infer<typeof mealIdeaUpdateSchema>
+
+const amountSchema = z.number().nonnegative().nullable().default(null)
+
+export const mealIngredientCreateSchema = z.union([
+  z.object({ pantry_item_id: idSchema, amount: amountSchema }).strict(),
+  z
+    .object({ name: nonEmptyText(MAX_OPTION_LABEL), unit: nonEmptyText(MAX_UNIT), amount: amountSchema })
+    .strict(),
+])
+export type MealIngredientCreate = z.infer<typeof mealIngredientCreateSchema>
+export type MealIngredientCreateInput = z.input<typeof mealIngredientCreateSchema>
+
+export const mealIngredientUpdateSchema = z
+  .object({
+    name: nonEmptyText(MAX_OPTION_LABEL),
+    unit: nonEmptyText(MAX_UNIT),
+    amount: z.number().nonnegative().nullable(),
+  })
+  .partial()
+  .strict()
+export type MealIngredientUpdate = z.infer<typeof mealIngredientUpdateSchema>
 
 export const mealIntroUpdateSchema = z
   .object({ meal_intro_markdown: z.string().max(MAX_WELCOME_LENGTH) })

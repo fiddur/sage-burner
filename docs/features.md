@@ -185,9 +185,16 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Hearts say what you want at a burn: on the Meals page for breakfast, snacks and
   the house, on the Pantry page for everything else. The count is of the people
   coming, so leaving the burn takes your heart with it.
-- The shopping list is what the hearts add up to — what to buy, what the house
-  already has plenty of, and a tick per thing that everybody shopping can see.
-  Copy it as text to paste anywhere.
+- A sitting carries its ingredients and one number saying how many they feed: pick
+  from the pantry (and see where it lives and what is there) or write a special buy
+  as you like. Amounts are optional — no amount means to taste. The meal plan links
+  into each sitting for them.
+- The shopping list is what the hearts and the ingredients add up to: how much to
+  buy of each thing, scaled to the people there on that sitting's day and less what
+  the pantry says is in the house, with the special buys listed apart and a tick per
+  thing that everybody shopping can see. **Buying for [n]** replaces the headcount
+  for every sitting, which is where the margin goes. Copy it as text to paste
+  anywhere.
 
 ## Meetings — [meetings.md](./meetings.md)
 

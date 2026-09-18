@@ -9,6 +9,14 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-18
 
+- **How much to buy, worked out for you.** Open a sitting from the Programme grid and write
+  what it takes — pick from the pantry, where you can see what is already in the house and
+  where it lives, or write anything else as a special buy. Say how many the amounts feed and
+  the shopping list does the rest: it scales each sitting to the people who are actually
+  there on that day, takes off what the pantry says is in the house, rounds up, and lists
+  the special buys apart so nobody looks for saffron in the cellar. **Buying for [n]** at the
+  top replaces the headcount everywhere at once when you want a margin. On a wide screen the
+  list is a table; on a phone it stays one thumb and a trolley.
 - **Say what you want there, and take the list to the shop.** Give a heart to anything
   in the pantry and the one shopping sees how many of you want it: breakfast, snacks and
   things for the house are on the Meals page, everything else on the Pantry page once a

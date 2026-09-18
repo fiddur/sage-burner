@@ -1,4 +1,10 @@
-import type { EventAttendeesResponse, Meal, MealUpdate } from '@sage-burner/shared'
+import type {
+  EventAttendeesResponse,
+  Meal,
+  MealIngredientCreateInput,
+  MealUpdate,
+  PantryItem,
+} from '@sage-burner/shared'
 
 import { MAX_OPTION_LABEL } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
@@ -7,12 +13,15 @@ import { usePhone } from '../viewport.ts'
 import { DreamPanel } from './DreamPanel.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
 import { Icon } from './Icon.tsx'
+import { Ingredients } from './Ingredients.tsx'
 
 type Person = EventAttendeesResponse['attendees'][number]
 
 export const MealDialog = ({
   meal,
   attendees,
+  pantry,
+  heads,
   viewerId,
   busy,
   error,
@@ -20,10 +29,15 @@ export const MealDialog = ({
   onLead,
   onStand,
   onIdea,
-  onRename,
+  onEdit,
+  onAddIngredient,
+  onIngredientAmount,
+  onRemoveIngredient,
 }: {
   meal: Meal
   attendees: readonly Person[]
+  pantry: readonly PantryItem[]
+  heads: number | null
   viewerId: string | undefined
   busy: boolean
   error: string | undefined
@@ -31,7 +45,10 @@ export const MealDialog = ({
   onLead: (accountId: string | null) => void
   onStand: (role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
   onIdea: (idea: string) => void
-  onRename: (changes: MealUpdate) => void
+  onEdit: (changes: MealUpdate) => void
+  onAddIngredient: (line: MealIngredientCreateInput) => void
+  onIngredientAmount: (id: string, amount: number | null) => void
+  onRemoveIngredient: (id: string) => void
 }) => {
   const phone = usePhone()
   const [renaming, setRenaming] = useState(false)
@@ -65,7 +82,7 @@ export const MealDialog = ({
             type="button"
             disabled={busy || label.trim() === ''}
             onClick={() => {
-              onRename({ label: label.trim() })
+              onEdit({ label: label.trim() })
               setRenaming(false)
             }}
           >
@@ -145,6 +162,19 @@ export const MealDialog = ({
         joinable
         onStand={onStand}
       />
+
+      {meal.kind !== 'chore' && (
+        <Ingredients
+          meal={meal}
+          pantry={pantry}
+          heads={heads}
+          busy={busy}
+          onServes={(serves) => onEdit({ serves })}
+          onAdd={onAddIngredient}
+          onAmount={onIngredientAmount}
+          onRemove={onRemoveIngredient}
+        />
+      )}
 
       <p class="form-note">
         The whole plan is on <a href="/meals">Meals</a>.

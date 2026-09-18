@@ -45,6 +45,8 @@ import type {
   MapLinkUpdate,
   MealCreateInput,
   MealIdeaUpdate,
+  MealIngredientCreateInput,
+  MealIngredientUpdate,
   MealIntroUpdate,
   MealLead,
   MealSlotCreateInput,
@@ -182,6 +184,11 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/admin/events/:eventId/meals',
     path: (eventId: string) => `/api/admin/events/${encodeURIComponent(eventId)}/meals`,
+  },
+  addMealIngredient: {
+    method: 'POST',
+    fastify: '/api/meals/:id/ingredients',
+    path: (id: string) => `/api/meals/${encodeURIComponent(id)}/ingredients`,
   },
   addMealSlot: {
     method: 'POST',
@@ -647,6 +654,26 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/pantry/:itemId/bought',
     path: (eventId: string, itemId: string) =>
       `/api/events/${encodeURIComponent(eventId)}/pantry/${encodeURIComponent(itemId)}/bought`,
+  },
+  updateMealIngredient: {
+    method: 'PATCH',
+    fastify: '/api/meal-ingredients/:id',
+    path: (id: string) => `/api/meal-ingredients/${encodeURIComponent(id)}`,
+  },
+  deleteMealIngredient: {
+    method: 'DELETE',
+    fastify: '/api/meal-ingredients/:id',
+    path: (id: string) => `/api/meal-ingredients/${encodeURIComponent(id)}`,
+  },
+  markIngredientBought: {
+    method: 'PUT',
+    fastify: '/api/meal-ingredients/:id/bought',
+    path: (id: string) => `/api/meal-ingredients/${encodeURIComponent(id)}/bought`,
+  },
+  unmarkIngredientBought: {
+    method: 'DELETE',
+    fastify: '/api/meal-ingredients/:id/bought',
+    path: (id: string) => `/api/meal-ingredients/${encodeURIComponent(id)}/bought`,
   },
   getPlaces: {
     method: 'GET',
@@ -1255,6 +1282,8 @@ export interface RouteBodies {
   addFaqEntry: FaqCreateInput
   addLeadRole: LeadRoleCreateInput
   addMeal: MealCreateInput
+  addMealIngredient: MealIngredientCreateInput
+  updateMealIngredient: MealIngredientUpdate
   addMealSlot: MealSlotCreateInput
   addPasskey: PasskeyRegistration
   addAllergyItem: AllergyItemCreate
