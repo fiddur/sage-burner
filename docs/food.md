@@ -203,7 +203,11 @@ stove wants to see.
 `pantry_item_id` has **no `ON DELETE`**, deliberately. Taking a thing off the
 pantry list is soft, so the row an ingredient points at is never deleted and the
 reference cannot dangle; a withdrawn thing is refused as a _new_ pick, so the list
-stops offering it without rewriting what is already planned.
+stops offering it without rewriting what is already planned. A sitting that still
+asks for one goes on saying so, and the shopping list carries it among the special
+buys rather than dropping it: the house no longer stocks the thing, which is
+exactly what a special buy is, and a meal quietly losing an ingredient because an
+admin tidied the pantry is the worse answer.
 
 Writing, changing or taking off a line adds **one coalescing `edited` entry** to
 the sitting's existing card — the same entry the food idea makes. The digest then

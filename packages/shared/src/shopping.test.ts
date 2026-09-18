@@ -304,6 +304,18 @@ describe('the shopping list', () => {
     expect(sections.special[0]?.ingredient_ids).toEqual(['i-1', 'i-2'])
   })
 
+  it('keeps a pick the pantry no longer stocks on the list, apart from the pantry', () => {
+    const sections = list({
+      items: [],
+      sittings: [sitting({ serves: 1, ingredients: [line({ amount: 2 })] })],
+      entries: [staying()],
+    })
+
+    expect(names(sections.special)).toEqual(['Oatmeal'])
+    expect(sections.special[0]?.ingredient_ids).toEqual(['i-1'])
+    expect(sections.special[0]?.pantry_item_id).toBeNull()
+  })
+
   it('keeps two special buys measured differently apart', () => {
     const sections = list({
       sittings: [

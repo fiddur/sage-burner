@@ -275,12 +275,15 @@ const pantryRow = (item: Shoppable, gathered: Gathered | undefined): ShoppingRow
 
 export const shoppingSections = (input: ShoppingInput): ShoppingSections => {
   const { picks, specials } = gather(input)
+  const stocked = new Set(input.items.map((item) => item.id))
 
   const rows = input.items
     .filter((item) => item.hearts.count > 0 || picks.has(item.id))
     .map((item) => pantryRow(item, picks.get(item.id)))
 
-  const asked = [...specials].map(([key, gathered]) => specialRow(key, gathered))
+  const asked = [...specials, ...[...picks].filter(([key]) => !stocked.has(key))].map(([key, gathered]) =>
+    specialRow(key, gathered),
+  )
 
   const enough = (row: ShoppingRow): boolean => row.stock_level === 'plenty' || row.buy === 0
 
