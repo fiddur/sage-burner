@@ -13,6 +13,7 @@ import {
   scaled,
   shoppingSections,
   shoppingText,
+  specialKey,
   staysOver,
   wantedSaid,
 } from './shopping.ts'
@@ -631,5 +632,17 @@ describe('cannotEat', () => {
     const blank = eater({ allergies_notes: '   ' })
 
     expect(cannotEat([blank], '2026-08-01', [NUTS]).others).toBe(0)
+  })
+})
+
+describe('the key two special buys are one purchase under', () => {
+  it('ignores case and surrounding space in both the name and the unit', () => {
+    expect(specialKey({ name: ' Coriander, Fresh ', unit: ' Bunches ' })).toBe(
+      specialKey({ name: 'coriander, fresh', unit: 'bunches' }),
+    )
+  })
+
+  it('keeps the same name in two units apart', () => {
+    expect(specialKey({ name: 'Saffron', unit: 'g' })).not.toBe(specialKey({ name: 'Saffron', unit: 'pcs' }))
   })
 })

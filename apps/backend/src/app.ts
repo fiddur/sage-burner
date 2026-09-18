@@ -86,6 +86,7 @@ import { registerScheduleRoutes } from './routes/schedule.ts'
 import { registerSessionRoutes } from './routes/sessions.ts'
 import { registerSongCategoryRoutes } from './routes/song-categories.ts'
 import { registerSongRoutes } from './routes/songs.ts'
+import { registerSpecialBuyRoutes } from './routes/special-buys.ts'
 import { registerThreadRoutes } from './routes/threads.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 import { createShellHandler, prepareShell } from './shell.ts'
@@ -390,6 +391,7 @@ export const createApp = async ({
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerPantryRoutes(app, { db, sessions, now })
   registerPantryPlaceRoutes(app, { db, sessions })
+  registerSpecialBuyRoutes(app, { db, sessions, now })
   registerSongRoutes(app, { db, sessions, now, notify: tellAccount })
   registerSongCategoryRoutes(app, { db, sessions })
   registerThreadRoutes(app, { db, sessions, now, notify: tellAccount })

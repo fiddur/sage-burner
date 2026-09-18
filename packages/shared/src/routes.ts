@@ -90,6 +90,7 @@ import type {
   SongCategoryUpdate,
   SongCreateInput,
   SongUpdate,
+  SpecialBuyAdopt,
   TargetShownInput,
 } from './index.ts'
 
@@ -639,6 +640,16 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/pantry',
     path: () => '/api/pantry',
+  },
+  getSpecialBuys: {
+    method: 'GET',
+    fastify: '/api/admin/special-buys',
+    path: () => '/api/admin/special-buys',
+  },
+  adoptSpecialBuy: {
+    method: 'POST',
+    fastify: '/api/admin/pantry/:id/adopt',
+    path: (id: string) => `/api/admin/pantry/${encodeURIComponent(id)}/adopt`,
   },
   getPantryPlaces: {
     method: 'GET',
@@ -1408,6 +1419,7 @@ export interface RouteBodies {
   updateMyStay: AttendanceUpdate
   updateAdminAccount: AdminAccountUpdate
   updateAllergyItem: AllergyItemUpdate
+  adoptSpecialBuy: SpecialBuyAdopt
   updatePantryItem: PantryUpdate
   updatePlace: PlaceUpdate
   updatePost: PostUpdate

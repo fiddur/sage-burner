@@ -205,6 +205,8 @@ export type RoutesApi = Pick<
   | 'updatePantryItem'
   | 'withdrawPantryItem'
   | 'restorePantryItem'
+  | 'getSpecialBuys'
+  | 'adoptSpecialBuy'
   | 'getPantryPlaces'
   | 'addPantryPlace'
   | 'updatePantryPlace'

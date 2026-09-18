@@ -145,6 +145,25 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise
   return 'inserted'
 }
 
+export const noteOnMeal = async (
+  db: Database,
+  at: Date,
+  sitting: { id: string; event_id: string; label: string },
+  entry: { kind: ThreadEntryKind; by: string | undefined; body: string },
+): Promise<void> => {
+  const card = await threadFor(db, 'meal', {
+    id: sitting.id,
+    event_id: sitting.event_id,
+    title: sitting.label,
+  })
+
+  await addEntry(
+    db,
+    { thread_id: card, kind: entry.kind, author_account_id: entry.by ?? null, body: entry.body },
+    at,
+  )
+}
+
 export const openWith = (tx: Database | Transaction, entry: NewEntry, at: Date) => {
   tx.insert(threadEntry)
     .values({

@@ -9,6 +9,14 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-18
 
+- **What cooks keep writing by hand can join the pantry in one step.** At the foot of
+  the Pantry page an admin now sees **Written on sittings, not in the pantry**: every
+  special buy on a burn still to come, with how many sittings ask for it. Press
+  **Promote**, say what kind of thing it is and which rooms it lives in, and saving both
+  puts it on the list and points those lines at it — amounts and shopping ticks intact,
+  so the count you take in the cellar starts counting against them. Lines written in a
+  different unit stay as they are, since 2 sachets are not 2 grams, and sittings of burns
+  that are over are left as they were cooked.
 - **The pantry knows which room things are in, and you can take inventory one room at a
   time.** Every thing now lives in rooms — Kitchen, Hallway, Cellar, Party kitchen to
   begin with — with the box or shelf named in each, and the Pantry page has a chip per

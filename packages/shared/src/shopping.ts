@@ -194,8 +194,8 @@ interface Gathered {
   unit: string
 }
 
-const specialKey = (line: SittingLine): string =>
-  `${line.name.trim().toLowerCase()} · ${line.unit.trim().toLowerCase()}`
+export const specialKey = (written: { name: string; unit: string }): string =>
+  `${written.name.trim().toLowerCase()} · ${written.unit.trim().toLowerCase()}`
 
 const gather = (input: ShoppingInput) => {
   const heads = new Map<string, number>()

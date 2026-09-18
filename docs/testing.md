@@ -434,6 +434,17 @@ phone" means 360px.
 - [ ] Type 40 into **Buying for**: every amount goes up at once; empty it and they go back.
 - [ ] A special buy from two sittings is one row under **Special for a meal**; ticking it
       marks both, and it moves to **Bought** only once every line of it is ticked.
+- [ ] As an admin, with the same special buy written on two sittings of a burn still to
+      come: at the foot of the Pantry page, **Written on sittings, not in the pantry**
+      lists it once with "2 sittings" and one of them named. Press **Promote**: the add
+      form above fills in with that name and unit and says what saving will do. Choose a
+      kind and save — the thing is on the list, the row is gone, the page says how many
+      lines now point at the pantry, and both sittings show it as a pantry pick with
+      their amounts intact and the sitting's card saying what it needs changed.
+- [ ] Promote one, change **Counted in** before saving: the thing is added and the page
+      says no line moved across. The special buy is still listed, unchanged.
+- [ ] With nothing written by hand on any burn still to come, the section is not there
+      at all — no heading over an empty list. As a member it is never there.
 - [ ] The sitting's card on the feed says the plan was edited **once**, however many lines you
       wrote, and nobody is notified. Ticking something in the shop adds nothing to the card.
 - [ ] On a wide screen the shopping list is a table — Thing, Need, Have, Buy, where it lives,

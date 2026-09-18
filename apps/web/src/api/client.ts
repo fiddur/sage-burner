@@ -88,6 +88,8 @@ import type {
   SongCategoriesResponse,
   SongCategoryResponse,
   SongResponse,
+  SpecialBuyAdopted,
+  SpecialBuysResponse,
   TermsResponse,
   ThreadResponse,
   VersionResponse,
@@ -840,6 +842,15 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     unflagPantryNeedMore: (id: string) =>
       request<undefined>(apiRoutes.unflagPantryNeedMore.path(id), {
         method: apiRoutes.unflagPantryNeedMore.method,
+      }),
+
+    getSpecialBuys: (signal?: AbortSignal) =>
+      request<SpecialBuysResponse>(apiRoutes.getSpecialBuys.path(), { signal }),
+
+    adoptSpecialBuy: (id: string, body: BodyOf<'adoptSpecialBuy'>) =>
+      request<SpecialBuyAdopted>(apiRoutes.adoptSpecialBuy.path(id), {
+        method: apiRoutes.adoptSpecialBuy.method,
+        body,
       }),
 
     getPantryPlaces: (signal?: AbortSignal) =>

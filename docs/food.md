@@ -7,7 +7,8 @@ On top of it sit the hearts — what people want at one burn — and the shoppin
 list they fill (#806), and on top of that the ingredients of each sitting, which
 are what turns that list into amounts (#807) and what the allergy warning reads
 (#808), and beside the count a flag anybody can raise to put a thing on the list
-(#813) and the rooms it is kept in (#814). Together they are what
+(#813) and the rooms it is kept in (#814), and the promotion that turns something cooks keep
+writing by hand into a row of the pantry (#815). Together they are what
 [#804](https://github.com/fiddur/sage-burner/issues/804) calls food.
 
 [← back to the README](../README.md)
@@ -349,6 +350,51 @@ the sitting's existing card — the same entry the food idea makes. The digest t
 says the plan moved without a line per lentil, and nobody is notified: an
 ingredient is not something done to anybody. A **tick** in the shop writes no
 entry at all; buying is not a change to the plan.
+
+## Promoting a special buy
+
+The escape hatch works, which is what makes this necessary: the third time somebody
+writes "Saffron, 1 g sachets" because the pantry has no row for it, it is a thing the
+house keeps — and three sittings still carry it as free text that no count in the
+cellar is ever taken against. **Written on sittings, not in the pantry**, at the foot
+of the Pantry page, is that list: the special buys on burns still to come, gathered by
+`specialKey` — the shopping list's own rule, exported rather than written out a second
+time, so the page and the list cannot disagree about what is one purchase — with the
+count of sittings, one of them named, and **Promote** beside each.
+
+**Promote fills the add form rather than adding the row.** A pantry thing needs a kind
+and the rooms it lives in, and no ingredient line can say either; the admin is the one
+who knows. Saving is then the ordinary add followed by the adoption, which is why the
+outcome is a sentence about how many lines followed rather than a silent refresh.
+
+**The unit has to match the pantry thing's**, and that is checked against the row
+rather than against the form. A pick carries no unit of its own — the pantry row's is
+the true one — so adopting a line written in `g` into a thing counted in `pcs` would
+quietly change what the shopping list adds up, which is the one failure nobody would
+notice until the shop. A line in another unit therefore stays a special buy, still
+listed and still promotable under its own key. An admin who changes the unit in the
+form before saving gets the thing on the list and nothing moved across, and the page
+says so: the alternative is a promotion that looks like it worked.
+
+What the line already carries is kept — the amount, and a tick somebody made in the
+shop. Only the name and the unit go, because the pantry row now supplies them.
+
+**A burn that has ended is left as written.** Adoption rewrites what a sitting asks
+for, and a sitting that has happened is a record of what was cooked rather than a plan
+anybody can still act on; the reading half skips those burns for the same reason —
+they are not what this is deciding about. That is `openEvent`'s rule, not
+`activeEvent`'s: every burn still to come is fair game, since a grid is laid out months
+ahead.
+
+**Both halves are admin's**, `GET /api/admin/special-buys` and
+`POST /api/admin/pantry/:id/adopt`, because deciding what is on the list is admin's and
+a promotion is an add. The read shows nothing a member cannot already see on the Meals
+page, and it sits under the prefix rather than beside it because an exception there is
+the thing the prefix exists to make impossible.
+
+Each sitting it touches gets the same coalescing `edited` entry an ingredient edit
+makes, and nobody is notified. What the sitting needs has not changed; what it points
+at has.
 
 ## How the list is worked out
 

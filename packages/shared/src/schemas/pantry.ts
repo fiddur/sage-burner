@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { pantryKinds, stockLevels } from '../enums.ts'
 import { MAX_OPTION_LABEL, MAX_SPOT, MAX_UNIT } from '../limits.ts'
 import { allergyTagSchema } from './allergy.ts'
-import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
+import { dateSchema, dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 import { supporterSchema } from './thread.ts'
 
 export const pantryPlaceSchema = z.object({
@@ -128,3 +128,26 @@ export type EventPantryItem = z.infer<typeof eventPantryItemSchema>
 
 export const eventPantryResponseSchema = z.object({ items: z.array(eventPantryItemSchema) })
 export type EventPantryResponse = z.infer<typeof eventPantryResponseSchema>
+
+export const specialBuySchema = z.object({
+  name: nonEmptyText(MAX_OPTION_LABEL),
+  unit: nonEmptyText(MAX_UNIT),
+  sittings: z.int().min(1),
+  sample: z.object({
+    meal_label: z.string(),
+    date: dateSchema,
+    event_name: z.string(),
+  }),
+})
+export type SpecialBuy = z.infer<typeof specialBuySchema>
+
+export const specialBuysResponseSchema = z.object({ buys: z.array(specialBuySchema) })
+export type SpecialBuysResponse = z.infer<typeof specialBuysResponseSchema>
+
+export const specialBuyAdoptSchema = z
+  .object({ name: nonEmptyText(MAX_OPTION_LABEL), unit: nonEmptyText(MAX_UNIT) })
+  .strict()
+export type SpecialBuyAdopt = z.infer<typeof specialBuyAdoptSchema>
+
+export const specialBuyAdoptedSchema = z.object({ adopted: z.int().min(0) })
+export type SpecialBuyAdopted = z.infer<typeof specialBuyAdoptedSchema>

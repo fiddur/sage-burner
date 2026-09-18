@@ -1,11 +1,4 @@
-import type {
-  Meal,
-  MealResponse,
-  MealSlot,
-  MealSlotsResponse,
-  MealsResponse,
-  ThreadEntryKind,
-} from '@sage-burner/shared'
+import type { Meal, MealResponse, MealSlot, MealSlotsResponse, MealsResponse } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
@@ -49,7 +42,14 @@ import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.t
 import { ingredientsFor } from '../meal-ingredients.ts'
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow } from './events.ts'
-import { addEntry, forgetThread, sittingName, threadFor } from './threads.ts'
+import { forgetThread, noteOnMeal, sittingName } from './threads.ts'
+
+export const noteIngredientsChanged = (
+  db: Database,
+  at: Date,
+  sitting: { id: string; event_id: string; label: string },
+  by: string | undefined,
+): Promise<void> => noteOnMeal(db, at, sitting, { kind: 'edited', by, body: 'changed what it needs' })
 
 export interface MealDeps extends GuardDeps {
   now: () => Date
@@ -181,21 +181,6 @@ export const registerMealRoutes = (
     )
   }
 
-  const noteOnMeal = async (
-    sitting: { id: string; event_id: string; label: string },
-    kind: ThreadEntryKind,
-    by: string | undefined,
-    body: string,
-  ) => {
-    const card = await threadFor(db, 'meal', {
-      id: sitting.id,
-      event_id: sitting.event_id,
-      title: sitting.label,
-    })
-
-    await addEntry(db, { thread_id: card, kind, author_account_id: by ?? null, body }, now())
-  }
-
   const cookMoved = async (sitting: MealRow, by: string, was: string | undefined, after: string | null) => {
     if (was !== undefined && was !== after) {
       await tell(
@@ -210,7 +195,7 @@ export const registerMealRoutes = (
     }
 
     const said = await cookLine(by, was, after)
-    if (said !== undefined) await noteOnMeal(sitting, 'facilitator', by, said)
+    if (said !== undefined) await noteOnMeal(db, now(), sitting, { kind: 'facilitator', by, body: said })
 
     if (after === null || after === was) return
 
@@ -388,14 +373,14 @@ export const registerMealRoutes = (
             existing.event_id,
             `You are on ${role} for ${sittingName(existing.label, existing.date)}`,
           )
-          await noteOnMeal(
-            existing,
-            'helper',
-            viewer.account_id,
-            accountId === viewer.account_id
-              ? `put a hand up for ${role}`
-              : `asked ${await displayName(db, accountId)} onto ${role}`,
-          )
+          await noteOnMeal(db, now(), existing, {
+            kind: 'helper',
+            by: viewer.account_id,
+            body:
+              accountId === viewer.account_id
+                ? `put a hand up for ${role}`
+                : `asked ${await displayName(db, accountId)} onto ${role}`,
+          })
           await tellTheBurn(
             existing,
             viewer.account_id,
@@ -422,14 +407,14 @@ export const registerMealRoutes = (
             existing.event_id,
             `You are off ${role} for ${sittingName(existing.label, existing.date)}`,
           )
-          await noteOnMeal(
-            existing,
-            'helper',
-            viewer.account_id,
-            accountId === viewer.account_id
-              ? `cannot do ${role} after all`
-              : `took ${await displayName(db, accountId)} off ${role}`,
-          )
+          await noteOnMeal(db, now(), existing, {
+            kind: 'helper',
+            by: viewer.account_id,
+            body:
+              accountId === viewer.account_id
+                ? `cannot do ${role} after all`
+                : `took ${await displayName(db, accountId)} off ${role}`,
+          })
         }
       }
 
@@ -502,12 +487,11 @@ export const registerMealRoutes = (
 
       if (idea !== existing.food_idea) {
         const viewer = await viewerFor(request, { db, sessions })
-        await noteOnMeal(
-          existing,
-          'edited',
-          viewer?.account_id,
-          idea === '' ? 'took the food idea off it' : `said what it will be: ${idea}`,
-        )
+        await noteOnMeal(db, now(), existing, {
+          kind: 'edited',
+          by: viewer?.account_id,
+          body: idea === '' ? 'took the food idea off it' : `said what it will be: ${idea}`,
+        })
       }
 
       return answer(reply, existing.id)
@@ -529,7 +513,7 @@ export const registerMealRoutes = (
   const ingredientsChanged = async (sitting: MealRow, request: FastifyRequest) => {
     const viewer = await viewerFor(request, { db, sessions })
 
-    await noteOnMeal(sitting, 'edited', viewer?.account_id, 'changed what it needs')
+    await noteIngredientsChanged(db, now(), sitting, viewer?.account_id)
   }
 
   app.post<{ Params: { id: string } }>(
