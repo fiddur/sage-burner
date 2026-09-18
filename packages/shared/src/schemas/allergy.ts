@@ -11,6 +11,10 @@ export const allergyItemSchema = z.object({
 
 export type AllergyItem = z.infer<typeof allergyItemSchema>
 
+export const allergyTagSchema = allergyItemSchema.pick({ id: true, label: true })
+
+export type AllergyTag = z.infer<typeof allergyTagSchema>
+
 export const allergyItemsResponseSchema = z.object({ items: z.array(allergyItemSchema) })
 export type AllergyItemsResponse = z.infer<typeof allergyItemsResponseSchema>
 

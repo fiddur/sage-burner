@@ -11,7 +11,16 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, meal, mealSlot, pantryItem } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  attendance,
+  event,
+  meal,
+  mealSlot,
+  pantryItem,
+  pantryItemAllergy,
+} from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 
 const SECRET = 'i'.repeat(40)
@@ -212,6 +221,29 @@ describe('the ingredients of a sitting', () => {
         pantry: { where: 'Hallway bucket', stock_level: null },
       },
     ])
+  })
+
+  it('carries what the pantry says the pick contains, which is what the panel warns from', async () => {
+    const { server, ada, mealId } = await setUp()
+    const cashew = await givenPantryItem('Cashew, whole')
+    await db()
+      .insert(pantryItemAllergy)
+      .values({ item_id: cashew, allergy_item_id: 'a11e0000-0000-4000-8000-000000000004' })
+
+    const response = await add(server, ada.cookie, mealId, { pantry_item_id: cashew, amount: 0.2 })
+
+    expect(response.json().meal.ingredients[0].pantry.allergies).toEqual([
+      { id: 'a11e0000-0000-4000-8000-000000000004', label: 'Lactose' },
+    ])
+  })
+
+  it('carries an empty list for a pick nobody has tagged', async () => {
+    const { server, ada, mealId } = await setUp()
+    const rice = await givenPantryItem('Rice, basmati')
+
+    const response = await add(server, ada.cookie, mealId, { pantry_item_id: rice, amount: 1 })
+
+    expect(response.json().meal.ingredients[0].pantry.allergies).toEqual([])
   })
 
   it('takes a special buy as the cook wrote it', async () => {

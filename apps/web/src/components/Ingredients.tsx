@@ -1,15 +1,33 @@
-import type { Meal, MealIngredient, MealIngredientCreateInput, PantryItem } from '@sage-burner/shared'
+import type {
+  AllergyTag,
+  Eater,
+  Meal,
+  MealIngredient,
+  MealIngredientCreateInput,
+  PantryItem,
+} from '@sage-burner/shared'
 
-import { dayName, haveSaid, MAX_OPTION_LABEL, MAX_UNIT } from '@sage-burner/shared'
+import {
+  cannotEat,
+  dayName,
+  haveSaid,
+  MAX_OPTION_LABEL,
+  MAX_UNIT,
+  membersPage,
+  profilePage,
+} from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import { IconButton } from './IconButton.tsx'
+import { NAMELESS } from './PersonBadge.tsx'
 
 const MATCHES = 6
 
 export interface IngredientsProps {
   meal: Meal
+  eventId: string
   pantry: readonly PantryItem[]
+  roster: readonly Eater[]
   heads: number | null
   busy: boolean
   onServes: (serves: number) => void
@@ -30,6 +48,8 @@ const amountOf = (text: string): number | null | undefined => {
 
 const shown = (amount: number | null): string => (amount === null ? '' : String(amount))
 
+const idOf = (tag: AllergyTag): string => tag.id
+
 const standing = (item: {
   where: string
   unit: string
@@ -39,7 +59,9 @@ const standing = (item: {
 
 export const Ingredients = ({
   meal,
+  eventId,
   pantry,
+  roster,
   heads,
   busy,
   onServes,
@@ -60,7 +82,17 @@ export const Ingredients = ({
 
     <ul class="ingredient-list">
       {meal.ingredients.map((line) => (
-        <Row key={line.id} line={line} busy={busy} onAmount={onAmount} onRemove={onRemove} />
+        <Row
+          key={line.id}
+          line={line}
+          date={meal.date}
+          eventId={eventId}
+          roster={roster}
+          heads={heads}
+          busy={busy}
+          onAmount={onAmount}
+          onRemove={onRemove}
+        />
       ))}
     </ul>
 
@@ -108,11 +140,19 @@ const Serves = ({
 
 const Row = ({
   line,
+  date,
+  eventId,
+  roster,
+  heads,
   busy,
   onAmount,
   onRemove,
 }: {
   line: MealIngredient
+  date: string
+  eventId: string
+  roster: readonly Eater[]
+  heads: number | null
   busy: boolean
   onAmount: (id: string, amount: number | null) => void
   onRemove: (id: string) => void
@@ -135,6 +175,15 @@ const Row = ({
         </span>
         {line.pantry !== null && (
           <span class="form-note">{standing({ ...line.pantry, unit: line.unit })}</span>
+        )}
+        {line.pantry !== null && heads !== null && (
+          <Warning
+            allergies={line.pantry.allergies}
+            date={date}
+            eventId={eventId}
+            roster={roster}
+            heads={heads}
+          />
         )}
       </span>
 
@@ -162,6 +211,56 @@ const Row = ({
     </li>
   )
 }
+
+const Warning = ({
+  allergies,
+  date,
+  eventId,
+  roster,
+  heads,
+}: {
+  allergies: readonly AllergyTag[]
+  date: string
+  eventId: string
+  roster: readonly Eater[]
+  heads: number
+}) => {
+  const { who, others } = cannotEat(roster, date, allergies.map(idOf))
+
+  if (who.length === 0 && others === 0) return null
+
+  return (
+    <span class="allergy-warning">
+      {who.length > 0 && (
+        <span>
+          {who.length} of the {heads} here on {dayName(date)} cannot eat this:{' '}
+          {who.map((one, at) => (
+            <span key={one.account_id}>
+              {at === 0 ? '' : ', '}
+              <a href={profilePage(one.account_id)}>{one.name ?? NAMELESS}</a>
+            </span>
+          ))}
+          .
+        </span>
+      )}
+      {others > 0 && (
+        <span class="form-note">
+          {others} more wrote something under Other — <a href={membersPage(eventId)}>see the roster</a>.
+        </span>
+      )}
+    </span>
+  )
+}
+
+const Tags = ({ allergies }: { allergies: readonly AllergyTag[] }) => (
+  <>
+    {allergies.map((tag) => (
+      <span key={tag.id} class="allergy-tag">
+        {tag.label}
+      </span>
+    ))}
+  </>
+)
 
 const AddIngredient = ({
   meal,
@@ -247,7 +346,7 @@ const AddIngredient = ({
               onClick={() => take(at)}
             >
               <span>
-                {item.name} <span class="form-note">{item.unit}</span>
+                {item.name} <span class="form-note">{item.unit}</span> <Tags allergies={item.allergies} />
               </span>
               <span class="form-note">{standing(item)}</span>
             </button>

@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { pantryKinds, stockLevels } from '../enums.ts'
 import { MAX_OPTION_LABEL, MAX_UNIT, MAX_WHERE } from '../limits.ts'
+import { allergyTagSchema } from './allergy.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 import { supporterSchema } from './thread.ts'
 
@@ -22,6 +23,7 @@ export const pantryItemSchema = z.object({
   counted_at: dateTimeSchema.nullable(),
   withdrawn_at: dateTimeSchema.nullable(),
   created_at: dateTimeSchema,
+  allergies: z.array(allergyTagSchema),
 })
 export type PantryItem = z.infer<typeof pantryItemSchema>
 
@@ -36,12 +38,16 @@ export const pantryCreateSchema = z
     ...pantryFields,
     unit: pantryFields.unit.default('pcs'),
     where: pantryFields.where.default(''),
+    allergy_item_ids: z.array(idSchema).default([]),
   })
   .strict()
 export type PantryCreate = z.infer<typeof pantryCreateSchema>
 export type PantryCreateInput = z.input<typeof pantryCreateSchema>
 
-export const pantryUpdateSchema = z.object(pantryFields).partial().strict()
+export const pantryUpdateSchema = z
+  .object({ ...pantryFields, allergy_item_ids: z.array(idSchema) })
+  .partial()
+  .strict()
 export type PantryUpdate = z.infer<typeof pantryUpdateSchema>
 
 export const pantryStockSchema = z

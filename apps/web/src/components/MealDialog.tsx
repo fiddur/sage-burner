@@ -1,4 +1,5 @@
 import type {
+  Eater,
   EventAttendeesResponse,
   Meal,
   MealIngredientCreateInput,
@@ -19,8 +20,10 @@ type Person = EventAttendeesResponse['attendees'][number]
 
 export const MealDialog = ({
   meal,
+  eventId,
   attendees,
   pantry,
+  roster,
   heads,
   viewerId,
   busy,
@@ -35,8 +38,10 @@ export const MealDialog = ({
   onRemoveIngredient,
 }: {
   meal: Meal
+  eventId: string
   attendees: readonly Person[]
   pantry: readonly PantryItem[]
+  roster: readonly Eater[]
   heads: number | null
   viewerId: string | undefined
   busy: boolean
@@ -166,7 +171,9 @@ export const MealDialog = ({
       {meal.kind !== 'chore' && (
         <Ingredients
           meal={meal}
+          eventId={eventId}
           pantry={pantry}
+          roster={roster}
           heads={heads}
           busy={busy}
           onServes={(serves) => onEdit({ serves })}

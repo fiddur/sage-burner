@@ -368,6 +368,201 @@ describe('what is on the list, which is the admin’s', () => {
   })
 })
 
+const LACTOSE = 'a11e0000-0000-4000-8000-000000000004'
+const GLUTEN = 'a11e0000-0000-4000-8000-000000000002'
+
+const tagsOf = async (server: FastifyInstance, cookie: string, id: string) =>
+  (await list(server, cookie)).items.find((item) => item.id === id)?.allergies
+
+const seeded = async (server: FastifyInstance, cookie: string, name: string): Promise<PantryItem> => {
+  const found = (await list(server, cookie)).items.find((item) => item.name === name)
+  if (found === undefined) throw new Error(`no ${name} in the seeded pantry`)
+
+  return found
+}
+
+describe('what a pantry thing is tagged as containing', () => {
+  it('comes back on the list, named, in the order the vocabulary is in', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+
+    const made = await add(server, ada.cookie, {
+      kind: 'staple',
+      name: 'Almond',
+      allergy_item_ids: [LACTOSE, GLUTEN],
+    })
+
+    expect(made.json().item.allergies).toEqual([
+      { id: GLUTEN, label: 'Gluten (non-celiac)' },
+      { id: LACTOSE, label: 'Lactose' },
+    ])
+    expect(await tagsOf(server, ada.cookie, made.json().item.id)).toEqual([
+      { id: GLUTEN, label: 'Gluten (non-celiac)' },
+      { id: LACTOSE, label: 'Lactose' },
+    ])
+  })
+
+  it('is empty on a thing nobody has tagged', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+
+    const plain = await given(server, ada.cookie, 'Rice, basmati')
+
+    expect(plain.allergies).toEqual([])
+  })
+
+  it('replaces the whole set rather than adding to it', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    await edit(server, ada.cookie, cashew.id, { allergy_item_ids: [LACTOSE, GLUTEN] })
+    await edit(server, ada.cookie, cashew.id, { allergy_item_ids: [GLUTEN] })
+
+    expect(await tagsOf(server, ada.cookie, cashew.id)).toEqual([
+      { id: GLUTEN, label: 'Gluten (non-celiac)' },
+    ])
+  })
+
+  it('clears every tag when the set sent is empty', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    await edit(server, ada.cookie, cashew.id, { allergy_item_ids: [LACTOSE] })
+    await edit(server, ada.cookie, cashew.id, { allergy_item_ids: [] })
+
+    expect(await tagsOf(server, ada.cookie, cashew.id)).toEqual([])
+  })
+
+  it('leaves the tags alone when the patch says nothing about them', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    await edit(server, ada.cookie, cashew.id, { allergy_item_ids: [LACTOSE] })
+    await edit(server, ada.cookie, cashew.id, { where: 'Hallway bucket' })
+
+    expect(await tagsOf(server, ada.cookie, cashew.id)).toEqual([{ id: LACTOSE, label: 'Lactose' }])
+  })
+
+  it('refuses an allergy item nobody has heard of, and writes nothing', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    await edit(server, ada.cookie, cashew.id, { allergy_item_ids: [LACTOSE] })
+
+    const refused = await edit(server, ada.cookie, cashew.id, {
+      allergy_item_ids: [GLUTEN, randomUUID()],
+    })
+
+    expect(refused.statusCode).toBe(400)
+    expect(await tagsOf(server, ada.cookie, cashew.id)).toEqual([{ id: LACTOSE, label: 'Lactose' }])
+  })
+
+  it('refuses one nobody has heard of on a new thing, and adds no thing either', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+
+    const refused = await add(server, ada.cookie, {
+      kind: 'staple',
+      name: 'Almond',
+      allergy_item_ids: [randomUUID()],
+    })
+
+    expect(refused.statusCode).toBe(400)
+    expect((await list(server, ada.cookie)).items.some((item) => item.name === 'Almond')).toBe(false)
+  })
+
+  it('keeps the tags through being taken off the list and put back', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    await edit(server, ada.cookie, cashew.id, { allergy_item_ids: [LACTOSE] })
+    await withdraw(server, ada.cookie, cashew.id)
+
+    expect(await tagsOf(server, ada.cookie, cashew.id)).toEqual([{ id: LACTOSE, label: 'Lactose' }])
+
+    const back = await restore(server, ada.cookie, cashew.id)
+
+    expect(back.json().item.allergies).toEqual([{ id: LACTOSE, label: 'Lactose' }])
+  })
+
+  it('loses a tag whose allergy item an admin retires, rather than refusing the retirement', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    await edit(server, ada.cookie, cashew.id, { allergy_item_ids: [LACTOSE, GLUTEN] })
+
+    const gone = await server.inject({
+      method: 'DELETE',
+      url: `/api/admin/allergy-items/${LACTOSE}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(gone.statusCode).toBe(204)
+    expect(await tagsOf(server, ada.cookie, cashew.id)).toEqual([
+      { id: GLUTEN, label: 'Gluten (non-celiac)' },
+    ])
+  })
+
+  it('is no business of a member to write', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const bo = await givenAccount('Bo')
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    const refused = await edit(server, bo.cookie, cashew.id, { allergy_item_ids: [LACTOSE] })
+
+    expect(refused.statusCode).toBe(403)
+    expect(await tagsOf(server, ada.cookie, cashew.id)).toEqual([])
+  })
+})
+
+describe('what the tag table itself refuses, which no route has to be trusted for', () => {
+  const tag = (itemId: string, allergyId: string) => () =>
+    client()
+      .prepare('INSERT INTO pantry_item_allergy (item_id, allergy_item_id) VALUES (?, ?)')
+      .run(itemId, allergyId)
+
+  const tagsLeft = (itemId: string) =>
+    client().prepare('SELECT * FROM pantry_item_allergy WHERE item_id = ?').all(itemId).length
+
+  it('takes a tag, and refuses the same one twice', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    expect(tag(cashew.id, LACTOSE)).not.toThrow()
+    expect(tag(cashew.id, LACTOSE)).toThrow()
+  })
+
+  it('refuses a tag on a thing that is not there, or of an allergy item that is not', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    expect(tag(randomUUID(), LACTOSE)).toThrow()
+    expect(tag(cashew.id, randomUUID())).toThrow()
+  })
+
+  it('takes its tags with it when the pantry row is deleted outright', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const cashew = await seeded(server, ada.cookie, 'Cashew')
+
+    tag(cashew.id, LACTOSE)()
+    expect(tagsLeft(cashew.id)).toBe(1)
+
+    client().prepare('DELETE FROM pantry_item WHERE id = ?').run(cashew.id)
+
+    expect(tagsLeft(cashew.id)).toBe(0)
+  })
+})
+
 describe('what the table itself refuses, which no route has to be trusted for', () => {
   const insert = (values: Record<string, null | number | string>) => {
     const columns = Object.keys(values)

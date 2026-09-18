@@ -1,4 +1,5 @@
 import type {
+  AllergyTag,
   EventPantryResponse,
   PantryItem,
   PantryItemResponse,
@@ -19,6 +20,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch } from '../db/patch.ts'
 import { account, pantryHeart, pantryItem, pantryPurchase } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { knownTags, setTags, tagsFor } from '../pantry-allergies.ts'
 import { heartsFor, purchasesFor, withHeartsAndTicks } from '../pantry-hearts.ts'
 import { openEventNow } from './events.ts'
 
@@ -46,15 +48,26 @@ const byName = sql`lower(trim(${pantryItem.name}))`
 const listing = (db: Database) =>
   db.select(columns).from(pantryItem).leftJoin(account, eq(account.id, pantryItem.counted_by))
 
-export const pantryFor = (db: Database): Promise<PantryItem[]> => listing(db).orderBy(byName)
+type Bare = Awaited<ReturnType<typeof listing>>[number]
+
+const withTags = (rows: readonly Bare[], tags: ReadonlyMap<string, AllergyTag[]>): PantryItem[] =>
+  rows.map((row) => ({ ...row, allergies: tags.get(row.id) ?? [] }))
+
+const listed = async (db: Database, rows: Promise<Bare[]>): Promise<PantryItem[]> =>
+  withTags(...(await Promise.all([rows, tagsFor(db)])))
+
+export const pantryFor = (db: Database): Promise<PantryItem[]> => listed(db, listing(db).orderBy(byName))
 
 const livePantry = (db: Database): Promise<PantryItem[]> =>
-  listing(db).where(isNull(pantryItem.withdrawn_at)).orderBy(byName)
+  listed(db, listing(db).where(isNull(pantryItem.withdrawn_at)).orderBy(byName))
 
 const oneItem = async (db: Database, id: string): Promise<PantryItem | undefined> => {
   const [row] = await listing(db).where(eq(pantryItem.id, id)).limit(1)
+  if (row === undefined) return undefined
 
-  return row
+  const [item] = withTags([row], await tagsFor(db, [row.id]))
+
+  return item
 }
 
 const nameTaken = async (db: Database, name: string, except?: string): Promise<boolean> => {
@@ -234,11 +247,16 @@ export const registerPantryRoutes = (app: FastifyInstance, { db, sessions, now }
 
     const body = bodyOf(pantryCreateSchema, request)
     if (body === undefined) return sendError(reply, 400)
-    if (await nameTaken(db, body.name)) return sendError(reply, 409)
+
+    const { allergy_item_ids, ...fields } = body
+    const tags = await knownTags(db, allergy_item_ids)
+    if (tags === undefined) return sendError(reply, 400)
+    if (await nameTaken(db, fields.name)) return sendError(reply, 409)
 
     const id = randomUUID()
 
-    await db.insert(pantryItem).values({ ...body, id, created_at: now().toISOString() })
+    await db.insert(pantryItem).values({ ...fields, id, created_at: now().toISOString() })
+    await setTags(db, id, tags)
 
     const item = await oneItem(db, id)
     if (item === undefined) return sendError(reply, 404)
@@ -252,14 +270,19 @@ export const registerPantryRoutes = (app: FastifyInstance, { db, sessions, now }
     const body = bodyOf(pantryUpdateSchema, request)
     if (body === undefined || isEmptyPatch(body)) return sendError(reply, 400)
 
+    const { allergy_item_ids, ...fields } = body
+    const tags = allergy_item_ids === undefined ? undefined : await knownTags(db, allergy_item_ids)
+    if (allergy_item_ids !== undefined && tags === undefined) return sendError(reply, 400)
+
     const existing = await oneItem(db, request.params.id)
     if (existing === undefined) return sendError(reply, 404)
 
-    if (body.name !== undefined && (await nameTaken(db, body.name, existing.id))) {
+    if (fields.name !== undefined && (await nameTaken(db, fields.name, existing.id))) {
       return sendError(reply, 409)
     }
 
-    await db.update(pantryItem).set(body).where(eq(pantryItem.id, existing.id))
+    if (!isEmptyPatch(fields)) await db.update(pantryItem).set(fields).where(eq(pantryItem.id, existing.id))
+    if (tags !== undefined) await setTags(db, existing.id, tags)
 
     return await answer(reply, existing.id)
   })

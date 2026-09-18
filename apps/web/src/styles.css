@@ -3531,6 +3531,36 @@ a.song-row:hover .song-what {
   color: var(--ember);
 }
 
+/* A tag on a pantry thing is a warning about the thing, so it borrows the ember the
+   special-buy mark uses rather than the sage of "we stock this". */
+.allergy-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  border: 1px solid var(--ember);
+  border-radius: 1rem;
+  color: var(--ember);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Grid rather than the surrounding flex row: the box sits under the thing's own line
+   inside `.ingredient-what`, and its two sentences stack. */
+.allergy-warning {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.2rem 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--ember);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+  font-size: 0.9rem;
+}
+
+.allergy-said {
+  display: block;
+  color: var(--ember);
+}
+
 .ingredient-add {
   display: grid;
   gap: 0.3rem;

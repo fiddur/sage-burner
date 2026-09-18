@@ -1,4 +1,4 @@
-import type { Meal, MealIngredient, PantryItem } from '@sage-burner/shared'
+import type { Eater, Meal, MealIngredient, PantryItem } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +22,7 @@ const item = (over: Partial<PantryItem> = {}): PantryItem => ({
   counted_at: null,
   withdrawn_at: null,
   created_at: '2026-07-01T00:00:00.000Z',
+  allergies: [],
   ...over,
 })
 
@@ -39,7 +40,7 @@ const line = (over: Partial<MealIngredient> = {}): MealIngredient => ({
   unit: 'kg',
   amount: 1.2,
   bought: null,
-  pantry: { where: 'Hallway bucket', stock_level: 'plenty', stock_amount: null },
+  pantry: { where: 'Hallway bucket', stock_level: 'plenty', stock_amount: null, allergies: [] },
   ...over,
 })
 
@@ -62,7 +63,9 @@ const aMeal = (over: Partial<Meal> = {}): Meal => ({
 const show = (over: Partial<IngredientsProps> = {}) => {
   const props: IngredientsProps = {
     meal: aMeal(),
+    eventId: 'e-1',
     pantry: PANTRY,
+    roster: [],
     heads: 34,
     busy: false,
     onServes: () => undefined,
@@ -319,5 +322,101 @@ describe('adding a line', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(screen.getByLabelText('Add an ingredient to Dinner')).toBeTruthy()
+  })
+})
+
+const NUTS = { id: 'al-1', label: 'Nuts' }
+const GLUTEN = { id: 'al-2', label: 'Gluten' }
+
+const eater = (over: Partial<Eater> = {}): Eater => ({
+  account_id: 'a-1',
+  name: 'Anna L',
+  waiting: false,
+  arrival_date: null,
+  departure_date: null,
+  allergy_items: [],
+  allergies_notes: '',
+  ...over,
+})
+
+const cashew = (over: Partial<MealIngredient> = {}) =>
+  line({
+    id: 'i-9',
+    pantry_item_id: 'p-9',
+    name: 'Cashew',
+    unit: 'g',
+    amount: 200,
+    pantry: { where: 'Hallway bucket', stock_level: null, stock_amount: null, allergies: [NUTS] },
+    ...over,
+  })
+
+describe('who among the people there cannot eat a line', () => {
+  it("says how many of the day's headcount, and names them", () => {
+    show({
+      meal: aMeal({ ingredients: [cashew()] }),
+      roster: [
+        eater({ allergy_items: ['al-1'] }),
+        eater({ account_id: 'a-2', name: 'Bo K', allergy_items: ['al-1'] }),
+        eater({ account_id: 'a-3', name: 'Cilla Y' }),
+      ],
+    })
+
+    expect(screen.getByText(/2 of the 34 here on Saturday 1 cannot eat this/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Anna L' }).getAttribute('href')).toBe('/members/a-1')
+    expect(screen.getByRole('link', { name: 'Bo K' })).toBeTruthy()
+  })
+
+  it('says nothing about a line the pantry carries no tag for', () => {
+    show({
+      meal: aMeal({ ingredients: [line()] }),
+      roster: [eater({ allergy_items: ['al-1'] })],
+    })
+
+    expect(screen.queryByText(/cannot eat this/)).toBeNull()
+  })
+
+  it('leaves out somebody whose stay misses the day', () => {
+    show({
+      meal: aMeal({ ingredients: [cashew()] }),
+      roster: [eater({ allergy_items: ['al-1'], departure_date: '2026-07-31' })],
+    })
+
+    expect(screen.queryByText(/cannot eat this/)).toBeNull()
+  })
+
+  it('counts what somebody wrote under Other without reading it, and links to the roster', () => {
+    show({
+      meal: aMeal({ ingredients: [cashew()] }),
+      roster: [eater({ allergies_notes: 'red lentils make me ill' })],
+    })
+
+    expect(screen.getByText(/1 more wrote something under Other/)).toBeTruthy()
+    expect(screen.queryByText(/red lentils/)).toBeNull()
+    expect(screen.getByRole('link', { name: 'see the roster' }).getAttribute('href')).toBe(
+      '/members?burn=e-1',
+    )
+  })
+
+  it('says nothing at all when nobody there is concerned', () => {
+    show({ meal: aMeal({ ingredients: [cashew()] }), roster: [eater()] })
+
+    expect(screen.queryByText(/cannot eat this/)).toBeNull()
+    expect(screen.queryByText(/under Other/)).toBeNull()
+  })
+
+  it('shows the tags beside a match in the picker, so the nudge is towards the thing without them', () => {
+    show({
+      pantry: [
+        item({ id: 'p-9', name: 'Cashew', allergies: [NUTS, GLUTEN] }),
+        item({ id: 'p-10', name: 'Cashew-free spread' }),
+      ],
+    })
+
+    fireEvent.input(screen.getByLabelText('Add an ingredient to Dinner'), {
+      target: { value: 'cashew' },
+    })
+
+    expect(screen.getByText('Nuts')).toBeTruthy()
+    expect(screen.getByText('Gluten')).toBeTruthy()
   })
 })
