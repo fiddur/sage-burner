@@ -33,7 +33,7 @@ export interface Eater extends Stay {
   account_id: string
   name: string | null
   waiting: boolean
-  allergy_items: readonly string[]
+  allergy_item_ids: readonly string[]
   allergies_notes: string | null
 }
 
@@ -125,7 +125,7 @@ export const cannotEat = (
   allergyIds: readonly string[],
 ): CannotEat => {
   const here = entries.filter((entry) => eating(entry, date))
-  const tagged = (entry: Eater): boolean => entry.allergy_items.some((id) => allergyIds.includes(id))
+  const tagged = (entry: Eater): boolean => entry.allergy_item_ids.some((id) => allergyIds.includes(id))
 
   return {
     who: here.filter(tagged),

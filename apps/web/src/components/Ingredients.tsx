@@ -176,7 +176,7 @@ const Row = ({
         {line.pantry !== null && (
           <span class="form-note">{standing({ ...line.pantry, unit: line.unit })}</span>
         )}
-        {line.pantry !== null && heads !== null && (
+        {line.pantry !== null && heads !== null && line.pantry.allergies.length > 0 && (
           <Warning
             allergies={line.pantry.allergies}
             date={date}

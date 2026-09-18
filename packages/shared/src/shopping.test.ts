@@ -64,7 +64,7 @@ const eater = (over: Partial<Eater> = {}): Eater => ({
   waiting: false,
   arrival_date: null,
   departure_date: null,
-  allergy_items: [],
+  allergy_item_ids: [],
   allergies_notes: '',
   ...over,
 })
@@ -519,40 +519,40 @@ describe('cannotEat', () => {
   const GLUTEN = 'al-gluten'
 
   it('names whoever ticked one of the tags the thing carries', () => {
-    const anna = eater({ account_id: 'a-1', name: 'Anna L', allergy_items: [NUTS] })
-    const bo = eater({ account_id: 'a-2', name: 'Bo K', allergy_items: [GLUTEN] })
+    const anna = eater({ account_id: 'a-1', name: 'Anna L', allergy_item_ids: [NUTS] })
+    const bo = eater({ account_id: 'a-2', name: 'Bo K', allergy_item_ids: [GLUTEN] })
 
     expect(cannotEat([anna, bo], '2026-08-01', [NUTS]).who).toEqual([anna])
   })
 
   it('names somebody once when two of their ticks are on the same thing', () => {
-    const anna = eater({ allergy_items: [NUTS, GLUTEN] })
+    const anna = eater({ allergy_item_ids: [NUTS, GLUTEN] })
 
     expect(cannotEat([anna], '2026-08-01', [NUTS, GLUTEN]).who).toEqual([anna])
   })
 
   it('leaves out somebody whose stay misses the day', () => {
-    const early = eater({ allergy_items: [NUTS], departure_date: '2026-07-31' })
-    const late = eater({ account_id: 'a-2', allergy_items: [NUTS], arrival_date: '2026-08-02' })
-    const there = eater({ account_id: 'a-3', allergy_items: [NUTS], arrival_date: '2026-08-01' })
+    const early = eater({ allergy_item_ids: [NUTS], departure_date: '2026-07-31' })
+    const late = eater({ account_id: 'a-2', allergy_item_ids: [NUTS], arrival_date: '2026-08-02' })
+    const there = eater({ account_id: 'a-3', allergy_item_ids: [NUTS], arrival_date: '2026-08-01' })
 
     expect(cannotEat([early, late, there], '2026-08-01', [NUTS]).who).toEqual([there])
   })
 
   it('counts a stay that misses the day when no day is asked about', () => {
-    const early = eater({ allergy_items: [NUTS], departure_date: '2026-07-31' })
+    const early = eater({ allergy_item_ids: [NUTS], departure_date: '2026-07-31' })
 
     expect(cannotEat([early], null, [NUTS]).who).toEqual([early])
   })
 
   it('leaves out the waiting list', () => {
-    const waiting = eater({ allergy_items: [NUTS], waiting: true })
+    const waiting = eater({ allergy_item_ids: [NUTS], waiting: true })
 
     expect(cannotEat([waiting], '2026-08-01', [NUTS]).who).toEqual([])
   })
 
   it('names nobody for a thing carrying no tag', () => {
-    const anna = eater({ allergy_items: [NUTS] })
+    const anna = eater({ allergy_item_ids: [NUTS] })
 
     expect(cannotEat([anna], '2026-08-01', []).who).toEqual([])
   })
@@ -564,7 +564,7 @@ describe('cannotEat', () => {
   })
 
   it('does not count somebody already named among the others', () => {
-    const both = eater({ allergy_items: [NUTS], allergies_notes: 'and red lentils' })
+    const both = eater({ allergy_item_ids: [NUTS], allergies_notes: 'and red lentils' })
 
     expect(cannotEat([both], '2026-08-01', [NUTS])).toEqual({ who: [both], others: 0 })
   })

@@ -306,7 +306,8 @@ that is what the shopping list wants, since a row there is not about one evening
 
 **The source is the roster read** members already have,
 `GET /api/events/:eventId/members` (#159), which carries each entry's ticked
-allergy items. Nothing new is exposed: the names are on the Members page and the
+allergy items — as ids beside the labels the Members page shows, since a tag is
+an id and a label can be renamed. Nothing new is exposed: the names are on the Members page and the
 ticks are what the whole allergy vocabulary exists to publish to whoever cooks.
 It also means the warning is a page-side intersection of two reads the page makes
 anyway, rather than a fifth route to keep in step.

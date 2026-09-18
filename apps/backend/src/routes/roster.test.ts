@@ -13,8 +13,10 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import {
   account,
+  accountAllergy,
   accountAvatar,
   accountRole,
+  allergyItem,
   attendance,
   attendanceHelping,
   event,
@@ -482,6 +484,22 @@ describe('the same list as a member sees it', () => {
     expect(entry.name).toBe('Ana')
     expect(entry.allergies_notes).toBe('peanuts')
     expect(entry.contact).toBe('Ana on discord')
+  })
+
+  it('carries the ticked allergies as ids beside their labels, so a tag on a pantry thing can be matched', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ana = await givenAccount('Ana')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, ana.id, '2026-07-01T00:00:00Z')
+    const nuts = randomUUID()
+    await db().insert(allergyItem).values({ id: nuts, order: 99, label: 'Nuts' })
+    await db().insert(accountAllergy).values({ account_id: ana.id, item_id: nuts })
+
+    const [entry] = (await members(server, reader.cookie, eventId)).json().entries
+
+    expect(entry.allergy_items).toEqual(['Nuts'])
+    expect(entry.allergy_item_ids).toEqual([nuts])
   })
 
   it('says who has paid, which is the mark of somebody actually joining', async () => {

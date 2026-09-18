@@ -123,6 +123,7 @@ const staying = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
   contact: null,
   allergies_notes: null,
   allergy_items: [],
+  allergy_item_ids: [],
   lodging: null,
   helping: null,
   waiting: false,
@@ -310,7 +311,7 @@ describe('the shopping list on a wide screen', () => {
         {},
         [thing({ id: 'p-4', name: 'Lentils, red', allergies: [{ id: 'al-1', label: 'Lentils' }] })],
         [aMeal()],
-        [staying({ allergy_items: ['al-1'] }), staying({ id: 'at-2', account_id: 'a-2' })],
+        [staying({ allergy_item_ids: ['al-1'] }), staying({ id: 'at-2', account_id: 'a-2' })],
       ),
     )
 
@@ -319,7 +320,7 @@ describe('the shopping list on a wide screen', () => {
 
   it('says nothing in that cell about a thing nobody is tagged against', async () => {
     onADesktop()
-    renderPage(stub({}, ITEMS, [aMeal()], [staying({ allergy_items: ['al-1'] })]))
+    renderPage(stub({}, ITEMS, [aMeal()], [staying({ allergy_item_ids: ['al-1'] })]))
 
     await screen.findByRole('rowheader', { name: 'Lentils, red' })
 

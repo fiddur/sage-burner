@@ -334,7 +334,7 @@ const eater = (over: Partial<Eater> = {}): Eater => ({
   waiting: false,
   arrival_date: null,
   departure_date: null,
-  allergy_items: [],
+  allergy_item_ids: [],
   allergies_notes: '',
   ...over,
 })
@@ -355,8 +355,8 @@ describe('who among the people there cannot eat a line', () => {
     show({
       meal: aMeal({ ingredients: [cashew()] }),
       roster: [
-        eater({ allergy_items: ['al-1'] }),
-        eater({ account_id: 'a-2', name: 'Bo K', allergy_items: ['al-1'] }),
+        eater({ allergy_item_ids: ['al-1'] }),
+        eater({ account_id: 'a-2', name: 'Bo K', allergy_item_ids: ['al-1'] }),
         eater({ account_id: 'a-3', name: 'Cilla Y' }),
       ],
     })
@@ -369,16 +369,25 @@ describe('who among the people there cannot eat a line', () => {
   it('says nothing about a line the pantry carries no tag for', () => {
     show({
       meal: aMeal({ ingredients: [line()] }),
-      roster: [eater({ allergy_items: ['al-1'] })],
+      roster: [eater({ allergy_item_ids: ['al-1'] })],
     })
 
     expect(screen.queryByText(/cannot eat this/)).toBeNull()
   })
 
+  it('says nothing under an untagged line about what somebody wrote under Other', () => {
+    show({
+      meal: aMeal({ ingredients: [line()] }),
+      roster: [eater({ allergies_notes: 'red lentils make me ill' })],
+    })
+
+    expect(screen.queryByText(/wrote something under Other/)).toBeNull()
+  })
+
   it('leaves out somebody whose stay misses the day', () => {
     show({
       meal: aMeal({ ingredients: [cashew()] }),
-      roster: [eater({ allergy_items: ['al-1'], departure_date: '2026-07-31' })],
+      roster: [eater({ allergy_item_ids: ['al-1'], departure_date: '2026-07-31' })],
     })
 
     expect(screen.queryByText(/cannot eat this/)).toBeNull()
