@@ -427,6 +427,33 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.leaveMealCrew.method,
       }),
 
+    addMealIngredient: (id: string, body: BodyOf<'addMealIngredient'>) =>
+      request<MealResponse>(apiRoutes.addMealIngredient.path(id), {
+        method: apiRoutes.addMealIngredient.method,
+        body,
+      }),
+
+    updateMealIngredient: (id: string, body: BodyOf<'updateMealIngredient'>) =>
+      request<MealResponse>(apiRoutes.updateMealIngredient.path(id), {
+        method: apiRoutes.updateMealIngredient.method,
+        body,
+      }),
+
+    deleteMealIngredient: (id: string) =>
+      request<undefined>(apiRoutes.deleteMealIngredient.path(id), {
+        method: apiRoutes.deleteMealIngredient.method,
+      }),
+
+    markIngredientBought: (id: string) =>
+      request<undefined>(apiRoutes.markIngredientBought.path(id), {
+        method: apiRoutes.markIngredientBought.method,
+      }),
+
+    unmarkIngredientBought: (id: string) =>
+      request<undefined>(apiRoutes.unmarkIngredientBought.path(id), {
+        method: apiRoutes.unmarkIngredientBought.method,
+      }),
+
     setMealIdea: (id: string, body: BodyOf<'setMealIdea'>) =>
       request<MealResponse>(apiRoutes.setMealIdea.path(id), {
         method: apiRoutes.setMealIdea.method,

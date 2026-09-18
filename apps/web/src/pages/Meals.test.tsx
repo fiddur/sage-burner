@@ -39,9 +39,11 @@ const aMeal = (over: Partial<Meal> = {}): Meal => ({
   label: 'Dinner',
   kind: 'meal',
   food_idea: '',
+  serves: 1,
   lead: null,
   helpers: [],
   cleanup: [],
+  ingredients: [],
   ...over,
 })
 
@@ -193,6 +195,36 @@ describe('the meal plan', () => {
     await waitFor(() => expect(setMealIdea).toHaveBeenCalledWith('m-1', { food_idea: 'Vegan bolognese' }))
   })
 
+  it('leads to the sitting itself, where what it takes is written', async () => {
+    renderPage(stub({}, [aMeal()]))
+
+    const link = await screen.findByRole('link', { name: 'Ingredients' })
+
+    expect(link.getAttribute('href')).toBe('/schedule?burn=e-1&meal=m-1')
+  })
+
+  it('counts what is written there already', async () => {
+    renderPage(
+      stub({}, [
+        aMeal({
+          ingredients: [
+            {
+              id: 'i-1',
+              pantry_item_id: 'p-1',
+              name: 'Rice, basmati',
+              unit: 'kg',
+              amount: 1.2,
+              bought: null,
+              pantry: { where: 'Hallway bucket', stock_level: null, stock_amount: null },
+            },
+          ],
+        }),
+      ]),
+    )
+
+    expect(await screen.findByRole('link', { name: 'Ingredients (1)' })).toBeTruthy()
+  })
+
   it('asks a chore for cleaners and nothing else', async () => {
     renderPage(stub({}, [aMeal({ label: 'Morning cleanup', at: '09:00', kind: 'chore' })]))
 
@@ -205,6 +237,7 @@ describe('the meal plan', () => {
       screen.queryByRole('button', { name: 'Take the spot on cooking at Morning cleanup on 2026-08-01' }),
     ).toBeNull()
     expect(screen.queryByLabelText('Food idea for Morning cleanup on 2026-08-01')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Ingredients' })).toBeNull()
     expect(
       screen.getByRole('button', { name: 'Take the spot on cleanup at Morning cleanup on 2026-08-01' }),
     ).toBeTruthy()

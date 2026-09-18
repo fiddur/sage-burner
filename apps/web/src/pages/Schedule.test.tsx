@@ -95,6 +95,11 @@ const stub = (
   joinMealCrew: () => Promise.reject(new Error('joinMealCrew is not stubbed here')),
   leaveMealCrew: () => Promise.reject(new Error('leaveMealCrew is not stubbed here')),
   setMealIdea: () => Promise.reject(new Error('setMealIdea is not stubbed here')),
+  getPantry: () => Promise.resolve({ items: [] }),
+  getMembers: () => Promise.resolve({ event: null, entries: [] }),
+  addMealIngredient: () => Promise.reject(new Error('addMealIngredient is not stubbed here')),
+  updateMealIngredient: () => Promise.reject(new Error('updateMealIngredient is not stubbed here')),
+  deleteMealIngredient: () => Promise.reject(new Error('deleteMealIngredient is not stubbed here')),
   ...over,
 })
 
@@ -1245,9 +1250,11 @@ describe('the kitchen', () => {
     label: 'Dinner',
     kind: 'meal',
     food_idea: '',
+    serves: 1,
     lead: null,
     helpers: [],
     cleanup: [],
+    ingredients: [],
     ...over,
   })
 
@@ -1378,9 +1385,11 @@ describe('a drag that was abandoned', () => {
     label: 'Dinner',
     kind: 'meal',
     food_idea: '',
+    serves: 1,
     lead: null,
     helpers: [],
     cleanup: [],
+    ingredients: [],
   })
 
   const both = (over: Partial<ScheduleApi>) =>
@@ -1464,9 +1473,11 @@ describe('a chore in the kitchen', () => {
     label: 'Morning cleanup',
     kind: 'chore',
     food_idea: '',
+    serves: 1,
     lead: null,
     helpers: [],
     cleanup: [],
+    ingredients: [],
   })
 
   it('asks for cleaners and nothing else', async () => {
@@ -1495,6 +1506,103 @@ describe('a chore in the kitchen', () => {
   })
 })
 
+describe('the ingredients of a sitting, in the panel', () => {
+  const sitting = (ingredients: Meal['ingredients'] = []): Meal => ({
+    id: 'm-4',
+    event_id: 'e-1',
+    date: '2026-08-01',
+    at: '18:00',
+    label: 'Dinner',
+    kind: 'meal',
+    food_idea: '',
+    serves: 10,
+    lead: null,
+    helpers: [],
+    cleanup: [],
+    ingredients,
+  })
+
+  const withPantry = (meal: Meal, over: Partial<ScheduleApi> = {}) =>
+    stub({
+      getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [meal] }),
+      getPantry: () =>
+        Promise.resolve({
+          items: [
+            {
+              id: 'p-1',
+              kind: 'staple' as const,
+              name: 'Rice, basmati',
+              unit: 'kg',
+              where: 'Hallway bucket',
+              stock_level: null,
+              stock_amount: null,
+              counted_by: null,
+              counted_by_name: null,
+              counted_at: null,
+              withdrawn_at: null,
+              created_at: '2026-07-01T00:00:00.000Z',
+            },
+          ],
+        }),
+      ...over,
+    })
+
+  it('lists what it takes, and says who the shopping list counts for', async () => {
+    renderPage(
+      withPantry(
+        sitting([
+          {
+            id: 'i-1',
+            pantry_item_id: 'p-1',
+            name: 'Rice, basmati',
+            unit: 'kg',
+            amount: 1.2,
+            bought: null,
+            pantry: { where: 'Hallway bucket', stock_level: null, stock_amount: null },
+          },
+        ]),
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Dinner' }))
+    const panel = await screen.findByRole('dialog', { name: 'Dinner' })
+
+    expect(within(panel).getByText('Ingredients')).toBeTruthy()
+    expect(within(panel).getByText('Rice, basmati')).toBeTruthy()
+    expect(within(panel).getByText(/who are here on Saturday 1/)).toBeTruthy()
+  })
+
+  it('writes a pantry pick onto the sitting', async () => {
+    const addMealIngredient = vi.fn<ScheduleApi['addMealIngredient']>(() =>
+      Promise.resolve({ meal: sitting() }),
+    )
+    renderPage(withPantry(sitting(), { addMealIngredient }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Dinner' }))
+    const panel = await screen.findByRole('dialog', { name: 'Dinner' })
+
+    fireEvent.input(within(panel).getByLabelText('Add an ingredient to Dinner'), {
+      target: { value: 'rice' },
+    })
+    fireEvent.click(within(panel).getByRole('button', { name: /Rice, basmati/ }))
+    fireEvent.input(within(panel).getByLabelText('Amount of Rice, basmati'), { target: { value: '1.2' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Add' }))
+
+    await waitFor(() =>
+      expect(addMealIngredient).toHaveBeenCalledWith('m-4', { pantry_item_id: 'p-1', amount: 1.2 }),
+    )
+  })
+
+  it('leaves a chore without any, since nobody cooks it', async () => {
+    renderPage(withPantry({ ...sitting(), id: 'm-5', kind: 'chore', label: 'Morning cleanup' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
+    const panel = await screen.findByRole('dialog', { name: 'Morning cleanup' })
+
+    expect(within(panel).queryByText('Ingredients')).toBeNull()
+  })
+})
+
 describe('a chore’s lead, in the panel', () => {
   const stranded = (lead: { account_id: string; name: string } | null): Meal => ({
     id: 'm-3',
@@ -1504,9 +1612,11 @@ describe('a chore’s lead, in the panel', () => {
     label: 'Morning cleanup',
     kind: 'chore',
     food_idea: '',
+    serves: 1,
     lead,
     helpers: [],
     cleanup: [],
+    ingredients: [],
   })
 
   const withMeal = (meal: Meal) =>

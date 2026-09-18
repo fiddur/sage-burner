@@ -4,7 +4,8 @@ The pantry: what the house usually has, where it lives and roughly how much
 (#805). It replaces the spreadsheet's _Food inventory_ and _Spice inventory_
 tabs, which were two tabs of the same shape — a thing, a place, a rough amount.
 On top of it sit the hearts — what people want at one burn — and the shopping
-list they fill (#806), which are the second half of what
+list they fill (#806), and on top of that the ingredients of each sitting, which
+are what turns that list into amounts (#807). Together they are what
 [#804](https://github.com/fiddur/sage-burner/issues/804) calls food.
 
 [← back to the README](../README.md)
@@ -169,14 +170,103 @@ test rather than a claim about a component. `shoppingText` is the same list as
 plain lines for **Copy as text**, for the pasting into a chat that the app should
 not try to prevent.
 
-How **much** of each to buy is not here yet: that needs the sittings' ingredients
-and the headcount per day, which is phase 3 of
-[#804](https://github.com/fiddur/sage-burner/issues/804). The page says so rather
-than showing an amount column nobody has filled.
+How **much** of each to buy comes from the sittings' ingredients, below.
+
+## Ingredients
+
+A sitting carries a list of what it takes, and one number — `meal.serves` — saying
+how many people those amounts feed (#807). One number for the whole list rather
+than one per line: a recipe is written for a number of eaters, and asking for it
+again beside every lentil is the kind of form people abandon halfway. Whoever
+writes it writes it for whatever number they cooked it for last time; the
+shopping list does the arithmetic.
+
+A line is **either** a pantry pick **or** a special buy, never both and never
+neither — a CHECK on the table says so, not only the schema. A pick carries no
+name and no unit of its own: the pantry row's are the true ones and are resolved
+at read time, which is the data-model rule the whole app runs on. A thing written
+here as `Lentils` while the pantry calls the sack `Lentils, red` would be a second
+spelling that nothing adds up, and the count somebody took in the cellar would
+buy against the wrong row.
+
+The picker is therefore the nudge: typing filters the pantry and shows what is
+there and where it lives, and the last row — **Use "…" as written** — is always
+offered. That row is the escape hatch for the saffron nobody keeps a sack of, and
+what it writes is listed apart on the shopping list rather than pretending to be
+stock. Renaming a pick is refused: pick another instead.
+
+An amount is optional, and absent means _to taste_ — salt does not scale and
+nobody wants to be asked how many grams. Such a line asks the shopping list for
+nothing while still appearing on the sitting, which is what a cook standing at the
+stove wants to see.
+
+`pantry_item_id` has **no `ON DELETE`**, deliberately. Taking a thing off the
+pantry list is soft, so the row an ingredient points at is never deleted and the
+reference cannot dangle; a withdrawn thing is refused as a _new_ pick, so the list
+stops offering it without rewriting what is already planned.
+
+Writing, changing or taking off a line adds **one coalescing `edited` entry** to
+the sitting's existing card — the same entry the food idea makes. The digest then
+says the plan moved without a line per lentil, and nobody is notified: an
+ingredient is not something done to anybody. A **tick** in the shop writes no
+entry at all; buying is not a change to the plan.
+
+## How the list is worked out
+
+`shoppingSections` in `packages/shared/src/shopping.ts` is the whole of it — a
+pure function with no Zod in it, the way `roster.ts` draws the line between a
+place and the waiting list. The page renders what it returns and decides nothing,
+which is what lets every rule below be a test rather than a claim about a
+component.
+
+**The headcount is per day.** People arrive on the Friday and leave on the Sunday,
+so a Friday dinner and a Saturday dinner are not the same number of mouths.
+`headcountOn` counts the attendances that have a place (`withPlaces`, the same
+ordering the roster page shows) and whose stay covers that date — `arrival_date`
+null or on or before it, `departure_date` null or on or after it. The comparison
+is between plain `YYYY-MM-DD` strings, so no timezone can move anybody a day
+either way; a stay with no dates on it is the whole burn.
+
+**"Buying for [n]" is where the margin goes.** Left empty, each sitting counts the
+people there that day. A number replaces that for every sitting at once — for the
+guests who never filled anything in, for the second helpings, for the buyer who
+would rather come home with too much. It is not stored: it is a knob on the page
+for the hour somebody is in the shop, not a decision about the burn.
+
+**Then the arithmetic.** `scaled` takes an amount from what it feeds to who is
+there, the sum over sittings is what the burn `need`s, what the pantry says is in
+the house is taken off it — _some_ counts as its rough amount, _plenty_ as enough,
+_out_ and never counted as nothing — and what is left is rounded **up** by
+`roundUp`: to a tenth for `kg` and `l`, to a whole for everything else. Rounding
+up, because coming home short is a meal that does not happen and coming home long
+is a sack in the cellar; to the whole for pieces and packets, because shops do not
+sell 2.4 packets. Rounding happens once, on the sum, so four onions at three
+sittings for eleven people is fourteen to buy rather than the fifteen that rounding
+each sitting first would ask for — the per-sitting figures beside the row are
+rounded for reading, and are not what is added up.
+
+A thing the house has enough of folds away under the same line as phase 2's
+_plenty_ ones, because a buyer in the shop may still want to check. A hearted
+thing nobody cooks with keeps exactly the row it had: no amount is invented for
+it, since a heart says "I want this here" and nothing about how much.
+
+**Special buys gather by name and unit, lowercased.** Two cooks writing
+`Coriander, fresh` and `coriander, fresh` are one line on the list — they are one
+trip down one aisle — while the same word in two units stays two rows, because
+`1 kg` and `1 bunch` of the same herb are not one purchase. Ticking such a row
+ticks every line in the group, and the row only reads as bought once all of them
+are: half a group bought is a thing still to buy.
+
+Amounts are **stored nowhere** but on the sitting. There is no per-burn "we need
+14 kg of oats" row to keep in step with the plan, so moving a sitting, changing
+who is coming or correcting `serves` is enough, and the list cannot go stale
+against what the sittings actually say.
 
 ## What this deliberately does not have
 
-No thread, no notification, no feed card. A pantry row is furniture: nobody wants
-a bell because the flour is running low, and #804's later phases put the
-conversation where it belongs — on the sitting that needs the flour. Ingredients
-per sitting and allergy tags are phases 3 and 4 and are not here.
+No thread, no notification, no feed card on a pantry row. A pantry row is
+furniture: nobody wants a bell because the flour is running low, and the
+conversation belongs where the flour is needed — on the sitting's card, which is
+where an ingredient edit lands. Allergy tags on a pantry item, and the warning on
+a sitting whose ingredients somebody there cannot eat, are phase 4 of
+[#804](https://github.com/fiddur/sage-burner/issues/804) and are not here.

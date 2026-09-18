@@ -215,6 +215,12 @@ const clientWith = (
   joinMealCrew: () => Promise.reject(new Error('joinMealCrew is not stubbed in this file')),
   leaveMealCrew: () => Promise.reject(new Error('leaveMealCrew is not stubbed in this file')),
   setMealIdea: () => Promise.reject(new Error('setMealIdea is not stubbed in this file')),
+  addMealIngredient: () => Promise.reject(new Error('addMealIngredient is not stubbed in this file')),
+  updateMealIngredient: () => Promise.reject(new Error('updateMealIngredient is not stubbed in this file')),
+  deleteMealIngredient: () => Promise.reject(new Error('deleteMealIngredient is not stubbed in this file')),
+  markIngredientBought: () => Promise.reject(new Error('markIngredientBought is not stubbed in this file')),
+  unmarkIngredientBought: () =>
+    Promise.reject(new Error('unmarkIngredientBought is not stubbed in this file')),
   updateMealIntro: () => Promise.reject(new Error('updateMealIntro is not stubbed in this file')),
   getMealSlots: () => Promise.resolve({ slots: [] }),
   addMealSlot: () => Promise.reject(new Error('addMealSlot is not stubbed in this file')),

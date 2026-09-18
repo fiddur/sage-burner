@@ -13,6 +13,7 @@ import {
   MAX_OPTION_LABEL,
   MAX_WELCOME_LENGTH,
   pantryPage,
+  schedulePage,
   shoppingPage,
 } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
@@ -155,6 +156,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
           ) : (
             <MealTable
               meals={plan.meals}
+              eventId={plan.eventId}
               attendees={plan.attendees}
               viewerId={viewer.account?.id}
               busy={busy}
@@ -240,6 +242,7 @@ const IntroEditor = ({
 
 const MealTable = ({
   meals,
+  eventId,
   attendees,
   viewerId,
   busy,
@@ -248,6 +251,7 @@ const MealTable = ({
   onIdea,
 }: {
   meals: readonly Meal[]
+  eventId: string
   attendees: readonly Person[]
   viewerId: string | undefined
   busy: boolean
@@ -281,6 +285,11 @@ const MealTable = ({
             <td>
               <div>{meal.label}</div>
               <FoodIdea meal={meal} busy={busy} onIdea={onIdea} />
+              {meal.kind !== 'chore' && (
+                <a class="form-note" href={schedulePage(eventId, { meal: meal.id })}>
+                  {meal.ingredients.length === 0 ? 'Ingredients' : `Ingredients (${meal.ingredients.length})`}
+                </a>
+              )}
             </td>
             <td>
               {meal.kind === 'chore' && meal.lead === null ? (

@@ -13,6 +13,8 @@ import {
   helperSchema,
   mealCreateSchema,
   mealIdeaUpdateSchema,
+  mealIngredientCreateSchema,
+  mealIngredientUpdateSchema,
   mealIntroUpdateSchema,
   mealLeadSchema,
   mealSlotCreateSchema,
@@ -31,9 +33,20 @@ import { accountForAttendance, attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
-import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
+import { isEmptyPatch } from '../db/patch.ts'
+import {
+  account,
+  attendance,
+  event,
+  meal,
+  mealIngredient,
+  mealRole,
+  mealSlot,
+  pantryItem,
+} from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
+import { ingredientsFor } from '../meal-ingredients.ts'
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow } from './events.ts'
 import { addEntry, forgetThread, sittingName, threadFor } from './threads.ts'
@@ -97,6 +110,11 @@ const mealsFor = async (db: Database, eventId: string): Promise<Meal[]> => {
     )
     .orderBy(asc(account.name), asc(account.id))
 
+  const ingredients = await ingredientsFor(
+    db,
+    rows.map((row) => row.id),
+  )
+
   const lead = new Map<string, Person>()
   const helpers = new Map<string, Person[]>()
   const cleanup = new Map<string, Person[]>()
@@ -116,9 +134,11 @@ const mealsFor = async (db: Database, eventId: string): Promise<Meal[]> => {
     label: row.label,
     kind: row.kind,
     food_idea: row.food_idea,
+    serves: row.serves,
     lead: lead.get(row.id) ?? null,
     helpers: helpers.get(row.id) ?? [],
     cleanup: cleanup.get(row.id) ?? [],
+    ingredients: ingredients.get(row.id) ?? [],
   }))
 }
 
@@ -491,6 +511,149 @@ export const registerMealRoutes = (
       }
 
       return answer(reply, existing.id)
+    },
+  )
+
+  const openIngredient = async (id: string) => {
+    const [row] = await db
+      .select({ line: mealIngredient, sitting: meal })
+      .from(mealIngredient)
+      .innerJoin(meal, eq(meal.id, mealIngredient.meal_id))
+      .where(eq(mealIngredient.id, id))
+      .limit(1)
+    if (row === undefined) return undefined
+
+    return (await openEventNow(db, now, row.sitting.event_id)) === undefined ? undefined : row
+  }
+
+  const ingredientsChanged = async (sitting: MealRow, request: FastifyRequest) => {
+    const viewer = await viewerFor(request, { db, sessions })
+
+    await noteOnMeal(sitting, 'edited', viewer?.account_id, 'changed what it needs')
+  }
+
+  app.post<{ Params: { id: string } }>(
+    apiRoutes.addMealIngredient.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const body = bodyOf(mealIngredientCreateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
+
+      const existing = await openMeal(request.params.id)
+      if (existing === undefined) return sendError(reply, 404)
+
+      const picked = 'pantry_item_id' in body ? body.pantry_item_id : null
+
+      if (picked !== null) {
+        const [item] = await db
+          .select({ withdrawn_at: pantryItem.withdrawn_at })
+          .from(pantryItem)
+          .where(eq(pantryItem.id, picked))
+          .limit(1)
+
+        if (item === undefined || item.withdrawn_at !== null) return sendError(reply, 400)
+      }
+
+      await db.insert(mealIngredient).values({
+        id: randomUUID(),
+        meal_id: existing.id,
+        pantry_item_id: picked,
+        name: 'name' in body ? body.name : null,
+        unit: 'name' in body ? body.unit : null,
+        amount: body.amount,
+        created_at: now().toISOString(),
+      })
+
+      await ingredientsChanged(existing, request)
+
+      const found = await oneMeal(db, existing.id)
+
+      return found === undefined
+        ? sendError(reply, 404)
+        : reply.code(201).send({ meal: found } satisfies MealResponse)
+    },
+  )
+
+  app.patch<{ Params: { id: string } }>(
+    apiRoutes.updateMealIngredient.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const body = bodyOf(mealIngredientUpdateSchema, request)
+      if (body === undefined || isEmptyPatch(body)) return sendError(reply, 400)
+
+      const found = await openIngredient(request.params.id)
+      if (found === undefined) return sendError(reply, 404)
+
+      const renaming = body.name !== undefined || body.unit !== undefined
+      if (renaming && found.line.pantry_item_id !== null) return sendError(reply, 400)
+
+      await db.update(mealIngredient).set(body).where(eq(mealIngredient.id, found.line.id))
+
+      await ingredientsChanged(found.sitting, request)
+
+      return answer(reply, found.sitting.id)
+    },
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    apiRoutes.deleteMealIngredient.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const found = await openIngredient(request.params.id)
+      if (found === undefined) return sendError(reply, 404)
+
+      await db.delete(mealIngredient).where(eq(mealIngredient.id, found.line.id))
+
+      await ingredientsChanged(found.sitting, request)
+
+      return reply.code(204).send()
+    },
+  )
+
+  app.put<{ Params: { id: string } }>(
+    apiRoutes.markIngredientBought.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const found = await openIngredient(request.params.id)
+      if (found === undefined) return sendError(reply, 404)
+
+      if (found.line.bought_at === null) {
+        await db
+          .update(mealIngredient)
+          .set({ bought_by: viewer.account_id, bought_at: now().toISOString() })
+          .where(eq(mealIngredient.id, found.line.id))
+      }
+
+      return reply.code(204).send()
+    },
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    apiRoutes.unmarkIngredientBought.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const found = await openIngredient(request.params.id)
+      if (found === undefined) return sendError(reply, 404)
+
+      await db
+        .update(mealIngredient)
+        .set({ bought_by: null, bought_at: null })
+        .where(eq(mealIngredient.id, found.line.id))
+
+      return reply.code(204).send()
     },
   )
 }
