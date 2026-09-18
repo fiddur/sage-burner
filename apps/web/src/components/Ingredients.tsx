@@ -230,7 +230,7 @@ const AddIngredient = ({
           }
           if (press.key === 'Enter') {
             press.preventDefault()
-            take(highlighted)
+            if (looking.trim() !== '') take(highlighted)
           }
         }}
       />

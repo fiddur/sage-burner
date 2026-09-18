@@ -243,6 +243,17 @@ describe('adding a line', () => {
     expect(onAdd).toHaveBeenCalledWith({ pantry_item_id: 'p-2', amount: 2 })
   })
 
+  it('picks nothing on Enter in an empty box, since nothing was asked for', () => {
+    const onAdd = vi.fn()
+    show({ onAdd })
+    const field = type('')
+
+    fireEvent.keyDown(field, { key: 'Enter' })
+
+    expect(screen.queryByRole('button', { name: 'Add' })).toBeNull()
+    expect(onAdd).not.toHaveBeenCalled()
+  })
+
   it('comes back up the list with the arrow keys', () => {
     const onAdd = vi.fn()
     show({ onAdd })
