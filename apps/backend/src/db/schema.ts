@@ -1065,7 +1065,6 @@ export const pantryItem = sqliteTable(
     kind: text('kind', { enum: pantryKinds }).notNull(),
     name: text('name').notNull(),
     unit: text('unit').notNull().default('pcs'),
-    where: text('where').notNull().default(''),
     stock_level: text('stock_level', { enum: stockLevels }),
     stock_amount: real('stock_amount'),
     counted_by: text('counted_by').references(() => account.id, { onDelete: 'set null' }),
@@ -1089,6 +1088,41 @@ export const pantryItem = sqliteTable(
       'pantry_item_stock_amount_check',
       sql`${table.stock_amount} is null or (${table.stock_level} is 'some' and ${table.stock_amount} >= 0)`,
     ),
+  ],
+)
+
+export const pantryPlace = sqliteTable(
+  'pantry_place',
+  {
+    id: text('id').notNull(),
+    order: integer('order').notNull(),
+    name: text('name').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    uniqueIndex('pantry_place_name_idx').on(sql`lower(trim(${table.name}))`),
+    index('pantry_place_order_idx').on(table.order),
+    check('pantry_place_order_check', sql`${table.order} >= 0`),
+    check('pantry_place_name_check', sql`length(trim(${table.name})) > 0`),
+  ],
+)
+
+// No `onDelete`: SQLite refuses to remove a room something is still in, and `pantry-places.ts`
+// turns that into a 409.
+export const pantryItemPlace = sqliteTable(
+  'pantry_item_place',
+  {
+    item_id: text('item_id')
+      .notNull()
+      .references(() => pantryItem.id, { onDelete: 'cascade' }),
+    place_id: text('place_id')
+      .notNull()
+      .references(() => pantryPlace.id),
+    spot: text('spot').notNull().default(''),
+  },
+  (table) => [
+    primaryKey({ columns: [table.item_id, table.place_id] }),
+    index('pantry_item_place_place_idx').on(table.place_id),
   ],
 )
 

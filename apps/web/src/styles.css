@@ -3364,6 +3364,58 @@ a.song-row:hover .song-what {
   gap: 0.5rem;
 }
 
+/* The box is what the eye follows down a shelf while the torch is in the other hand,
+   so it leads the row rather than trailing the name. */
+.pantry-spot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-inline-end: 0.4rem;
+}
+
+.spot-tag {
+  min-height: 44px;
+  min-width: 3rem;
+  border: 1px dashed var(--line);
+  border-radius: 0.5rem;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.pantry-spot input {
+  min-height: 44px;
+  width: 6rem;
+}
+
+.pantry-put {
+  margin: 1rem 0;
+}
+
+.pantry-places {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+}
+
+.pantry-places .row {
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.pantry-places label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 9rem;
+}
+
 .wanted-list,
 .shopping-list {
   list-style: none;

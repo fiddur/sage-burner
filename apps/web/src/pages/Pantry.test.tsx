@@ -1,6 +1,7 @@
-import type { EventPantryItem, MyBurn, PantryItem } from '@sage-burner/shared'
+import type { EventPantryItem, MyBurn, PantryItem, PantryPlace } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -29,7 +30,10 @@ const thing = (over: Partial<PantryItem> = {}): PantryItem => ({
   kind: 'breakfast',
   name: 'Oatmeal',
   unit: 'kg',
-  where: 'Hallway bucket · cellar I',
+  places: [
+    { place_id: 'pl-2', name: 'Hallway', spot: 'bucket' },
+    { place_id: 'pl-3', name: 'Cellar', spot: 'I' },
+  ],
   stock_level: null,
   stock_amount: null,
   counted_by: null,
@@ -42,6 +46,12 @@ const thing = (over: Partial<PantryItem> = {}): PantryItem => ({
   ...over,
 })
 
+const PLACES: PantryPlace[] = [
+  { id: 'pl-1', order: 0, name: 'Kitchen' },
+  { id: 'pl-2', order: 1, name: 'Hallway' },
+  { id: 'pl-3', order: 2, name: 'Cellar' },
+]
+
 const ALLERGIES = [
   { id: 'al-1', order: 0, label: 'Nuts' },
   { id: 'al-2', order: 1, label: 'Gluten' },
@@ -49,8 +59,21 @@ const ALLERGIES = [
 
 const ITEMS: PantryItem[] = [
   thing(),
-  thing({ id: 'p-2', kind: 'spice', name: 'Cumin', unit: 'g', stock_level: 'plenty', where: 'Spice shelf' }),
-  thing({ id: 'p-3', kind: 'household', name: 'Toilet paper', unit: 'pkt', where: 'Cellar II' }),
+  thing({
+    id: 'p-2',
+    kind: 'spice',
+    name: 'Cumin',
+    unit: 'g',
+    stock_level: 'plenty',
+    places: [{ place_id: 'pl-1', name: 'Kitchen', spot: 'spice shelf' }],
+  }),
+  thing({
+    id: 'p-3',
+    kind: 'household',
+    name: 'Toilet paper',
+    unit: 'pkt',
+    places: [{ place_id: 'pl-3', name: 'Cellar', spot: 'R10' }],
+  }),
 ]
 
 const BURN: MyBurn = {
@@ -75,6 +98,9 @@ const wanted = (item: PantryItem, count: number, mine: boolean): EventPantryItem
 const stub = (over: Partial<PantryApi> = {}, items: PantryItem[] = ITEMS): PantryApi => ({
   getPantry: () => Promise.resolve({ items }),
   getAllergyItems: () => Promise.resolve({ items: ALLERGIES }),
+  getPantryPlaces: () => Promise.resolve({ places: PLACES }),
+  putPantrySpot: () => Promise.reject(new Error('putPantrySpot is not stubbed here')),
+  removePantrySpot: () => Promise.reject(new Error('removePantrySpot is not stubbed here')),
   getEventPantry: () =>
     Promise.resolve({
       items: [wanted(items[0] ?? thing(), 3, true), ...items.slice(1).map((one) => wanted(one, 0, false))],
@@ -102,12 +128,28 @@ const renderPage = (api: PantryApi, viewer: Viewer = MEMBER, burn?: MyBurn) =>
     </RememberedProvider>,
   )
 
+const renderPageAt = (at: string, api: PantryApi, viewer: Viewer = MEMBER) => {
+  history.replaceState(null, '', at)
+
+  return render(
+    <LocationProvider>
+      <RememberedProvider remembered={createRemembered()}>
+        <ViewerProvider viewer={viewer}>
+          <BurnProvider value={{ status: 'ready', burns: [], selected: undefined }}>
+            <Pantry api={api} />
+          </BurnProvider>
+        </ViewerProvider>
+      </RememberedProvider>
+    </LocationProvider>,
+  )
+}
+
 describe('the pantry page', () => {
-  it('lists what the house has, with where it lives', async () => {
+  it('lists what the house has, with the rooms and boxes it lives in', async () => {
     renderPage(stub())
 
     expect(await screen.findByText('Oatmeal')).toBeTruthy()
-    expect(screen.getByText('Hallway bucket · cellar I')).toBeTruthy()
+    expect(screen.getByText('Hallway bucket · Cellar I')).toBeTruthy()
   })
 
   it('filters by name as you type', async () => {
@@ -226,7 +268,12 @@ describe('the pantry page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
 
     await waitFor(() =>
-      expect(addPantryItem).toHaveBeenCalledWith({ kind: 'staple', name: 'Rice', unit: 'kg', where: '' }),
+      expect(addPantryItem).toHaveBeenCalledWith({
+        kind: 'staple',
+        name: 'Rice',
+        unit: 'kg',
+        places: [],
+      }),
     )
   })
 
@@ -255,8 +302,11 @@ describe('the pantry page', () => {
         kind: 'breakfast',
         name: 'Oats',
         unit: 'kg',
-        where: 'Hallway bucket · cellar I',
         allergy_item_ids: [],
+        places: [
+          { place_id: 'pl-2', spot: 'bucket' },
+          { place_id: 'pl-3', spot: 'I' },
+        ],
       }),
     )
   })
@@ -427,5 +477,196 @@ describe('hearting from the pantry, where the rarer things are', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Cumin' }))
 
     await waitFor(() => expect(heartPantryItem).toHaveBeenCalledWith('e-1', 'p-2'))
+  })
+})
+
+describe('taking inventory one room at a time', () => {
+  const spread: PantryItem[] = [
+    thing({
+      id: 'p-1',
+      name: 'Rice',
+      places: [{ place_id: 'pl-3', name: 'Cellar', spot: 'R10' }],
+    }),
+    thing({
+      id: 'p-2',
+      name: 'Oats',
+      places: [
+        { place_id: 'pl-3', name: 'Cellar', spot: 'R2' },
+        { place_id: 'pl-2', name: 'Hallway', spot: 'bucket' },
+      ],
+    }),
+    thing({ id: 'p-3', name: 'Salt', places: [{ place_id: 'pl-3', name: 'Cellar', spot: '' }] }),
+    thing({ id: 'p-4', name: 'Candles', places: [{ place_id: 'pl-1', name: 'Kitchen', spot: 'drawer' }] }),
+  ]
+
+  const walking = () => screen.getAllByRole('listitem').map((row) => row.textContent ?? '')
+
+  it('shows only what is in the room, and puts the chip in the address', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread))
+
+    await screen.findByText('Rice')
+    expect(screen.queryByText('Candles')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Cellar' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('walks the room by box, counting the numbers and leaving the boxless last', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread))
+
+    await screen.findByText('Oats')
+
+    const order = walking()
+    expect(order[0]).toContain('Oats')
+    expect(order[1]).toContain('Rice')
+    expect(order[2]).toContain('Salt')
+  })
+
+  it('narrows the walk by name as well', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread))
+
+    fireEvent.input(await screen.findByLabelText('Find a thing'), { target: { value: 'oat' } })
+
+    expect(screen.getByText('Oats')).toBeTruthy()
+    expect(screen.queryByText('Rice')).toBeNull()
+  })
+
+  it('names the other rooms a thing is in, since this one is the box beside its name', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread))
+
+    await screen.findByText('Oats')
+
+    expect(screen.getByText('Hallway bucket')).toBeTruthy()
+  })
+
+  it('writes a box a member types in place', async () => {
+    const putPantrySpot = vi.fn<PantryApi['putPantrySpot']>(() =>
+      Promise.resolve({ item: spread[0] ?? thing() }),
+    )
+    renderPageAt('/pantry?place=pl-3', stub({ putPantrySpot }, spread))
+
+    fireEvent.click(await screen.findByLabelText('Write where Rice is in the Cellar'))
+    fireEvent.input(screen.getByLabelText('Where Rice is in the Cellar'), { target: { value: ' R3 ' } })
+    fireEvent.keyDown(screen.getByLabelText('Where Rice is in the Cellar'), { key: 'Enter' })
+
+    await waitFor(() => expect(putPantrySpot).toHaveBeenCalledWith('p-1', 'pl-3', { spot: 'R3' }))
+  })
+
+  it('takes a thing out of this room alone, never off the list', async () => {
+    const removePantrySpot = vi.fn<PantryApi['removePantrySpot']>(() => Promise.resolve(undefined))
+    renderPageAt('/pantry?place=pl-3', stub({ removePantrySpot }, spread))
+
+    fireEvent.click(await screen.findByLabelText('Take Rice out of the Cellar'))
+
+    await waitFor(() => expect(removePantrySpot).toHaveBeenCalledWith('p-1', 'pl-3'))
+    expect(screen.queryByRole('button', { name: 'Really take off Rice' })).toBeNull()
+  })
+
+  it('offers the count and the ask on every row of the walk', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread))
+
+    await screen.findByText('Rice')
+
+    expect(screen.getByRole('group', { name: 'How much Rice is left' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ask for more Rice' })).toBeTruthy()
+  })
+
+  it('puts something found on the floor into the room, at the box it went into', async () => {
+    const putPantrySpot = vi.fn<PantryApi['putPantrySpot']>(() =>
+      Promise.resolve({ item: spread[3] ?? thing() }),
+    )
+    renderPageAt('/pantry?place=pl-3', stub({ putPantrySpot }, spread))
+
+    fireEvent.input(await screen.findByLabelText('What did you find?'), { target: { value: 'cand' } })
+    fireEvent.click(screen.getByRole('button', { name: /Candles/ }))
+    fireEvent.input(screen.getByLabelText('Where Candles goes in the Cellar'), { target: { value: 'R4' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Put it here' }))
+
+    await waitFor(() => expect(putPantrySpot).toHaveBeenCalledWith('p-4', 'pl-3', { spot: 'R4' }))
+  })
+
+  it('offers only what is not in this room yet, and says where it is now', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread))
+
+    fireEvent.input(await screen.findByLabelText('What did you find?'), { target: { value: 'a' } })
+
+    const offered = document.querySelector('.ingredient-matches')?.textContent ?? ''
+    expect(offered).toContain('Candles')
+    expect(offered).toContain('Kitchen drawer')
+    expect(offered).not.toContain('Salt')
+  })
+
+  it('does nothing on Enter in an empty box, which would otherwise pick the first thing', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread))
+
+    const box = await screen.findByLabelText('What did you find?')
+    fireEvent.keyDown(box, { key: 'Enter' })
+
+    expect(screen.queryByRole('button', { name: 'Put it here' })).toBeNull()
+  })
+
+  it('tells a member to ask an admin for a thing that is on no list', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread))
+
+    fireEvent.input(await screen.findByLabelText('What did you find?'), { target: { value: 'Quinoa' } })
+
+    expect(screen.getByText(/Ask an admin/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Add a new thing/ })).toBeNull()
+  })
+
+  it('offers an admin the add form, filled in with the name and this room', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, spread), ADMIN)
+
+    fireEvent.input(await screen.findByLabelText('What did you find?'), { target: { value: ' Quinoa ' } })
+    fireEvent.click(screen.getByRole('button', { name: /Add a new thing/ }))
+
+    expect((screen.getByLabelText('What is it?') as HTMLInputElement).value).toBe('Quinoa')
+    expect((screen.getByLabelText('In the Cellar, for the new thing') as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('adds a thing into the rooms an admin ticked', async () => {
+    const addPantryItem = vi.fn<PantryApi['addPantryItem']>(() =>
+      Promise.resolve({ item: thing({ id: 'p-9', name: 'Quinoa' }) }),
+    )
+    renderPage(stub({ addPantryItem }), ADMIN)
+
+    fireEvent.input(await screen.findByLabelText('What is it?'), { target: { value: 'Quinoa' } })
+    fireEvent.input(screen.getByLabelText('Which box in the Cellar, for the new thing'), {
+      target: { value: 'R5' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    await waitFor(() =>
+      expect(addPantryItem).toHaveBeenCalledWith({
+        kind: 'staple',
+        name: 'Quinoa',
+        unit: 'pcs',
+        places: [{ place_id: 'pl-3', spot: 'R5' }],
+      }),
+    )
+  })
+
+  it('takes a thing out of a room by unticking it in the pen', async () => {
+    const updatePantryItem = vi.fn<PantryApi['updatePantryItem']>(() => Promise.resolve({ item: thing() }))
+    renderPage(stub({ updatePantryItem }), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Edit Oatmeal'))
+    fireEvent.click(screen.getByLabelText('In the Cellar, for Oatmeal'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updatePantryItem).toHaveBeenCalledWith('p-1', {
+        kind: 'breakfast',
+        name: 'Oatmeal',
+        unit: 'kg',
+        allergy_item_ids: [],
+        places: [{ place_id: 'pl-2', spot: 'bucket' }],
+      }),
+    )
+  })
+
+  it('leaves the ordinary list alone where no room is chosen', async () => {
+    renderPageAt('/pantry', stub({}, spread))
+
+    expect(await screen.findByText('Candles')).toBeTruthy()
+    expect(screen.queryByLabelText('What did you find?')).toBeNull()
   })
 })

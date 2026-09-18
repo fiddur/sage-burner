@@ -34,6 +34,7 @@ import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
 import { AdminInvites } from './pages/AdminInvites.tsx'
 import { AdminNotificationLog } from './pages/AdminNotificationLog.tsx'
+import { AdminPantryPlaces } from './pages/AdminPantryPlaces.tsx'
 import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { AdminRoster } from './pages/AdminRoster.tsx'
 import { AdminSettings } from './pages/AdminSettings.tsx'
@@ -204,6 +205,13 @@ export type RoutesApi = Pick<
   | 'updatePantryItem'
   | 'withdrawPantryItem'
   | 'restorePantryItem'
+  | 'getPantryPlaces'
+  | 'addPantryPlace'
+  | 'updatePantryPlace'
+  | 'deletePantryPlace'
+  | 'reorderPantryPlaces'
+  | 'putPantrySpot'
+  | 'removePantrySpot'
   | 'getBringList'
   | 'addBringItem'
   | 'updateBringItem'
@@ -306,6 +314,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   )
   const AdminEventsRoute = useMemo(() => () => <AdminEvents api={api} />, [api])
   const AdminAllergiesRoute = useMemo(() => () => <AdminAllergies api={api} />, [api])
+  const AdminPantryPlacesRoute = useMemo(() => () => <AdminPantryPlaces api={api} />, [api])
   const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
   const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
   const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
@@ -390,6 +399,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path={ADMIN_ACCOUNT_PATTERN} component={AdminAccountRoute} />
       <Route path="/admin/events" component={AdminEventsRoute} />
       <Route path="/admin/allergies" component={AdminAllergiesRoute} />
+      <Route path="/admin/pantry-places" component={AdminPantryPlacesRoute} />
       <Route path="/admin/questions" component={AdminQuestionsRoute} />
       <Route path="/admin/applications" component={AdminApplicationsRoute} />
       <Route path="/admin/invites" component={AdminInvitesRoute} />

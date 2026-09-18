@@ -7,7 +7,7 @@ On top of it sit the hearts — what people want at one burn — and the shoppin
 list they fill (#806), and on top of that the ingredients of each sitting, which
 are what turns that list into amounts (#807) and what the allergy warning reads
 (#808), and beside the count a flag anybody can raise to put a thing on the list
-(#813). Together they are what
+(#813) and the rooms it is kept in (#814). Together they are what
 [#804](https://github.com/fiddur/sage-burner/issues/804) calls food.
 
 [← back to the README](../README.md)
@@ -24,9 +24,10 @@ today, which is why it is a column on the row rather than a history.
 What follows from that is the seed: a fresh install comes with a starter list —
 two dozen breakfast, snack and household things — with ids fixed in the migration
 so a new installation and an old one mean the same row by the same id. The
-spreadsheet's own hundred and fifty rows come in through the import below. Places
-are left empty. Where a thing lives is this house's answer and the software has
-no business guessing it.
+spreadsheet's own hundred and fifty rows come in through the import below. The
+rooms are seeded — Kitchen, Hallway, Cellar, Party kitchen, the spreadsheet's own
+columns — and no thing is put in any of them. Which box in which room a sack lives
+in is this house's answer and the software has no business guessing it.
 
 ## Three answers, not a number
 
@@ -51,6 +52,78 @@ obvious spelling.
 Pressing the lit answer again clears the count, and clearing it also forgets who
 counted and when. Nothing was counted then, and a row reading "counted by Ada
 yesterday" above no answer is a worse record than no record.
+
+## Places: a room, and a box in it
+
+The spreadsheet had a column per room — Kitchen, Hallway, Cellar, Party kitchen —
+and a box or a shelf in each cell: "Bucket", "Left white box", "C", "R2, R3". One
+free-text line loses the room, and **the room is what inventory is done by**: you
+walk the cellar with a torch and go box by box, and a page that cannot show you one
+room at a time is a page you use standing in the wrong place.
+
+So the rooms are a **vocabulary** — `pantry_place`, ordered, admin-edited, the shape
+`allergy_item` has — and a thing is in a room through `pantry_item_place`, which
+carries the `spot`. Free text would have been three spellings of "cellar" within a
+season, and nothing to chip the page by; a fixed enum would have been this house's
+four rooms compiled into everybody's installation. The spot beside it stays free
+text for the same reason the unit does: "R2, R3" and "left white box" are a house's
+shorthand, not a coordinate system, and it **may be empty** — the thing is in this
+room, at no particular box, which is a real answer and not a missing one.
+
+The `where` line the pantry had before this is **dropped**, which SQLite can only do
+by rebuilding the table, and what any row said is carried into a spot in a fifth
+room, **"Somewhere"**, seeded only where such a row exists. A free-text line cannot
+be sorted into rooms by the software, and losing it would be losing the only record
+of where the thing is; an empty extra room in every installation that never used the
+column would be furniture nobody asked for.
+
+**Stock stays per thing, not per place.** A count is about the sack, and "some,
+about 2 kg" summed across a bucket and a shelf is what the buyer wants; asking for a
+count per room would be asking the same question four times and getting three
+guesses. The same goes for the need-more flag and the hearts: they are about the
+thing.
+
+**Removing a room that still holds something is refused**, with a 409 and "rename it
+instead: _n_ things are in it". `pantry_item_place.place_id` has no `ON DELETE`, so
+SQLite refuses it and `pantry-places.ts` turns the refusal into the 409 — the
+`account_allergy` rule rather than the `pantry_item_allergy` one. The difference is
+what the row means: a tag on a pantry thing is an admin's note that can be recreated
+from the thing itself, while a spot is where the sack actually is, and dropping a
+room would quietly lose fifty of those. Renaming is the answer, and everything in
+the room follows it.
+
+**Placing a thing is everybody's**, `PUT` and `DELETE /api/pantry/:id/places/:placeId`
+under `requireApproved`, beside counting rather than beside the catalogue. Somebody
+moving a bucket from the hallway to the cellar is reporting a fact about the house,
+exactly as counting is; waiting for an admin would mean the page goes stale the first
+afternoon somebody tidies. What is on the list stays admin's, so the add and the pen
+take the rooms too and an unknown room there is a 400 rather than a dropped id.
+
+**The walk is sorted by spot, naturally**, `bySpot` in `packages/shared/src/pantry.ts`:
+"B" before "C", "R2" before "R10", and **the boxless last** because they are the ones
+the walk cannot find. A plain string sort would put R10 between R1 and R2, which is
+the one thing a person holding a torch will not forgive. It is a pure function beside
+`whereSaid`, which renders "Cellar C · Hallway bucket" for the list, the sitting's
+panel, the picker and the shopping list — one sentence in one place rather than four
+that drift.
+
+**The chosen room lives in the URL** (`?place=`), so a reload in the cellar keeps the
+cellar and the chip row is shareable, which is #184's habit applied to a page that has
+no burn in it.
+
+**"Put something here"** is the other half of the walk: you find a bucket of lentils
+on the floor, and the thing you want is not "edit the lentils" but "put this here".
+The box filters the whole live pantry by name, lists what is **not** in this room yet
+with where it is now, and asks for the box. Its last row offers an admin the add form
+with the name and the room filled in — a thing that is in no catalogue is a thing to
+add, and making somebody leave the cellar to do it is how the spreadsheet lost rows.
+A member sees the sentence about asking an admin instead, since adding stays admin's.
+
+The one deviation from a plain "a blank box means it is not there": the admin's add
+and pen carry **a tick box per room beside the spot**, ticked by typing a box. A blank
+input has to mean something, and "in the room, at no particular box" and "not in the
+room" are both real answers — the tick says which, and the ✕ in the walk says the other
+one in one press.
 
 ## Need more: a request, not a fourth answer
 
@@ -132,11 +205,12 @@ it is not on the list, and the page does not offer it.
 ## Importing a sheet
 
 `pnpm --filter sage-burner-backend pantry:import <file.tsv>` takes a
-tab-separated file whose first line names `name`, `kind`, `unit` and `where` — and
-may end with a fifth, `need more`, which is the spreadsheet's own column — and upserts by name,
-case-insensitively: a thing already on the list has its kind, unit and place
-updated, a new one is added, and **nothing touches the count**. A spreadsheet
-knows what the house keeps; it knows nothing about what is in the cellar today.
+tab-separated file whose first line names `name`, `kind` and `unit`, then **one
+column per room**, and may end with `need more`, which is the spreadsheet's own
+column. It upserts by name, case-insensitively: a thing already on the list has its
+kind, unit and spots updated, a new one is added, and **nothing touches the count**.
+A spreadsheet knows what the house keeps; it knows nothing about what is in the
+cellar today.
 
 The parsing is a pure function with its own tests, and it refuses rather than
 guesses: a kind nobody named, a missing column or a line with no name stops the
@@ -150,10 +224,20 @@ the moment it has. Re-importing the sheet must not overwrite "asked by Cleo this
 morning" with "asked by nobody", and a column the sheet left blank is not the
 same statement as somebody pressing the button again.
 
-The spreadsheet's four room columns become one `where` line, joined with a spaced
-middot, **before** the import. That is a minute with a spreadsheet formula, against a
-column-mapping vocabulary in the importer that every future sheet would disagree
-with.
+**A room column is matched to the vocabulary by name, ignoring case, and a column
+naming no room refuses the whole file and says which column it was.** Guessing would
+be worse than refusing: the cost of a typo is a room nobody can find again, and the
+fix — renaming the column, or adding the room under ⚙️ → Pantry places — takes
+seconds. A cell is the box; an empty cell means the thing is not in that room, and
+the spots for the rooms the header names are **replaced** for the things in the file
+while a room the header leaves out is untouched. So the spreadsheet's two tabs import
+as they are, once the spice tab's _Jar_ and _Refills kitchen_ columns are renamed to
+room names.
+
+Because the columns are matched against rows in the database, the file is read
+**after** the migrations have run and the vocabulary has been read, not before: the
+CLI opens the database first and the parsing takes the rooms as an argument, which is
+what keeps `readPantryTsv` a pure function with its own tests.
 
 ## Hearts: what you want there
 

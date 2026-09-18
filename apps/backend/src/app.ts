@@ -68,6 +68,7 @@ import { registerMeetingRoutes } from './routes/meetings.ts'
 import { registerNotificationRoutes } from './routes/notifications.ts'
 import { registerOauthAdminRoutes } from './routes/oauth-admin.ts'
 import { registerOauthRoutes } from './routes/oauth.ts'
+import { registerPantryPlaceRoutes } from './routes/pantry-places.ts'
 import { registerPantryRoutes } from './routes/pantry.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPasswordResetRoutes } from './routes/password-reset.ts'
@@ -388,6 +389,7 @@ export const createApp = async ({
   registerFeedRoutes(app, { db, sessions })
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerPantryRoutes(app, { db, sessions, now })
+  registerPantryPlaceRoutes(app, { db, sessions })
   registerSongRoutes(app, { db, sessions, now, notify: tellAccount })
   registerSongCategoryRoutes(app, { db, sessions })
   registerThreadRoutes(app, { db, sessions, now, notify: tellAccount })

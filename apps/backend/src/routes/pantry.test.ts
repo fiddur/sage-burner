@@ -331,7 +331,7 @@ describe('asking for more of something, which any member may do', () => {
 })
 
 describe('what is on the list, which is the admin’s', () => {
-  it('adds one, defaulting the unit and leaving the place empty', async () => {
+  it('adds one, defaulting the unit and putting it in no room', async () => {
     const server = await build()
     const ada = await givenAccount('Ada', ['admin'])
 
@@ -340,7 +340,7 @@ describe('what is on the list, which is the admin’s', () => {
     expect(made.statusCode).toBe(201)
     const item: PantryItem = made.json().item
     expect(item.unit).toBe('pcs')
-    expect(item.where).toBe('')
+    expect(item.places).toEqual([])
     expect(item.created_at).toBe(NOW)
   })
 
@@ -386,22 +386,17 @@ describe('what is on the list, which is the admin’s', () => {
     expect(again.statusCode).toBe(409)
   })
 
-  it('renames one, and the place and the unit with it', async () => {
+  it('renames one, and the unit with it', async () => {
     const server = await build()
     const ada = await givenAccount('Ada', ['admin'])
     const cumin = await given(server, ada.cookie, 'Cumin', 'spice')
 
-    const written = await edit(server, ada.cookie, cumin.id, {
-      name: 'Kummin',
-      unit: 'g',
-      where: 'Hallway bucket · cellar I',
-    })
+    const written = await edit(server, ada.cookie, cumin.id, { name: 'Kummin', unit: 'g' })
 
     expect(written.statusCode).toBe(200)
     const item: PantryItem = written.json().item
     expect(item.name).toBe('Kummin')
     expect(item.unit).toBe('g')
-    expect(item.where).toBe('Hallway bucket · cellar I')
   })
 
   it('refuses a rename onto a name already taken, withdrawn or not', async () => {
@@ -676,7 +671,6 @@ describe('what the table itself refuses, which no route has to be trusted for', 
     kind: 'staple',
     name: `Rice ${randomUUID()}`,
     unit: 'kg',
-    where: '',
     created_at: NOW,
     ...over,
   })

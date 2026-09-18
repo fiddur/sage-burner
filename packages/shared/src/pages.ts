@@ -57,7 +57,10 @@ export const changelogPage = (): string => '/changelog'
 
 export const formattingPage = (): string => '/formatting'
 
-export const pantryPage = (): string => '/pantry'
+export const PLACE_PARAM = 'place'
+
+export const pantryPage = (placeId?: string): string =>
+  placeId === undefined ? '/pantry' : `/pantry?${PLACE_PARAM}=${encodeURIComponent(placeId)}`
 
 export const shoppingPage = (eventId: string): string =>
   `/shopping?${BURN_PARAM}=${encodeURIComponent(eventId)}`

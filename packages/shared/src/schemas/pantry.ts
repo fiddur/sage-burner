@@ -1,10 +1,43 @@
 import { z } from 'zod'
 
 import { pantryKinds, stockLevels } from '../enums.ts'
-import { MAX_OPTION_LABEL, MAX_UNIT, MAX_WHERE } from '../limits.ts'
+import { MAX_OPTION_LABEL, MAX_SPOT, MAX_UNIT } from '../limits.ts'
 import { allergyTagSchema } from './allergy.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 import { supporterSchema } from './thread.ts'
+
+export const pantryPlaceSchema = z.object({
+  id: idSchema,
+  order: z.int().nonnegative(),
+  name: nonEmptyText(MAX_OPTION_LABEL),
+})
+export type PantryPlace = z.infer<typeof pantryPlaceSchema>
+
+export const pantryPlacesResponseSchema = z.object({ places: z.array(pantryPlaceSchema) })
+export type PantryPlacesResponse = z.infer<typeof pantryPlacesResponseSchema>
+
+export const pantryPlaceCreateSchema = pantryPlaceSchema.omit({ id: true, order: true }).strict()
+export type PantryPlaceCreate = z.infer<typeof pantryPlaceCreateSchema>
+
+export const pantryPlaceUpdateSchema = pantryPlaceCreateSchema.partial().strict()
+export type PantryPlaceUpdate = z.infer<typeof pantryPlaceUpdateSchema>
+
+export const pantryPlaceOrderSchema = z.object({ ids: z.array(idSchema) }).strict()
+export type PantryPlaceOrder = z.infer<typeof pantryPlaceOrderSchema>
+
+const spotField = z.string().trim().max(MAX_SPOT)
+
+export const pantrySpotSchema = z.object({ spot: spotField }).strict()
+export type PantrySpot = z.infer<typeof pantrySpotSchema>
+
+export const pantryPlacingSchema = z.object({
+  place_id: idSchema,
+  name: nonEmptyText(MAX_OPTION_LABEL),
+  spot: spotField,
+})
+
+const pantryPlacementSchema = z.object({ place_id: idSchema, spot: spotField.default('') }).strict()
+export type PantryPlacement = z.infer<typeof pantryPlacementSchema>
 
 export const pantryNeedMoreSchema = z.object({
   by: idSchema.nullable(),
@@ -17,7 +50,6 @@ const pantryFields = {
   name: nonEmptyText(MAX_OPTION_LABEL),
   kind: z.enum(pantryKinds),
   unit: nonEmptyText(MAX_UNIT),
-  where: z.string().trim().max(MAX_WHERE),
 }
 
 export const pantryItemSchema = z.object({
@@ -29,6 +61,7 @@ export const pantryItemSchema = z.object({
   counted_by_name: z.string().nullable(),
   counted_at: dateTimeSchema.nullable(),
   need_more: pantryNeedMoreSchema.nullable(),
+  places: z.array(pantryPlacingSchema),
   withdrawn_at: dateTimeSchema.nullable(),
   created_at: dateTimeSchema,
   allergies: z.array(allergyTagSchema),
@@ -45,15 +78,19 @@ export const pantryCreateSchema = z
   .object({
     ...pantryFields,
     unit: pantryFields.unit.default('pcs'),
-    where: pantryFields.where.default(''),
     allergy_item_ids: z.array(idSchema).default([]),
+    places: z.array(pantryPlacementSchema).default([]),
   })
   .strict()
 export type PantryCreate = z.infer<typeof pantryCreateSchema>
 export type PantryCreateInput = z.input<typeof pantryCreateSchema>
 
 export const pantryUpdateSchema = z
-  .object({ ...pantryFields, allergy_item_ids: z.array(idSchema) })
+  .object({
+    ...pantryFields,
+    allergy_item_ids: z.array(idSchema),
+    places: z.array(pantryPlacementSchema),
+  })
   .partial()
   .strict()
 export type PantryUpdate = z.infer<typeof pantryUpdateSchema>

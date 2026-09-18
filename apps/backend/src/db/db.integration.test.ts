@@ -1875,3 +1875,147 @@ describe('the cards a redeemed invite never opened', () => {
     }
   })
 })
+
+const PANTRY_PLACES = '20260918180000_pantry_places'
+
+const SOMEWHERE = 'fa0d0001-0000-4000-8000-000000000005'
+
+describe('the pantry places migration', () => {
+  const beforeThePlaces = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(PANTRY_PLACES)
+
+    expect(kept).not.toContain(PANTRY_PLACES)
+    runMigrations(fresh, staged)
+    expect(columnsOf(fresh, 'pantry_item')).toContain('where')
+
+    return fresh
+  }
+
+  const aThing = (db: DbHandle, id: string, name: string, saying: string) =>
+    db.client
+      .prepare('insert into pantry_item (id, kind, name, unit, "where", created_at) values (?,?,?,?,?,?)')
+      .run(id, 'staple', name, 'kg', saying, NOW)
+
+  it('carries what a row said into a spot in a room called Somewhere', () => {
+    const fresh = beforeThePlaces()
+    try {
+      aThing(fresh, 'p-1', 'Rice', 'Hallway bucket · cellar I')
+
+      runMigrations(fresh)
+
+      expect(columnsOf(fresh, 'pantry_item')).not.toContain('where')
+      expect(
+        fresh.client.prepare('select place_id, spot from pantry_item_place where item_id = ?').all('p-1'),
+      ).toEqual([{ place_id: SOMEWHERE, spot: 'Hallway bucket · cellar I' }])
+      expect(fresh.client.prepare('select name from pantry_place where id = ?').get(SOMEWHERE)?.name).toBe(
+        'Somewhere',
+      )
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('seeds no such room where every row was silent about where it lived', () => {
+    const fresh = beforeThePlaces()
+    try {
+      aThing(fresh, 'p-1', 'Rice', '')
+
+      runMigrations(fresh)
+
+      expect(fresh.client.prepare('select count(*) as n from pantry_place').get()?.n).toBe(4)
+      expect(fresh.client.prepare('select count(*) as n from pantry_item_place').get()?.n).toBe(0)
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('leaves the hearts, the ticks, the tags and the ingredients pointing at the rebuilt row', () => {
+    const fresh = beforeThePlaces()
+    try {
+      aThing(fresh, 'p-1', 'Rice', 'cellar I')
+      fresh.client
+        .prepare('insert into account (id, email, created_at) values (?, ?, ?)')
+        .run('a-1', 'ada@example.org', NOW)
+      anEvent(fresh, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+      fresh.client
+        .prepare(
+          'insert into attendance (id, event_id, account_id, joined_at, payment_status) values (?,?,?,?,?)',
+        )
+        .run('m-1', 'e-1', 'a-1', NOW, 'unpaid')
+      fresh.client
+        .prepare('insert into meal (id, event_id, date, at, label, kind) values (?,?,?,?,?,?)')
+        .run('me-1', 'e-1', '2026-10-02', '18:00', 'Dinner', 'meal')
+      fresh.client
+        .prepare('insert into pantry_heart (item_id, attendance_id) values (?, ?)')
+        .run('p-1', 'm-1')
+      fresh.client
+        .prepare('insert into pantry_purchase (event_id, item_id, bought_by, bought_at) values (?,?,?,?)')
+        .run('e-1', 'p-1', 'a-1', NOW)
+      fresh.client
+        .prepare('insert into pantry_item_allergy (item_id, allergy_item_id) values (?, ?)')
+        .run('p-1', 'a11e0000-0000-4000-8000-000000000001')
+      fresh.client
+        .prepare(
+          'insert into meal_ingredient (id, meal_id, pantry_item_id, amount, created_at) values (?,?,?,?,?)',
+        )
+        .run('i-1', 'me-1', 'p-1', 1, NOW)
+
+      runMigrations(fresh)
+
+      const rows = (table: string) => fresh.client.prepare(`select count(*) as n from ${table}`).get()?.n
+      expect(rows('pantry_item')).toBe(23)
+      expect(rows('pantry_heart')).toBe(1)
+      expect(rows('pantry_purchase')).toBe(1)
+      expect(rows('pantry_item_allergy')).toBe(1)
+      expect(rows('meal_ingredient')).toBe(1)
+      expect(rows('pantry_item_place')).toBe(1)
+      expect(fresh.client.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('keeps the name index and the checks the rebuilt table had', () => {
+    const fresh = beforeThePlaces()
+    try {
+      runMigrations(fresh)
+
+      const insert = (id: string, kind: string, name: string) => () =>
+        fresh.client
+          .prepare('insert into pantry_item (id, kind, name, unit, created_at) values (?,?,?,?,?)')
+          .run(id, kind, name, 'kg', NOW)
+
+      expect(insert('p-2', 'staple', ' oatmeal ')).toThrow()
+      expect(insert('p-3', 'pudding', 'Semolina')).toThrow()
+      expect(insert('p-4', 'staple', '  ')).toThrow()
+      expect(insert('p-5', 'staple', 'Semolina')).not.toThrow()
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('takes the account off a count and a request rather than the row, as it did before', () => {
+    const fresh = createDb({ url: ':memory:' })
+    try {
+      runMigrations(fresh)
+      fresh.client
+        .prepare('insert into account (id, email, created_at) values (?, ?, ?)')
+        .run('a-1', 'ada@example.org', NOW)
+      fresh.client
+        .prepare(
+          'insert into pantry_item (id, kind, name, unit, counted_by, counted_at, need_more_by, need_more_at, created_at) values (?,?,?,?,?,?,?,?,?)',
+        )
+        .run('p-1', 'staple', 'Rice', 'kg', 'a-1', NOW, 'a-1', NOW, NOW)
+
+      fresh.client.prepare('delete from account where id = ?').run('a-1')
+
+      const row = fresh.client
+        .prepare('select counted_by, counted_at, need_more_by, need_more_at from pantry_item where id = ?')
+        .get('p-1')
+      expect(row).toEqual({ counted_by: null, counted_at: NOW, need_more_by: null, need_more_at: NOW })
+    } finally {
+      fresh.close()
+    }
+  })
+})

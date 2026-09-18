@@ -4,10 +4,17 @@ import type {
   PantryItem,
   PantryItemResponse,
   PantryListResponse,
+  PantryPlacing,
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, pantryCreateSchema, pantryStockSchema, pantryUpdateSchema } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  pantryCreateSchema,
+  pantrySpotSchema,
+  pantryStockSchema,
+  pantryUpdateSchema,
+} from '@sage-burner/shared'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import { randomUUID } from 'node:crypto'
@@ -19,10 +26,11 @@ import { attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch } from '../db/patch.ts'
-import { account, pantryHeart, pantryItem, pantryPurchase } from '../db/schema.ts'
+import { account, pantryHeart, pantryItem, pantryItemPlace, pantryPurchase } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { knownTags, setTags, tagsFor } from '../pantry-allergies.ts'
 import { heartsFor, purchasesFor, withHeartsAndTicks } from '../pantry-hearts.ts'
+import { knownPlacements, placesFor, setPlaces } from '../pantry-places.ts'
 import { openEventNow } from './events.ts'
 
 export interface PantryDeps extends GuardDeps {
@@ -36,7 +44,6 @@ const columns = {
   kind: pantryItem.kind,
   name: pantryItem.name,
   unit: pantryItem.unit,
-  where: pantryItem.where,
   stock_level: pantryItem.stock_level,
   stock_amount: pantryItem.stock_amount,
   counted_by: pantryItem.counted_by,
@@ -60,16 +67,21 @@ const listing = (db: Database) =>
 
 type Bare = Awaited<ReturnType<typeof listing>>[number]
 
-const withTags = (rows: readonly Bare[], tags: ReadonlyMap<string, AllergyTag[]>): PantryItem[] =>
+const withTags = (
+  rows: readonly Bare[],
+  tags: ReadonlyMap<string, AllergyTag[]>,
+  places: ReadonlyMap<string, PantryPlacing[]>,
+): PantryItem[] =>
   rows.map(({ need_more_by, need_more_by_name, need_more_at, ...row }) => ({
     ...row,
     need_more:
       need_more_at === null ? null : { by: need_more_by, by_name: need_more_by_name, at: need_more_at },
     allergies: tags.get(row.id) ?? [],
+    places: places.get(row.id) ?? [],
   }))
 
 const listed = async (db: Database, rows: Promise<Bare[]>): Promise<PantryItem[]> =>
-  withTags(...(await Promise.all([rows, tagsFor(db)])))
+  withTags(...(await Promise.all([rows, tagsFor(db), placesFor(db)])))
 
 export const pantryFor = (db: Database): Promise<PantryItem[]> => listed(db, listing(db).orderBy(byName))
 
@@ -80,7 +92,7 @@ const oneItem = async (db: Database, id: string): Promise<PantryItem | undefined
   const [row] = await listing(db).where(eq(pantryItem.id, id)).limit(1)
   if (row === undefined) return undefined
 
-  const [item] = withTags([row], await tagsFor(db, [row.id]))
+  const [item] = withTags([row], await tagsFor(db, [row.id]), await placesFor(db, [row.id]))
 
   return item
 }
@@ -308,21 +320,67 @@ export const registerPantryRoutes = (app: FastifyInstance, { db, sessions, now }
     },
   )
 
+  app.put<{ Params: { id: string; placeId: string } }>(
+    apiRoutes.putPantrySpot.fastify,
+    guarded,
+    async (request, reply) => {
+      void noStore(reply)
+
+      const body = bodyOf(pantrySpotSchema, request)
+      if (body === undefined) return sendError(reply, 400)
+
+      const { id, placeId } = request.params
+      const item = await oneItem(db, id)
+      if (item === undefined || item.withdrawn_at !== null) return sendError(reply, 404)
+
+      const known = await knownPlacements(db, [{ place_id: placeId, spot: body.spot }])
+      if (known === undefined) return sendError(reply, 404)
+
+      await db
+        .insert(pantryItemPlace)
+        .values({ item_id: id, place_id: placeId, spot: body.spot })
+        .onConflictDoUpdate({
+          target: [pantryItemPlace.item_id, pantryItemPlace.place_id],
+          set: { spot: body.spot },
+        })
+
+      return await answer(reply, id)
+    },
+  )
+
+  app.delete<{ Params: { id: string; placeId: string } }>(
+    apiRoutes.removePantrySpot.fastify,
+    guarded,
+    async (request, reply) => {
+      void noStore(reply)
+
+      const { id, placeId } = request.params
+
+      await db
+        .delete(pantryItemPlace)
+        .where(and(eq(pantryItemPlace.item_id, id), eq(pantryItemPlace.place_id, placeId)))
+
+      return reply.code(204).send()
+    },
+  )
+
   app.post(apiRoutes.addPantryItem.fastify, async (request, reply) => {
     void noStore(reply)
 
     const body = bodyOf(pantryCreateSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    const { allergy_item_ids, ...fields } = body
+    const { allergy_item_ids, places, ...fields } = body
     const tags = await knownTags(db, allergy_item_ids)
-    if (tags === undefined) return sendError(reply, 400)
+    const placements = await knownPlacements(db, places)
+    if (tags === undefined || placements === undefined) return sendError(reply, 400)
     if (await nameTaken(db, fields.name)) return sendError(reply, 409)
 
     const id = randomUUID()
 
     await db.insert(pantryItem).values({ ...fields, id, created_at: now().toISOString() })
     await setTags(db, id, tags)
+    await setPlaces(db, id, placements)
 
     const item = await oneItem(db, id)
     if (item === undefined) return sendError(reply, 404)
@@ -336,9 +394,12 @@ export const registerPantryRoutes = (app: FastifyInstance, { db, sessions, now }
     const body = bodyOf(pantryUpdateSchema, request)
     if (body === undefined || isEmptyPatch(body)) return sendError(reply, 400)
 
-    const { allergy_item_ids, ...fields } = body
+    const { allergy_item_ids, places, ...fields } = body
     const tags = allergy_item_ids === undefined ? undefined : await knownTags(db, allergy_item_ids)
     if (allergy_item_ids !== undefined && tags === undefined) return sendError(reply, 400)
+
+    const placements = places === undefined ? undefined : await knownPlacements(db, places)
+    if (places !== undefined && placements === undefined) return sendError(reply, 400)
 
     const existing = await oneItem(db, request.params.id)
     if (existing === undefined) return sendError(reply, 404)
@@ -349,6 +410,7 @@ export const registerPantryRoutes = (app: FastifyInstance, { db, sessions, now }
 
     if (!isEmptyPatch(fields)) await db.update(pantryItem).set(fields).where(eq(pantryItem.id, existing.id))
     if (tags !== undefined) await setTags(db, existing.id, tags)
+    if (placements !== undefined) await setPlaces(db, existing.id, placements)
 
     return await answer(reply, existing.id)
   })

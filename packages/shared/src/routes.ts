@@ -59,6 +59,10 @@ import type {
   NotificationSettings,
   OAuthSettingsUpdate,
   PantryCreateInput,
+  PantryPlaceCreate,
+  PantryPlaceOrder,
+  PantryPlaceUpdate,
+  PantrySpot,
   PantryStock,
   PantryUpdate,
   PasskeyLogin,
@@ -225,6 +229,11 @@ export const apiRoutes = {
     fastify: '/api/admin/pantry',
     path: () => '/api/admin/pantry',
   },
+  addPantryPlace: {
+    method: 'POST',
+    fastify: '/api/admin/pantry-places',
+    path: () => '/api/admin/pantry-places',
+  },
   addQuestion: {
     method: 'POST',
     fastify: '/api/admin/questions',
@@ -335,6 +344,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/admin/allergy-items/:id',
     path: (id: string) => `/api/admin/allergy-items/${encodeURIComponent(id)}`,
+  },
+  deletePantryPlace: {
+    method: 'DELETE',
+    fastify: '/api/admin/pantry-places/:id',
+    path: (id: string) => `/api/admin/pantry-places/${encodeURIComponent(id)}`,
   },
   deletePlace: {
     method: 'DELETE',
@@ -626,6 +640,11 @@ export const apiRoutes = {
     fastify: '/api/pantry',
     path: () => '/api/pantry',
   },
+  getPantryPlaces: {
+    method: 'GET',
+    fastify: '/api/pantry-places',
+    path: () => '/api/pantry-places',
+  },
   getEventPantry: {
     method: 'GET',
     fastify: '/api/events/:eventId/pantry',
@@ -904,6 +923,11 @@ export const apiRoutes = {
     fastify: '/api/admin/allergy-items/order',
     path: () => '/api/admin/allergy-items/order',
   },
+  reorderPantryPlaces: {
+    method: 'PUT',
+    fastify: '/api/admin/pantry-places/order',
+    path: () => '/api/admin/pantry-places/order',
+  },
   reorderPlaces: {
     method: 'PUT',
     fastify: '/api/events/:eventId/places/order',
@@ -923,6 +947,23 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/sessions/:id/merge',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/merge`,
+  },
+  putPantrySpot: {
+    method: 'PUT',
+    fastify: '/api/pantry/:id/places/:placeId',
+    path: (id: string, placeId: string) =>
+      `/api/pantry/${encodeURIComponent(id)}/places/${encodeURIComponent(placeId)}`,
+  },
+  removePantrySpot: {
+    method: 'DELETE',
+    fastify: '/api/pantry/:id/places/:placeId',
+    path: (id: string, placeId: string) =>
+      `/api/pantry/${encodeURIComponent(id)}/places/${encodeURIComponent(placeId)}`,
+  },
+  updatePantryPlace: {
+    method: 'PATCH',
+    fastify: '/api/admin/pantry-places/:id',
+    path: (id: string) => `/api/admin/pantry-places/${encodeURIComponent(id)}`,
   },
   restorePantryItem: {
     method: 'POST',
@@ -1301,6 +1342,10 @@ export interface RouteBodies {
   addPost: PostCreate
   addRide: RideCreate
   addPantryItem: PantryCreateInput
+  addPantryPlace: PantryPlaceCreate
+  putPantrySpot: PantrySpot
+  reorderPantryPlaces: PantryPlaceOrder
+  updatePantryPlace: PantryPlaceUpdate
   addQuestion: FormQuestionCreateInput
   adminAddAttendance: AttendanceCreate
   bringThis: Helper

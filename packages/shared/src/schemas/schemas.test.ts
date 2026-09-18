@@ -876,8 +876,8 @@ describe('a pantry thing', () => {
       kind: 'spice',
       name: 'Cumin',
       unit: 'pcs',
-      where: '',
       allergy_item_ids: [],
+      places: [],
     })
   })
 
@@ -892,10 +892,19 @@ describe('a pantry thing', () => {
   })
 
   it('lets an update carry one field alone, and fills nothing in', () => {
-    const parsed = pantryUpdateSchema.safeParse({ where: 'Cellar I' })
+    const parsed = pantryUpdateSchema.safeParse({ unit: 'kg' })
 
     expect(parsed.success).toBe(true)
-    expect(parsed.data).toEqual({ where: 'Cellar I' })
+    expect(parsed.data).toEqual({ unit: 'kg' })
+  })
+
+  it('takes a thing placed as it is added, with an empty box where none was written', () => {
+    const parsed = pantryCreateSchema.safeParse(
+      aThing({ places: [{ place_id: '11111111-1111-4111-8111-111111111111' }] }),
+    )
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.places).toEqual([{ place_id: '11111111-1111-4111-8111-111111111111', spot: '' }])
   })
 })
 
