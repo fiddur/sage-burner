@@ -20,6 +20,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconButton } from '../components/IconButton.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { NAMELESS } from '../components/PersonBadge.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localMoment } from '../datetime.ts'
 import { errorMessage, useAction, useLoad } from '../load.ts'
@@ -290,7 +291,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
 const countedBy = (item: PantryItem): string | undefined => {
   if (item.counted_at === null) return undefined
 
-  const who = item.counted_by_name ?? 'somebody who has left'
+  const who = item.counted_by === null ? 'somebody who has left' : (item.counted_by_name ?? NAMELESS)
 
   return `Counted by ${who} · ${localMoment(item.counted_at)}`
 }

@@ -144,6 +144,30 @@ describe('the pantry page', () => {
     expect(await screen.findByText(/Counted by Ada/)).toBeTruthy()
   })
 
+  it('tells an account with no name yet apart from one that has left', async () => {
+    renderPage(
+      stub({}, [
+        thing({
+          counted_at: '2026-09-17T18:30:00.000Z',
+          counted_by: 'a-9',
+          counted_by_name: null,
+          stock_level: 'out',
+        }),
+        thing({
+          id: 'p-2',
+          name: 'Cumin',
+          counted_at: '2026-09-17T18:30:00.000Z',
+          counted_by: null,
+          counted_by_name: null,
+          stock_level: 'out',
+        }),
+      ]),
+    )
+
+    expect(await screen.findByText(/Counted by Someone without a name yet/)).toBeTruthy()
+    expect(screen.getByText(/Counted by somebody who has left/)).toBeTruthy()
+  })
+
   it('offers a member none of the admin controls', async () => {
     renderPage(stub())
 
