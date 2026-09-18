@@ -124,6 +124,9 @@ const untick = (server: FastifyInstance, cookie: string, itemId: string, eventId
 const withdraw = (server: FastifyInstance, cookie: string, itemId: string) =>
   server.inject({ method: 'DELETE', url: `/api/admin/pantry/${itemId}`, headers: { cookie } })
 
+const flag = (server: FastifyInstance, cookie: string, itemId: string) =>
+  server.inject({ method: 'PUT', url: `/api/pantry/${itemId}/need-more`, headers: { cookie } })
+
 describe('the pantry as one burn sees it', () => {
   it('answers every live thing with its hearts and its tick in one read', async () => {
     const server = await build()
@@ -386,6 +389,48 @@ describe('ticking something off in the shop', () => {
     const oatmeal = await oneOf(server, ada.cookie, 'Oatmeal', OVER)
 
     expect((await tick(server, ada.cookie, oatmeal.id, OVER)).statusCode).toBe(404)
+  })
+
+  it('answers the pantry’s request for more, since buying it is what was asked for', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+
+    const oatmeal = await oneOf(server, ada.cookie, 'Oatmeal')
+    await flag(server, ada.cookie, oatmeal.id)
+
+    await tick(server, ada.cookie, oatmeal.id)
+
+    expect((await oneOf(server, ada.cookie, 'Oatmeal')).need_more).toBeNull()
+  })
+
+  it('does not ask for it again when the tick is taken back', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+
+    const oatmeal = await oneOf(server, ada.cookie, 'Oatmeal')
+    await flag(server, ada.cookie, oatmeal.id)
+    await tick(server, ada.cookie, oatmeal.id)
+
+    await untick(server, ada.cookie, oatmeal.id)
+
+    expect((await oneOf(server, ada.cookie, 'Oatmeal')).need_more).toBeNull()
+  })
+
+  it('leaves a request for more alone until somebody ticks it', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+
+    const oatmeal = await oneOf(server, ada.cookie, 'Oatmeal')
+    await flag(server, ada.cookie, oatmeal.id)
+
+    expect((await oneOf(server, ada.cookie, 'Oatmeal')).need_more).toEqual({
+      by: ada.id,
+      by_name: 'Ada',
+      at: NOW,
+    })
   })
 })
 

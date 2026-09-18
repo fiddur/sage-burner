@@ -18,6 +18,7 @@ export interface Shoppable {
   stock_level: StockLevel | null
   stock_amount: number | null
   hearts: { count: number }
+  need_more: boolean
   bought: Ticked | null
   allergies: readonly { id: string }[]
 }
@@ -74,6 +75,7 @@ export interface ShoppingRow {
   stock_level: StockLevel | null
   stock_amount: number | null
   hearts: number
+  need_more: boolean
   need: number | null
   buy: number | null
   used_in: readonly Use[]
@@ -146,6 +148,8 @@ export const roundUp = (amount: number, unit: string): number => {
 
 export const wantedSaid = (count: number): string => `${count} want${count === 1 ? 's' : ''} it`
 
+const NEEDED_MORE = 'the pantry says: need more'
+
 export const haveSaid = (item: {
   stock_level: StockLevel | null
   stock_amount: number | null
@@ -168,6 +172,7 @@ export const askedSaid = (row: ShoppingRow): string =>
   [
     ...row.used_in.map((use) => usedSaid(use, row.unit)),
     ...(row.hearts === 0 ? [] : [wantedSaid(row.hearts)]),
+    ...(row.need_more ? [NEEDED_MORE] : []),
   ].join(' · ')
 
 export const placesSaid = (entries: readonly Staying[], cap: number, dates: readonly string[]): string => {
@@ -277,6 +282,7 @@ const specialRow = (key: string, gathered: Gathered): ShoppingRow => {
     stock_level: null,
     stock_amount: null,
     hearts: 0,
+    need_more: false,
     need: gathered.counted ? roundUp(gathered.sum, gathered.unit) : null,
     buy: gathered.counted ? roundUp(gathered.sum, gathered.unit) : null,
     used_in: gathered.used_in,
@@ -299,6 +305,7 @@ const pantryRow = (item: Shoppable, gathered: Gathered | undefined): ShoppingRow
     stock_level: item.stock_level,
     stock_amount: item.stock_amount,
     hearts: item.hearts.count,
+    need_more: item.need_more,
     need: wanted === null ? null : roundUp(wanted, item.unit),
     buy: wanted === null ? null : roundUp(Math.max(0, wanted - have), item.unit),
     used_in: gathered?.used_in ?? [],
@@ -314,14 +321,15 @@ export const shoppingSections = (input: ShoppingInput): ShoppingSections => {
   const stocked = new Set(input.items.map((item) => item.id))
 
   const rows = input.items
-    .filter((item) => item.hearts.count > 0 || picks.has(item.id))
+    .filter((item) => item.hearts.count > 0 || item.need_more || item.bought !== null || picks.has(item.id))
     .map((item) => pantryRow(item, picks.get(item.id)))
 
   const asked = [...specials, ...[...picks].filter(([key]) => !stocked.has(key))].map(([key, gathered]) =>
     specialRow(key, gathered),
   )
 
-  const enough = (row: ShoppingRow): boolean => row.stock_level === 'plenty' || row.buy === 0
+  const enough = (row: ShoppingRow): boolean =>
+    !row.need_more && (row.stock_level === 'plenty' || row.buy === 0)
 
   return {
     pantry: rows.filter((row) => row.bought === null && !enough(row)).sort(byNeeded),

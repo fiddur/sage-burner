@@ -9,6 +9,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { apiRoutes, pantryCreateSchema, pantryStockSchema, pantryUpdateSchema } from '@sage-burner/shared'
 import { and, eq, isNull, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/sqlite-core'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -28,6 +29,8 @@ export interface PantryDeps extends GuardDeps {
   now: () => Date
 }
 
+const asker = alias(account, 'asker')
+
 const columns = {
   id: pantryItem.id,
   kind: pantryItem.kind,
@@ -39,6 +42,9 @@ const columns = {
   counted_by: pantryItem.counted_by,
   counted_by_name: account.name,
   counted_at: pantryItem.counted_at,
+  need_more_by: pantryItem.need_more_by,
+  need_more_by_name: asker.name,
+  need_more_at: pantryItem.need_more_at,
   withdrawn_at: pantryItem.withdrawn_at,
   created_at: pantryItem.created_at,
 }
@@ -46,12 +52,21 @@ const columns = {
 const byName = sql`lower(trim(${pantryItem.name}))`
 
 const listing = (db: Database) =>
-  db.select(columns).from(pantryItem).leftJoin(account, eq(account.id, pantryItem.counted_by))
+  db
+    .select(columns)
+    .from(pantryItem)
+    .leftJoin(account, eq(account.id, pantryItem.counted_by))
+    .leftJoin(asker, eq(asker.id, pantryItem.need_more_by))
 
 type Bare = Awaited<ReturnType<typeof listing>>[number]
 
 const withTags = (rows: readonly Bare[], tags: ReadonlyMap<string, AllergyTag[]>): PantryItem[] =>
-  rows.map((row) => ({ ...row, allergies: tags.get(row.id) ?? [] }))
+  rows.map(({ need_more_by, need_more_by_name, need_more_at, ...row }) => ({
+    ...row,
+    need_more:
+      need_more_at === null ? null : { by: need_more_by, by_name: need_more_by_name, at: need_more_at },
+    allergies: tags.get(row.id) ?? [],
+  }))
 
 const listed = async (db: Database, rows: Promise<Bare[]>): Promise<PantryItem[]> =>
   withTags(...(await Promise.all([rows, tagsFor(db)])))
@@ -193,6 +208,11 @@ export const registerPantryRoutes = (app: FastifyInstance, { db, sessions, now }
         })
         .onConflictDoNothing()
 
+      await db
+        .update(pantryItem)
+        .set({ need_more_by: null, need_more_at: null })
+        .where(eq(pantryItem.id, on.itemId))
+
       return reply.code(204).send()
     },
   )
@@ -241,6 +261,52 @@ export const registerPantryRoutes = (app: FastifyInstance, { db, sessions, now }
 
     return await answer(reply, request.params.id)
   })
+
+  app.put<{ Params: { id: string } }>(
+    apiRoutes.flagPantryNeedMore.fastify,
+    guarded,
+    async (request, reply) => {
+      void noStore(reply)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const written = await db
+        .update(pantryItem)
+        .set({ need_more_by: viewer.account_id, need_more_at: now().toISOString() })
+        .where(
+          and(
+            eq(pantryItem.id, request.params.id),
+            isNull(pantryItem.withdrawn_at),
+            isNull(pantryItem.need_more_at),
+          ),
+        )
+        .returning({ id: pantryItem.id })
+
+      if (written.length === 0) {
+        const existing = await oneItem(db, request.params.id)
+
+        if (existing === undefined || existing.withdrawn_at !== null) return sendError(reply, 404)
+      }
+
+      return reply.code(204).send()
+    },
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    apiRoutes.unflagPantryNeedMore.fastify,
+    guarded,
+    async (request, reply) => {
+      void noStore(reply)
+
+      await db
+        .update(pantryItem)
+        .set({ need_more_by: null, need_more_at: null })
+        .where(eq(pantryItem.id, request.params.id))
+
+      return reply.code(204).send()
+    },
+  )
 
   app.post(apiRoutes.addPantryItem.fastify, async (request, reply) => {
     void noStore(reply)

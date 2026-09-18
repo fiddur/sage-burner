@@ -45,6 +45,7 @@ const thing = (over: Partial<EventPantryItem> = {}): EventPantryItem => ({
   counted_by: null,
   counted_by_name: null,
   counted_at: null,
+  need_more: null,
   withdrawn_at: null,
   created_at: '2026-07-01T00:00:00.000Z',
   allergies: [],
@@ -234,6 +235,97 @@ describe('the shopping list on a phone', () => {
     fireEvent.click(await screen.findByLabelText('Bought Candles, tea lights'))
 
     await waitFor(() => expect(unmarkPantryBought).toHaveBeenCalledWith('e-1', 'p-3'))
+  })
+})
+
+describe('what the pantry itself asked for', () => {
+  const ASKED = { by: 'a-9', by_name: 'Cleo', at: '2026-09-17T08:00:00.000Z' }
+
+  it('lists a thing nobody hearted and nobody cooks with, saying who asked', async () => {
+    onAPhone()
+    renderPage(
+      stub(
+        {},
+        [
+          thing({
+            id: 'p-5',
+            name: 'Rice, long',
+            hearts: { count: 0, people: [], mine: false },
+            need_more: ASKED,
+          }),
+        ],
+        [],
+      ),
+    )
+
+    expect(await screen.findByText('Rice, long')).toBeTruthy()
+    expect(screen.getByText('the pantry says: need more')).toBeTruthy()
+  })
+
+  it('keeps a plentiful thing on the list rather than folding it away', async () => {
+    onAPhone()
+    renderPage(
+      stub(
+        {},
+        [
+          thing({
+            id: 'p-5',
+            name: 'Rice, long',
+            stock_level: 'plenty',
+            hearts: { count: 0, people: [], mine: false },
+            need_more: ASKED,
+          }),
+        ],
+        [],
+      ),
+    )
+
+    expect(await screen.findByText('Rice, long')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /there is enough of/u })).toBeNull()
+  })
+
+  it('folds the same plentiful thing away once nobody is asking', async () => {
+    onAPhone()
+    renderPage(
+      stub(
+        {},
+        [
+          thing({
+            id: 'p-5',
+            name: 'Rice, long',
+            stock_level: 'plenty',
+            hearts: { count: 1, people: [], mine: false },
+          }),
+        ],
+        [],
+      ),
+    )
+
+    expect(await screen.findByRole('button', { name: 'Show the 1 thing there is enough of' })).toBeTruthy()
+    expect(screen.queryByText('Rice, long')).toBeNull()
+  })
+
+  it('answers the ask by ticking it bought, which is the route that clears it', async () => {
+    onAPhone()
+    const markPantryBought = vi.fn<ShoppingApi['markPantryBought']>(() => Promise.resolve(undefined))
+    renderPage(
+      stub(
+        { markPantryBought },
+        [
+          thing({
+            id: 'p-5',
+            name: 'Rice, long',
+            hearts: { count: 0, people: [], mine: false },
+            need_more: ASKED,
+          }),
+        ],
+        [],
+      ),
+    )
+
+    fireEvent.click(await screen.findByLabelText('Bought Rice, long'))
+
+    await waitFor(() => expect(markPantryBought).toHaveBeenCalledWith('e-1', 'p-5'))
   })
 })
 

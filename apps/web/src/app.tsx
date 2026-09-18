@@ -197,6 +197,8 @@ export type RoutesApi = Pick<
   | 'unheartPantryItem'
   | 'markPantryBought'
   | 'unmarkPantryBought'
+  | 'flagPantryNeedMore'
+  | 'unflagPantryNeedMore'
   | 'setPantryStock'
   | 'addPantryItem'
   | 'updatePantryItem'

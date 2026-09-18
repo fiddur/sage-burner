@@ -1,4 +1,12 @@
-import type { Eater, Meal, ShoppingRow, ShoppingSections, Sitting } from '@sage-burner/shared'
+import type {
+  Eater,
+  EventPantryItem,
+  Meal,
+  Shoppable,
+  ShoppingRow,
+  ShoppingSections,
+  Sitting,
+} from '@sage-burner/shared'
 
 import {
   askedSaid,
@@ -52,6 +60,11 @@ interface Filling {
   sections: ShoppingSections
   note: string
 }
+
+const asShoppable = (item: EventPantryItem): Shoppable => ({
+  ...item,
+  need_more: item.need_more !== null,
+})
 
 const asSitting = (meal: Meal): Sitting => ({
   label: meal.label,
@@ -110,7 +123,7 @@ export const Shopping = ({ api }: { api: ShoppingApi }) => {
 
   const filling: Filling = {
     sections: shoppingSections({
-      items: held.items,
+      items: held.items.map(asShoppable),
       sittings,
       entries: held.entries,
       cap: held.cap,

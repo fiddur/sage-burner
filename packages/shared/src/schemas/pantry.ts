@@ -6,6 +6,13 @@ import { allergyTagSchema } from './allergy.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 import { supporterSchema } from './thread.ts'
 
+export const pantryNeedMoreSchema = z.object({
+  by: idSchema.nullable(),
+  by_name: z.string().nullable(),
+  at: dateTimeSchema,
+})
+export type PantryNeedMore = z.infer<typeof pantryNeedMoreSchema>
+
 const pantryFields = {
   name: nonEmptyText(MAX_OPTION_LABEL),
   kind: z.enum(pantryKinds),
@@ -21,6 +28,7 @@ export const pantryItemSchema = z.object({
   counted_by: idSchema.nullable(),
   counted_by_name: z.string().nullable(),
   counted_at: dateTimeSchema.nullable(),
+  need_more: pantryNeedMoreSchema.nullable(),
   withdrawn_at: dateTimeSchema.nullable(),
   created_at: dateTimeSchema,
   allergies: z.array(allergyTagSchema),

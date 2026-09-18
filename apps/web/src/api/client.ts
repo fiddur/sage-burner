@@ -830,6 +830,16 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.restorePantryItem.method,
       }),
 
+    flagPantryNeedMore: (id: string) =>
+      request<undefined>(apiRoutes.flagPantryNeedMore.path(id), {
+        method: apiRoutes.flagPantryNeedMore.method,
+      }),
+
+    unflagPantryNeedMore: (id: string) =>
+      request<undefined>(apiRoutes.unflagPantryNeedMore.path(id), {
+        method: apiRoutes.unflagPantryNeedMore.method,
+      }),
+
     getEventPantry: (eventId: string, signal?: AbortSignal) =>
       request<EventPantryResponse>(apiRoutes.getEventPantry.path(eventId), { signal }),
 

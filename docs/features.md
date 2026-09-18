@@ -189,6 +189,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   from the pantry (and see where it lives and what is there) or write a special buy
   as you like. Amounts are optional — no amount means to taste. The meal plan links
   into each sitting for them.
+- **Need more** on a pantry row asks the buyer for a sack of something, whoever
+  spots the empty one — a request rather than a count, so a thing can be flagged
+  while the shelf still says plenty, and buying it clears the flag.
 - The shopping list is what the hearts and the ingredients add up to: how much to
   buy of each thing, scaled to the people there on that sitting's day and less what
   the pantry says is in the house, with the special buys listed apart and a tick per

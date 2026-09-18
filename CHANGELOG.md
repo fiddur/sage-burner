@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-18
 
+- **"Need more" puts a thing on the shopping list.** Standing in the cellar looking at
+  an empty rice sack, press **Need more** on that row in the Pantry — it says so to
+  whoever shops next, with your name and the time under it, and the thing appears on
+  the shopping list even if nobody hearted it and no meal asks for it. It is a separate
+  question from how much is left, so something can be marked _plenty_ and still be asked
+  for: you looked at the shelf after the count was taken. Ticking it bought answers the
+  request and clears it.
 - **The kitchen knows who cannot eat what.** An admin tags a pantry thing with what it
   contains — Nuts, Gluten, Lactose — out of the same list everybody ticks on their own
   record. Open a sitting that uses one and it says so under the line: how many of the

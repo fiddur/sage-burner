@@ -86,6 +86,12 @@ const count = (
   payload: { amount: number | null; level: string | null },
 ) => server.inject({ method: 'PUT', url: `/api/pantry/${id}/stock`, headers: { cookie }, payload })
 
+const flag = (server: FastifyInstance, cookie: string, id: string) =>
+  server.inject({ method: 'PUT', url: `/api/pantry/${id}/need-more`, headers: { cookie } })
+
+const unflag = (server: FastifyInstance, cookie: string, id: string) =>
+  server.inject({ method: 'DELETE', url: `/api/pantry/${id}/need-more`, headers: { cookie } })
+
 const given = async (server: FastifyInstance, cookie: string, name: string, kind = 'staple') => {
   const made = await add(server, cookie, { kind, name })
   const item: PantryItem = made.json().item
@@ -230,6 +236,97 @@ describe('counting a thing, which any member may do', () => {
     })
 
     expect(written.statusCode).toBe(401)
+  })
+})
+
+describe('asking for more of something, which any member may do', () => {
+  const asOf = async (server: FastifyInstance, cookie: string, id: string) => {
+    const { items } = await list(server, cookie)
+
+    return items.find((item) => item.id === id)?.need_more ?? null
+  }
+
+  it('stamps who asked and when', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const rice = await given(server, ada.cookie, 'Rice')
+
+    expect((await flag(server, ada.cookie, rice.id)).statusCode).toBe(204)
+    expect(await asOf(server, ada.cookie, rice.id)).toEqual({ by: ada.id, by_name: 'Ada', at: NOW })
+  })
+
+  it('keeps the first asker when somebody else presses it again', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const bo = await givenAccount('Bo')
+    const rice = await given(server, ada.cookie, 'Rice')
+    await flag(server, ada.cookie, rice.id)
+
+    expect((await flag(server, bo.cookie, rice.id)).statusCode).toBe(204)
+    expect((await asOf(server, ada.cookie, rice.id))?.by_name).toBe('Ada')
+  })
+
+  it('leaves the count alone, because the shelf and the request are two questions', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const rice = await given(server, ada.cookie, 'Rice')
+    await count(server, ada.cookie, rice.id, { amount: null, level: 'plenty' })
+
+    await flag(server, ada.cookie, rice.id)
+
+    const { items } = await list(server, ada.cookie)
+    expect(items.find((item) => item.id === rice.id)?.stock_level).toBe('plenty')
+  })
+
+  it('takes it back, and says so however often it is asked', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const rice = await given(server, ada.cookie, 'Rice')
+    await flag(server, ada.cookie, rice.id)
+
+    expect((await unflag(server, ada.cookie, rice.id)).statusCode).toBe(204)
+    expect((await unflag(server, ada.cookie, rice.id)).statusCode).toBe(204)
+    expect(await asOf(server, ada.cookie, rice.id)).toBeNull()
+  })
+
+  it('refuses a thing somebody took off the list', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const gone = await given(server, ada.cookie, 'Marmite')
+    await withdraw(server, ada.cookie, gone.id)
+
+    expect((await flag(server, ada.cookie, gone.id)).statusCode).toBe(404)
+  })
+
+  it('refuses a thing that was never on the list', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada')
+
+    expect((await flag(server, ada.cookie, randomUUID())).statusCode).toBe(404)
+  })
+
+  it('is refused to somebody signed out, both ways round', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const rice = await given(server, ada.cookie, 'Rice')
+
+    const asked = await server.inject({ method: 'PUT', url: `/api/pantry/${rice.id}/need-more` })
+    const taken = await server.inject({ method: 'DELETE', url: `/api/pantry/${rice.id}/need-more` })
+
+    expect(asked.statusCode).toBe(401)
+    expect(taken.statusCode).toBe(401)
+  })
+
+  it('goes on saying more is needed once whoever asked has left', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const bo = await givenAccount('Bo')
+    const rice = await given(server, ada.cookie, 'Rice')
+    await flag(server, bo.cookie, rice.id)
+
+    client().prepare('delete from account where id = ?').run(bo.id)
+
+    expect(await asOf(server, ada.cookie, rice.id)).toEqual({ by: null, by_name: null, at: NOW })
   })
 })
 
@@ -606,6 +703,12 @@ describe('what the table itself refuses, which no route has to be trusted for', 
     await build()
 
     expect(insert(row({ unit: '' }))).toThrow()
+  })
+
+  it('takes a request nobody signed, which is what the importer writes', async () => {
+    await build()
+
+    expect(insert(row({ need_more_at: NOW }))).not.toThrow()
   })
 
   it('refuses a stock level nobody named', async () => {

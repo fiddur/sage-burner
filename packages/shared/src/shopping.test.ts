@@ -25,6 +25,7 @@ const thing = (over: Partial<Shoppable> = {}): Shoppable => ({
   stock_level: null,
   stock_amount: null,
   hearts: { count: 1 },
+  need_more: false,
   bought: null,
   allergies: [],
   ...over,
@@ -241,6 +242,29 @@ describe('the shopping list', () => {
     expect(names(sections.enough)).toEqual([])
   })
 
+  it('lists a thing the pantry says it needs more of, hearted by nobody and cooked with by nobody', () => {
+    const sections = list({ items: [thing({ hearts: { count: 0 }, need_more: true })] })
+
+    expect(names(sections.pantry)).toEqual(['Oatmeal'])
+    expect(first(sections.pantry).buy).toBeNull()
+  })
+
+  it('keeps a thing the pantry says it needs more of out of the fold-away, plenty or not', () => {
+    const sections = list({
+      items: [thing({ hearts: { count: 0 }, need_more: true, stock_level: 'plenty' })],
+    })
+
+    expect(names(sections.pantry)).toEqual(['Oatmeal'])
+    expect(names(sections.enough)).toEqual([])
+  })
+
+  it('folds away the same plenty thing once nobody says more is needed', () => {
+    const sections = list({ items: [thing({ hearts: { count: 1 }, stock_level: 'plenty' })] })
+
+    expect(names(sections.pantry)).toEqual([])
+    expect(names(sections.enough)).toEqual(['Oatmeal'])
+  })
+
   it('says what is needed even when nobody hearted it', () => {
     const sections = list({
       items: [thing({ hearts: { count: 0 } })],
@@ -388,6 +412,14 @@ describe('the shopping list', () => {
     expect(names(sections.pantry)).toEqual([])
   })
 
+  it('keeps a bought thing under Bought once buying it has cleared the ask that listed it', () => {
+    const at = { by: 'a-1', by_name: 'Ada', at: '2026-09-17T10:00:00.000Z' }
+    const sections = list({ items: [thing({ hearts: { count: 0 }, need_more: false, bought: at })] })
+
+    expect(names(sections.bought)).toEqual(['Oatmeal'])
+    expect(names(sections.pantry)).toEqual([])
+  })
+
   it('leaves the list it was given alone', () => {
     const items = [thing({ id: 'p-1', name: 'Bread' }), thing({ id: 'p-2', name: 'Almonds' })]
 
@@ -444,6 +476,18 @@ describe('askedSaid', () => {
 
     expect(askedSaid(first(sections.pantry))).toBe('14 want it')
   })
+
+  it('says the pantry asked for it when the pantry did, after whoever else did', () => {
+    const sections = list({ items: [thing({ hearts: { count: 2 }, need_more: true })] })
+
+    expect(askedSaid(first(sections.pantry))).toBe('2 want it · the pantry says: need more')
+  })
+
+  it('says only the pantry when nobody hearted it', () => {
+    const sections = list({ items: [thing({ hearts: { count: 0 }, need_more: true })] })
+
+    expect(askedSaid(first(sections.pantry))).toBe('the pantry says: need more')
+  })
 })
 
 describe('placesSaid', () => {
@@ -491,6 +535,14 @@ describe('shoppingText', () => {
       '- Oatmeal · 0.2 kg · Sat 1 Dinner 0.2 kg · 14 want it · hallway, left white box\n' +
         '- Saffron · 1 pcs · Sat 1 Dinner 1 pcs',
     )
+  })
+
+  it('carries what the pantry asked for, with no amount nobody worked out', () => {
+    const sections = list({
+      items: [thing({ name: 'Rice', where: 'cellar I', hearts: { count: 0 }, need_more: true })],
+    })
+
+    expect(shoppingText(sections)).toBe('- Rice · the pantry says: need more · cellar I')
   })
 
   it('leaves out what is ticked and what there is enough of', () => {
