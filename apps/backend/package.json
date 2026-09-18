@@ -12,7 +12,8 @@
     "test": "vitest run",
     "check": "tsgo --noEmit && oxlint -c ../../.oxlintrc.json --type-aware",
     "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix",
-    "admin:create": "node src/cli/create-admin.ts"
+    "admin:create": "node src/cli/create-admin.ts",
+    "pantry:import": "node src/cli/import-pantry.ts"
   },
   "dependencies": {
     "@fastify/helmet": "^13.1.0",

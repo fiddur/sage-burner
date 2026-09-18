@@ -165,8 +165,8 @@ has been reached from the page it belongs to. That worked until a page belonged 
 other page: the rideshare board is linked from a form that only renders for a burn you
 have already joined, so somebody who has not joined one could not get there at all.
 
-**☰ is where those live** — 🎵 Songbook, 🛻 Rideshares, 🎁 Bring list and 🗣️ Meetings, and the
-map of the area where one is set.
+**☰ is where those live** — 🎵 Songbook, 🛻 Rideshares, 🎁 Bring list, 🧺 Pantry and 🗣️ Meetings,
+and the map of the area where one is set.
 
 **It holds every page, though, not only those.** The drawer takes the same `everyPage`
 list the sidebar gets on a wide screen, in the same order: the six the bottom bar shows,
@@ -188,7 +188,7 @@ not a page: the brand, the burn selector, and the bell, ⚙️ and face that are
 Navigation used to be in two places on a desktop — six words in the bar and five more
 behind ☰ — and which half a page landed in was decided by how many fitted, which is not
 something a person can learn. There is room down the side of a wide screen and none across
-the top, so that is where they go: eleven entries with their icons, the six member pages
+the top, so that is where they go: twelve entries with their icons, the six member pages
 first, then what ☰ held, the map last and still leaving the app.
 
 **A grid rather than a fixed column.** The drawer is `position: fixed` and the page does

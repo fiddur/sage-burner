@@ -112,6 +112,7 @@ and why it does it that way rather than the obvious other way — live in `docs/
 | [the-app.md](./docs/the-app.md)             | Getting around, what the installation calls itself, installing it, avatars, markdown |
 | [burns.md](./docs/burns.md)                 | Events, attendance, lodging, helping out, the calendar feed                          |
 | [schedule.md](./docs/schedule.md)           | Meals, dreams, the lead roles register, places and the grid                          |
+| [food.md](./docs/food.md)                   | The pantry: what the house keeps, where it lives and how much is left                |
 | [http.md](./docs/http.md)                   | Security headers, and the shape every API error takes                                |
 
 What changed, release by release, is [`CHANGELOG.md`](./CHANGELOG.md) — which the app

@@ -24,11 +24,16 @@ import {
   isFeedKind,
   isFormQuestionType,
   isInviteStatus,
+  isPantryKind,
   isPaymentStatus,
   isPlaceColor,
+  isStockLevel,
   notificationCategories,
+  pantryKindLabel,
+  pantryKinds,
   paymentStatuses,
   placeColors,
+  stockLevels,
   threadEntityTypes,
 } from './enums.ts'
 
@@ -43,6 +48,8 @@ describe('enum type guards', () => {
     { name: 'event option kind', values: eventOptionKinds, guard: isEventOptionKind },
     { name: 'place colour', values: placeColors, guard: isPlaceColor },
     { name: 'feed kind', values: feedKinds, guard: isFeedKind },
+    { name: 'pantry kind', values: pantryKinds, guard: isPantryKind },
+    { name: 'stock level', values: stockLevels, guard: isStockLevel },
   ]
 
   for (const { name, values, guard } of cases) {
@@ -399,5 +406,15 @@ describe('which categories are emailed before anybody has said anything', () => 
 
   it('emails nothing else, so an upgrade never starts posting to somebody’s inbox', () => {
     expect(notificationCategories.filter(emailsByDefault)).toEqual(['application_news'])
+  })
+})
+
+describe('the pantry vocabularies', () => {
+  it('has a chip label for every kind', () => {
+    for (const kind of pantryKinds) expect(pantryKindLabel[kind]).toBeTruthy()
+  })
+
+  it('offers three answers to how much is left, one of which needs a number', () => {
+    expect([...stockLevels]).toEqual(['plenty', 'some', 'out'])
   })
 })
