@@ -227,6 +227,7 @@ describe('handing on a place that has been paid for', () => {
     contact: null,
     allergies_notes: null,
     allergy_items: [],
+    allergy_item_ids: [],
     payment_status: 'unpaid',
     waiting: true,
     ...over,

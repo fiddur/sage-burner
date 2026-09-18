@@ -121,6 +121,7 @@ export const rosterEntrySchema = attendanceFields.extend({
   contact: profileFields.shape.contact.nullable(),
   allergies_notes: profileFields.shape.allergies_notes,
   allergy_items: z.array(z.string()),
+  allergy_item_ids: z.array(idSchema),
   lodging: optionalText(MAX_OPTION_LABEL),
   helping: optionalText(MAX_NOTES),
   waiting: z.boolean(),

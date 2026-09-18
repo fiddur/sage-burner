@@ -9,6 +9,14 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-18
 
+- **The kitchen knows who cannot eat what.** An admin tags a pantry thing with what it
+  contains — Nuts, Gluten, Lactose — out of the same list everybody ticks on their own
+  record. Open a sitting that uses one and it says so under the line: how many of the
+  people there **that day** cannot eat it, and who, with a link to each of them. Anyone
+  who wrote something in their own words under Other is counted below it with a link to
+  the roster, because that is a sentence for a person to read rather than for the app to
+  guess at. The shopping list marks the same things on a wide screen, and the ingredient
+  picker shows the tags so you can reach for something else.
 - **How much to buy, worked out for you.** Open a sitting from the Programme grid and write
   what it takes — pick from the pantry, where you can see what is already in the house and
   where it lives, or write anything else as a special buy. Say how many the amounts feed and

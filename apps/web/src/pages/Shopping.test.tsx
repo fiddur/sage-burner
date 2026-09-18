@@ -47,6 +47,7 @@ const thing = (over: Partial<EventPantryItem> = {}): EventPantryItem => ({
   counted_at: null,
   withdrawn_at: null,
   created_at: '2026-07-01T00:00:00.000Z',
+  allergies: [],
   hearts: { count: 14, people: [], mine: true },
   bought: null,
   ...over,
@@ -85,7 +86,7 @@ const line = (over: Partial<MealIngredient> = {}): MealIngredient => ({
   unit: 'kg',
   amount: 1,
   bought: null,
-  pantry: { where: 'Hallway bucket', stock_level: null, stock_amount: null },
+  pantry: { where: 'Hallway bucket', stock_level: null, stock_amount: null, allergies: [] },
   ...over,
 })
 
@@ -122,6 +123,7 @@ const staying = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
   contact: null,
   allergies_notes: null,
   allergy_items: [],
+  allergy_item_ids: [],
   lodging: null,
   helping: null,
   waiting: false,
@@ -300,6 +302,29 @@ describe('the shopping list on a wide screen', () => {
     expect(await screen.findByRole('rowheader', { name: 'Lentils, red' })).toBeTruthy()
     expect(screen.getAllByRole('columnheader', { name: 'Buy' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('cell', { name: '2 kg' })).toHaveLength(2)
+  })
+
+  it('warns in the asked-for cell when somebody coming cannot eat the thing', async () => {
+    onADesktop()
+    renderPage(
+      stub(
+        {},
+        [thing({ id: 'p-4', name: 'Lentils, red', allergies: [{ id: 'al-1', label: 'Lentils' }] })],
+        [aMeal()],
+        [staying({ allergy_item_ids: ['al-1'] }), staying({ id: 'at-2', account_id: 'a-2' })],
+      ),
+    )
+
+    expect(await screen.findByText('1 cannot eat this')).toBeTruthy()
+  })
+
+  it('says nothing in that cell about a thing nobody is tagged against', async () => {
+    onADesktop()
+    renderPage(stub({}, ITEMS, [aMeal()], [staying({ allergy_item_ids: ['al-1'] })]))
+
+    await screen.findByRole('rowheader', { name: 'Lentils, red' })
+
+    expect(screen.queryByText(/cannot eat this/)).toBeNull()
   })
 
   it('has no table on a phone', async () => {

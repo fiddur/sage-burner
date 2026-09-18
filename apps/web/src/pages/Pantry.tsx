@@ -1,4 +1,4 @@
-import type { PantryHearts, PantryItem, PantryKind, StockLevel } from '@sage-burner/shared'
+import type { AllergyItem, PantryHearts, PantryItem, PantryKind, StockLevel } from '@sage-burner/shared'
 
 import {
   isPantryKind,
@@ -32,6 +32,7 @@ import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 export type PantryApi = Pick<
   ApiClient,
   | 'addPantryItem'
+  | 'getAllergyItems'
   | 'getEventPantry'
   | 'getPantry'
   | 'heartPantryItem'
@@ -78,6 +79,10 @@ interface PantryDraft {
   where: string
 }
 
+interface PantryEdit extends PantryDraft {
+  allergy_item_ids: string[]
+}
+
 const BLANK: PantryDraft = { kind: 'staple', name: '', unit: 'pcs', where: '' }
 
 export const Pantry = ({ api }: { api: PantryApi }) => {
@@ -86,12 +91,17 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
   const burn = useSelectedBurn()
   const { loaded, refreshing, reload } = useLoad(
     async (signal) => {
-      const [all, wanted] = await Promise.all([
+      const [all, wanted, allergies] = await Promise.all([
         api.getPantry(signal),
         burn === undefined ? undefined : api.getEventPantry(burn.event.id, signal),
+        api.getAllergyItems(signal),
       ])
 
-      return { items: all.items, hearts: new Map((wanted?.items ?? []).map((one) => [one.id, one.hearts])) }
+      return {
+        items: all.items,
+        hearts: new Map((wanted?.items ?? []).map((one) => [one.id, one.hearts])),
+        allergies: allergies.items,
+      }
     },
     {
       enabled: isApproved(viewer),
@@ -109,6 +119,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
 
   const items = loaded.status === 'ready' ? loaded.data.items : []
   const hearts = loaded.status === 'ready' ? loaded.data.hearts : new Map<string, PantryHearts>()
+  const allergies: readonly AllergyItem[] = loaded.status === 'ready' ? loaded.data.allergies : []
   const shown = shownPantry(items, { filter, search })
   const gone = items.filter((item) => item.withdrawn_at !== null)
 
@@ -197,6 +208,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
                   {editing === item.id ? (
                     <ItemFields
                       item={item}
+                      allergies={allergies}
                       busy={busy}
                       onCancel={() => setEditing(undefined)}
                       onSave={(changes) =>
@@ -351,7 +363,12 @@ const Row = ({
   return (
     <>
       <div class="pantry-what">
-        <strong>{item.name}</strong> <span class="pantry-kind">{pantryKindLabel[item.kind]}</span>
+        <strong>{item.name}</strong> <span class="pantry-kind">{pantryKindLabel[item.kind]}</span>{' '}
+        {item.allergies.map((tag) => (
+          <span key={tag.id} class="allergy-tag">
+            {tag.label}
+          </span>
+        ))}
         {hearts !== undefined && (
           <Heart
             what={item.name}
@@ -441,21 +458,32 @@ const Amount = ({
 
 const ItemFields = ({
   item,
+  allergies,
   busy,
   onCancel,
   onSave,
 }: {
   item: PantryItem
+  allergies: readonly AllergyItem[]
   busy: boolean
   onCancel: () => void
-  onSave: (changes: PantryDraft) => void
+  onSave: (changes: PantryEdit) => void
 }) => {
   const [held, setHeld] = useState({
     kind: item.kind,
     name: item.name,
     unit: item.unit,
     where: item.where,
+    allergy_item_ids: item.allergies.map((tag) => tag.id),
   })
+
+  const tick = (id: string) =>
+    setHeld((was) => ({
+      ...was,
+      allergy_item_ids: was.allergy_item_ids.includes(id)
+        ? was.allergy_item_ids.filter((ticked) => ticked !== id)
+        : [...was.allergy_item_ids, id],
+    }))
 
   return (
     <div class="pantry-edit">
@@ -510,6 +538,23 @@ const ItemFields = ({
         />
       </label>
 
+      {allergies.length > 0 && (
+        <p class="chip-row" role="group" aria-label={`What ${item.name} contains`}>
+          {allergies.map((one) => (
+            <button
+              key={one.id}
+              type="button"
+              class={held.allergy_item_ids.includes(one.id) ? 'chip is-on' : 'chip'}
+              aria-pressed={held.allergy_item_ids.includes(one.id)}
+              disabled={busy}
+              onClick={() => tick(one.id)}
+            >
+              {one.label}
+            </button>
+          ))}
+        </p>
+      )}
+
       <p class="row">
         <PendingButton
           busy={busy}
@@ -522,6 +567,7 @@ const ItemFields = ({
               name: held.name.trim(),
               unit: held.unit.trim(),
               where: held.where.trim(),
+              allergy_item_ids: held.allergy_item_ids,
             })
           }
         />

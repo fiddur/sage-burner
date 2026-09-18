@@ -19,11 +19,27 @@ export interface Shoppable {
   stock_amount: number | null
   hearts: { count: number }
   bought: Ticked | null
+  allergies: readonly { id: string }[]
 }
 
-export interface Staying extends Placeable {
+export interface Stay {
   arrival_date: string | null
   departure_date: string | null
+}
+
+export interface Staying extends Placeable, Stay {}
+
+export interface Eater extends Stay {
+  account_id: string
+  name: string | null
+  waiting: boolean
+  allergy_item_ids: readonly string[]
+  allergies_notes: string | null
+}
+
+export interface CannotEat {
+  who: readonly Eater[]
+  others: number
 }
 
 export interface SittingLine {
@@ -64,6 +80,7 @@ export interface ShoppingRow {
   pantry_item_id: string | null
   ingredient_ids: readonly string[]
   bought: Ticked | null
+  allergies: readonly { id: string }[]
 }
 
 export interface ShoppingSections {
@@ -92,12 +109,29 @@ export interface Hearted {
 export const byWanted = (a: Hearted, b: Hearted): number =>
   a.hearts.count === b.hearts.count ? byName(a.name, b.name) : b.hearts.count - a.hearts.count
 
-export const staysOver = (entry: Staying, date: string): boolean =>
+export const staysOver = (entry: Stay, date: string): boolean =>
   (entry.arrival_date === null || entry.arrival_date <= date) &&
   (entry.departure_date === null || entry.departure_date >= date)
 
 export const headcountOn = (entries: readonly Staying[], cap: number, date: string): number =>
   withPlaces(entries, cap).filter((entry) => !entry.waiting && staysOver(entry, date)).length
+
+const eating = (entry: Eater, date: string | null): boolean =>
+  !entry.waiting && (date === null || staysOver(entry, date))
+
+export const cannotEat = (
+  entries: readonly Eater[],
+  date: string | null,
+  allergyIds: readonly string[],
+): CannotEat => {
+  const here = entries.filter((entry) => eating(entry, date))
+  const tagged = (entry: Eater): boolean => entry.allergy_item_ids.some((id) => allergyIds.includes(id))
+
+  return {
+    who: here.filter(tagged),
+    others: here.filter((entry) => !tagged(entry) && (entry.allergies_notes ?? '').trim() !== '').length,
+  }
+}
 
 export const scaled = (amount: number, serves: number, heads: number): number => (amount * heads) / serves
 
@@ -249,6 +283,7 @@ const specialRow = (key: string, gathered: Gathered): ShoppingRow => {
     pantry_item_id: null,
     ingredient_ids: gathered.ids,
     bought: ticks.length === gathered.ticks.length ? newest(ticks) : null,
+    allergies: [],
   }
 }
 
@@ -270,6 +305,7 @@ const pantryRow = (item: Shoppable, gathered: Gathered | undefined): ShoppingRow
     pantry_item_id: item.id,
     ingredient_ids: [],
     bought: item.bought,
+    allergies: item.allergies,
   }
 }
 

@@ -195,6 +195,10 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   thing that everybody shopping can see. **Buying for [n]** replaces the headcount
   for every sitting, which is where the margin goes. Copy it as text to paste
   anywhere.
+- A pantry thing can be tagged with what it contains, from the same allergy list
+  members tick about themselves. A sitting using one says how many of the people
+  there that day cannot eat it and names them, with a count of whoever wrote
+  something under Other and a link to the roster — free text is never matched.
 
 ## Meetings — [meetings.md](./meetings.md)
 

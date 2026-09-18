@@ -37,8 +37,14 @@ const thing = (over: Partial<PantryItem> = {}): PantryItem => ({
   counted_at: null,
   withdrawn_at: null,
   created_at: '2026-09-01T00:00:00.000Z',
+  allergies: [],
   ...over,
 })
+
+const ALLERGIES = [
+  { id: 'al-1', order: 0, label: 'Nuts' },
+  { id: 'al-2', order: 1, label: 'Gluten' },
+]
 
 const ITEMS: PantryItem[] = [
   thing(),
@@ -67,6 +73,7 @@ const wanted = (item: PantryItem, count: number, mine: boolean): EventPantryItem
 
 const stub = (over: Partial<PantryApi> = {}, items: PantryItem[] = ITEMS): PantryApi => ({
   getPantry: () => Promise.resolve({ items }),
+  getAllergyItems: () => Promise.resolve({ items: ALLERGIES }),
   getEventPantry: () =>
     Promise.resolve({
       items: [wanted(items[0] ?? thing(), 3, true), ...items.slice(1).map((one) => wanted(one, 0, false))],
@@ -246,8 +253,54 @@ describe('the pantry page', () => {
         name: 'Oats',
         unit: 'kg',
         where: 'Hallway bucket · cellar I',
+        allergy_item_ids: [],
       }),
     )
+  })
+
+  it('shows what a thing contains beside its name, so the cook sees it while browsing', async () => {
+    renderPage(stub({}, [thing({ allergies: [{ id: 'al-1', label: 'Nuts' }] })]))
+
+    expect(await screen.findByText('Nuts')).toBeTruthy()
+  })
+
+  it('lets an admin tick what a thing contains, out of the allergy vocabulary', async () => {
+    const updatePantryItem = vi.fn(() => Promise.resolve({ item: thing() }))
+    renderPage(stub({ updatePantryItem }), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Edit Oatmeal'))
+    fireEvent.click(screen.getByRole('button', { name: 'Gluten' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updatePantryItem).toHaveBeenCalledWith(
+        'p-1',
+        expect.objectContaining({ allergy_item_ids: ['al-2'] }),
+      ),
+    )
+  })
+
+  it('starts the ticks from what the thing already carries, and untick takes one off', async () => {
+    const updatePantryItem = vi.fn(() => Promise.resolve({ item: thing() }))
+    renderPage(stub({ updatePantryItem }, [thing({ allergies: [{ id: 'al-1', label: 'Nuts' }] })]), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Edit Oatmeal'))
+
+    expect(screen.getByRole('button', { name: 'Nuts' }).getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nuts' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updatePantryItem).toHaveBeenCalledWith('p-1', expect.objectContaining({ allergy_item_ids: [] })),
+    )
+  })
+
+  it('offers a member no ticking at all', async () => {
+    renderPage(stub({}, [thing({ allergies: [{ id: 'al-1', label: 'Nuts' }] })]))
+
+    expect(await screen.findByText('Nuts')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Gluten' })).toBeNull()
   })
 
   it('asks before taking one off', async () => {

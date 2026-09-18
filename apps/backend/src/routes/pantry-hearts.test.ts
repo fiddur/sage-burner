@@ -455,3 +455,25 @@ describe('the rows behind all that', () => {
     expect(left?.bought_at).toBe(NOW)
   })
 })
+
+describe("what the burn's pantry says a thing contains", () => {
+  it('carries the tags, which is what the sitting warns from', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+    const oatmeal = await oneOf(server, ada.cookie, 'Oatmeal')
+
+    await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/pantry/${oatmeal.id}`,
+      headers: { cookie: ada.cookie },
+      payload: { allergy_item_ids: ['a11e0000-0000-4000-8000-000000000002'] },
+    })
+
+    const again = await oneOf(server, ada.cookie, 'Oatmeal')
+
+    expect(again.allergies).toEqual([
+      { id: 'a11e0000-0000-4000-8000-000000000002', label: 'Gluten (non-celiac)' },
+    ])
+  })
+})

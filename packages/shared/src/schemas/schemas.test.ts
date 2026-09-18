@@ -872,7 +872,13 @@ describe('a pantry thing', () => {
     const parsed = pantryCreateSchema.safeParse(aThing())
 
     expect(parsed.success).toBe(true)
-    expect(parsed.data).toEqual({ kind: 'spice', name: 'Cumin', unit: 'pcs', where: '' })
+    expect(parsed.data).toEqual({
+      kind: 'spice',
+      name: 'Cumin',
+      unit: 'pcs',
+      where: '',
+      allergy_item_ids: [],
+    })
   })
 
   it('refuses a kind nobody named and a name that is only spaces', () => {

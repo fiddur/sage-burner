@@ -5,7 +5,8 @@ The pantry: what the house usually has, where it lives and roughly how much
 tabs, which were two tabs of the same shape — a thing, a place, a rough amount.
 On top of it sit the hearts — what people want at one burn — and the shopping
 list they fill (#806), and on top of that the ingredients of each sitting, which
-are what turns that list into amounts (#807). Together they are what
+are what turns that list into amounts (#807) and what the allergy warning reads
+(#808). Together they are what
 [#804](https://github.com/fiddur/sage-burner/issues/804) calls food.
 
 [← back to the README](../README.md)
@@ -266,11 +267,64 @@ Amounts are **stored nowhere** but on the sitting. There is no per-burn "we need
 who is coming or correcting `serves` is enough, and the list cannot go stale
 against what the sittings actually say.
 
+## Who cannot eat it
+
+This is the part [#25](https://github.com/fiddur/sage-burner/issues/25) was really
+about, and the part a spreadsheet cannot do: a meal lead writing cashews into
+Saturday's dinner has no way of knowing that two of the thirty-four people there
+that evening cannot eat nuts. `pantry_item_allergy` is the join that makes it
+possible — a pantry thing tagged with items from the **same vocabulary members
+tick about themselves**, so the two sides can be intersected at all. A second
+vocabulary for ingredients would have been a translation table nobody maintains.
+
+**The tag is on the pantry row, not on the ingredient line.** A cashew contains
+nuts wherever it is cooked, so tagging it once is one answer for every sitting
+that ever picks it; tagging the line would be the same claim written out per
+sitting, and the third cook would forget. It is also what lets the shopping list
+mark the row, which has no sitting behind it at all. This is the shape the whole
+data model follows: reference the thing, resolve its facts at read time.
+
+**Cascading, unlike `account_allergy`.** That table has no `ON DELETE` on its
+`allergy_item` reference, so SQLite refuses to retire a vocabulary item somebody
+has ticked and `allergies.ts` turns the refusal into a 409 — deleting it would
+destroy somebody's statement about themselves. A tag on a pantry row is nobody's
+statement about themselves; it is an admin's note about a sack of nuts, and
+retiring "Nuts" from the vocabulary should take the notes with it rather than
+being blocked by them. Tagging is admin's, under `/api/admin/pantry`, exactly as
+deciding what is on the list is; an unknown allergy item is a 400 rather than a
+silently dropped id, and the set sent **replaces** what was there, so unticking
+is a save rather than a second route.
+
+**The derivation is a pure function**, `cannotEat(entries, date, allergyIds)` in
+`packages/shared/src/shopping.ts`, beside `headcountOn` and following the same
+stay rule: somebody with a place whose `arrival_date`/`departure_date` cover that
+plain `YYYY-MM-DD`. So "2 of the 34 here on Saturday" counts the two against the
+same thirty-four, rather than against everybody who ever joined the burn. The
+waiting list is out of both, through the `waiting` the roster read already
+carries. A `null` date means the whole burn and nobody's stay is consulted —
+that is what the shopping list wants, since a row there is not about one evening.
+
+**The source is the roster read** members already have,
+`GET /api/events/:eventId/members` (#159), which carries each entry's ticked
+allergy items — as ids beside the labels the Members page shows, since a tag is
+an id and a label can be renamed. Nothing new is exposed: the names are on the Members page and the
+ticks are what the whole allergy vocabulary exists to publish to whoever cooks.
+It also means the warning is a page-side intersection of two reads the page makes
+anyway, rather than a fifth route to keep in step.
+
+**Free text is counted, never matched.** `allergies_notes` is a sentence a person
+wrote — "red lentils make me ill", "I react to something in cheap curry powder" —
+and no substring search over it is right often enough to be trusted. Matching
+"nuts" against "no nuts, but nutmeg is fine" is the failure that would teach a
+cook to ignore the box. So the line below says only how many people there wrote
+something, and links to the roster where the sentences are, and a cook reads them.
+Somebody already named above is not counted again; "k more" means more.
+
 ## What this deliberately does not have
 
 No thread, no notification, no feed card on a pantry row. A pantry row is
 furniture: nobody wants a bell because the flour is running low, and the
 conversation belongs where the flour is needed — on the sitting's card, which is
-where an ingredient edit lands. Allergy tags on a pantry item, and the warning on
-a sitting whose ingredients somebody there cannot eat, are phase 4 of
-[#804](https://github.com/fiddur/sage-burner/issues/804) and are not here.
+where an ingredient edit lands. A tag is the same: it is an admin correcting the
+catalogue, not something done to anybody, and the warning it raises is read where
+the cooking is planned rather than pushed at everybody who might be affected.

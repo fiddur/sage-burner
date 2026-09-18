@@ -19,7 +19,7 @@ import { allOf } from '../db/conditions.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { account, accountAvatar, attendance, event, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { allergyLabelsFor } from './allergy-ticks.ts'
+import { allergyLabelsFor, allergyTicksFor } from './allergy-ticks.ts'
 import { activeEventNow, todayIso } from './events.ts'
 import { helpingIdsFor, helpingLabelsFor } from './helping.ts'
 import { tellAboutTheWaitingList } from './waiting-list.ts'
@@ -47,6 +47,7 @@ const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
   contact: entry.contact,
   allergies_notes: entry.allergies_notes,
   allergy_items: entry.allergy_items,
+  allergy_item_ids: entry.allergy_item_ids,
   payment_status: entry.payment_status,
   waiting: entry.waiting,
 })
@@ -202,10 +203,11 @@ export const registerRosterRoutes = (
       rows.map((row) => row.id),
     )
 
-    const allergies = await allergyLabelsFor(
-      db,
-      rows.map((row) => row.account_id),
-    )
+    const accountIds = rows.map((row) => row.account_id)
+    const [allergies, ticks] = await Promise.all([
+      allergyLabelsFor(db, accountIds),
+      allergyTicksFor(db, accountIds),
+    ])
 
     return withPlaces(
       rows.map((row) => {
@@ -214,6 +216,7 @@ export const registerRosterRoutes = (
         return {
           ...row,
           allergy_items: allergies.get(row.account_id) ?? [],
+          allergy_item_ids: ticks.get(row.account_id) ?? [],
           helping_option_ids: ticked.map((entry) => entry.id),
           helping: ticked.length === 0 ? null : ticked.map((entry) => entry.label).join(', '),
         }

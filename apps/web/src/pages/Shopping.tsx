@@ -1,6 +1,14 @@
-import type { Meal, ShoppingRow, ShoppingSections, Sitting } from '@sage-burner/shared'
+import type { Eater, Meal, ShoppingRow, ShoppingSections, Sitting } from '@sage-burner/shared'
 
-import { askedSaid, buySaid, haveSaid, placesSaid, shoppingSections, shoppingText } from '@sage-burner/shared'
+import {
+  askedSaid,
+  buySaid,
+  cannotEat,
+  haveSaid,
+  placesSaid,
+  shoppingSections,
+  shoppingText,
+} from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -29,6 +37,16 @@ export type ShoppingApi = Pick<
 >
 
 type Tick = (row: ShoppingRow, bought: boolean) => void
+
+const CannotEat = ({ row, roster }: { row: ShoppingRow; roster: readonly Eater[] }) => {
+  const { who } = cannotEat(
+    roster,
+    null,
+    row.allergies.map((tag) => tag.id),
+  )
+
+  return who.length === 0 ? null : <span class="allergy-said">{who.length} cannot eat this</span>
+}
 
 interface Filling {
   sections: ShoppingSections
@@ -161,14 +179,24 @@ export const Shopping = ({ api }: { api: ShoppingApi }) => {
             and to a tenth of a kilo or litre.
           </p>
 
-          <List sections={filling.sections} busy={busy} onTick={tick} />
+          <List sections={filling.sections} roster={held.entries} busy={busy} onTick={tick} />
         </>
       )}
     </GuardedPage>
   )
 }
 
-const List = ({ sections, busy, onTick }: { sections: ShoppingSections; busy: boolean; onTick: Tick }) => {
+const List = ({
+  sections,
+  roster,
+  busy,
+  onTick,
+}: {
+  sections: ShoppingSections
+  roster: readonly Eater[]
+  busy: boolean
+  onTick: Tick
+}) => {
   const [showingEnough, setShowingEnough] = useState(false)
   const phone = usePhone()
 
@@ -186,7 +214,7 @@ const List = ({ sections, busy, onTick }: { sections: ShoppingSections; busy: bo
             the ingredients of a sitting.
           </p>
         ) : (
-          <Rows rows={sections.pantry} bought={false} busy={busy} onTick={onTick} />
+          <Rows rows={sections.pantry} roster={roster} bought={false} busy={busy} onTick={onTick} />
         )}
 
         {sections.enough.length > 0 && (
@@ -203,38 +231,38 @@ const List = ({ sections, busy, onTick }: { sections: ShoppingSections; busy: bo
           </p>
         )}
 
-        {showingEnough && <Rows rows={sections.enough} bought={false} busy={busy} onTick={onTick} />}
+        {showingEnough && (
+          <Rows rows={sections.enough} roster={roster} bought={false} busy={busy} onTick={onTick} />
+        )}
       </section>
 
       {sections.special.length > 0 && (
         <section>
           <h2>Special for a meal</h2>
           <p class="form-note">Not in the pantry. Written by the cook as it is here.</p>
-          <Rows rows={sections.special} bought={false} busy={busy} onTick={onTick} />
+          <Rows rows={sections.special} roster={roster} bought={false} busy={busy} onTick={onTick} />
         </section>
       )}
 
       {sections.bought.length > 0 && (
         <section>
           <h2>Bought</h2>
-          <Rows rows={sections.bought} bought busy={busy} onTick={onTick} />
+          <Rows rows={sections.bought} roster={roster} bought busy={busy} onTick={onTick} />
         </section>
       )}
     </>
   )
 }
 
-const PhoneRows = ({
-  rows,
-  bought,
-  busy,
-  onTick,
-}: {
+interface RowsProps {
   rows: readonly ShoppingRow[]
+  roster: readonly Eater[]
   bought: boolean
   busy: boolean
   onTick: Tick
-}) => (
+}
+
+const PhoneRows = ({ rows, bought, busy, onTick }: RowsProps) => (
   <ul class="shopping-list">
     {rows.map((row) => (
       <li key={row.key}>
@@ -265,17 +293,7 @@ const PhoneRows = ({
   </ul>
 )
 
-const WideRows = ({
-  rows,
-  bought,
-  busy,
-  onTick,
-}: {
-  rows: readonly ShoppingRow[]
-  bought: boolean
-  busy: boolean
-  onTick: Tick
-}) => (
+const WideRows = ({ rows, roster, bought, busy, onTick }: RowsProps) => (
   <table class="shopping-table">
     <thead>
       <tr>
@@ -314,7 +332,10 @@ const WideRows = ({
             {bought && <span class="form-note">{boughtBy(row)}</span>}
           </td>
           <td class="form-note">{row.where}</td>
-          <td class="form-note">{askedSaid(row)}</td>
+          <td class="form-note">
+            {askedSaid(row)}
+            <CannotEat row={row} roster={roster} />
+          </td>
         </tr>
       ))}
     </tbody>

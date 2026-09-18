@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { mealSlotKinds, stockLevels } from '../enums.ts'
 import { MAX_OPTION_LABEL, MAX_UNIT, MAX_WELCOME_LENGTH, MAX_WHERE } from '../limits.ts'
+import { allergyTagSchema } from './allergy.ts'
 import { dateSchema, dateTimeSchema, idSchema, nonEmptyText, timeSchema } from './common.ts'
 
 export const mealSlotFields = z.object({
@@ -43,6 +44,7 @@ export const mealIngredientSchema = z.object({
       where: z.string().max(MAX_WHERE),
       stock_level: z.enum(stockLevels).nullable(),
       stock_amount: z.number().nonnegative().nullable(),
+      allergies: z.array(allergyTagSchema),
     })
     .nullable(),
 })

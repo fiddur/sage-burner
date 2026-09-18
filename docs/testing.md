@@ -416,6 +416,23 @@ phone" means 360px.
       wrote, and nobody is notified. Ticking something in the shop adds nothing to the card.
 - [ ] On a wide screen the shopping list is a table — Thing, Need, Have, Buy, where it lives,
       what asked for it; narrow the window under about 45rem and it becomes rows again.
+- [ ] As an admin, add **Nuts** to the vocabulary under ⚙️ → Allergies (the seeded five do not
+      include it), then the pen on ☰ → Pantry's **Cashew** offers the allergy list as chips:
+      tick **Nuts** and Save. The row carries a small **Nuts** mark from then on, and every
+      member sees it. A member has no chips.
+- [ ] Tick **Nuts** on a member whose stay covers the Saturday, then open Saturday's dinner
+      from the Programme grid and add Cashew: under the line is "1 of the [n] here on Saturday
+      cannot eat this", naming them, and the name links to their page.
+- [ ] Move that member's departure to the Friday: the warning goes. Move it back and it
+      returns. Somebody on the waiting list is never counted.
+- [ ] Write something under **Other** in a member's allergies: the sitting gains one line
+      below the warning saying how many more wrote something, linking to the Members page —
+      and what they wrote is nowhere on the sitting.
+- [ ] Type "cash" in the sitting's add box: the **Nuts** mark shows beside the match.
+- [ ] The shopping list on a wide screen: the _Asked for by_ cell of Cashew says "1 cannot
+      eat this".
+- [ ] Retire **Nuts** under ⚙️ → Allergies while only pantry rows carry it: it goes, and the
+      marks go with it. Retire one a member has ticked and it is refused instead.
 
 ## Being told
 

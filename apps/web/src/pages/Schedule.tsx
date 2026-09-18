@@ -370,6 +370,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
       <OpenedMeal
         meal={shownMeal}
+        eventId={event.id}
         api={api}
         attendees={attendees}
         pantry={pantry}
@@ -807,6 +808,7 @@ const Timetable = ({
 
 const OpenedMeal = ({
   meal,
+  eventId,
   api,
   attendees,
   pantry,
@@ -819,6 +821,7 @@ const OpenedMeal = ({
   onClose,
 }: {
   meal: Meal | undefined
+  eventId: string
   api: Pick<
     ScheduleApi,
     | 'addMealIngredient'
@@ -845,8 +848,10 @@ const OpenedMeal = ({
   return (
     <MealDialog
       meal={meal}
+      eventId={eventId}
       attendees={attendees}
       pantry={pantry}
+      roster={roster}
       heads={roster.length === 0 ? null : headcountOn(roster, cap, meal.date)}
       viewerId={viewerId}
       busy={busy}

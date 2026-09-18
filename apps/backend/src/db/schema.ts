@@ -1121,6 +1121,22 @@ export const mealIngredient = sqliteTable(
   ],
 )
 
+export const pantryItemAllergy = sqliteTable(
+  'pantry_item_allergy',
+  {
+    item_id: text('item_id')
+      .notNull()
+      .references(() => pantryItem.id, { onDelete: 'cascade' }),
+    allergy_item_id: text('allergy_item_id')
+      .notNull()
+      .references(() => allergyItem.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.item_id, table.allergy_item_id] }),
+    index('pantry_item_allergy_allergy_idx').on(table.allergy_item_id),
+  ],
+)
+
 export const pantryHeart = sqliteTable(
   'pantry_heart',
   {
