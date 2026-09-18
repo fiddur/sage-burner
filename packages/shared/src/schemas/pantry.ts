@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { pantryKinds, stockLevels } from '../enums.ts'
 import { MAX_OPTION_LABEL, MAX_UNIT, MAX_WHERE } from '../limits.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
+import { supporterSchema } from './thread.ts'
 
 const pantryFields = {
   name: nonEmptyText(MAX_OPTION_LABEL),
@@ -53,3 +54,26 @@ export const pantryStockSchema = z
     error: 'an amount only says anything beside “some”',
   })
 export type PantryStock = z.infer<typeof pantryStockSchema>
+
+export const pantryHeartsSchema = z.object({
+  count: z.int().min(0),
+  people: z.array(supporterSchema),
+  mine: z.boolean(),
+})
+export type PantryHearts = z.infer<typeof pantryHeartsSchema>
+
+export const pantryBoughtSchema = z.object({
+  by: idSchema.nullable(),
+  by_name: z.string().nullable(),
+  at: dateTimeSchema,
+})
+export type PantryBought = z.infer<typeof pantryBoughtSchema>
+
+export const eventPantryItemSchema = pantryItemSchema.extend({
+  hearts: pantryHeartsSchema,
+  bought: pantryBoughtSchema.nullable(),
+})
+export type EventPantryItem = z.infer<typeof eventPantryItemSchema>
+
+export const eventPantryResponseSchema = z.object({ items: z.array(eventPantryItemSchema) })
+export type EventPantryResponse = z.infer<typeof eventPantryResponseSchema>

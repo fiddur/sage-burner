@@ -223,6 +223,7 @@ describe('the menu at the edge of the bar', () => {
       'Rideshares',
       'Bring list',
       'Pantry',
+      'Shopping list',
       'Meetings',
       'Map of area',
     ])
@@ -331,6 +332,7 @@ describe('the column of pages beside a wide page', () => {
     'Rideshares',
     'Bring list',
     'Pantry',
+    'Shopping list',
     'Meetings',
   ]
 

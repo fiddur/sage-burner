@@ -39,6 +39,7 @@ const menuPages: readonly NavPage[] = [
   { href: '/rides', label: 'Rideshares', icon: '🛻' },
   { href: '/bring', label: 'Bring list', icon: '🎁' },
   { href: '/pantry', label: 'Pantry', icon: '🧺' },
+  { href: '/shopping', label: 'Shopping list', icon: '🛒' },
   { href: '/meetings', label: 'Meetings', icon: '🗣️' },
 ]
 

@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-18
 
+- **Say what you want there, and take the list to the shop.** Give a heart to anything
+  in the pantry and the one shopping sees how many of you want it: breakfast, snacks and
+  things for the house are on the Meals page, everything else on the Pantry page once a
+  burn is chosen in the bar. The new **Shopping list** — ☰ → Shopping list, or the link
+  on Meals — turns those hearts into what to buy, with what the house already has beside
+  each thing and where it lives. Tick things off as you put them in the trolley:
+  everybody shopping sees the same ticks, so two of you can split the list, and it
+  survives your phone dying. Copy the whole thing as text to paste into a chat.
+
 - **The pantry.** ☰ → Pantry is one shared list of what the house usually has, where it
   lives and roughly how much — the spreadsheet's food and spice inventories, with a
   couple of dozen everyday things already on it. Counting is everybody's and is one tap a row: plenty, some

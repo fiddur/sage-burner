@@ -26,6 +26,7 @@ import type {
   EventOptionOrder,
   EventOptionResponse,
   EventOptionsResponse,
+  EventPantryResponse,
   EventResponse,
   EventsResponse,
   FaqListResponse,
@@ -800,6 +801,29 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     restorePantryItem: (id: string) =>
       request<PantryItemResponse>(apiRoutes.restorePantryItem.path(id), {
         method: apiRoutes.restorePantryItem.method,
+      }),
+
+    getEventPantry: (eventId: string, signal?: AbortSignal) =>
+      request<EventPantryResponse>(apiRoutes.getEventPantry.path(eventId), { signal }),
+
+    heartPantryItem: (eventId: string, itemId: string) =>
+      request<undefined>(apiRoutes.heartPantryItem.path(eventId, itemId), {
+        method: apiRoutes.heartPantryItem.method,
+      }),
+
+    unheartPantryItem: (eventId: string, itemId: string) =>
+      request<undefined>(apiRoutes.unheartPantryItem.path(eventId, itemId), {
+        method: apiRoutes.unheartPantryItem.method,
+      }),
+
+    markPantryBought: (eventId: string, itemId: string) =>
+      request<undefined>(apiRoutes.markPantryBought.path(eventId, itemId), {
+        method: apiRoutes.markPantryBought.method,
+      }),
+
+    unmarkPantryBought: (eventId: string, itemId: string) =>
+      request<undefined>(apiRoutes.unmarkPantryBought.path(eventId, itemId), {
+        method: apiRoutes.unmarkPantryBought.method,
       }),
 
     getSongbook: (signal?: AbortSignal) =>

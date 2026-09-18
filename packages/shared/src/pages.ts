@@ -59,6 +59,9 @@ export const formattingPage = (): string => '/formatting'
 
 export const pantryPage = (): string => '/pantry'
 
+export const shoppingPage = (eventId: string): string =>
+  `/shopping?${BURN_PARAM}=${encodeURIComponent(eventId)}`
+
 export const songbookPage = (): string => '/songs'
 
 export const songPage = (songId: string): string => `/songs/${encodeURIComponent(songId)}`

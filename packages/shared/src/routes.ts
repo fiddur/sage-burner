@@ -619,6 +619,35 @@ export const apiRoutes = {
     fastify: '/api/pantry',
     path: () => '/api/pantry',
   },
+  getEventPantry: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/pantry',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/pantry`,
+  },
+  heartPantryItem: {
+    method: 'PUT',
+    fastify: '/api/events/:eventId/pantry/:itemId/heart',
+    path: (eventId: string, itemId: string) =>
+      `/api/events/${encodeURIComponent(eventId)}/pantry/${encodeURIComponent(itemId)}/heart`,
+  },
+  unheartPantryItem: {
+    method: 'DELETE',
+    fastify: '/api/events/:eventId/pantry/:itemId/heart',
+    path: (eventId: string, itemId: string) =>
+      `/api/events/${encodeURIComponent(eventId)}/pantry/${encodeURIComponent(itemId)}/heart`,
+  },
+  markPantryBought: {
+    method: 'PUT',
+    fastify: '/api/events/:eventId/pantry/:itemId/bought',
+    path: (eventId: string, itemId: string) =>
+      `/api/events/${encodeURIComponent(eventId)}/pantry/${encodeURIComponent(itemId)}/bought`,
+  },
+  unmarkPantryBought: {
+    method: 'DELETE',
+    fastify: '/api/events/:eventId/pantry/:itemId/bought',
+    path: (eventId: string, itemId: string) =>
+      `/api/events/${encodeURIComponent(eventId)}/pantry/${encodeURIComponent(itemId)}/bought`,
+  },
   getPlaces: {
     method: 'GET',
     fastify: '/api/events/:eventId/places',

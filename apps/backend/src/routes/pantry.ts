@@ -1,5 +1,10 @@
-import type { PantryItem, PantryItemResponse, PantryListResponse } from '@sage-burner/shared'
-import type { FastifyInstance, FastifyReply } from 'fastify'
+import type {
+  EventPantryResponse,
+  PantryItem,
+  PantryItemResponse,
+  PantryListResponse,
+} from '@sage-burner/shared'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { apiRoutes, pantryCreateSchema, pantryStockSchema, pantryUpdateSchema } from '@sage-burner/shared'
 import { and, eq, isNull, sql } from 'drizzle-orm'
@@ -8,11 +13,14 @@ import { randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
+import { attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch } from '../db/patch.ts'
-import { account, pantryItem } from '../db/schema.ts'
+import { account, pantryHeart, pantryItem, pantryPurchase } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { heartsFor, purchasesFor, withHeartsAndTicks } from '../pantry-hearts.ts'
+import { openEventNow } from './events.ts'
 
 export interface PantryDeps extends GuardDeps {
   now: () => Date
@@ -39,6 +47,9 @@ const listing = (db: Database) =>
   db.select(columns).from(pantryItem).leftJoin(account, eq(account.id, pantryItem.counted_by))
 
 export const pantryFor = (db: Database): Promise<PantryItem[]> => listing(db).orderBy(byName)
+
+const livePantry = (db: Database): Promise<PantryItem[]> =>
+  listing(db).where(isNull(pantryItem.withdrawn_at)).orderBy(byName)
 
 const oneItem = async (db: Database, id: string): Promise<PantryItem | undefined> => {
   const [row] = await listing(db).where(eq(pantryItem.id, id)).limit(1)
@@ -71,6 +82,122 @@ export const registerPantryRoutes = (app: FastifyInstance, { db, sessions, now }
 
     return { items: await pantryFor(db) } satisfies PantryListResponse
   })
+
+  app.get<{ Params: { eventId: string } }>(
+    apiRoutes.getEventPantry.fastify,
+    guarded,
+    async (request, reply) => {
+      void noStore(reply)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const { eventId } = request.params
+      const mine = await attendanceFor(db, eventId, viewer.account_id)
+
+      const [items, hearts, bought] = await Promise.all([
+        livePantry(db),
+        heartsFor(db, eventId, mine),
+        purchasesFor(db, eventId),
+      ])
+
+      return { items: withHeartsAndTicks(items, hearts, bought) } satisfies EventPantryResponse
+    },
+  )
+
+  const onOpenBurn = async (
+    request: FastifyRequest<{ Params: { eventId: string; itemId: string } }>,
+    reply: FastifyReply,
+  ): Promise<{ eventId: string; itemId: string; accountId: string } | undefined> => {
+    void noStore(reply)
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer === undefined) {
+      void sendError(reply, 401)
+      return undefined
+    }
+
+    const open = await openEventNow(db, now, request.params.eventId)
+    const item = await oneItem(db, request.params.itemId)
+
+    if (open === undefined || item === undefined || item.withdrawn_at !== null) {
+      void sendError(reply, 404)
+      return undefined
+    }
+
+    return { eventId: open.id, itemId: item.id, accountId: viewer.account_id }
+  }
+
+  app.put<{ Params: { eventId: string; itemId: string } }>(
+    apiRoutes.heartPantryItem.fastify,
+    guarded,
+    async (request, reply) => {
+      const on = await onOpenBurn(request, reply)
+      if (on === undefined) return reply
+
+      const mine = await attendanceFor(db, on.eventId, on.accountId)
+      if (mine === undefined) return sendError(reply, 400, 'not_attending')
+
+      await db.insert(pantryHeart).values({ item_id: on.itemId, attendance_id: mine }).onConflictDoNothing()
+
+      return reply.code(204).send()
+    },
+  )
+
+  app.delete<{ Params: { eventId: string; itemId: string } }>(
+    apiRoutes.unheartPantryItem.fastify,
+    guarded,
+    async (request, reply) => {
+      const on = await onOpenBurn(request, reply)
+      if (on === undefined) return reply
+
+      const mine = await attendanceFor(db, on.eventId, on.accountId)
+
+      if (mine !== undefined) {
+        await db
+          .delete(pantryHeart)
+          .where(and(eq(pantryHeart.item_id, on.itemId), eq(pantryHeart.attendance_id, mine)))
+      }
+
+      return reply.code(204).send()
+    },
+  )
+
+  app.put<{ Params: { eventId: string; itemId: string } }>(
+    apiRoutes.markPantryBought.fastify,
+    guarded,
+    async (request, reply) => {
+      const on = await onOpenBurn(request, reply)
+      if (on === undefined) return reply
+
+      await db
+        .insert(pantryPurchase)
+        .values({
+          event_id: on.eventId,
+          item_id: on.itemId,
+          bought_by: on.accountId,
+          bought_at: now().toISOString(),
+        })
+        .onConflictDoNothing()
+
+      return reply.code(204).send()
+    },
+  )
+
+  app.delete<{ Params: { eventId: string; itemId: string } }>(
+    apiRoutes.unmarkPantryBought.fastify,
+    guarded,
+    async (request, reply) => {
+      const on = await onOpenBurn(request, reply)
+      if (on === undefined) return reply
+
+      await db
+        .delete(pantryPurchase)
+        .where(and(eq(pantryPurchase.event_id, on.eventId), eq(pantryPurchase.item_id, on.itemId)))
+
+      return reply.code(204).send()
+    },
+  )
 
   app.put<{ Params: { id: string } }>(apiRoutes.setPantryStock.fastify, guarded, async (request, reply) => {
     void noStore(reply)
