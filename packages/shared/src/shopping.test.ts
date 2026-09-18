@@ -412,6 +412,14 @@ describe('the shopping list', () => {
     expect(names(sections.pantry)).toEqual([])
   })
 
+  it('keeps a bought thing under Bought once buying it has cleared the ask that listed it', () => {
+    const at = { by: 'a-1', by_name: 'Ada', at: '2026-09-17T10:00:00.000Z' }
+    const sections = list({ items: [thing({ hearts: { count: 0 }, need_more: false, bought: at })] })
+
+    expect(names(sections.bought)).toEqual(['Oatmeal'])
+    expect(names(sections.pantry)).toEqual([])
+  })
+
   it('leaves the list it was given alone', () => {
     const items = [thing({ id: 'p-1', name: 'Bread' }), thing({ id: 'p-2', name: 'Almonds' })]
 

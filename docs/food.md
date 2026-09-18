@@ -205,7 +205,9 @@ The row records who ticked it and when, and a second tick on the same thing
 this", not "who last pressed it".
 
 **Nothing gets on the list by sitting in the pantry.** A row is there because
-somebody hearted it, a sitting cooks with it, or the pantry says more is needed;
+somebody hearted it, a sitting cooks with it, the pantry says more is needed, or it
+was bought for this burn already — a tick that answered a request must not make the
+row vanish from under the buyer's thumb;
 without that rule the page would open on a hundred and fifty rows with nothing to
 choose between them. What there is **plenty** of and nobody has asked for folds
 away behind a line saying how many — hidden rather than absent, because a buyer

@@ -321,7 +321,7 @@ export const shoppingSections = (input: ShoppingInput): ShoppingSections => {
   const stocked = new Set(input.items.map((item) => item.id))
 
   const rows = input.items
-    .filter((item) => item.hearts.count > 0 || item.need_more || picks.has(item.id))
+    .filter((item) => item.hearts.count > 0 || item.need_more || item.bought !== null || picks.has(item.id))
     .map((item) => pantryRow(item, picks.get(item.id)))
 
   const asked = [...specials, ...[...picks].filter(([key]) => !stocked.has(key))].map(([key, gathered]) =>
