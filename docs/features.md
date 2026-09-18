@@ -204,6 +204,11 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   thing that everybody shopping can see. **Buying for [n]** replaces the headcount
   for every sitting, which is where the margin goes. Copy it as text to paste
   anywhere.
+- Special buys written again and again are listed for an admin at the foot of the
+  Pantry page, with how many sittings ask for them. **Promote** fills the add form in
+  from one, and saving both puts the thing on the list and points every line written
+  that way — in that unit, on a burn still to come — at it, keeping their amounts and
+  any shopping tick.
 - A pantry thing can be tagged with what it contains, from the same allergy list
   members tick about themselves. A sitting using one says how many of the people
   there that day cannot eat it and names them, with a count of whoever wrote

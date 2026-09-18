@@ -1,4 +1,4 @@
-import type { EventPantryItem, MyBurn, PantryItem, PantryPlace } from '@sage-burner/shared'
+import type { EventPantryItem, MyBurn, PantryItem, PantryPlace, SpecialBuy } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { LocationProvider } from 'preact-iso'
@@ -114,6 +114,8 @@ const stub = (over: Partial<PantryApi> = {}, items: PantryItem[] = ITEMS): Pantr
   updatePantryItem: () => Promise.reject(new Error('updatePantryItem is not stubbed here')),
   withdrawPantryItem: () => Promise.reject(new Error('withdrawPantryItem is not stubbed here')),
   restorePantryItem: () => Promise.reject(new Error('restorePantryItem is not stubbed here')),
+  getSpecialBuys: () => Promise.resolve({ buys: [] }),
+  adoptSpecialBuy: () => Promise.reject(new Error('adoptSpecialBuy is not stubbed here')),
   ...over,
 })
 
@@ -668,5 +670,110 @@ describe('taking inventory one room at a time', () => {
 
     expect(await screen.findByText('Candles')).toBeTruthy()
     expect(screen.queryByLabelText('What did you find?')).toBeNull()
+  })
+})
+
+const SAFFRON: SpecialBuy = {
+  name: 'Saffron, 1 g sachets',
+  unit: 'sachets',
+  sittings: 3,
+  sample: { meal_label: 'Dinner', date: '2026-08-01', event_name: 'Autumn burn' },
+}
+
+const promoting = (over: Partial<PantryApi> = {}, buys: SpecialBuy[] = [SAFFRON]) =>
+  stub({ getSpecialBuys: () => Promise.resolve({ buys }), ...over })
+
+describe('promoting a special buy', () => {
+  it('lists what cooks keep writing by hand, with how often and where', async () => {
+    renderPage(promoting(), ADMIN)
+
+    expect(await screen.findByText('Saffron, 1 g sachets')).toBeTruthy()
+    expect(screen.getByText('3 sittings · Autumn burn: Sat 1 Dinner')).toBeTruthy()
+  })
+
+  it('is absent when there is nothing to promote', async () => {
+    renderPage(promoting({}, []), ADMIN)
+
+    await screen.findByText('Oatmeal')
+
+    expect(screen.queryByText('Written on sittings, not in the pantry')).toBeNull()
+  })
+
+  it('is not offered to a member, who may not read it either', async () => {
+    const getSpecialBuys = vi.fn<PantryApi['getSpecialBuys']>(() => Promise.resolve({ buys: [SAFFRON] }))
+    renderPage(promoting({ getSpecialBuys }), MEMBER)
+
+    await screen.findByText('Oatmeal')
+
+    expect(screen.queryByText('Written on sittings, not in the pantry')).toBeNull()
+    expect(getSpecialBuys).not.toHaveBeenCalled()
+  })
+
+  it('fills the add form in with what was written, and says what saving will do', async () => {
+    renderPage(promoting(), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+
+    expect(screen.getByLabelText('What is it?')).toHaveProperty('value', 'Saffron, 1 g sachets')
+    expect(screen.getByLabelText('Counted in')).toHaveProperty('value', 'sachets')
+    expect(screen.getByText(/points every line written/)).toBeTruthy()
+  })
+
+  it('adds the thing and then points the lines at it, saying how many followed', async () => {
+    const addPantryItem = vi.fn<PantryApi['addPantryItem']>(() =>
+      Promise.resolve({ item: thing({ id: 'p-9', name: 'Saffron, 1 g sachets', unit: 'sachets' }) }),
+    )
+    const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 3 }))
+    renderPage(promoting({ addPantryItem, adoptSpecialBuy }), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    await waitFor(() =>
+      expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', { name: 'Saffron, 1 g sachets', unit: 'sachets' }),
+    )
+    expect(addPantryItem).toHaveBeenCalledWith({
+      kind: 'staple',
+      name: 'Saffron, 1 g sachets',
+      unit: 'sachets',
+      places: [],
+    })
+    expect(await screen.findByText('3 lines now point at the pantry.')).toBeTruthy()
+  })
+
+  it('still asks, and says nothing followed, when the unit was changed before saving', async () => {
+    const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 0 }))
+    renderPage(
+      promoting({
+        addPantryItem: () => Promise.resolve({ item: thing({ id: 'p-9', name: 'Saffron, 1 g sachets' }) }),
+        adoptSpecialBuy,
+      }),
+      ADMIN,
+    )
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'g' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    await waitFor(() =>
+      expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', { name: 'Saffron, 1 g sachets', unit: 'sachets' }),
+    )
+    expect(
+      await screen.findByText(
+        'It is on the list, but no line moved across: they are written in another unit.',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('adds an ordinary thing without asking for any adoption', async () => {
+    const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 0 }))
+    const addPantryItem = vi.fn<PantryApi['addPantryItem']>(() => Promise.resolve({ item: thing() }))
+    renderPage(promoting({ addPantryItem, adoptSpecialBuy }), ADMIN)
+
+    fireEvent.input(await screen.findByLabelText('What is it?'), { target: { value: 'Quinoa' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    await waitFor(() => expect(addPantryItem).toHaveBeenCalled())
+    expect(adoptSpecialBuy).not.toHaveBeenCalled()
   })
 })

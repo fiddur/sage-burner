@@ -4,11 +4,14 @@ import type {
   PantryItem,
   PantryKind,
   PantryPlace,
+  SpecialBuy,
   StockLevel,
 } from '@sage-burner/shared'
+import type { Ref } from 'preact'
 
 import {
   bySpot,
+  dayName,
   isPantryKind,
   MAX_OPTION_LABEL,
   MAX_SPOT,
@@ -23,7 +26,7 @@ import {
   whereSaid,
 } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
-import { useState } from 'preact/hooks'
+import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
@@ -45,11 +48,13 @@ import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 export type PantryApi = Pick<
   ApiClient,
   | 'addPantryItem'
+  | 'adoptSpecialBuy'
   | 'flagPantryNeedMore'
   | 'getAllergyItems'
   | 'getEventPantry'
   | 'getPantry'
   | 'getPantryPlaces'
+  | 'getSpecialBuys'
   | 'heartPantryItem'
   | 'putPantrySpot'
   | 'removePantrySpot'
@@ -126,7 +131,19 @@ const nothing = (): {
   hearts: ReadonlyMap<string, PantryHearts>
   allergies: readonly AllergyItem[]
   places: readonly PantryPlace[]
-} => ({ items: [], hearts: new Map(), allergies: [], places: [] })
+  buys: readonly SpecialBuy[]
+} => ({ items: [], hearts: new Map(), allergies: [], places: [], buys: [] })
+
+const writtenOn = (buy: SpecialBuy): string =>
+  [
+    `${buy.sittings} sitting${buy.sittings === 1 ? '' : 's'}`,
+    `${buy.sample.event_name}: ${dayName(buy.sample.date, 'short')} ${buy.sample.meal_label}`,
+  ].join(' · ')
+
+const adoptedSaid = (adopted: number): string =>
+  adopted === 0
+    ? 'It is on the list, but no line moved across: they are written in another unit.'
+    : `${adopted} line${adopted === 1 ? '' : 's'} now point${adopted === 1 ? 's' : ''} at the pantry.`
 
 export const Pantry = ({ api }: { api: PantryApi }) => {
   const viewer = useViewer()
@@ -136,11 +153,12 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
   const asked: string | undefined = query?.[PLACE_PARAM]
   const { loaded, refreshing, reload } = useLoad(
     async (signal) => {
-      const [all, wanted, allergies, rooms] = await Promise.all([
+      const [all, wanted, allergies, rooms, written] = await Promise.all([
         api.getPantry(signal),
         burn === undefined ? undefined : api.getEventPantry(burn.event.id, signal),
         api.getAllergyItems(signal),
         api.getPantryPlaces(signal),
+        admin ? api.getSpecialBuys(signal) : undefined,
       ])
 
       return {
@@ -148,6 +166,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
         hearts: new Map((wanted?.items ?? []).map((one) => [one.id, one.hearts])),
         allergies: allergies.items,
         places: rooms.places,
+        buys: written?.buys ?? [],
       }
     },
     {
@@ -163,8 +182,11 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
   const [filter, setFilter] = useState<PantryFilter>('all')
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [draft, setDraft] = useState(BLANK)
+  const [promoting, setPromoting] = useState<{ name: string; unit: string } | undefined>(undefined)
+  const [promoted, setPromoted] = useState<string | undefined>(undefined)
+  const form = useRef<HTMLFormElement>(null)
 
-  const { items, hearts, allergies, places } = loaded.status === 'ready' ? loaded.data : nothing()
+  const { items, hearts, allergies, places, buys } = loaded.status === 'ready' ? loaded.data : nothing()
   const here = places.find((one) => one.id === asked)
   const shown = shownPantry(items, { filter, search, place: here?.id })
   const gone = items.filter((item) => item.withdrawn_at !== null)
@@ -204,14 +226,28 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
     }
 
     run(async () => {
-      await api.addPantryItem({
+      const added = await api.addPantryItem({
         kind: draft.kind,
         name: draft.name.trim(),
         unit: draft.unit.trim() === '' ? 'pcs' : draft.unit.trim(),
         places: draft.places,
       })
+
+      if (promoting !== undefined) {
+        const moved = await api.adoptSpecialBuy(added.item.id, promoting)
+        setPromoted(adoptedSaid(moved.adopted))
+      }
+
       setDraft(BLANK)
+      setPromoting(undefined)
     }, nameClash('Could not add that.'))
+  }
+
+  const promote = (buy: SpecialBuy) => {
+    setDraft({ ...BLANK, name: buy.name, unit: buy.unit })
+    setPromoting({ name: buy.name, unit: buy.unit })
+    setPromoted(undefined)
+    form.current?.scrollIntoView?.({ behavior: 'smooth' })
   }
 
   return (
@@ -309,66 +345,19 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
           )}
 
           {admin && (
-            <form
-              class="form"
-              onSubmit={(submitted) => {
-                submitted.preventDefault()
-                put()
-              }}
-            >
-              <h2>Add a thing</h2>
-
-              <label class="field">
-                <span>What is it?</span>
-                <input
-                  type="text"
-                  name="name"
-                  maxLength={MAX_OPTION_LABEL}
-                  value={draft.name}
-                  onInput={(typed) => setDraft((held) => ({ ...held, name: typed.currentTarget.value }))}
-                />
-              </label>
-
-              <label class="field">
-                <span>What kind of thing?</span>
-                <select
-                  name="kind"
-                  value={draft.kind}
-                  onChange={(chosen) => {
-                    const kind = chosen.currentTarget.value
-                    if (isPantryKind(kind)) setDraft((held) => ({ ...held, kind }))
-                  }}
-                >
-                  {pantryKinds.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {pantryKindLabel[kind]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label class="field">
-                <span>Counted in</span>
-                <input
-                  type="text"
-                  name="unit"
-                  maxLength={MAX_UNIT}
-                  value={draft.unit}
-                  onInput={(typed) => setDraft((held) => ({ ...held, unit: typed.currentTarget.value }))}
-                />
-              </label>
-
-              <PlaceFields
-                what="the new thing"
-                places={places}
-                held={draft.places}
-                busy={busy}
-                onChange={(wanted) => setDraft((held) => ({ ...held, places: wanted }))}
-              />
-
-              <PendingButton busy={busy} label="Add it" busyLabel="Adding…" type="submit" />
-            </form>
+            <AddAThing
+              draft={draft}
+              places={places}
+              busy={busy}
+              promoting={promoting}
+              promoted={promoted}
+              form={form}
+              onChange={setDraft}
+              onAdd={put}
+            />
           )}
+
+          {admin && <WrittenOnSittings buys={buys} busy={busy} onPromote={promote} />}
 
           {admin && (
             <TakenOff
@@ -439,6 +428,138 @@ const PlaceChips = ({
         </p>
       )}
     </>
+  )
+}
+
+const AddAThing = ({
+  draft,
+  places,
+  busy,
+  promoting,
+  promoted,
+  form,
+  onAdd,
+  onChange,
+}: {
+  draft: PantryDraft
+  places: readonly PantryPlace[]
+  busy: boolean
+  promoting: { name: string; unit: string } | undefined
+  promoted: string | undefined
+  form: Ref<HTMLFormElement>
+  onAdd: () => void
+  onChange: (change: (held: PantryDraft) => PantryDraft) => void
+}) => (
+  <form
+    class="form"
+    ref={form}
+    onSubmit={(submitted) => {
+      submitted.preventDefault()
+      onAdd()
+    }}
+  >
+    <h2>Add a thing</h2>
+
+    {promoting !== undefined && (
+      <p class="form-note">
+        Saving puts it on the list and points every line written “{promoting.name} · {promoting.unit}” at it.
+        Change the unit and none of them can follow.
+      </p>
+    )}
+
+    <label class="field">
+      <span>What is it?</span>
+      <input
+        type="text"
+        name="name"
+        maxLength={MAX_OPTION_LABEL}
+        value={draft.name}
+        onInput={(typed) => onChange((held) => ({ ...held, name: typed.currentTarget.value }))}
+      />
+    </label>
+
+    <label class="field">
+      <span>What kind of thing?</span>
+      <select
+        name="kind"
+        value={draft.kind}
+        onChange={(chosen) => {
+          const kind = chosen.currentTarget.value
+          if (isPantryKind(kind)) onChange((held) => ({ ...held, kind }))
+        }}
+      >
+        {pantryKinds.map((kind) => (
+          <option key={kind} value={kind}>
+            {pantryKindLabel[kind]}
+          </option>
+        ))}
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Counted in</span>
+      <input
+        type="text"
+        name="unit"
+        maxLength={MAX_UNIT}
+        value={draft.unit}
+        onInput={(typed) => onChange((held) => ({ ...held, unit: typed.currentTarget.value }))}
+      />
+    </label>
+
+    <PlaceFields
+      what="the new thing"
+      places={places}
+      held={draft.places}
+      busy={busy}
+      onChange={(wanted) => onChange((held) => ({ ...held, places: wanted }))}
+    />
+
+    <PendingButton busy={busy} label="Add it" busyLabel="Adding…" type="submit" />
+
+    {promoted !== undefined && <p class="form-note">{promoted}</p>}
+  </form>
+)
+
+const WrittenOnSittings = ({
+  buys,
+  busy,
+  onPromote,
+}: {
+  buys: readonly SpecialBuy[]
+  busy: boolean
+  onPromote: (buy: SpecialBuy) => void
+}) => {
+  if (buys.length === 0) return null
+
+  return (
+    <section>
+      <h2>Written on sittings, not in the pantry</h2>
+      <p class="form-note">
+        What cooks have written by hand for a burn still to come. Something written again and again is
+        something the house keeps — promote it, and the lines already written point at it.
+      </p>
+      <ul class="pantry-list">
+        {buys.map((buy) => (
+          <li key={`${buy.name} · ${buy.unit}`} class="pantry-row">
+            <div class="pantry-what">
+              <strong>{buy.name}</strong> <span class="pantry-kind">{buy.unit}</span>
+            </div>
+            <p class="form-note">{writtenOn(buy)}</p>
+            <p class="pantry-actions">
+              <button
+                type="button"
+                aria-label={`Promote ${buy.name} to the pantry`}
+                disabled={busy}
+                onClick={() => onPromote(buy)}
+              >
+                Promote
+              </button>
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
