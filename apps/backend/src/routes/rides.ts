@@ -1,24 +1,31 @@
 import type { Ride, RideEntry, RidesResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, rideCreateSchema, rideUpdateSchema } from '@sage-burner/shared'
+import { apiRoutes, rideCreateSchema, ridesPage, rideTitle, rideUpdateSchema } from '@sage-burner/shared'
 import { and, asc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
-import { account, event, ride } from '../db/schema.ts'
+import { account, event, ride, thread } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
+import { addEntry, forgetThread, threadFor, threadIdFor } from './threads.ts'
 
 export interface RideDeps extends GuardDeps {
   now: () => Date
+  notify?: Notifier
 }
+
+const posted = (kind: Ride['kind']): string =>
+  kind === 'offers' ? 'is offering a lift' : 'is looking for a lift'
 
 export const ridesFor = async (db: Database, eventId: string): Promise<RideEntry[]> => {
   const rows = await db
@@ -34,9 +41,11 @@ export const ridesFor = async (db: Database, eventId: string): Promise<RideEntry
       created_at: ride.created_at,
       name: account.name,
       contact: account.contact,
+      thread_id: thread.id,
     })
     .from(ride)
     .innerJoin(account, eq(ride.account_id, account.id))
+    .leftJoin(thread, and(eq(thread.entity_type, 'ride'), eq(thread.entity_id, ride.id)))
     .where(eq(ride.event_id, eventId))
     .orderBy(asc(ride.created_at), asc(ride.id))
 
@@ -54,7 +63,10 @@ const openJourney = async (db: Database, now: () => Date, id: string): Promise<R
   return row?.ride
 }
 
-export const registerRideRoutes = (app: FastifyInstance, { db, sessions, now }: RideDeps) => {
+export const registerRideRoutes = (
+  app: FastifyInstance,
+  { db, sessions, now, notify = async () => undefined }: RideDeps,
+) => {
   const { requireApproved } = createGuards({ db, sessions })
 
   app.get<{ Params: { eventId: string } }>(
@@ -90,12 +102,42 @@ export const registerRideRoutes = (app: FastifyInstance, { db, sessions, now }: 
         created_at: now().toISOString(),
       } satisfies Ride
 
+      let threadId: string
       try {
-        await db.insert(ride).values(row)
+        threadId = db.transaction((tx) => {
+          tx.insert(ride).values(row).run()
+
+          return threadIdFor(tx, {
+            type: 'ride',
+            id: row.id,
+            event_id: row.event_id,
+            title: rideTitle(row),
+          })
+        })
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return sendError(reply, 404)
         throw failure
       }
+
+      await addEntry(
+        db,
+        { thread_id: threadId, kind: 'added', author_account_id: viewer.account_id, body: posted(row.kind) },
+        now(),
+      )
+
+      const who = await displayName(db, viewer.account_id)
+
+      await tellAttendees(
+        db,
+        notify,
+        row.event_id,
+        {
+          category: 'ride_posted',
+          body: `${who} ${posted(row.kind)} from ${row.from}`,
+          link: ridesPage(row.event_id, row.id),
+        },
+        { except: [viewer.account_id] },
+      )
 
       return reply.code(201).send({ ride: row })
     },
@@ -121,6 +163,32 @@ export const registerRideRoutes = (app: FastifyInstance, { db, sessions, now }: 
       const patched = await patchRow(db, ride, eq(ride.id, request.params.id), body)
       if (patched.kind !== 'ok') return sendError(reply, 404)
 
+      const changed =
+        patched.row.kind !== existing.kind ||
+        patched.row.from !== existing.from ||
+        patched.row.when !== existing.when ||
+        patched.row.seats !== existing.seats ||
+        patched.row.notes !== existing.notes
+
+      if (changed) {
+        const threadId = await threadFor(db, 'ride', {
+          id: patched.row.id,
+          event_id: patched.row.event_id,
+          title: rideTitle(patched.row),
+        })
+
+        await addEntry(
+          db,
+          {
+            thread_id: threadId,
+            kind: 'edited',
+            author_account_id: viewer.account_id,
+            body: 'went over it',
+          },
+          now(),
+        )
+      }
+
       return { ride: patched.row }
     },
   )
@@ -138,7 +206,10 @@ export const registerRideRoutes = (app: FastifyInstance, { db, sessions, now }: 
       if (existing === undefined) return sendError(reply, 404)
       if (existing.account_id !== viewer.account_id) return sendError(reply, 403)
 
-      await db.delete(ride).where(eq(ride.id, request.params.id))
+      db.transaction((tx) => {
+        tx.delete(ride).where(eq(ride.id, existing.id)).run()
+        forgetThread(tx, 'ride', existing.id)
+      })
 
       return reply.code(204).send()
     },

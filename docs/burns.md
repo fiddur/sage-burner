@@ -807,3 +807,23 @@ with whom.
 Reached from **(looking for a lift, or offering one?)** beside the arrival dates on the
 details page — where somebody is standing when they think about getting there. Not from
 the bar: that carries one entry per thing and is already full at six on a phone (#337).
+
+**A journey is a feed card** (#831). Posting one opens a `ride` thread, tells whoever is
+coming under `ride_posted`, and thereby reaches the digest — the board was the last shared
+list nobody heard about, so a lift going spare was seen only by whoever opened the page.
+The card's title and body are computed from the row on every read, by `rideTitle` and
+`rideBody` in `packages/shared/src/cards.ts`, rather than stored: the title says which half
+of the board it is and where from, the body is the when line, the seats on an offer and the
+notes. `thread.title` is written once at creation and never renamed, because nothing reads
+it while the ride exists — it is what a card falls back to once it does not.
+
+**Taking a journey down forgets its thread**, in the same transaction as the delete, the way
+a talking point does. There is no withdrawal here to soften: a row is one person's statement
+about their own travel, and a board of journeys nobody is making any more is the spreadsheet
+tab this replaced. The comments go with it, which is the price of a hard delete and the
+reason the bring list does not take one.
+
+**Editing writes one line, and only when something changed.** `edited` coalesces, so going
+over the wording three times is one line rather than three; a save that changed nothing
+writes none. Notes are plain text with no mention picker, so nothing here calls `namedBy` —
+a comment on the card is where naming somebody belongs.
