@@ -107,20 +107,33 @@ const Introduction = ({ written, mine, whose }: { written: string; mine: boolean
   )
 }
 
+interface Talked {
+  cards: Thread[]
+  lost: number
+}
+
+const lostSaid = (lost: number): string =>
+  lost === 1 ? 'Could not load one of the conversations.' : `Could not load ${lost} of the conversations.`
+
 const Talks = ({ api, cardIds }: { api: PersonApi; cardIds: readonly string[] }) => {
   const viewer = useViewer()
 
-  const { loaded: said } = useLoad<Thread[]>(
-    async (signal) => await Promise.all(cardIds.map(async (id) => (await api.getThread(id, signal)).thread)),
-    {
-      enabled: cardIds.length > 0,
-      key: cardIds.join(','),
-      fallback: 'Could not load what people have said.',
+  const { loaded: said } = useLoad<Talked>(
+    async (signal) => {
+      const settled = await Promise.allSettled(
+        cardIds.map(async (id) => (await api.getThread(id, signal)).thread),
+      )
+
+      return {
+        cards: settled.flatMap((one) => (one.status === 'fulfilled' ? [one.value] : [])),
+        lost: settled.filter((one) => one.status === 'rejected').length,
+      }
     },
+    { enabled: cardIds.length > 0, key: cardIds.join(',') },
   )
 
   const { loaded: everybody } = useLoad(async (signal) => (await api.getApprovedAccounts(signal)).accounts, {
-    enabled: isApproved(viewer),
+    enabled: isApproved(viewer) && cardIds.length > 0,
     fallback: 'Could not load who can be mentioned.',
   })
   const people = everybody.status === 'ready' ? everybody.data : []
@@ -152,7 +165,8 @@ const Talks = ({ api, cardIds }: { api: PersonApi; cardIds: readonly string[] })
 
   // `useLoad` keeps the last successful data across a key change, so A’s conversations would
   // render under B’s page for one round trip.
-  const cards = (said.status === 'ready' ? said.data : []).filter((card) => cardIds.includes(card.id))
+  const held = said.status === 'ready' ? said.data : { cards: [], lost: 0 }
+  const cards = held.cards.filter((card) => cardIds.includes(card.id))
 
   if (cardIds.length === 0) return null
 
@@ -160,7 +174,7 @@ const Talks = ({ api, cardIds }: { api: PersonApi; cardIds: readonly string[] })
     <>
       <h2>What people say</h2>
       {said.status === 'loading' && <p class="form-note">Loading…</p>}
-      {said.status === 'failed' && <ErrorText message={said.message} />}
+      {held.lost > 0 && <ErrorText message={lostSaid(held.lost)} />}
       <ErrorText message={error} />
       {cards.map((card) => {
         const shown = fresher[card.id] ?? card

@@ -174,6 +174,23 @@ export type Guarded =
   | 'sessions'
   | 'song'
 
+interface Sendable {
+  payload: BodyInit | undefined
+  contentType: string | undefined
+}
+
+const sendable = (body: unknown): Sendable => {
+  if (body === undefined) return { payload: undefined, contentType: undefined }
+
+  if (typeof body === 'string') {
+    throw new TypeError('A request body is an object here; this one is already serialised.')
+  }
+
+  if (body instanceof Blob) return { payload: body, contentType: body.type }
+
+  return { payload: JSON.stringify(body), contentType: 'application/json' }
+}
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
@@ -225,9 +242,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     const { method = 'GET', body, signal, version } = options
 
     let response: Response
-    const binary = body instanceof Blob
-    const payload = body === undefined ? undefined : binary ? body : JSON.stringify(body)
-    const contentType = binary ? body.type : 'application/json'
+    const { payload, contentType } = sendable(body)
 
     try {
       response = await doFetch(path, {
@@ -235,7 +250,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         signal,
         credentials: 'same-origin',
         headers: {
-          ...(payload === undefined ? {} : { 'content-type': contentType }),
+          ...(contentType === undefined ? {} : { 'content-type': contentType }),
           ...precondition(method, version),
         },
         body: payload,

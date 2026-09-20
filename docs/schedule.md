@@ -321,7 +321,9 @@ unschedules it — so a dream restored months later can sit on a slot another ha
 taken; the grid draws overlaps rather than refusing them, and whoever restores is
 looking at the schedule anyway. Rows deleted before the stamp existed left orphaned threads;
 the migration resurrects each as a withdrawn dream — title from the thread, description and
-the rest lost with the original row.
+the rest lost with the original row. One of those comes back to the trashcan only on a burn
+still to come: restore refuses on a burn that has ended and the burn selector does not offer
+one, so on an ended burn the resurrected row is a record of what was said and nothing more.
 
 **The Dreams page opens this same panel** (#342), through `OpenedDream` — the state,
 the writes and the markup are one thing rather than two. It used to swap a row for an

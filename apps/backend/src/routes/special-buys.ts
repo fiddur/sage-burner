@@ -86,6 +86,8 @@ export const specialBuysFor = async (db: Database, today: string): Promise<Speci
     .sort(byCount)
 }
 
+type Adoption = { kind: 'elsewhere' } | { kind: 'gone' } | { kind: 'taken'; meals: string[] }
+
 const same = (column: AnyColumn, written_as: string) =>
   sql`lower(trim(${column})) = ${written_as.trim().toLowerCase()}`
 
@@ -102,50 +104,74 @@ export const registerSpecialBuyRoutes = (app: FastifyInstance, { db, sessions, n
     const body = bodyOf(specialBuyAdoptSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    const [thing] = await db
-      .select({ id: pantryItem.id, unit: pantryItem.unit, withdrawn_at: pantryItem.withdrawn_at })
-      .from(pantryItem)
-      .where(eq(pantryItem.id, request.params.id))
-      .limit(1)
-
-    if (thing === undefined || thing.withdrawn_at !== null) return sendError(reply, 404)
-
-    const open = db
-      .select({ id: meal.id })
-      .from(meal)
-      .innerJoin(event, eq(event.id, meal.event_id))
-      .where(gte(event.end_date, todayIso(now)))
-
-    const matching = await db
-      .select({ id: mealIngredient.id })
-      .from(mealIngredient)
-      .where(
-        and(
-          isNull(mealIngredient.pantry_item_id),
-          same(mealIngredient.name, body.name),
-          same(mealIngredient.unit, body.unit),
-          inArray(mealIngredient.meal_id, open),
-        ),
-      )
-
-    const converting = new Set(matching.map((line) => line.id))
     const given = Object.entries(body.amounts)
-    if (given.some(([id]) => !converting.has(id))) return sendError(reply, 400)
 
-    const taken =
-      converting.size === 0
-        ? []
-        : await db
-            .update(mealIngredient)
-            .set({ pantry_item_id: thing.id, name: null, unit: null })
-            .where(inArray(mealIngredient.id, [...converting]))
-            .returning({ meal_id: mealIngredient.meal_id })
+    const done = db.transaction((tx): Adoption => {
+      const [thing] = tx
+        .select({ id: pantryItem.id, withdrawn_at: pantryItem.withdrawn_at })
+        .from(pantryItem)
+        .where(eq(pantryItem.id, request.params.id))
+        .limit(1)
+        .all()
 
-    for (const [id, amount] of given) {
-      await db.update(mealIngredient).set({ amount }).where(eq(mealIngredient.id, id))
-    }
+      if (thing === undefined || thing.withdrawn_at !== null) return { kind: 'gone' }
 
-    const touched = [...new Set(taken.map((line) => line.meal_id))]
+      const open = tx
+        .select({ id: meal.id })
+        .from(meal)
+        .innerJoin(event, eq(event.id, meal.event_id))
+        .where(gte(event.end_date, todayIso(now)))
+
+      const matching = tx
+        .select({ id: mealIngredient.id })
+        .from(mealIngredient)
+        .where(
+          and(
+            isNull(mealIngredient.pantry_item_id),
+            same(mealIngredient.name, body.name),
+            same(mealIngredient.unit, body.unit),
+            inArray(mealIngredient.meal_id, open),
+          ),
+        )
+        .all()
+
+      const converting = new Set(matching.map((line) => line.id))
+      const stray = given.filter(([id]) => !converting.has(id)).map(([id]) => id)
+
+      const left =
+        stray.length === 0
+          ? []
+          : tx
+              .select({ id: mealIngredient.id })
+              .from(mealIngredient)
+              .where(inArray(mealIngredient.id, stray))
+              .all()
+
+      if (left.length > 0) return { kind: 'elsewhere' }
+
+      const taken =
+        converting.size === 0
+          ? []
+          : tx
+              .update(mealIngredient)
+              .set({ pantry_item_id: thing.id, name: null, unit: null })
+              .where(and(inArray(mealIngredient.id, [...converting]), isNull(mealIngredient.pantry_item_id)))
+              .returning({ meal_id: mealIngredient.meal_id })
+              .all()
+
+      for (const [id, amount] of given) {
+        if (converting.has(id)) {
+          tx.update(mealIngredient).set({ amount }).where(eq(mealIngredient.id, id)).run()
+        }
+      }
+
+      return { kind: 'taken', meals: taken.map((line) => line.meal_id) }
+    })
+
+    if (done.kind === 'gone') return sendError(reply, 404)
+    if (done.kind === 'elsewhere') return sendError(reply, 400)
+
+    const touched = [...new Set(done.meals)]
 
     if (touched.length > 0) {
       const viewer = await viewerFor(request, { db, sessions })
@@ -159,6 +185,6 @@ export const registerSpecialBuyRoutes = (app: FastifyInstance, { db, sessions, n
       }
     }
 
-    return { adopted: taken.length } satisfies SpecialBuyAdopted
+    return { adopted: done.meals.length } satisfies SpecialBuyAdopted
   })
 }

@@ -248,8 +248,8 @@ export const registerSessionRoutes = (
 
     const was = before.facilitator_account_id
 
-    if (was !== null) await tell(by, was, `You are no longer facilitating ${before.title}`)
-    if (after !== null) await tell(by, after, `You are facilitating ${before.title}`)
+    if (was !== null) await tell(by, was, before, `You are no longer facilitating ${before.title}`)
+    if (after !== null) await tell(by, after, before, `You are facilitating ${before.title}`)
 
     const line = await facilitatorLine(by, was, after)
     if (line !== undefined) await noteOnDream(before, 'facilitator', by, line)
@@ -269,10 +269,19 @@ export const registerSessionRoutes = (
     return `asked ${await displayName(db, after)} to facilitate`
   }
 
-  const tell = async (by: string | undefined, accountId: string, message: string) => {
+  const tell = async (
+    by: string | undefined,
+    accountId: string,
+    dream: { id: string; event_id: string },
+    message: string,
+  ) => {
     if (accountId === by) return
 
-    await notify(accountId, { category: 'dream_role', body: message, link: '/dreams' })
+    await notify(accountId, {
+      category: 'dream_role',
+      body: message,
+      link: dreamPage(dream.event_id, dream.id),
+    })
   }
 
   const noteOnDream = async (
@@ -668,7 +677,7 @@ export const registerSessionRoutes = (
     const told = new Set(theirs.flatMap((id) => (id === null || id === by ? [] : [id])))
 
     for (const accountId of told) {
-      await tell(by, accountId, `“${dream.title}” was folded into “${target.title}”`)
+      await tell(by, accountId, target, `“${dream.title}” was folded into “${target.title}”`)
     }
   }
 
@@ -758,7 +767,7 @@ export const registerSessionRoutes = (
         .returning()
 
       if (added.length > 0) {
-        await tell(found.callerId, body.account_id, `You are helping with ${found.dream.title}`)
+        await tell(found.callerId, body.account_id, found.dream, `You are helping with ${found.dream.title}`)
         await noteOnDream(
           found.dream,
           'helper',
@@ -794,6 +803,7 @@ export const registerSessionRoutes = (
         await tell(
           found.callerId,
           request.params.accountId,
+          found.dream,
           `You are no longer helping with ${found.dream.title}`,
         )
         await noteOnDream(

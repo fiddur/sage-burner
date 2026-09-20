@@ -1,6 +1,6 @@
 import type { PantryKind } from '@sage-burner/shared'
 
-import { isPantryKind, pantryKinds } from '@sage-burner/shared'
+import { isPantryKind, MAX_PANTRY_NOTE, pantryKinds } from '@sage-burner/shared'
 import { and, eq, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -122,11 +122,20 @@ export const readPantryTsv = (text: string, places: readonly KnownPlace[]): Pant
         : [{ place_id: column.place.id, spot: rooms[index] ?? '' }],
     )
 
+    const note = cellUnder(header.columns, rooms, 'note')
+
+    if (note.length > MAX_PANTRY_NOTE) {
+      return {
+        kind: 'bad',
+        problem: `Line ${at}: the note is ${note.length} characters, and ${MAX_PANTRY_NOTE} is the most.`,
+      }
+    }
+
     lines.push({
       name,
       kind,
       unit: unit === '' ? DEFAULT_UNIT : unit,
-      note: cellUnder(header.columns, rooms, 'note'),
+      note,
       spots,
       need_more: cellUnder(header.columns, rooms, 'need_more') !== '',
     })

@@ -22,6 +22,29 @@ under today's heading, and make a new heading when there is none.
   "Salsa · jars" and count it in `jars (300g)`, and the form asks what each line already
   written becomes before it saves, instead of adding the thing and leaving every line
   behind.
+- **A pantry note opens where you can read it on a phone.** The ℹ️ bubble was measured from
+  the icon, so one opened near the end of a line ran off the side of the screen and was cut
+  off. It is measured from the row now, wraps a long word or a pasted link, and stays inside
+  the screen at any width.
+- **The adjust step gets out of your way.** Put **Counted in** back to the unit the lines
+  were written in and the step goes; **Back** and then **Add it** again keeps the figures you
+  typed instead of throwing them away.
+- **The copy-from control fits a phone.** On the Leads page, "Or start from a previous burn"
+  used to be wider than the screen and took the page sideways with it.
+- **Folding a dream keeps the keyboard with you.** Opening "Fold into another dream…" puts
+  the cursor in the choice, and "Keep it apart" puts it back on the button, the way Withdraw
+  already did.
+- **A dream-role notification opens the dream.** Being handed a dream, or put on one as a
+  helper, now lands on that dream on that burn rather than on the Dreams page.
+- **The page for somebody who is not a member at the moment names the organisers to ask.**
+  It said so only where the application had been turned down; somebody whose membership
+  simply is not current was left with nobody to write to.
+- **A member's page leaves out a burn they have left**, matching what the feed shows, and
+  when one conversation fails to load the rest are still there with one line saying so
+  instead of the whole section disappearing.
+- **A short session slides too.** Installations running a session lifetime of under two days
+  were signing people out on the dot instead of keeping them signed in while they kept
+  visiting.
 
 # 2026-09-18
 

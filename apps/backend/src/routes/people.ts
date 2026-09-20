@@ -7,7 +7,15 @@ import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { account, accountAvatar, accountIdentity, accountRole, event, thread } from '../db/schema.ts'
+import {
+  account,
+  accountAvatar,
+  accountIdentity,
+  accountRole,
+  attendance,
+  event,
+  thread,
+} from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { connectionsFor } from './connections.ts'
 
@@ -56,6 +64,10 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
       const cards = await db
         .select({ thread_id: thread.id })
         .from(thread)
+        .innerJoin(
+          attendance,
+          and(eq(attendance.event_id, thread.event_id), eq(attendance.account_id, accountId)),
+        )
         .leftJoin(event, eq(event.id, thread.event_id))
         .where(and(eq(thread.entity_type, 'attendance'), eq(thread.subject_account_id, accountId)))
         .orderBy(desc(event.start_date), asc(thread.id))

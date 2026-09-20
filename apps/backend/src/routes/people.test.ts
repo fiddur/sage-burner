@@ -11,7 +11,15 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountConnection, accountIdentity, accountRole, event, thread } from '../db/schema.ts'
+import {
+  account,
+  accountConnection,
+  accountIdentity,
+  accountRole,
+  attendance,
+  event,
+  thread,
+} from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -290,16 +298,26 @@ describe('the conversations held about somebody', () => {
     return id
   }
 
-  const givenCard = async (subjectId: string, eventId: string) => {
+  const givenComing = async (accountId: string, eventId: string) => {
     const id = randomUUID()
+    await db().insert(attendance).values({ id, event_id: eventId, account_id: accountId, joined_at: NOW })
+
+    return id
+  }
+
+  const givenCard = async (subjectId: string, eventId: string, over: { gone?: boolean } = {}) => {
+    const id = randomUUID()
+    const stay = await givenComing(subjectId, eventId)
     await db().insert(thread).values({
       id,
       event_id: eventId,
       entity_type: 'attendance',
-      entity_id: randomUUID(),
+      entity_id: stay,
       subject_account_id: subjectId,
       title: 'Wren Aldertide',
     })
+    if (over.gone === true) await db().delete(attendance).where(eq(attendance.id, stay))
+
     return id
   }
 
@@ -326,6 +344,20 @@ describe('the conversations held about somebody', () => {
     const response = await fetchProfile(server, asker.cookie, wren.id)
 
     expect(response.json().person.card_thread_ids).toEqual([])
+  })
+
+  it('leaves out a burn somebody has left, as the feed does', async () => {
+    const server = await build()
+    const asker = await givenAccount()
+    const wren = await givenAccount()
+    const earlier = await givenBurn('spring-2026', '2026-05-01')
+    const later = await givenBurn('autumn-2026', '2026-10-01')
+    await givenCard(wren.id, earlier, { gone: true })
+    const laterCard = await givenCard(wren.id, later)
+
+    const response = await fetchProfile(server, asker.cookie, wren.id)
+
+    expect(response.json().person.card_thread_ids).toEqual([laterCard])
   })
 
   it('leaves other people and other kinds of thread out', async () => {

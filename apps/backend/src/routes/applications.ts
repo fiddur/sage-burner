@@ -57,6 +57,9 @@ const organisersFor = async (db: GuardDeps['db']) => {
     .orderBy(account.name)
 }
 
+const decided = (mine: { status: string } | undefined): boolean =>
+  mine?.status === 'rejected' || mine?.status === 'approved'
+
 export const messagesOn = async (
   db: GuardDeps['db'],
   applicationId: string,
@@ -117,7 +120,7 @@ export const registerApplicationRoutes = (
       mine: {
         application: mine ?? null,
         messages: mine === undefined ? [] : await messagesOn(db, mine.id, viewer),
-        organisers: mine?.status === 'rejected' ? await organisersFor(db) : [],
+        organisers: decided(mine) && !viewer.roles.includes('member') ? await organisersFor(db) : [],
       },
     } satisfies MyApplicationResponse
   })

@@ -264,7 +264,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
     const adjust = toAdjust(promoting, adjusting, unit)
 
     if (adjust !== undefined) {
-      setAmounts(adjust)
+      setAmounts((typed) => ({ ...adjust, ...typed }))
       setAdjusting(true)
 
       return
@@ -615,7 +615,7 @@ const AddAThing = ({
       onChange={(wanted) => onChange((held) => ({ ...held, places: wanted }))}
     />
 
-    {adjusting && promoting !== undefined ? (
+    {adjusting && promoting !== undefined && !sameUnit(unitOf(draft), promoting.unit) ? (
       <AdjustAmounts
         buy={promoting}
         unit={unitOf(draft)}

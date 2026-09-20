@@ -1,6 +1,6 @@
 import type { Session } from '@sage-burner/shared'
 
-import { useId, useState } from 'preact/hooks'
+import { useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 export const FoldDream = ({
   dream,
@@ -16,12 +16,25 @@ export const FoldDream = ({
   const [asking, setAsking] = useState(false)
   const [chosen, setChosen] = useState('')
   const noteId = useId()
+  const into = useRef<HTMLSelectElement>(null)
+  const opener = useRef<HTMLButtonElement>(null)
+  const moved = useRef(false)
+
+  useLayoutEffect(() => {
+    if (!moved.current) {
+      moved.current = true
+      return
+    }
+
+    if (asking) into.current?.focus()
+    else opener.current?.focus({ preventScroll: true })
+  }, [asking])
 
   if (others.length === 0) return null
 
   if (!asking) {
     return (
-      <button type="button" class="link-button" disabled={busy} onClick={() => setAsking(true)}>
+      <button ref={opener} type="button" class="link-button" disabled={busy} onClick={() => setAsking(true)}>
         Fold into another dream…
       </button>
     )
@@ -34,6 +47,7 @@ export const FoldDream = ({
       <label class="field">
         <span>Which dream is this one part of?</span>
         <select
+          ref={into}
           aria-label={`Fold ${dream.title} into`}
           disabled={busy}
           value={chosen}

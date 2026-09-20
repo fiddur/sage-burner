@@ -822,11 +822,27 @@ describe('who an applicant is told to ask', () => {
     expect((await mine(server, applicantCookie())).json().mine.organisers).toEqual([])
   })
 
-  it('names nobody where the answer was yes, since they are in and can read the roster', async () => {
+  it('names them where the answer was yes but the membership is not current', async () => {
     const server = await build()
     await givenOrganiser()
     await submit(server, { ...applicant, answers: {} })
     await decided('approved')
+
+    const said = await mine(server, applicantCookie())
+
+    expect(said.json().mine.organisers.map((one: { contact: string }) => one.contact)).toEqual([
+      'ada on discord',
+    ])
+  })
+
+  it('names nobody to a member, who is in and can read the roster', async () => {
+    const server = await build()
+    await givenOrganiser()
+    await submit(server, { ...applicant, answers: {} })
+    await decided('approved')
+    await db()
+      .insert(accountRole)
+      .values({ account_id: applicantAccount?.id ?? '', role: 'member' })
 
     expect((await mine(server, applicantCookie())).json().mine.organisers).toEqual([])
   })

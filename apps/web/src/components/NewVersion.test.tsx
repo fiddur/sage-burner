@@ -9,6 +9,7 @@ import { NewVersion } from './NewVersion.tsx'
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  history.replaceState(null, '', '/')
 })
 
 const changing = () => {
@@ -38,6 +39,7 @@ describe('the redeploy bar', () => {
     await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS * 2)
 
     screen.getByRole('link', { name: /new/ }).click()
+    await vi.advanceTimersByTimeAsync(0)
 
     expect(go).toHaveBeenCalledWith(`${location.origin}/changelog`)
   })
@@ -54,6 +56,7 @@ describe('the redeploy bar', () => {
     await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS * 2)
 
     screen.getByRole('link', { name: 'Notifications' }).click()
+    await vi.advanceTimersByTimeAsync(0)
 
     expect(go).toHaveBeenCalledWith(`${location.origin}/notifications`)
   })
@@ -71,6 +74,7 @@ describe('the redeploy bar', () => {
     await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS * 2)
 
     screen.getByRole('link', { name: 'Notifications' }).click()
+    await vi.advanceTimersByTimeAsync(0)
 
     expect(go).not.toHaveBeenCalled()
   })

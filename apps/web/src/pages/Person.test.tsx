@@ -337,6 +337,68 @@ describe('what people say about them', () => {
     expect(screen.queryByText('Lovely to meet you')).toBeNull()
   })
 
+  it('keeps the conversations that loaded when one of them fails', async () => {
+    const api = stub(aPerson({ card_thread_ids: ['th-1', 'th-2'] }), {
+      getThread: (id: string) =>
+        id === 'th-1'
+          ? Promise.resolve({ thread: aCard([anEntry({ id: 'c-1', body: 'Lovely to meet you' })]) })
+          : Promise.reject(new Error('boom')),
+    })
+
+    show(api)
+
+    expect(await screen.findByText('Lovely to meet you')).toBeTruthy()
+    expect(screen.getByText('Could not load one of the conversations.')).toBeTruthy()
+  })
+
+  it('says nothing about a failure when every conversation loaded', async () => {
+    const api = stub(aPerson({ card_thread_ids: ['th-1', 'th-2'] }), {
+      getThread: (id: string) =>
+        Promise.resolve({ thread: { ...aCard([anEntry({ id: `c-${id}`, body: `said on ${id}` })]), id } }),
+    })
+
+    show(api)
+
+    expect(await screen.findByText('said on th-1')).toBeTruthy()
+    expect(screen.getByText('said on th-2')).toBeTruthy()
+    expect(screen.queryByText(/Could not load .* of the conversations\./)).toBeNull()
+    expect(screen.queryByText('Could not load one of the conversations.')).toBeNull()
+  })
+
+  it('counts the conversations that failed when more than one did', async () => {
+    const api = stub(aPerson({ card_thread_ids: ['th-1', 'th-2'] }), {
+      getThread: () => Promise.reject(new Error('boom')),
+    })
+
+    show(api)
+
+    expect(await screen.findByText('Could not load 2 of the conversations.')).toBeTruthy()
+  })
+
+  it('leaves the roster unread where there is nowhere to mention anybody', async () => {
+    const getApprovedAccounts = vi.fn<PersonApi['getApprovedAccounts']>(() =>
+      Promise.resolve({ accounts: [] }),
+    )
+    show(stub(aPerson(), { getApprovedAccounts }))
+
+    await waitFor(() => expect(screen.getByText('Wren Aldertide')).toBeTruthy())
+    expect(getApprovedAccounts).not.toHaveBeenCalled()
+  })
+
+  it('reads the roster once there is a conversation to mention somebody in', async () => {
+    const getApprovedAccounts = vi.fn<PersonApi['getApprovedAccounts']>(() =>
+      Promise.resolve({ accounts: [] }),
+    )
+    show(
+      stub(aPerson({ card_thread_ids: ['th-1'] }), {
+        getApprovedAccounts,
+        getThread: () => Promise.resolve({ thread: aCard([]) }),
+      }),
+    )
+
+    await waitFor(() => expect(getApprovedAccounts).toHaveBeenCalled())
+  })
+
   it('holds no talk section for somebody nothing was ever said about', async () => {
     show(stub(aPerson()))
 

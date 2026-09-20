@@ -522,6 +522,70 @@ describe('the meetings themselves', () => {
     expect((await cardFor(server, ada.cookie, id)).entries).toHaveLength(1)
   })
 
+  const bellFor = async (server: FastifyInstance, cookie: string) => {
+    const bells = await server.inject({
+      method: 'GET',
+      url: '/api/me/notifications',
+      headers: { cookie },
+    })
+
+    return bells.json().notifications.map((one: { body: string }) => one.body)
+  }
+
+  it('says nothing when the same instant is spelled another way', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bo = await givenAccount('Bo')
+    await givenComing(ada.id)
+    await givenComing(bo.id)
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    await server.inject({
+      method: 'PATCH',
+      url: `/api/meetings/${id}`,
+      headers: { cookie: ada.cookie },
+      payload: {
+        title: 'Planning call',
+        starts_at: '2026-07-20T17:00:00Z',
+        ends_at: null,
+        notes: 'bring the map',
+      },
+    })
+
+    expect((await cardFor(server, ada.cookie, id)).entries).toHaveLength(1)
+    expect(await bellFor(server, bo.cookie)).toEqual(['Ada put a meeting in the diary: Planning call'])
+  })
+
+  it('says so when the instant really moves', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bo = await givenAccount('Bo')
+    await givenComing(ada.id)
+    await givenComing(bo.id)
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    await server.inject({
+      method: 'PATCH',
+      url: `/api/meetings/${id}`,
+      headers: { cookie: ada.cookie },
+      payload: {
+        title: 'Planning call',
+        starts_at: '2026-07-20T18:00:00Z',
+        ends_at: null,
+        notes: 'bring the map',
+      },
+    })
+
+    expect((await cardFor(server, ada.cookie, id)).entries.map((entry) => entry.body)).toContain('moved it')
+    expect(await bellFor(server, bo.cookie)).toContain('Ada moved a meeting: Planning call')
+  })
+
   it('refuses one that ends before it starts', async () => {
     const server = await build()
     await givenBurn()

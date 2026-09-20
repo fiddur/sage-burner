@@ -128,32 +128,80 @@ describe('turning in-app links into full loads while the build is stale', () => 
     return link
   }
 
+  const settled = async () => {
+    await new Promise((resume) => setTimeout(resume, 0))
+  }
+
+  const routing = () => {
+    const push = (event: Event) => {
+      const link = event.target
+      if (link instanceof HTMLAnchorElement) history.pushState(null, '', link.href)
+    }
+
+    globalThis.addEventListener('click', push)
+
+    return () => globalThis.removeEventListener('click', push)
+  }
+
   afterEach(() => {
     document.body.innerHTML = ''
+    history.replaceState(null, '', '/')
   })
 
-  it('navigates rather than letting the router push, which would keep this build', () => {
+  it('loads the new build once the router has pushed the link', async () => {
     const go = vi.fn()
     const off = hardenNavigation(go)
-    const link = clicking('<a href="/members">Members</a>')
+    const stopRouting = routing()
 
-    link.click()
+    clicking('<a href="/members">Members</a>').click()
+    await settled()
 
     expect(go).toHaveBeenCalledWith(`${location.origin}/members`)
+    stopRouting()
     off()
   })
 
-  it('stops when the bar goes, so an app on the newest build routes as it always did', () => {
+  it('leaves a click the app handled itself alone, nothing having moved', async () => {
     const go = vi.fn()
-    hardenNavigation(go)()
-    const link = clicking('<a href="/members">Members</a>')
+    const off = hardenNavigation(go)
+    const link = clicking('<a href="/notifications">Notifications</a>')
+    const handle = (event: Event) => event.preventDefault()
+    link.addEventListener('click', handle)
 
     link.click()
+    await settled()
 
     expect(go).not.toHaveBeenCalled()
+    link.removeEventListener('click', handle)
+    off()
   })
 
-  it('leaves the click alone where the browser is doing the navigating itself', () => {
+  it('stops when the bar goes, so an app on the newest build routes as it always did', async () => {
+    const go = vi.fn()
+    hardenNavigation(go)()
+    const stopRouting = routing()
+
+    clicking('<a href="/members">Members</a>').click()
+    await settled()
+
+    expect(go).not.toHaveBeenCalled()
+    stopRouting()
+  })
+
+  it('drops a click still settling when the bar goes', async () => {
+    const go = vi.fn()
+    const off = hardenNavigation(go)
+    const stopRouting = routing()
+
+    clicking('<a href="/members">Members</a>').click()
+    off()
+    await settled()
+
+    expect(go).not.toHaveBeenCalled()
+    stopRouting()
+  })
+
+  it('leaves the click alone where the browser is doing the navigating itself', async () => {
     const go = vi.fn()
     const off = hardenNavigation(go)
 
@@ -162,17 +210,19 @@ describe('turning in-app links into full loads while the build is stale', () => 
     clicking('<a href="/songs" target="_blank">A new tab</a>').click()
     clicking('<a href="/songs" download="song.txt">A download</a>').click()
     clicking('<a href="#words">An anchor on this page</a>').click()
+    await settled()
 
     expect(go).not.toHaveBeenCalled()
     off()
   })
 
-  it('leaves a modifier click to the browser, which is opening it elsewhere', () => {
+  it('leaves a modifier click to the browser, which is opening it elsewhere', async () => {
     const go = vi.fn()
     const off = hardenNavigation(go)
     const link = clicking('<a href="/members">Members</a>')
 
     link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true }))
+    await settled()
 
     expect(go).not.toHaveBeenCalled()
     off()
