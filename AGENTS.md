@@ -439,8 +439,8 @@ origin develop` and branch from `origin/develop`.
 9. Any push starts a fresh review round. Repeat from step 7.
 10. **Merge, without asking again**, once "merge on approval" is standing and all
     four gates hold:
-    - the latest review body starts with `✅Approved` (the service writes it `✅
-Approved`, with a space; match the ✅), **and** it is on the
+    - the latest review body starts with `✅Approved` — the service puts a space
+      after the ✅, so match the mark and not the spelling — **and** it is on the
       current head commit (a `✅Approved` left on an older commit is stale),
     - every inline review thread is resolved,
     - **every** check is green — not a named one. `CI Gate` runs the tests,
