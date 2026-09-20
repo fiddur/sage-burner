@@ -3,10 +3,8 @@ import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-import * as schema from './schema.ts'
-
 export interface DbHandle {
-  db: ReturnType<typeof drizzle<typeof schema>>
+  db: ReturnType<typeof drizzle>
   client: DatabaseSync
   close: () => void
 }
@@ -39,7 +37,7 @@ export const createDb = ({ url }: CreateDbOptions): DbHandle => {
   }
 
   return {
-    db: drizzle({ client, schema }),
+    db: drizzle({ client }),
     client,
     close: () => client.close(),
   }

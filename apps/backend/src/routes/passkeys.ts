@@ -117,6 +117,7 @@ export const registerPasskeyRoutes = (app: FastifyInstance, { db, config, sessio
       userDisplayName: viewer.name ?? holder.email,
       userID: new TextEncoder().encode(viewer.account_id),
       attestationType: 'none',
+      supportedAlgorithmIDs: [-8, -7, -257],
       excludeCredentials: already.map((row) => ({
         id: row.credential_id,
         ...(row.transports === null ? {} : { transports: knownTransports(row.transports.split(',')) }),

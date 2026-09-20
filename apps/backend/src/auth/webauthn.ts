@@ -1,5 +1,3 @@
-import type { AuthenticatorTransportFuture } from '@simplewebauthn/server'
-
 export interface RelyingParty {
   id: string
   origin: string
@@ -24,19 +22,12 @@ export const relyingParty = (
   return { id: url.hostname, origin: url.origin }
 }
 
-const transports: readonly AuthenticatorTransportFuture[] = [
-  'ble',
-  'cable',
-  'hybrid',
-  'internal',
-  'nfc',
-  'smart-card',
-  'usb',
-]
+// Not the library's `AuthenticatorTransport`, which has no `cable` or `smart-card`.
+const transports = ['ble', 'cable', 'hybrid', 'internal', 'nfc', 'smart-card', 'usb'] as const
 
-const isTransport = (value: string): value is AuthenticatorTransportFuture =>
-  transports.some((known) => known === value)
+export type KnownTransport = (typeof transports)[number]
 
-export const knownTransports = (
-  reported: readonly string[] | undefined,
-): AuthenticatorTransportFuture[] | undefined => reported?.filter(isTransport)
+const isTransport = (value: string): value is KnownTransport => transports.some((known) => known === value)
+
+export const knownTransports = (reported: readonly string[] | undefined): KnownTransport[] | undefined =>
+  reported?.filter(isTransport)

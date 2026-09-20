@@ -187,9 +187,13 @@ describe('createConfig', () => {
       expect(createConfig({}).trust_proxy).toBe(false)
     })
 
-    it('accepts a hop count, the right answer behind one reverse proxy', () => {
-      expect(createConfig({ TRUST_PROXY: '1' }).trust_proxy).toBe(1)
-      expect(createConfig({ TRUST_PROXY: '2' }).trust_proxy).toBe(2)
+    it('refuses a hop count, which Fastify 5.12.1 turned into trusting nothing', () => {
+      expect(() => createConfig({ TRUST_PROXY: '1' })).toThrow(/TRUST_PROXY/)
+      expect(() => createConfig({ TRUST_PROXY: '2' })).toThrow(/TRUST_PROXY/)
+    })
+
+    it('names the replacement in the refusal, so the fix does not need the changelog', () => {
+      expect(() => createConfig({ TRUST_PROXY: '1' })).toThrow(/uniquelocal/)
     })
 
     it('accepts explicit booleans', () => {

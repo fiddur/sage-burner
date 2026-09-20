@@ -9,21 +9,21 @@
     "build": "vite build && vite build --config vite.sw.config.ts",
     "preview": "vite preview",
     "test": "vitest run",
-    "check": "tsgo --noEmit && oxlint -c ../../.oxlintrc.json --type-aware",
+    "check": "tsc --noEmit && oxlint -c ../../.oxlintrc.json --type-aware",
     "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix"
   },
   "dependencies": {
     "@sage-burner/shared": "workspace:*",
-    "@simplewebauthn/browser": "^13.3.0",
-    "marked": "^18.0.7",
-    "preact": "^10.29.7",
-    "preact-iso": "^2.12.1"
+    "@simplewebauthn/browser": "^14.0.0",
+    "marked": "^18.0.13",
+    "preact": "^10.29.8",
+    "preact-iso": "^2.12.2"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
     "@testing-library/preact": "^3.2.4",
-    "happy-dom": "^20.11.1",
-    "vite": "^8.1.5",
-    "vitest": "^4"
+    "happy-dom": "^20.14.5",
+    "vite": "^8.3.0",
+    "vitest": "^5"
   }
 }
