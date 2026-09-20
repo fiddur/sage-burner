@@ -546,27 +546,32 @@ A session started from claude.ai/code runs in a fresh VM with a fresh clone.
 this section is the difference.
 
 - **Node 24, and check it before believing a test run.** The image ships Node 20–22
-  and puts `/opt/node22/bin` ahead of `/usr/local/bin`. The tool shell is a non-login
-  `bash -c` whose `PATH` was fixed when the session launched, so nothing the setup
-  script exports, and no `/etc/profile.d` file, ever reaches it. `scripts/cloud-setup.sh`
-  therefore installs Node 24 into `/opt/node24` with the pinned pnpm and links both
-  **over the directory the image's `PATH` already finds `node` in**. Run `node
---version` first. Anything but `v24` means prefixing every command with `export
-PATH="/opt/node24/bin:$PATH"`; if `/opt/node24` is missing, run the script (it needs
-  root) or stop and say so. **Under Node 22 the suite lies**: there is no
-  `node:sqlite`, so every backend suite importing the database fails at _import_
-  time, and vitest reports that as failed `Test Files` above a **passing** `Tests`
-  count for whatever did load. Read the `Test Files` line, never only `Tests`.
-- **The setup script is a pasted copy.** It runs before anything can call it from the
-  clone, so what the environment executes is the text in its settings, and the file in
-  `scripts/` is the versioned original. `NODE_MAJOR` and `PNPM_VERSION` are written
-  out in it rather than read from `.nvmrc` and `packageManager`: moving either of
-  those means changing the script and pasting it again.
-- **`pnpm install --frozen-lockfile` comes first**; the clone has no `node_modules`.
-  It needs `registry.npmjs.org`, which the _Trusted_ network level allows. A 403 from
-  the registry is the environment's network setting, not something to work around:
-  say so and stop rather than splitting the work into what can be done without it —
-  a PR that waits on another environment for its second half is how #828 stalled.
+  and puts `/opt/node22/bin` first, and the tool shell is a non-login `bash -c` whose
+  `PATH` was fixed when the session launched, so nothing an environment setup script
+  exports, and no `/etc/profile.d` file, ever reaches it. What does reach it is
+  `CLAUDE_ENV_FILE`, which every tool shell sources: `.claude/hooks/session-start.sh`
+  runs at every session start, installs Node 24 into `/opt/node24` if it is not there
+  (from `nodejs.org`, checksum verified) with the pinned pnpm, and writes the `PATH`
+  line to that file. Run `node --version` first anyway. Anything but `v24` means the
+  hook did not run — a clone from before it merged, or a failure in its output — so
+  run it by hand, `CLAUDE_CODE_REMOTE=true .claude/hooks/session-start.sh`, and prefix
+  every command with `export PATH="/opt/node24/bin:$PATH"` for the rest of the
+  session. **Under Node 22 the suite lies**: there is no `node:sqlite`, so every
+  backend suite importing the database fails at _import_ time, and vitest reports that
+  as failed `Test Files` above a **passing** `Tests` count for whatever did load. Read
+  the `Test Files` line, never only `Tests`.
+- **The hook is checked in, so there is nothing to paste** into the environment's
+  settings, whose setup script stays empty. It reads the major from `.nvmrc` and the
+  pnpm version from `packageManager`, so moving either moves the hook with it. It runs
+  from the clone as it is at session start, which is `develop`: a change to it reaches
+  sessions once merged, never from its own PR. Outside the cloud it exits at once.
+- **The hook also runs `pnpm install --frozen-lockfile`**, because the clone has no
+  `node_modules`. That and the Node download are the only things there that need the
+  network: `registry.npmjs.org` and `nodejs.org`, which the _Trusted_ network level
+  allows. A 403 from the registry is the environment's network setting, not something
+  to work around: say so and stop rather than splitting the work into what can be
+  done without it — a PR that waits on another environment for its second half is
+  how #828 stalled.
 - **Git and GitHub go through a proxy.** `gh` is signed in already; leave `GH_TOKEN`
   alone. A push is accepted for the session's own branch only, which is all this
   workflow needs. GraphQL is limited to a pinned set of pull-request operations and
