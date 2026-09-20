@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BellApi } from './NotificationBell.tsx'
 
 import { onADesktop, onAPhone } from '../testing/viewport.ts'
-import { NotificationBell } from './NotificationBell.tsx'
+import { ASK_EVERY_MS, NotificationBell } from './NotificationBell.tsx'
 
 afterEach(cleanup)
 afterEach(onADesktop)
@@ -329,33 +329,76 @@ describe('what the bell asks for while nobody is looking', () => {
     }
   })
 
-  it('catches up the moment the tab is looked at again', async () => {
-    const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
+  const bellAsking = (ask: BellApi['getMyNotifications']) => {
     render(
       <LocationProvider>
         <NotificationBell api={stub({ getMyNotifications: ask })} />
       </LocationProvider>,
     )
+  }
 
-    await waitFor(() => expect(ask).toHaveBeenCalledTimes(1))
+  const laterOn = () => vi.setSystemTime(Date.now() + ASK_EVERY_MS)
 
-    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+  it('catches up when the tab is looked at again', () => {
+    vi.useFakeTimers()
+    const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
 
-    await waitFor(() => expect(ask).toHaveBeenCalledTimes(2))
+    try {
+      bellAsking(ask)
+      laterOn()
+      document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+
+      expect(ask).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('catches up the moment somebody comes back to the tab', async () => {
+  it('catches up when somebody comes back to the tab', () => {
+    vi.useFakeTimers()
     const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
-    render(
-      <LocationProvider>
-        <NotificationBell api={stub({ getMyNotifications: ask })} />
-      </LocationProvider>,
-    )
 
-    await waitFor(() => expect(ask).toHaveBeenCalledTimes(1))
+    try {
+      bellAsking(ask)
+      laterOn()
+      globalThis.dispatchEvent(new Event('focus'))
 
-    globalThis.dispatchEvent(new Event('focus'))
+      expect(ask).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 
-    await waitFor(() => expect(ask).toHaveBeenCalledTimes(2))
+  it('asks once for a return that fires both events, not once each', () => {
+    vi.useFakeTimers()
+    const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
+
+    try {
+      bellAsking(ask)
+      laterOn()
+      document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+      globalThis.dispatchEvent(new Event('focus'))
+
+      expect(ask).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('asks again on the next return, the window having passed', () => {
+    vi.useFakeTimers()
+    const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
+
+    try {
+      bellAsking(ask)
+      laterOn()
+      document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+      laterOn()
+      globalThis.dispatchEvent(new Event('focus'))
+
+      expect(ask).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

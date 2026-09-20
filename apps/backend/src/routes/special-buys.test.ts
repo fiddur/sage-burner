@@ -403,6 +403,42 @@ describe('promoting a special buy to a pantry thing', () => {
     expect(await lineFrom(other)).toMatchObject({ pantry_item_id: null, amount: 1 })
   })
 
+  it('drops an amount for a line nobody has any more, and takes the rest', async () => {
+    const { server, bo } = await setUp()
+    const friday = await givenSitting({ date: '2026-08-01' })
+    const mine = await givenWritten(friday, { name: 'Salsa', unit: 'jars', amount: 1 })
+    const thing = await givenThing('Salsa', 'jars (300g)')
+
+    const response = await adopt(server, bo.cookie, thing, {
+      name: 'Salsa',
+      unit: 'jars',
+      amounts: { [mine]: 2, [randomUUID()]: 5 },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ adopted: 1 })
+    expect(await lineFrom(mine)).toMatchObject({ pantry_item_id: thing, amount: 2 })
+  })
+
+  it('leaves a line already pointed at another thing alone and takes its sibling', async () => {
+    const { server, bo } = await setUp()
+    const friday = await givenSitting({ date: '2026-08-01' })
+    const mine = await givenWritten(friday, { name: 'Salsa', unit: 'jars', amount: 1 })
+    const spoken = await givenThing('Salsa, mild', 'jars')
+    const taken = await givenWritten(friday, { name: 'Salsa', unit: 'jars', amount: 4 })
+    await db()
+      .update(mealIngredient)
+      .set({ pantry_item_id: spoken, name: null, unit: null })
+      .where(eq(mealIngredient.id, taken))
+    const thing = await givenThing('Salsa, chunky', 'jars (300g)')
+
+    const response = await adopt(server, bo.cookie, thing, { name: 'Salsa', unit: 'jars' })
+
+    expect(response.json()).toEqual({ adopted: 1 })
+    expect((await lineFrom(mine)).pantry_item_id).toBe(thing)
+    expect(await lineFrom(taken)).toMatchObject({ pantry_item_id: spoken, amount: 4 })
+  })
+
   it('refuses an amount for a line on a burn that has ended', async () => {
     const { server, bo } = await setUp()
     await givenBurn(ENDED, 'Last summer', '2025')

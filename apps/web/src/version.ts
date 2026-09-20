@@ -14,9 +14,11 @@ const inApp = (link: HTMLAnchorElement, scope: RegExp): boolean =>
   scope.test(link.pathname)
 
 export const hardenNavigation = (
-  go: (href: string) => void = (href) => globalThis.location.assign(href),
+  go: (href: string) => void = (href) => globalThis.location.replace(href),
   scope: RegExp = ROUTER_SCOPE,
 ): (() => void) => {
+  const pending = new Set<ReturnType<typeof setTimeout>>()
+
   const onClick = (event: MouseEvent) => {
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
 
@@ -25,13 +27,23 @@ export const hardenNavigation = (
       .find((step): step is HTMLAnchorElement => step instanceof HTMLAnchorElement)
     if (link === undefined || !inApp(link, scope)) return
 
-    event.preventDefault()
-    go(link.href)
+    const { href } = link
+
+    const settle = setTimeout(() => {
+      pending.delete(settle)
+      if (globalThis.location.href === href) go(href)
+    }, 0)
+
+    pending.add(settle)
   }
 
   globalThis.addEventListener('click', onClick, { capture: true })
 
-  return () => globalThis.removeEventListener('click', onClick, { capture: true })
+  return () => {
+    globalThis.removeEventListener('click', onClick, { capture: true })
+    for (const settle of pending) clearTimeout(settle)
+    pending.clear()
+  }
 }
 
 export const watchForNewVersion = (

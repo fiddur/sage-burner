@@ -976,7 +976,7 @@ describe('promoting a special buy', () => {
     expect(screen.getByRole('button', { name: 'Add it' })).toBeTruthy()
   })
 
-  it('sends no amounts when the unit is put back inside the adjust step itself', async () => {
+  it('leaves the step and sends no amounts when the unit is put back inside it', async () => {
     const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 3 }))
     renderPage(
       promoting({
@@ -994,7 +994,10 @@ describe('promoting a special buy', () => {
       { target: { value: '2' } },
     )
     fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'Sachets' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+
+    expect(screen.queryByText('Adjust the amounts')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
 
     await waitFor(() =>
       expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', {
@@ -1005,7 +1008,44 @@ describe('promoting a special buy', () => {
     )
   })
 
-  it('forgets the amounts once the unit is put back, since nothing is being converted', async () => {
+  it('brings the step back with what was typed when a third unit is chosen', async () => {
+    renderPage(promoting(), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'g' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+    fireEvent.input(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sat 1 Dinner, in g'),
+      { target: { value: '9' } },
+    )
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'sachets' } })
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'dl' } })
+
+    expect(screen.getByText('Adjust the amounts')).toBeTruthy()
+    expect(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sat 1 Dinner, in dl'),
+    ).toHaveProperty('value', '9')
+  })
+
+  it('keeps what was typed when the step is opened again after Back', async () => {
+    renderPage(promoting(), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'g' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+    fireEvent.input(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sat 1 Dinner, in g'),
+      { target: { value: '9' } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    expect(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sat 1 Dinner, in g'),
+    ).toHaveProperty('value', '9')
+  })
+
+  it('sends no amounts once the unit is put back, since nothing is being converted', async () => {
     const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 3 }))
     renderPage(
       promoting({

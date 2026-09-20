@@ -2111,6 +2111,18 @@ a.person-badge:focus-visible span:last-child {
   border-radius: 0.5rem;
 }
 
+/* A burn's name and its count make an option wider than a phone, and a grid item's
+   `auto` minimum is its content — so without these the box grows past the screen and
+   takes the page sideways with it. */
+.copy-from > * {
+  min-width: 0;
+}
+
+.copy-from select {
+  width: 100%;
+  max-width: 100%;
+}
+
 /*
   What scrolls when a shared table is wider than the screen (#339) — itself, rather
   than the page under it, nav and all. `Table.tsx` is the only thing that draws it,
@@ -3299,8 +3311,11 @@ a.song-row:hover .song-what {
 /* One flex line that wraps, so the same markup reads both ways: above the breakpoint the state
    is pushed to the end of the title line by the auto margin, and below it `flex-basis: 100%`
    drops it onto a line of its own. Both rules must not apply at once, which is why the auto
-   margin is inside a media query rather than sitting on the element. */
+   margin is inside a media query rather than sitting on the element.
+   `position: relative` is the whole row, which is what `.pantry-note-said` is measured from:
+   measured from the icon instead, a bubble opened near the end of the line runs off a phone. */
 .pantry-what {
+  position: relative;
   margin: 0;
   display: flex;
   flex-wrap: wrap;
@@ -3331,9 +3346,9 @@ a.song-row:hover .song-what {
 }
 
 /* A bubble without JS: the body is taken out of flow so opening one does not push the row
-   below it down a shelf. `position: relative` on the `details` is what it is measured from. */
+   below it down a shelf. It is measured from the row around it, never from this `details` —
+   see `.pantry-what`. */
 .pantry-note {
-  position: relative;
   display: inline-flex;
   align-items: center;
 }
@@ -3359,9 +3374,10 @@ a.song-row:hover .song-what {
   position: absolute;
   z-index: 3;
   inset-block-start: 100%;
-  inset-inline-start: 0;
+  inset-inline: 0;
   width: max-content;
-  max-width: min(24rem, 70vw);
+  max-width: min(24rem, 100%);
+  overflow-wrap: anywhere;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
@@ -3644,7 +3660,9 @@ a.song-row:hover .song-what {
   gap: 0.2rem;
 }
 
+/* `position: relative` is what the note bubble on a line is measured from — see `.pantry-what`. */
 .ingredient-row {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;

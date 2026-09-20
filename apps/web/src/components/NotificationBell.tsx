@@ -22,7 +22,7 @@ export type BellApi = Pick<
   | 'updateMyNotificationSettings'
 >
 
-const ASK_EVERY_MS = 60_000
+export const ASK_EVERY_MS = 60_000
 
 export const NotificationBell = ({ api }: { api: BellApi }) => {
   const [items, setItems] = useState<readonly Notification[]>([])
@@ -45,8 +45,10 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
 
   useEffect(() => {
     const controller = new AbortController()
+    let lastAsked = Number.NEGATIVE_INFINITY
 
     const ask = () => {
+      lastAsked = Date.now()
       api
         .getMyNotifications(controller.signal)
         .then(({ notifications, unseen: count }) => {
@@ -59,6 +61,7 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
 
     const askIfWatched = () => {
       if (globalThis.document?.visibilityState === 'hidden') return
+      if (Date.now() - lastAsked < ASK_EVERY_MS) return
       ask()
     }
 

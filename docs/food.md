@@ -89,7 +89,11 @@ So `pantry_item.note` is plain text, not markdown, bounded by `MAX_PANTRY_NOTE`,
 the add form and the pen and imported from an optional `note` column in the TSV. On a row it
 is an info icon after the kind, a `<details>` whose summary is the icon — a bubble that opens
 on a click and needs no JS — and the Inventory toggle does not touch it: a note is part of
-the overview, not of counting.
+the overview, not of counting. The bubble is measured from the **row**, not from its own
+icon (#822): measured from the icon, one opened near the end of a long name started off the
+right of a phone and was cut off by the panel's sideways scroll. `inset-inline: 0` and
+`max-width` against the row keep it inside whatever it is on, and `overflow-wrap: anywhere`
+breaks a pasted link rather than pushing the box wider.
 
 It is shown **where the amount is typed**, which is the whole point: on a sitting, the note
 of the pantry thing under the cursor in the add box appears before the thing is even taken,
@@ -271,7 +275,10 @@ same statement as somebody pressing the button again.
 `note` follows the same rule for the same reason: a cell with something in it is
 written onto the row, an empty one leaves the note that is there. A sheet exported
 before anybody wrote a note carries a column of blanks, and blanking every note in
-the pantry is not what re-importing it means.
+the pantry is not what re-importing it means. A cell longer than `MAX_PANTRY_NOTE`
+refuses the whole file, naming the line and the length (#821) — the form has held the
+same bound since the note existed, and a route that writes past what the form allows is
+a bound only half enforced.
 
 **A room column is matched to the vocabulary by name, ignoring case, and a column
 naming no room refuses the whole file and says which column it was.** Guessing would
@@ -430,11 +437,27 @@ it was written, and a box in the new unit prefilled with the old figure. Only th
 promoting knows what a jar of salsa is in `jars (300g)`, so the form asks rather than
 converts.
 
+**The step is derived, not a mode** (#821). It shows while the unit differs and goes the
+moment the unit is put back, rather than waiting to be dismissed, so the field that opened
+it is the field that closes it. What was typed survives both ways out: **Back** keeps the
+boxes, and re-opening the step seeds only the ones nobody has typed in, so an admin who went
+back to fix the name does not find their figures replaced by the originals.
+
 That is why the read carries `lines` and the adoption takes `amounts`, keyed by line id.
-An `amounts` key naming a line the adoption is not converting is a 400 rather than a
+An `amounts` key naming a line that **exists** and is not one the adoption is converting is
+a 400 rather than a
 silent skip: it means the page and the server disagree about what is being promoted, and
-the quiet version of that is a wrong figure in the shop. A line the step leaves alone
-keeps the amount it already had.
+the quiet version of that is a wrong figure in the shop. A key naming a line that is gone
+altogether is dropped instead (#821): whoever took it off the sitting made that call after
+the page drew its step, the thing has already been added by the time the amounts are read,
+and refusing there leaves the admin retrying into a name clash for a line nobody has. A
+line the step leaves alone keeps the amount it already had.
+
+**The adoption is one transaction.** The read of the thing, the read of the matching
+lines, the repointing and the per-line amounts are one unit of work, so nothing can be
+half-promoted; the update repeats `pantry_item_id is null` in its own `where`, so a line
+that got itself linked somewhere else between the two is left where it was rather than
+taken twice.
 
 A line written under **another key** — the same name in another unit — is a different
 special buy, still listed and still promotable under its own key. The key bounds the

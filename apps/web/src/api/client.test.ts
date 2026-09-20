@@ -50,27 +50,21 @@ describe('createApiClient', () => {
 
   it('hands a body the server can parse, not one wrapped in a string', async () => {
     const doFetch = respondWith({ ok: true })
-    const client = createApiClient(doFetch)
 
-    const posts: [string, () => Promise<unknown>][] = [
-      ['sendDigestPreview', () => client.sendDigestPreview({ hours: 24 })],
-      [
-        'markTargetShown',
-        () => client.markTargetShown({ link: '/meals', as_of: '2026-08-14T00:00:00.000Z' }),
-      ],
-      [
-        'updateMyNotificationSettings',
-        () => client.updateMyNotificationSettings({ on: [], email: [], digest: 'daily' }),
-      ],
-    ]
+    await createApiClient(doFetch).sendDigestPreview({ hours: 24 })
 
-    for (const [name, call] of posts) {
-      doFetch.mockClear()
-      await call()
-      const sent = doFetch.mock.calls[0]?.[1]?.body
-      expect(typeof sent, name).toBe('string')
-      expect(typeof JSON.parse(String(sent)), name).toBe('object')
-    }
+    const sent = doFetch.mock.calls[0]?.[1]?.body
+    expect(typeof sent).toBe('string')
+    expect(JSON.parse(String(sent))).toEqual({ hours: 24 })
+  })
+
+  it('refuses a body somebody serialised already, rather than sending it twice over', async () => {
+    const doFetch = respondWith({ ok: true })
+
+    await expect(
+      createApiClient(doFetch).request('/things', { method: 'POST', body: JSON.stringify({ hours: 24 }) }),
+    ).rejects.toThrow(TypeError)
+    expect(doFetch).not.toHaveBeenCalled()
   })
 
   it('sends no body or content type on a plain GET', async () => {

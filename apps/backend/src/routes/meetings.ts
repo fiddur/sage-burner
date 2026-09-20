@@ -415,7 +415,7 @@ export const registerMeetingRoutes = (
 
     if (row === undefined) return sendError(reply, 404)
 
-    if (row.starts_at !== existing.starts_at) {
+    if (Date.parse(row.starts_at) !== Date.parse(existing.starts_at)) {
       await noteOnMeeting(row, 'moved it', viewer.account_id)
 
       await sayInTheFeed(

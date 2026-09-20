@@ -22,6 +22,12 @@ describe('what a logged URL keeps', () => {
     expect(maskedUrl('/invite/a-secret-token')).toBe(`/invite/${REDACTED}`)
   })
 
+  it('takes it out of the calendar feed, which is a way in for anyone who reads it', () => {
+    expect(maskedUrl(apiRoutes.scheduleFeed.path('a-secret-token'))).toBe(
+      `/calendar/${REDACTED}/schedule.ics`,
+    )
+  })
+
   it('keeps the segments past the token, so a redeem still says what it was', () => {
     expect(maskedUrl(apiRoutes.redeemInvite.path('a-secret-token'))).toBe(`/api/invites/${REDACTED}/redeem`)
   })

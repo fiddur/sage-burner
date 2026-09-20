@@ -146,6 +146,53 @@ describe('slid', () => {
     expect(sessions({ now: at('2026-07-29T13:00:01.000Z'), ttlSeconds: 3600 }).slid(token)).toBeUndefined()
   })
 
+  it('renews at half a short lifetime rather than never', () => {
+    const ttlSeconds = 3600
+    const token = sessions({ now: at(issued), ttlSeconds }).issue('acct-1')
+
+    expect(sessions({ now: at('2026-07-29T12:29:59.000Z'), ttlSeconds }).slid(token)).toBeUndefined()
+    expect(sessions({ now: at('2026-07-29T12:30:00.000Z'), ttlSeconds }).slid(token)).toBeDefined()
+  })
+
+  it('reads a token minted before it carried an issue time, and still slides it at a day', () => {
+    const signedWith = (payload: string) => {
+      const encoded = Buffer.from(payload, 'utf8').toString('base64url')
+      return `${encoded}.${createHmac('sha256', secret).update(encoded).digest('base64url')}`
+    }
+
+    const ttlSeconds = 60 * 60 * 24 * 14
+    const exp = Math.floor(new Date(issued).getTime() / 1000) + ttlSeconds
+    const token = signedWith(JSON.stringify({ sub: 'acct-1', exp, jti: 'x' }))
+
+    expect(sessions({ now: at('2026-07-30T11:59:59.000Z'), ttlSeconds }).read(token)).toEqual({
+      account_id: 'acct-1',
+    })
+    expect(sessions({ now: at('2026-07-30T11:59:59.000Z'), ttlSeconds }).slid(token)).toBeUndefined()
+    expect(sessions({ now: at('2026-07-30T12:00:00.000Z'), ttlSeconds }).slid(token)).toBeDefined()
+  })
+
+  it('slides a token issued under a longer lifetime than the one now set', () => {
+    const token = sessions({ now: at(issued), ttlSeconds: 60 * 60 * 24 * 30 }).issue('acct-1')
+
+    expect(
+      sessions({ now: at('2026-07-31T12:00:00.000Z'), ttlSeconds: 60 * 60 * 24 * 14 }).slid(token),
+    ).toBeDefined()
+  })
+
+  it('slides at once a token minted before it carried an issue time, once the lifetime is shorter than it was', () => {
+    const signedWith = (payload: string) => {
+      const encoded = Buffer.from(payload, 'utf8').toString('base64url')
+      return `${encoded}.${createHmac('sha256', secret).update(encoded).digest('base64url')}`
+    }
+
+    const exp = Math.floor(new Date(issued).getTime() / 1000) + 60 * 60 * 24 * 30
+    const token = signedWith(JSON.stringify({ sub: 'acct-1', exp, jti: 'x' }))
+
+    expect(
+      sessions({ now: at('2026-07-29T12:00:01.000Z'), ttlSeconds: 60 * 60 * 24 * 14 }).slid(token),
+    ).toBeDefined()
+  })
+
   it('gives nothing for garbage or a foreign signature', () => {
     const later = sessions({ now: at('2026-08-05T12:00:00.000Z') })
     const foreign = sessions({ secret: 'b'.repeat(32), now: at(issued) }).issue('acct-1')

@@ -217,10 +217,16 @@ just next-login.
 database row.
 
 **The lifetime slides from the last visit, not from login.** The token carries its expiry
-(`SESSION_TTL_SECONDS`, six months by default), and any signed-in API request more than a
-day after the token was issued answers with a freshly issued cookie — so a member is only
+and, since #789, the moment it was issued (`iat`), and any signed-in API request more than a
+day — or half of `SESSION_TTL_SECONDS`, whichever is shorter — after that moment answers with
+a freshly issued cookie, so a member is only
 signed out after staying away a whole `SESSION_TTL_SECONDS`, however long ago they last
-typed a password. The day of slack keeps the renewal off every response; a response that
+typed a password. The age is read off `iat` rather than worked back from `exp`, which was
+only ever right while the TTL had not moved: lowering it put the arithmetic's "issued at" in
+the future and nothing slid again, and a TTL shorter than a day never slid at all — hence the
+half-lifetime floor. A token minted before `iat` existed still reads, and still slides at a
+day, off `exp - SESSION_TTL_SECONDS` — and where that arithmetic puts the issue in the future,
+which only a lowered TTL can do, it slides at once, so the renewal is what writes it an `iat`. The slack keeps the renewal off every response; a response that
 sets its own cookie (login, logout, an OAuth callback) is left alone, so a logout is never
 raced by its own renewal. Renewal extends a token's reach, so the paragraph below about
 revocation is worth reading with that in mind.
@@ -1014,11 +1020,14 @@ writes the same password, so nothing about the account changed and there is noth
 
 **The token never reaches a log line** (#744, #751). It travels in the path, so `req.url` carried
 it into anything reading the container's output — for two hours, the same as holding the mail.
-`requestSerializer` masks the token segment of the four routes that carry one: the two API reads,
-and — the half #744 missed — the two **page** paths the mail actually links to. `/reset/<token>`
+`requestSerializer` masks the token segment of the five routes that carry one: the two API reads,
+the two **page** paths the mail actually links to — the half #744 missed — and the calendar feed,
+whose token is a standing read of the whole schedule and is fetched again and again by whatever
+calendar holds it (#774). `/reset/<token>`
 is a full page load of the shell, so following the link from an inbox wrote the live credential
 into the log on the one request every recipient makes. `RESET_PATTERN` and `INVITE_PATTERN` are in
-`CARRIES_A_TOKEN` beside the API spellings, which is what #742 put in `pages.ts` for.
+`CARRIES_A_TOKEN` beside the API spellings, which is what #742 put in `pages.ts` for, and
+`apiRoutes.scheduleFeed.fastify` is there on the same rule.
 
 **Where the installation cannot post one there is no offer at all.** `GET /api/installation`
 carries `sends_email` and, since this, `knows_own_address` — the two halves of being able to
@@ -1718,9 +1727,15 @@ into that would fire in every one of them.
 code the server no longer serves, and `preact-iso` claims same-origin clicks and pushes state — so
 following it to `/changelog`, or following the notification that leads there, landed on the new page
 still running the old build, with the bar still up saying so. `hardenNavigation` listens for clicks
-at **capture**, ahead of the router's own listener, and hands an in-app link to `location.assign`
-instead. The service worker answers navigations fresh-first, so that is the new shell, and the bar is
-gone on arrival because the build now matches.
+at **capture**, ahead of the router's own listener, but decides nothing there (#571): it records the
+link and looks again once the target's own handlers have run. The location now equal to the link's
+href means the router pushed it, and only then does it reload — `location.replace`, the entry
+already being on the stack. Not moved means either the app handled the click for itself, the
+desktop bell's dropdown being the one that does, or the browser's own navigation is already under
+way; both are left alone. Deciding at capture instead swallowed that dropdown,
+because `preventDefault` there was a verdict passed before anyone else had spoken. The service worker
+answers navigations fresh-first, so what lands is the new shell, and the bar is gone on arrival
+because the build now matches.
 
 One rule rather than a list of destinations, because the bar is not about the changelog: any
 navigation is the natural moment to pick the new build up, and the next one after that is a
@@ -2208,7 +2223,12 @@ member, so a column added to `account` reaches it only when somebody names it in
 `personProfileSchema`. It carries `account_id`, `name`, `avatar`, the introduction, the
 connections in their order, `contact`, and `card_thread_ids` — the person's feed-card
 threads, one per burn and the freshest burn first, which the page reads through
-`GET /api/threads/:id` and renders with the feed's own thread component. A notification
+`GET /api/threads/:id` and renders with the feed's own thread component. A burn they have
+left is not among them: the query inner-joins `attendance`, so what the page lists is what the
+feed lists, a card whose stay is gone being `gone` there (#794). The page reads them
+one by one and settles the reads, so one that fails costs its own section and says so, rather
+than the whole conversation list (#795); it asks for the roster only where there is a card to
+mention somebody in (#796). A notification
 about a comment on somebody's card links to this page, so the conversation it is about has
 to be here rather than only on a card that scrolls away; saying something goes through the
 same comment routes the feed uses. What is absent is absent because something else

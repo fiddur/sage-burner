@@ -65,11 +65,17 @@ const givenSubscribed = async (accountId: string) => {
     })
 }
 
-const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) =>
+const pushedField = (deliver: ReturnType<typeof vi.fn<Delivery>>, field: string) =>
   deliver.mock.calls.map((call) => {
     const parsed: unknown = JSON.parse(String(call[1]))
-    return typeof parsed === 'object' && parsed !== null && 'body' in parsed ? String(parsed.body) : ''
+    return typeof parsed === 'object' && parsed !== null && field in parsed
+      ? String(Reflect.get(parsed, field))
+      : ''
   })
+
+const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) => pushedField(deliver, 'body')
+
+const linksFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) => pushedField(deliver, 'link')
 
 const db = () => {
   const found = handle?.db
@@ -1335,6 +1341,28 @@ describe('telling somebody a dream role moved', () => {
 
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
     expect(messagesFrom(deliver)).toEqual(['You are helping with Sunrise yoga'])
+  })
+
+  it('leads to the dream itself, on the burn it belongs to', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+
+    await helping(server, ada, id, 'POST', bea.id)
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(linksFrom(deliver)).toEqual([`/dreams?burn=${OPEN_BURN}&dream=${id}`])
+  })
+
+  it('leads there for a facilitator handed the dream as well', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+
+    await editDream(server, ada.cookie, id, { facilitator_account_id: bea.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(linksFrom(deliver)).toEqual([`/dreams?burn=${OPEN_BURN}&dream=${id}`])
   })
 
   it('says nothing to somebody who put their own hand up', async () => {

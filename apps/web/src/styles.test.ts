@@ -119,6 +119,26 @@ describe('the stylesheet', () => {
     expect(sidebar?.body).toMatch(/top:\s*0/)
   })
 
+  it('keeps the copy-from box inside a phone, whatever a burn is called', () => {
+    expect(rules.find((rule) => rule.selector === '.copy-from > *')?.body).toMatch(/min-width:\s*0/)
+
+    const select = rules.find((rule) => rule.selector === '.copy-from select')
+
+    expect(select?.body).toMatch(/width:\s*100%/)
+    expect(select?.body).toMatch(/max-width:\s*100%/)
+  })
+
+  it('measures a note bubble from the row it sits on rather than from its own icon', () => {
+    const said = rules.find((rule) => rule.selector === '.pantry-note-said')
+
+    expect(rules.find((rule) => rule.selector === '.pantry-note')?.body).not.toMatch(/position:/)
+    expect(rules.find((rule) => rule.selector === '.pantry-what')?.body).toMatch(/position:\s*relative/)
+    expect(rules.find((rule) => rule.selector === '.ingredient-row')?.body).toMatch(/position:\s*relative/)
+    expect(said?.body).toMatch(/inset-inline:\s*0/)
+    expect(said?.body).toMatch(/max-width:\s*min\(24rem,\s*100%\)/)
+    expect(said?.body).toMatch(/overflow-wrap:\s*anywhere/)
+  })
+
   it('positions every box that scrolls sideways', () => {
     const sideways = rules.filter((rule) => /overflow(-x)?:\s*(auto|scroll)/.test(rule.body))
 

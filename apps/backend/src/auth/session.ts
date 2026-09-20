@@ -17,17 +17,21 @@ const SLIDE_AFTER_SECONDS = 60 * 60 * 24
 interface WireFormat {
   sub: string
   exp: number
+  iat: number
   jti: string
 }
 
-const isWireFormat = (value: unknown): value is Pick<WireFormat, 'sub' | 'exp'> =>
+type Read = Pick<WireFormat, 'sub' | 'exp'> & { iat?: number }
+
+const isWireFormat = (value: unknown): value is Read =>
   typeof value === 'object' &&
   value !== null &&
   'sub' in value &&
   typeof value.sub === 'string' &&
   'exp' in value &&
   typeof value.exp === 'number' &&
-  Number.isFinite(value.exp)
+  Number.isFinite(value.exp) &&
+  (!('iat' in value) || (typeof value.iat === 'number' && Number.isFinite(value.iat)))
 
 export interface Sessions {
   issue: (accountId: string) => string
@@ -47,16 +51,22 @@ export const createSessions = ({ secret, now, ttlSeconds }: SessionDeps): Sessio
     return `${encoded}.${signatureFor(encoded)}`
   }
 
-  const issue = (accountId: string) =>
-    sign(
+  const seconds = () => Math.floor(now().getTime() / 1000)
+
+  const issue = (accountId: string) => {
+    const at = seconds()
+
+    return sign(
       JSON.stringify({
         sub: accountId,
-        exp: Math.floor(now().getTime() / 1000) + ttlSeconds,
+        exp: at + ttlSeconds,
+        iat: at,
         jti: randomBytes(9).toString('base64url'),
       } satisfies WireFormat),
     )
+  }
 
-  const verified = (token: string): Pick<WireFormat, 'sub' | 'exp'> | undefined => {
+  const verified = (token: string): Read | undefined => {
     const parts = token.split('.')
     if (parts.length !== 2) return undefined
 
@@ -94,8 +104,9 @@ export const createSessions = ({ secret, now, ttlSeconds }: SessionDeps): Sessio
       const parsed = verified(token)
       if (parsed === undefined) return undefined
 
-      const issuedAt = parsed.exp - ttlSeconds
-      if (Math.floor(now().getTime() / 1000) - issuedAt < SLIDE_AFTER_SECONDS) return undefined
+      const age = seconds() - (parsed.iat ?? parsed.exp - ttlSeconds)
+      const slack = Math.min(SLIDE_AFTER_SECONDS, Math.floor(ttlSeconds / 2))
+      if (age >= 0 && age < slack) return undefined
 
       return issue(parsed.sub)
     },

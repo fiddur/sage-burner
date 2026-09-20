@@ -1,3 +1,4 @@
+import { MAX_PANTRY_NOTE } from '@sage-burner/shared'
 import { and, eq, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -150,6 +151,18 @@ describe('reading a sheet somebody exported', () => {
     const both = `${HEADER}\tnote\tneed more\nRice\tstaple\tkg\t\tI\tDry weight\tx`
 
     expect(lines(both)[0]).toMatchObject({ note: 'Dry weight', need_more: true })
+  })
+
+  it('refuses a note longer than a note may be, and names the line and the length', () => {
+    expect(problem(`${NOTED}\nRice\tstaple\tkg\t\tI\t${'n'.repeat(MAX_PANTRY_NOTE + 1)}`)).toBe(
+      `Line 2: the note is ${MAX_PANTRY_NOTE + 1} characters, and ${MAX_PANTRY_NOTE} is the most.`,
+    )
+  })
+
+  it('takes a note exactly as long as a note may be', () => {
+    expect(lines(`${NOTED}\nRice\tstaple\tkg\t\tI\t${'n'.repeat(MAX_PANTRY_NOTE)}`)[0]?.note).toHaveLength(
+      MAX_PANTRY_NOTE,
+    )
   })
 
   it('refuses a file whose first line is not the header', () => {

@@ -157,7 +157,8 @@ phone" means 360px.
       address there does the same.
 - [ ] `grep` the backend's log output for the token you were sent — including the request for
       **the link you followed from the mail**, which is the page path and not an API call: it is
-      `[redacted]` on every line, and the same holds for an invite link.
+      `[redacted]` on every line, and the same holds for an invite link and for the calendar
+      feed's `/calendar/<token>/schedule.ics`.
 - [ ] Use the link, then open it again the way a second device would: it says it may have been
       used already, not that you mistyped it.
 - [ ] Ask for a link, then edit that member under ⚙️ → Accounts without touching the address:
@@ -227,8 +228,11 @@ phone" means 360px.
       confirmation names both dreams and what moves; afterwards the survivor's talk holds
       both conversations in time order plus a "folded" note, the helper is told, and the
       folded one sits under "Recently withdrawn" saying where it went, with no way back.
+      Reach **Fold into another dream…** by keyboard: opening it puts the cursor in the
+      choice, and **Keep it apart** puts it back on the trigger, as Withdraw does.
 - [ ] Hand the facilitator role to somebody coming; their initials show on the
-      block and they are notified. A hand up as helper notifies nobody for
+      block and they are notified, and their notification opens that dream on that burn
+      rather than the Dreams page. A hand up as helper notifies nobody for
       their own click.
 - [ ] The meal plan draws its own kitchen lane — cooking, eating, cleanup —
       and dragging a block moves the sitting. A dream cannot be dropped into
@@ -285,6 +289,10 @@ phone" means 360px.
       comment: the count is 2 and both faces are stacked.
 - [ ] Press the faces-and-count: the list of who gave one unfolds under the comment,
       each row linking to that person's page. Press again and it folds away.
+- [ ] Open somebody's page who has been on two burns and has talk on both: **What people say**
+      holds one section per burn. Take them off one of those burns from ⚙️ → Members and load
+      the page again: that burn's conversation is gone and the other is still there, matching
+      what the feed shows.
 - [ ] The lines the app wrote — "offered this dream", "is cooking it" — carry no heart.
 
 ## The songbook
@@ -450,8 +458,12 @@ phone" means 360px.
 - [ ] Promote one, change **Counted in** before saving and press **Add it**: nothing is
       saved yet — an **Adjust the amounts** step appears in place of the button, one row per
       line, each naming its sitting and what it was written as, with a box in the new unit
-      prefilled with the old figure. **Back** returns to the form with everything still filled
-      in. Press **Add it** again, change one box, empty another and press **Promote**: the thing
+      prefilled with the old figure. Put **Counted in** back to the unit the lines were written
+      in and the step goes, leaving **Add it**; change it to a third unit and the step is back
+      with what you typed still in the boxes. **Back** returns to the form with everything still
+      filled
+      in. Press **Add it** again — the boxes still hold what you typed, not the figures they
+      were seeded with — change one box, empty another and press **Promote**: the thing
       is on the list, the page says how many lines now point at the pantry, and those sittings
       show the amounts you typed — the emptied one reading _to taste_.
 - [ ] With nothing written by hand on any burn still to come, the section is not there
@@ -487,8 +499,14 @@ phone" means 360px.
       under the matches while **Beans, black** is the one highlighted, and stays beside the
       amount box once it is taken. The line, once written, carries the same icon after its name.
       The shopping list says nothing about it.
+- [ ] Narrow the window to 390px and open the note on a pantry thing whose name fills the line,
+      the note being 60 characters: the bubble stays inside the screen —
+      `said.getBoundingClientRect().right <= document.documentElement.clientWidth` — and
+      `document.documentElement.scrollWidth` is still 390. At 1280px, open the same note on a
+      written line in the sitting panel: the bubble's right edge is inside `.dream-panel`.
 - [ ] `pantry:import` a sheet with a `note` column: the cells land on the rows, and a row whose
-      cell is empty keeps the note it already had.
+      cell is empty keeps the note it already had. A row whose note runs past 500 characters is
+      refused naming the line and the length, and nothing is written.
 - [ ] Type "cash" in the sitting's add box: the **Nuts** mark shows beside the match.
 - [ ] The shopping list on a wide screen: the _Asked for by_ cell of Cashew says "1 cannot
       eat this".
@@ -502,6 +520,9 @@ phone" means 360px.
 - [ ] Without opening the bell, follow a notification's own link — a dream card from
       the bell's list, or "What's new" on the redeploy bar. The badge drops by one on
       arrival, and only that notification loses its emphasis.
+- [ ] While the redeploy bar is up, press the bell on a wide screen: the panel opens where
+      it always does rather than reloading the page. Follow a link from it, and that is a
+      full load, the bar gone on arrival.
 - [ ] Leave that page open and cause a second notification for the same thing from
       another browser: the badge appears while the page is up, and clears itself
       within a minute — when the page has refetched and is showing the change.
@@ -745,7 +766,9 @@ phone" means 360px.
       bottom bar left to right, then Songbook, Rideshares, Bring list, Pantry, Shopping
       list, Meetings and the map when one is set. The page you are on is marked. Backdrop, ✕
       and Escape all close it and focus returns to ☰.
-- [ ] At 360px nothing anywhere scrolls the page sideways.
+- [ ] At 360px nothing anywhere scrolls the page sideways — the Leads page's copy-from form
+      among them, which shows only while a burn has no roles yet and another burn has some, so
+      set that up before looking.
 
 ## Installing, offline, and the installation's face
 
