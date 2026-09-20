@@ -24,6 +24,7 @@ Two deliberate divergences from aurboda:
 - `apps/web` — Preact + Vite single-page app.
 - `packages/shared` — Zod schemas and inferred types, shared by both.
 - `docs/` — longer-form documentation.
+- `tryouts/` — the post-merge tryout rig and its recipes; see `tryouts/AGENTS.md`.
 
 One Node process serves everything in production.
 
@@ -617,6 +618,10 @@ this section is the difference.
   one. If the proxy refuses either, answer every thread in a reply, and report that the
   threads need resolving by hand — that is a stop, not a reason to look for another
   way past the ruleset.
+- **Post-merge tryouts run there too**, as a routine fired by a merged pull request, from the
+  rig in `tryouts/`. That routine's environment is the one exception to "the setup script stays
+  empty" — it pastes `tryouts/setup-environment.sh` in to cache the browser install, and
+  nothing else. `tryouts/routine.md` has the settings and the instructions.
 
 ## Deployment
 

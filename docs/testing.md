@@ -11,6 +11,10 @@ The feature list this protocol exercises is [features.md](./features.md); when a
 feature's observable behaviour changes, the check that exercises it changes in
 the same PR.
 
+For checking a **single merged PR** rather than walking the whole app,
+[`../tryouts/AGENTS.md`](../tryouts/AGENTS.md) is the rig an agent boots and the method it
+follows.
+
 **Run it against a disposable copy, never a live installation** — the protocol
 creates accounts, burns and content.
 
