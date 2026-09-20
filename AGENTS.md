@@ -536,7 +536,7 @@ pnpm check && pnpm test`; do not stage, commit, push or open a PR; report the st
 5. **Review before committing.** Read the report and the whole diff (`git diff`, and
    `git status` for new files), and run the checks yourself where the report is
    unclear. Send fixes back to the same agent so it keeps its context, or make small
-   ones directly. Then commit and carry on from step 4 of the list above.
+   ones directly. Then commit and carry on from step 4 of _Working an issue_.
 
 ## Running in the cloud
 
@@ -546,15 +546,22 @@ A session started from claude.ai/code runs in a fresh VM with a fresh clone.
 this section is the difference.
 
 - **Node 24, and check it before believing a test run.** The image ships Node 20–22
-  with 22 on `PATH`; the environment's setup script (`scripts/cloud-setup.sh`, pasted
-  into the environment's settings, since it runs before anything can call it from the
-  clone) installs the `.nvmrc` line into `/opt/node24` with the pinned pnpm. Run `node
+  and puts `/opt/node22/bin` ahead of `/usr/local/bin`. The tool shell is a non-login
+  `bash -c` whose `PATH` was fixed when the session launched, so nothing the setup
+  script exports, and no `/etc/profile.d` file, ever reaches it. `scripts/cloud-setup.sh`
+  therefore installs Node 24 into `/opt/node24` with the pinned pnpm and links both
+  **over the directory the image's `PATH` already finds `node` in**. Run `node
 --version` first. Anything but `v24` means prefixing every command with `export
 PATH="/opt/node24/bin:$PATH"`; if `/opt/node24` is missing, run the script (it needs
   root) or stop and say so. **Under Node 22 the suite lies**: there is no
   `node:sqlite`, so every backend suite importing the database fails at _import_
   time, and vitest reports that as failed `Test Files` above a **passing** `Tests`
   count for whatever did load. Read the `Test Files` line, never only `Tests`.
+- **The setup script is a pasted copy.** It runs before anything can call it from the
+  clone, so what the environment executes is the text in its settings, and the file in
+  `scripts/` is the versioned original. `NODE_MAJOR` and `PNPM_VERSION` are written
+  out in it rather than read from `.nvmrc` and `packageManager`: moving either of
+  those means changing the script and pasting it again.
 - **`pnpm install --frozen-lockfile` comes first**; the clone has no `node_modules`.
   It needs `registry.npmjs.org`, which the _Trusted_ network level allows. A 403 from
   the registry is the environment's network setting, not something to work around:
