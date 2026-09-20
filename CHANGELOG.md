@@ -42,7 +42,7 @@ under today's heading, and make a new heading when there is none.
 - **A member's page leaves out a burn they have left**, matching what the feed shows, and
   when one conversation fails to load the rest are still there with one line saying so
   instead of the whole section disappearing.
-- **A short session slides too.** Installations running a session lifetime of under two days
+- **A short session slides too.** Installations running a session lifetime of a day or less
   were signing people out on the dot instead of keeping them signed in while they kept
   visiting.
 

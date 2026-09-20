@@ -179,6 +179,20 @@ describe('slid', () => {
     ).toBeDefined()
   })
 
+  it('slides at once a token minted before it carried an issue time, once the lifetime is shorter than it was', () => {
+    const signedWith = (payload: string) => {
+      const encoded = Buffer.from(payload, 'utf8').toString('base64url')
+      return `${encoded}.${createHmac('sha256', secret).update(encoded).digest('base64url')}`
+    }
+
+    const exp = Math.floor(new Date(issued).getTime() / 1000) + 60 * 60 * 24 * 30
+    const token = signedWith(JSON.stringify({ sub: 'acct-1', exp, jti: 'x' }))
+
+    expect(
+      sessions({ now: at('2026-07-29T12:00:01.000Z'), ttlSeconds: 60 * 60 * 24 * 14 }).slid(token),
+    ).toBeDefined()
+  })
+
   it('gives nothing for garbage or a foreign signature', () => {
     const later = sessions({ now: at('2026-08-05T12:00:00.000Z') })
     const foreign = sessions({ secret: 'b'.repeat(32), now: at(issued) }).issue('acct-1')

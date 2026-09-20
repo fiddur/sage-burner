@@ -104,9 +104,9 @@ export const createSessions = ({ secret, now, ttlSeconds }: SessionDeps): Sessio
       const parsed = verified(token)
       if (parsed === undefined) return undefined
 
-      const issuedAt = parsed.iat ?? parsed.exp - ttlSeconds
+      const age = seconds() - (parsed.iat ?? parsed.exp - ttlSeconds)
       const slack = Math.min(SLIDE_AFTER_SECONDS, Math.floor(ttlSeconds / 2))
-      if (seconds() - issuedAt < slack) return undefined
+      if (age >= 0 && age < slack) return undefined
 
       return issue(parsed.sub)
     },
