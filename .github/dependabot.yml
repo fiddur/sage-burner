@@ -70,6 +70,15 @@ updates:
     # reasons unrelated to the change teaches people to skim past it.
     cooldown:
       default-days: 3
+    ignore:
+      # Not major bumps of @types/node. Types for a newer runtime let code
+      # compile against APIs the process does not have — the same rule as the
+      # node-major ignore above, from the other end. When Node moves, .nvmrc,
+      # `engines`, the Dockerfile's `FROM node:` lines, @tsconfig/nodeNN and
+      # @types/node move together, and that is a change to make deliberately
+      # rather than one to take from a weekly PR.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     # Keeps the 72-hour policy from becoming a stream of one-line PRs.
     groups:
       all-dependencies:

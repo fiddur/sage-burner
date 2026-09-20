@@ -385,6 +385,24 @@ describe('what the bell asks for while nobody is looking', () => {
     }
   })
 
+  it('asks on the tick that lands just after a return, the floor being the return’s alone', async () => {
+    vi.useFakeTimers()
+    const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
+
+    try {
+      bellAsking(ask)
+      await vi.advanceTimersByTimeAsync(ASK_EVERY_MS - 1)
+      vi.setSystemTime(Date.now() + 1)
+      globalThis.dispatchEvent(new Event('focus'))
+
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect(ask).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('asks again on the next return, the window having passed', () => {
     vi.useFakeTimers()
     const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))

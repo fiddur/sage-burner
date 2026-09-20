@@ -226,10 +226,11 @@ only ever right while the TTL had not moved: lowering it put the arithmetic's "i
 the future and nothing slid again, and a TTL shorter than a day never slid at all — hence the
 half-lifetime floor. A token minted before `iat` existed still reads, and still slides at a
 day, off `exp - SESSION_TTL_SECONDS` — and where that arithmetic puts the issue in the future,
-which only a lowered TTL can do, it slides at once, so the renewal is what writes it an `iat`. The slack keeps the renewal off every response; a response that
-sets its own cookie (login, logout, an OAuth callback) is left alone, so a logout is never
-raced by its own renewal. Renewal extends a token's reach, so the paragraph below about
-revocation is worth reading with that in mind.
+which only a lowered TTL can do, it slides at once, so the renewal is what writes it an `iat`.
+The slack keeps the renewal off every response; a response that sets its own cookie (login,
+logout, an OAuth callback) is left alone, so a logout is never raced by its own renewal.
+Renewal extends a token's reach, so the paragraph below about revocation is worth reading with
+that in mind.
 
 `Secure` is decided once in `config.ts` as `secure_cookies`, on exactly the same
 predicate as the `SESSION_SECRET` requirement: `production`, a non-loopback
@@ -1728,14 +1729,17 @@ code the server no longer serves, and `preact-iso` claims same-origin clicks and
 following it to `/changelog`, or following the notification that leads there, landed on the new page
 still running the old build, with the bar still up saying so. `hardenNavigation` listens for clicks
 at **capture**, ahead of the router's own listener, but decides nothing there (#571): it records the
-link and looks again once the target's own handlers have run. The location now equal to the link's
-href means the router pushed it, and only then does it reload — `location.replace`, the entry
-already being on the stack. Not moved means either the app handled the click for itself, the
-desktop bell's dropdown being the one that does, or the browser's own navigation is already under
-way; both are left alone. Deciding at capture instead swallowed that dropdown,
-because `preventDefault` there was a verdict passed before anyone else had spoken. The service worker
-answers navigations fresh-first, so what lands is the new shell, and the bar is gone on arrival
-because the build now matches.
+link and looks again once the target's own handlers have run. The location having **moved** to the
+link's href — moved rather than merely equal, read against where it stood before the click, so that
+a click on a link to the page already shown is not taken for a push — means the router pushed it,
+and only then does it reload — `location.replace`, the entry already being on the stack. Not moved
+means either the app handled the click for itself, the desktop bell's dropdown being the one that
+does, or the browser's own navigation is already under way; both are left alone. A router push to
+the URL already shown is left alone with them, nothing in the location telling the two apart; the
+next navigation that goes somewhere picks the build up. Deciding at capture instead swallowed that
+dropdown, because `preventDefault` there was a verdict passed before anyone else had spoken. The
+service worker answers navigations fresh-first, so what lands is the new shell, and the bar is gone
+on arrival because the build now matches.
 
 One rule rather than a list of destinations, because the bar is not about the changelog: any
 navigation is the natural moment to pick the new build up, and the next one after that is a

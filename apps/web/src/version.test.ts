@@ -176,6 +176,53 @@ describe('turning in-app links into full loads while the build is stale', () => 
     off()
   })
 
+  it('leaves a click the app handled alone on the page the link already points at', async () => {
+    const go = vi.fn()
+    const off = hardenNavigation(go)
+    history.replaceState(null, '', '/notifications')
+    const link = clicking('<a href="/notifications">Notifications</a>')
+    const handle = (event: Event) => event.preventDefault()
+    link.addEventListener('click', handle)
+
+    link.click()
+    await settled()
+
+    expect(go).not.toHaveBeenCalled()
+    link.removeEventListener('click', handle)
+    off()
+  })
+
+  it('loads the new build for that same link where the click does move the page to it', async () => {
+    const go = vi.fn()
+    const off = hardenNavigation(go)
+    const stopRouting = routing()
+
+    clicking('<a href="/notifications">Notifications</a>').click()
+    await settled()
+
+    expect(go).toHaveBeenCalledWith(`${location.origin}/notifications`)
+    stopRouting()
+    off()
+  })
+
+  it('leaves alone a click the app answered by routing somewhere else entirely', async () => {
+    const go = vi.fn()
+    const off = hardenNavigation(go)
+    const link = clicking('<a href="/members">Members</a>')
+    const elsewhere = (event: Event) => {
+      event.preventDefault()
+      history.pushState(null, '', '/login')
+    }
+    link.addEventListener('click', elsewhere)
+
+    link.click()
+    await settled()
+
+    expect(go).not.toHaveBeenCalled()
+    link.removeEventListener('click', elsewhere)
+    off()
+  })
+
   it('stops when the bar goes, so an app on the newest build routes as it always did', async () => {
     const go = vi.fn()
     hardenNavigation(go)()
