@@ -52,11 +52,11 @@ dotenv takes the last occurrence, so appending would also work — but the file
 would then read top-down as though no secret were set, which is the same trap
 `.env.example` warns about for `TRUST_PROXY`.
 
-For the Apache deployment below, change `TRUST_PROXY` to `1` in that `.env` —
-without it `request.ip` is the Docker bridge for every request. It ships as
-`false` rather than `1` because a trusted hop with nothing in front appending to
-`X-Forwarded-For` hands the client control of that value, and a default that is
-only safe if you edit the file is not a safe default.
+For the Apache deployment below, change `TRUST_PROXY` to `uniquelocal` in that
+`.env` — without it `request.ip` is the Docker bridge for every request. It
+ships as `false` rather than a trusted peer because trusting one with nothing in
+front appending to `X-Forwarded-For` hands the client control of that value, and
+a default that is only safe if you edit the file is not a safe default.
 
 One service, one named volume holding the SQLite database, and a watchtower
 sidecar that polls Docker Hub every five minutes and redeploys when the tag
@@ -169,13 +169,20 @@ client ──https──▶ Apache (host) ──http──▶ 127.0.0.1:8081 ─
 
 Two things follow from that, both easy to get wrong:
 
-**Set `TRUST_PROXY=1`.** Apache is the only hop that appends to
+**Set `TRUST_PROXY=uniquelocal`.** Apache is the only hop that appends to
 `X-Forwarded-For` — Docker's port mapping is NAT, not an HTTP proxy, so it adds
-nothing. Trusting exactly one hop makes `request.ip` the real client address,
-and it is spoof-resistant: a client can only _prepend_ to the header, while
-Apache appends the address it actually saw. `true` would trust the whole chain
-and let any client claim any address; the default `false` leaves every request
-looking like it came from the Docker bridge.
+nothing. Trusting the peer makes `request.ip` the real client address, and it is
+spoof-resistant: a client can only _prepend_ to the header, while Apache appends
+the address it actually saw. `true` would trust the whole chain and let any
+client claim any address; the default `false` leaves every request looking like
+it came from the Docker bridge.
+
+The value names an address rather than a count of hops. The container sees
+Docker's bridge — `172.17.0.1`, not `127.0.0.1` — as the peer, so `uniquelocal`
+is the preset that covers it and `loopback` is not. Fastify honoured a hop count
+until 5.12.1, which made one trust nothing at all, on the grounds that a hop
+count cannot check who the peer is; the app now refuses `TRUST_PROXY=1` at
+startup rather than letting it look set and do nothing.
 
 **Publish the port on loopback only** — `127.0.0.1:8081:3000`, never
 `8081:3000`. Docker writes its own iptables rules ahead of ufw/firewalld, so a
@@ -191,7 +198,7 @@ ProxyPass        / http://127.0.0.1:8081/
 ProxyPassReverse / http://127.0.0.1:8081/
 ```
 
-**`TRUST_PROXY=1` matters more than it did.** Both of the app's own bounds are keyed on
+**`TRUST_PROXY=uniquelocal` matters more than it did.** Both of the app's own bounds are keyed on
 `request.ip`, so with the default `false` behind this hop every request looks like it came from
 the Docker bridge — and the two per-origin bounds collapse into one bucket for the whole
 installation: thirty logins per five minutes and twenty redemptions per ten, shared by everybody.

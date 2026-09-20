@@ -2,7 +2,9 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "module": "NodeNext",
-    "moduleResolution": "NodeNext"
+    "moduleResolution": "NodeNext",
+    // Empty on purpose: the base sets `types: ["node"]`, and this package runs in the browser too.
+    "types": []
   },
   "include": ["src"]
 }

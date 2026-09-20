@@ -1068,6 +1068,11 @@ passkeys and no password at all.
   rather than checked before it — two removals from two tabs could otherwise each
   see two passkeys, both pass, and together strip the account bare. It is the one
   place here that engineers for a race, and the consequence is why.
+- **The algorithms offered are named**: EdDSA, ES256 and RS256
+  (`supportedAlgorithmIDs`). Left to itself `@simplewebauthn` 14 puts ML-DSA-44
+  first wherever the runtime can verify it, and Node 24 can only through a Web
+  Crypto API it still marks experimental. A passkey minted against that is a way
+  in that a Node patch release may take away, so it waits until the API is stable.
 - The **challenge is a row**, not a signed cookie, and it is deleted by the
   statement that reads it. Single-use is the whole point of a challenge, and a
   signed one is replayable for as long as it is valid. Expired rows are swept

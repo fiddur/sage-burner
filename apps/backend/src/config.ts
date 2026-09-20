@@ -13,11 +13,16 @@ const optional = <T extends z.ZodType>(schema: T) => z.preprocess(blankToUndefin
 
 const port = z.coerce.number().int().min(1).max(65_535)
 
-const parseTrustProxy = (value: string | undefined): boolean | number | string => {
+const parseTrustProxy = (value: string | undefined): boolean | string => {
   if (value === undefined) return false
   if (value === 'true') return true
   if (value === 'false') return false
-  if (/^\d+$/.test(value)) return Number(value)
+
+  if (/^\d+$/.test(value)) {
+    throw new Error(
+      `a hop count is no longer honoured — Fastify 5.12.1 made it trust nothing at all. Name the proxy's address instead: \`uniquelocal\` behind Docker's bridge, \`loopback\` when the proxy shares the host's network, or an explicit address or CIDR list (got ${value})`,
+    )
+  }
 
   proxyAddr.compile(value.split(',').map((entry) => entry.trim()))
   return value
@@ -65,7 +70,7 @@ export interface Config {
   log_level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent'
   build_sha: string
   web_root?: string
-  trust_proxy: boolean | number | string
+  trust_proxy: boolean | string
   public_origin?: string
 }
 
@@ -81,7 +86,7 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
 
   const value = parsed.data
 
-  let trust_proxy: boolean | number | string
+  let trust_proxy: boolean | string
   try {
     trust_proxy = parseTrustProxy(value.TRUST_PROXY)
   } catch (error) {
