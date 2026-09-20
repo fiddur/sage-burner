@@ -396,8 +396,9 @@ These are member records, so treat them as such:
 ## Working an issue: merge on approval
 
 This project works **merge on approval**: once an issue is ironed out and assigned,
-take it end to end, up to the merge. A webhook service reviews every ready PR
-automatically, so getting one reviewed, approved and ready needs nobody's attention.
+take it end to end, up to the merge. A webhook service reviews every PR that carries the
+`needs-review` label, so getting one reviewed, approved and ready needs nobody's
+attention.
 
 **The merge itself needs the go-ahead, and "merge on approval" is it.** Said once it
 stands for the whole run — the PR in hand and every later one in the same session,
@@ -417,14 +418,19 @@ origin develop` and branch from `origin/develop`.
    [Plan first, then an Opus implementer](#plan-first-then-an-opus-implementer).
 4. `pnpm fix && pnpm check && pnpm test` all green locally.
 5. Open a **Draft** PR against `develop`, body containing `Closes #<issue>`.
-6. Watch CI — all of it, not one named check. Red → fix and push. Green →
-   `gh pr ready <n>`.
+6. Watch CI — all of it, not one named check. Red → fix and push. Green → mark the
+   PR ready for review, **then put the `needs-review` label on it**. The label is what
+   asks for the review; ready alone asks for nothing. On Fredrik's machine that is
+   `gh pr ready <n> && gh pr edit <n> --add-label needs-review`; in the cloud it is
+   `update_pull_request` with `draft: false`, then `issue_write` (method `update`)
+   carrying the label — the GitHub MCP tools, see
+   [Running in the cloud](#running-in-the-cloud).
 7. Wait for the review. It arrives by itself, as a `COMMENTED` review, a few
-   minutes after the PR turns ready and after every later push.
+   minutes after the label goes on.
    - **On Fredrik's machine** the review service writes
      `/home/fiddur/src/codereview/events.log`, one `<ISO time> <pr url> <event>` per
      line. Wait for `<pr url> updated`; `review started` means it has only begun.
-     Poll the file by line offset — note `wc -l` before `gh pr ready`, then sleep
+     Poll the file by line offset — note `wc -l` before adding the label, then sleep
      and read only what is new — because a backgrounded `tail -F … | grep` prints
      its match and then never exits. Do not poll GitHub on a timer there.
    - **Anywhere that file does not exist** (the cloud), GitHub is the only signal:
@@ -435,9 +441,13 @@ origin develop` and branch from `origin/develop`.
 
 8. Read the review body **and every inline comment**. Fix genuine
    correctness/security findings; for trivial or subjective nits, resolve the
-   thread with a brief rationale. Resolve every inline thread via the GraphQL
-   `resolveReviewThread` mutation.
-9. Any push starts a fresh review round. Repeat from step 7.
+   thread with a brief rationale. Resolve every inline thread: the GraphQL
+   `resolveReviewThread` mutation on Fredrik's machine, the `resolve_review_thread`
+   tool in the cloud, with the thread id `pull_request_read` (`get_review_comments`)
+   lists.
+9. A push does not start a fresh review round by itself: **add `needs-review` again**
+   after every push that should be re-read — the label is the request, and putting it
+   on once more is how a re-review is asked for. Then repeat from step 7.
 10. **Merge, without asking again**, once "merge on approval" is standing and all
     four gates hold:
     - the latest review body starts with `✅Approved` — the service puts a space
@@ -447,10 +457,15 @@ origin develop` and branch from `origin/develop`.
     - **every** check is green — not a named one. `CI Gate` runs the tests,
       but `build` is what proves the image starts, and naming only the first
       would let a red `build` through. Check the whole rollup:
-      `gh pr view <n> --json statusCheckRollup`.
-    - `mergeStateStatus` is `CLEAN`.
-      Then `gh pr merge <n> --merge`. Never `--admin`. Avoid `--auto` — a push
-      clears it and the PR sits `BLOCKED`. Never the `merge` skill either: it is
+      `gh pr view <n> --json statusCheckRollup` on Fredrik's machine,
+      `pull_request_read` with `get_check_runs` in the cloud — every run `completed`
+      and `success`.
+    - `mergeStateStatus` is `CLEAN` (`mergeable_state` is `clean` on the
+      `pull_request_read` `get` answer).
+      Then `gh pr merge <n> --merge`, or `merge_pull_request` with
+      `merge_method: merge` and the head sha as `expectedHeadSha`. Never `--admin`.
+      Avoid `--auto` — a push clears it and the PR sits `BLOCKED`. Never the `merge`
+      skill either: it is
       `disable-model-invocation: true`, so only Fredrik can run it, and waiting on
       him to type `/merge` is the stall this step exists to prevent.
 11. If `BEHIND`: `git fetch origin develop && git merge origin/develop
@@ -498,6 +513,10 @@ trust it:
 ```sh
 gh api repos/:owner/:repo/rules/branches/develop --jq '.[] | "\(.type): \(.parameters // {} | tojson)"'
 ```
+
+That is a check for Fredrik's machine: the GitHub MCP tools have no rules endpoint, so
+in the cloud this paragraph is what there is, and a merge the ruleset refuses is the
+signal that it has gone stale.
 
 (Beware `// empty` as a jq fallback: `empty` produces _no_ outputs, so any
 expression needing a value from it yields nothing and the whole surrounding
@@ -573,26 +592,29 @@ this section is the difference.
   to work around: say so and stop rather than splitting the work into what can be
   done without it — a PR that waits on another environment for its second half is
   how #828 stalled.
-- **Git and GitHub go through a proxy.** `gh` is signed in already; leave `GH_TOKEN`
-  alone. A push is accepted for the session's own branch only, which is all this
-  workflow needs. GraphQL is limited to a pinned set of pull-request operations and
-  anything else is a 403 naming the REST fallback. Projects v2 is GraphQL-only, so
-  **the board cannot be read there**: work the issue the session was started on.
-- **Waiting for CI and for the review is a bounded poll of GitHub**, a minute or two
-  between reads and a deadline on the loop. CI: `gh pr checks <n>`. The review: it has landed when the
-  newest review sits on the head commit —
-
-  ```sh
-  gh pr view <n> --json headRefOid,reviews \
-    --jq '.headRefOid as $h | [.reviews[] | select(.commit.oid == $h)] | last | (.body // "no review on the head yet") | split("\n")[0]'
-  ```
-
-  — the review's first line, which opens with ✅ when the gate's first part holds.
-  Forty minutes without one means the review service is down; say so.
-
+- **There is no `gh` there, and no GraphQL. GitHub is the GitHub MCP tools**, the
+  `mcp__github__*` set, whose schemas load through `ToolSearch` when only their names
+  are listed. The whole workflow is six of them: `create_pull_request` (draft, against
+  `develop`), `update_pull_request` (`draft: false` to mark it ready), `issue_write`
+  (method `update`, the PR's number as `issue_number`, `labels` carrying
+  `needs-review` — it sets the whole list, so name every label the PR should keep),
+  `pull_request_read` (`get_check_runs`, `get_reviews`, `get_review_comments`, and
+  `get` for `head.sha` and `mergeable_state`), `resolve_review_thread` and
+  `merge_pull_request`. `subscribe_pr_activity` on the PR right after opening it, so
+  reviews and check suites arrive as events rather than only by polling. Git itself
+  goes through a proxy, and a push is accepted for the session's own branch only,
+  which is all this workflow needs. Projects v2 has no tool there, so **the board
+  cannot be read**: work the issue the session was started on.
+- **Waiting for CI and for the review is a bounded poll of GitHub** between events, a
+  minute or two between reads and a deadline on the loop. CI: `pull_request_read` with
+  `get_check_runs`, every run `completed` and `success`. The review: `get_reviews`, and
+  it has landed when the newest review's `commit_id` is the head sha that `get`
+  reports — its body's first line opens with ✅ when the gate's first part holds. A
+  review on an older commit is stale, whatever it says. Forty minutes without one
+  after the label went on means the review service is down; say so.
 - **Threads still have to be resolved**, because the ruleset blocks the merge on
-  them. List them with `reviewThreads` and close each with `resolveReviewThread`. If
-  the proxy refuses either, answer every thread in a reply, and report that the
+  them. `get_review_comments` lists them with their ids; `resolve_review_thread` closes
+  one. If the proxy refuses either, answer every thread in a reply, and report that the
   threads need resolving by hand — that is a stop, not a reason to look for another
   way past the ruleset.
 
