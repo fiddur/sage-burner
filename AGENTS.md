@@ -402,22 +402,36 @@ automatically, so getting one reviewed, approved and ready needs nobody's attent
 stands for the whole run — the PR in hand and every later one in the same session,
 including a queue worked off the Ready column. Do not ask again per PR; that is the
 confirmation step those words remove. Without them, take the PR to `✅Approved` with
-every thread resolved and CI green, then stop and say it is ready. The rule lives in
-`~/.claude/CLAUDE.md` and holds for every project; it is spelled out here because
-this repo's flow is built around it.
+every thread resolved and CI green, then stop and say it is ready. The rule is
+spelled out here in full because a cloud session has no `~/.claude` to find it in:
+this file is the whole rulebook wherever the session runs.
 
 1. Sync: `git checkout develop && git fetch origin develop && git reset --hard
 origin/develop`. Reset rather than pull — squash merges make local `develop`
-   diverge.
+   diverge. Where `develop` cannot be checked out (another worktree holds it) or
+   is not there at all (a fresh cloud clone), skip the local branch: `git fetch
+origin develop` and branch from `origin/develop`.
 2. Branch off `develop`.
-3. Implement, tests first where reasonable.
+3. Plan, then implement, tests first where reasonable — see
+   [Plan first, then an Opus implementer](#plan-first-then-an-opus-implementer).
 4. `pnpm fix && pnpm check && pnpm test` all green locally.
 5. Open a **Draft** PR against `develop`, body containing `Closes #<issue>`.
 6. Watch CI — all of it, not one named check. Red → fix and push. Green →
    `gh pr ready <n>`.
-7. Wait for the review by tailing `/home/fiddur/src/codereview/events.log` for
-   the line `<pr url> updated` — do not poll GitHub on a timer. (`review
-started` means it has only begun; keep waiting for `updated`.)
+7. Wait for the review. It arrives by itself, as a `COMMENTED` review, a few
+   minutes after the PR turns ready and after every later push.
+   - **On Fredrik's machine** the review service writes
+     `/home/fiddur/src/codereview/events.log`, one `<ISO time> <pr url> <event>` per
+     line. Wait for `<pr url> updated`; `review started` means it has only begun.
+     Poll the file by line offset — note `wc -l` before `gh pr ready`, then sleep
+     and read only what is new — because a backgrounded `tail -F … | grep` prints
+     its match and then never exits. Do not poll GitHub on a timer there.
+   - **Anywhere that file does not exist** (the cloud), GitHub is the only signal:
+     see [Running in the cloud](#running-in-the-cloud).
+
+   Either way bound the wait with a deadline, and when it runs out say the review
+   service may be wedged rather than ending silently.
+
 8. Read the review body **and every inline comment**. Fix genuine
    correctness/security findings; for trivial or subjective nits, resolve the
    thread with a brief rationale. Resolve every inline thread via the GraphQL
@@ -425,7 +439,8 @@ started` means it has only begun; keep waiting for `updated`.)
 9. Any push starts a fresh review round. Repeat from step 7.
 10. **Merge, without asking again**, once "merge on approval" is standing and all
     four gates hold:
-    - the latest review body starts with `✅Approved`, **and** it is on the
+    - the latest review body starts with `✅Approved` (the service writes it `✅
+Approved`, with a space; match the ✅), **and** it is on the
       current head commit (a `✅Approved` left on an older commit is stale),
     - every inline review thread is resolved,
     - **every** check is green — not a named one. `CI Gate` runs the tests,
@@ -489,6 +504,84 @@ output disappears — silently, and still exiting 0. Substituting
 `.parameters.required_status_checks // empty` into the interpolation above drops
 every rule that lacks the field, which reads as a ruleset that does not have
 them.)
+
+## Plan first, then an Opus implementer
+
+The session model plans; an Opus subagent writes the code. Planning is where the
+strongest model earns its cost, and an implementer that starts from a finished plan
+has nothing to spend context on but the change. Trivial edits — a line or two, a doc
+tweak — skip the round trip.
+
+1. **Plan in the main session.** Read the code, settle the design, and resolve every
+   open question with Fredrik — or in the issue, which is where a cloud session finds
+   the answers — before any implementation starts. The implementer cannot ask.
+2. **Write the plan to a file outside the repo** (the session scratchpad, else a
+   `mktemp -d`), `PLAN.md`, one file per independent part. A fresh agent has none of
+   the conversation, so the file is its whole brief: the goal, the decisions already
+   made and why, the files and functions to touch by name, the steps in order, the
+   tests to write, the checks to run, and what is out of scope.
+3. **Delegate.** Use the `implementer` agent where the session lists one. Where it
+   does not — the cloud, which has no `~/.claude/agents` — start a general-purpose
+   agent with the Agent tool's `model: "opus"` and put the implementer's rules in the
+   prompt: read the plan in full first; follow its decisions and, where it is silent,
+   this file; stay inside its scope; where the plan is wrong, do what is unaffected
+   and say exactly what blocked the rest rather than redesigning it; run `pnpm fix &&
+pnpm check && pnpm test`; do not stage, commit, push or open a PR; report the steps
+   done and not done, every file changed, the exact commands run with failing output
+   verbatim, and anything decided that the plan did not specify. Never a fork: it
+   inherits the session model, which defeats the point. Beyond those rules the prompt
+   is three things: the absolute plan path, the repo path, the branch.
+4. **Parallelise only independent parts**, one implementer per plan file, only where
+   they touch disjoint files, and two or three at a time at most.
+5. **Review before committing.** Read the report and the whole diff (`git diff`, and
+   `git status` for new files), and run the checks yourself where the report is
+   unclear. Send fixes back to the same agent so it keeps its context, or make small
+   ones directly. Then commit and carry on from step 4 of the list above.
+
+## Running in the cloud
+
+A session started from claude.ai/code runs in a fresh VM with a fresh clone.
+`CLAUDE_CODE_REMOTE=true` says so. Nothing of Fredrik's machine exists there — no
+`~/.claude`, no memory, no review log — so everything above applies as written and
+this section is the difference.
+
+- **Node 24, and check it before believing a test run.** The image ships Node 20–22
+  with 22 on `PATH`; the environment's setup script (`scripts/cloud-setup.sh`, pasted
+  into the environment's settings, since it runs before anything can call it from the
+  clone) installs the `.nvmrc` line into `/opt/node24` with the pinned pnpm. Run `node
+--version` first. Anything but `v24` means prefixing every command with `export
+PATH="/opt/node24/bin:$PATH"`; if `/opt/node24` is missing, run the script (it needs
+  root) or stop and say so. **Under Node 22 the suite lies**: there is no
+  `node:sqlite`, so every backend suite importing the database fails at _import_
+  time, and vitest reports that as failed `Test Files` above a **passing** `Tests`
+  count for whatever did load. Read the `Test Files` line, never only `Tests`.
+- **`pnpm install --frozen-lockfile` comes first**; the clone has no `node_modules`.
+  It needs `registry.npmjs.org`, which the _Trusted_ network level allows. A 403 from
+  the registry is the environment's network setting, not something to work around:
+  say so and stop rather than splitting the work into what can be done without it —
+  a PR that waits on another environment for its second half is how #828 stalled.
+- **Git and GitHub go through a proxy.** `gh` is signed in already; leave `GH_TOKEN`
+  alone. A push is accepted for the session's own branch only, which is all this
+  workflow needs. GraphQL is limited to a pinned set of pull-request operations and
+  anything else is a 403 naming the REST fallback. Projects v2 is GraphQL-only, so
+  **the board cannot be read there**: work the issue the session was started on.
+- **Waiting for CI and for the review is a bounded poll of GitHub**, a minute or two
+  between reads and a deadline on the loop. CI: `gh pr checks <n>`. The review: it has landed when the
+  newest review sits on the head commit —
+
+  ```sh
+  gh pr view <n> --json headRefOid,reviews \
+    --jq '.headRefOid as $h | [.reviews[] | select(.commit.oid == $h)] | last | (.body // "no review on the head yet") | split("\n")[0]'
+  ```
+
+  — the review's first line, which opens with ✅ when the gate's first part holds.
+  Forty minutes without one means the review service is down; say so.
+
+- **Threads still have to be resolved**, because the ruleset blocks the merge on
+  them. List them with `reviewThreads` and close each with `resolveReviewThread`. If
+  the proxy refuses either, answer every thread in a reply, and report that the
+  threads need resolving by hand — that is a stop, not a reason to look for another
+  way past the ruleset.
 
 ## Deployment
 
