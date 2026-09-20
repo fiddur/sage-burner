@@ -15,8 +15,8 @@ under today's heading, and make a new heading when there is none.
   `out`, `need more`. **Inventory management** at the top brings the counting buttons back
   for as long as you are actually counting, and it is there for everybody.
 - **A thing can carry a note for whoever is writing an amount.** Black beans are kept in
-  kg and cooked in dl, and now the row can say so: `Dry weight. 0.09 kg becomes ca 2.5
-dl/230 g`. It sits behind a small ℹ️ on the pantry row, and — the point of it — appears
+  kg and cooked in dl, and now the row can say so — "dry weight, 0.09 kg becomes about
+  2.5 dl". It sits behind a small ℹ️ on the pantry row, and — the point of it — appears
   beside the amount box on a sitting the moment you pick that thing.
 - **Promoting a special buy now takes the lines even if you change the unit.** Promote
   "Salsa · jars" and count it in `jars (300g)`, and the form asks what each line already

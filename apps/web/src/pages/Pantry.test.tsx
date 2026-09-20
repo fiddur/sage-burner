@@ -976,6 +976,35 @@ describe('promoting a special buy', () => {
     expect(screen.getByRole('button', { name: 'Add it' })).toBeTruthy()
   })
 
+  it('sends no amounts when the unit is put back inside the adjust step itself', async () => {
+    const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 3 }))
+    renderPage(
+      promoting({
+        addPantryItem: () => Promise.resolve({ item: thing({ id: 'p-9', name: 'Saffron, 1 g sachets' }) }),
+        adoptSpecialBuy,
+      }),
+      ADMIN,
+    )
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'g' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+    fireEvent.input(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sat 1 Dinner, in g'),
+      { target: { value: '2' } },
+    )
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'Sachets' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+
+    await waitFor(() =>
+      expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', {
+        name: 'Saffron, 1 g sachets',
+        unit: 'sachets',
+        amounts: {},
+      }),
+    )
+  })
+
   it('forgets the amounts once the unit is put back, since nothing is being converted', async () => {
     const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 3 }))
     renderPage(

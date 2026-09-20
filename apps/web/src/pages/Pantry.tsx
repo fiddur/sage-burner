@@ -283,7 +283,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
         const moved = await api.adoptSpecialBuy(added.item.id, {
           name: promoting.name,
           unit: promoting.unit,
-          amounts: amountsFor(adjusting, amounts),
+          amounts: amountsFor(adjusting && !sameUnit(unit, promoting.unit), amounts),
         })
         setPromoted(adoptedSaid(moved.adopted))
       }
