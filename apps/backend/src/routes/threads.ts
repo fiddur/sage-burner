@@ -1,5 +1,6 @@
 import type {
   NotificationCategory,
+  RideKind,
   Supporter,
   Thread,
   ThreadEntityType,
@@ -22,6 +23,9 @@ import {
   meetingsPage,
   mentionedAccounts,
   profilePage,
+  rideBody,
+  ridesPage,
+  rideTitle,
   rolesPage,
   songPage,
   withMentionNames,
@@ -52,6 +56,7 @@ import {
   meeting,
   meetingPoint,
   post,
+  ride,
   session,
   sessionHelper,
   sessionSupport,
@@ -520,6 +525,12 @@ export const readThreads = async (
       meal_label: meal.label,
       meal_date: meal.date,
       meal_idea: meal.food_idea,
+      ride_kind: ride.kind,
+      ride_from: ride.from,
+      ride_when: ride.when,
+      ride_seats: ride.seats,
+      ride_notes: ride.notes,
+      ride_account: ride.account_id,
     })
     .from(thread)
     .leftJoin(event, eq(event.id, thread.event_id))
@@ -533,6 +544,7 @@ export const readThreads = async (
     .leftJoin(meeting, and(eq(thread.entity_type, 'meeting'), eq(meeting.id, thread.entity_id)))
     .leftJoin(leadRole, and(eq(thread.entity_type, 'role'), eq(leadRole.id, thread.entity_id)))
     .leftJoin(meal, and(eq(thread.entity_type, 'meal'), eq(meal.id, thread.entity_id)))
+    .leftJoin(ride, and(eq(thread.entity_type, 'ride'), eq(ride.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const ranked = db
@@ -647,6 +659,7 @@ const authorOf = (row: CardRow): string | null => {
   if (row.entity_type === 'bring') return row.bring_author
   if (row.entity_type === 'point') return row.point_author
   if (row.entity_type === 'meeting') return row.meeting_author
+  if (row.entity_type === 'ride') return row.ride_account
 
   return null
 }
@@ -690,6 +703,12 @@ interface CardRow {
   meal_label: string | null
   meal_date: string | null
   meal_idea: string | null
+  ride_kind: RideKind | null
+  ride_from: string | null
+  ride_when: string | null
+  ride_seats: number | null
+  ride_notes: string | null
+  ride_account: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
@@ -766,6 +785,34 @@ const mealFacts = (row: CardRow): CardFacts => ({
   gone: row.meal_label === null,
 })
 
+const journeyIn = (
+  row: CardRow,
+): { kind: RideKind; from: string; when: string; seats: number; notes: string } | undefined =>
+  row.ride_kind === null ||
+  row.ride_from === null ||
+  row.ride_when === null ||
+  row.ride_seats === null ||
+  row.ride_notes === null
+    ? undefined
+    : {
+        kind: row.ride_kind,
+        from: row.ride_from,
+        when: row.ride_when,
+        seats: row.ride_seats,
+        notes: row.ride_notes,
+      }
+
+const rideFacts = (row: CardRow): CardFacts => {
+  const journey = journeyIn(row)
+
+  return {
+    title: journey === undefined ? row.title : rideTitle(journey),
+    link: journey === undefined || row.event_id === null ? null : ridesPage(row.event_id, row.entity_id),
+    body: journey === undefined ? null : rideBody(journey),
+    gone: journey === undefined,
+  }
+}
+
 const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
   facts.body === null ? facts : { ...facts, body: named(facts.body) }
 
@@ -795,6 +842,7 @@ const factsFor = (row: CardRow): CardFacts =>
     meeting: meetingFacts,
     role: roleFacts,
     meal: mealFacts,
+    ride: rideFacts,
   })[row.entity_type](row)
 
 export const nameOf = async (db: Database, accountId: string): Promise<string | null> => {
@@ -843,6 +891,16 @@ const authorRow = async (
   return row?.author == null ? [] : [row.author]
 }
 
+const riderOf = async (db: Database, entityId: string): Promise<string[]> => {
+  const [row] = await db
+    .select({ account_id: ride.account_id })
+    .from(ride)
+    .where(eq(ride.id, entityId))
+    .limit(1)
+
+  return row === undefined ? [] : [row.account_id]
+}
+
 const cardAuthor = {
   attendance: (_db: Database, found: Whose) => Promise.resolve(found.subject_account_id),
   post: async (db: Database, found: Whose) => (await authorRow(db, post, found.entity_id))[0] ?? null,
@@ -861,6 +919,7 @@ const cardAuthor = {
 
     return offered?.author ?? null
   },
+  ride: async (db: Database, found: Whose) => (await riderOf(db, found.entity_id))[0] ?? null,
   role: () => Promise.resolve(null),
   meal: () => Promise.resolve(null),
 } as const satisfies Record<ThreadEntityType, (db: Database, found: Whose) => Promise<string | null>>
@@ -908,6 +967,7 @@ const alsoInIt = {
   song: async (db: Database, found: Whose) => await authorRow(db, song, found.entity_id),
   point: async (db: Database, found: Whose) => await authorRow(db, meetingPoint, found.entity_id),
   meeting: async (db: Database, found: Whose) => await authorRow(db, meeting, found.entity_id),
+  ride: async (db: Database, found: Whose) => await riderOf(db, found.entity_id),
   bring: async (db: Database, found: Whose) => [
     ...(await authorRow(db, bringItem, found.entity_id)),
     ...(await handsOn(db, found.entity_id)).map((hand) => hand.account_id),
@@ -1356,6 +1416,18 @@ export const registerThreadRoutes = (
       link: found.event_id === null ? null : rolesPage(found.event_id),
       what: await titleOf(leadRole, found),
     }),
+    ride: async (found: Subject) => {
+      const [row] = await db
+        .select({ kind: ride.kind, from: ride.from })
+        .from(ride)
+        .where(eq(ride.id, found.entity_id))
+        .limit(1)
+
+      return {
+        link: atItsBurn(found, ridesPage),
+        what: row === undefined ? found.title : rideTitle(row),
+      }
+    },
     meal: async (found: Subject) => {
       const [row] = await db
         .select({ label: meal.label, date: meal.date })
@@ -1386,6 +1458,7 @@ export const registerThreadRoutes = (
     meeting: { mine: 'meeting_comment', anybody: 'meeting_comment_any' },
     role: { mine: 'lead_role_comment', anybody: 'lead_role_comment_any' },
     meal: { mine: 'meal_comment', anybody: 'meal_comment_any' },
+    ride: { mine: 'ride_comment', anybody: 'ride_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {

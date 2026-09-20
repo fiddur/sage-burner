@@ -109,6 +109,9 @@ export const notificationCategories = [
   'bring_role',
   'bring_comment',
   'bring_comment_any',
+  'ride_posted',
+  'ride_comment',
+  'ride_comment_any',
   'point_raised',
   'point_decided',
   'point_comment',
@@ -203,6 +206,19 @@ export const notificationCategoryInfo = {
     email: false,
     about: 'else',
   },
+  ride_posted: {
+    label: 'Somebody is looking for a lift or offering one',
+    on: false,
+    email: false,
+    about: 'else',
+  },
+  ride_comment: { label: 'Somebody comments on your journey', on: true, email: false, about: 'you' },
+  ride_comment_any: {
+    label: 'Somebody comments on any journey on the rideshare board',
+    on: false,
+    email: false,
+    about: 'else',
+  },
   point_raised: { label: 'Somebody raises a talking point', on: false, email: false, about: 'else' },
   point_decided: { label: 'A talking point is decided', on: false, email: false, about: 'else' },
   point_comment: { label: 'Somebody comments on a point you raised', on: true, email: false, about: 'you' },
@@ -270,6 +286,7 @@ export const threadEntityTypes = [
   'meeting',
   'role',
   'meal',
+  'ride',
 ] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
@@ -289,6 +306,7 @@ export const feedKindLabel = {
   meeting: 'Meetings',
   role: 'Leads',
   meal: 'Meals',
+  ride: 'Rides',
 } as const satisfies Record<FeedKind, string>
 
 export const KINDS_PARAM = 'kinds'
@@ -395,6 +413,13 @@ const mealCategory = (kind: ThreadEntryKind): NotificationCategory | undefined =
   return undefined
 }
 
+const rideCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'ride_comment_any'
+  if (kind === 'added' || kind === 'edited') return 'ride_posted'
+
+  return undefined
+}
+
 const categoriesFor = {
   session: sessionCategory,
   attendance: attendanceCategory,
@@ -405,6 +430,7 @@ const categoriesFor = {
   meeting: meetingCategory,
   role: roleCategory,
   meal: mealCategory,
+  ride: rideCategory,
 } as const satisfies Record<ThreadEntityType, (kind: ThreadEntryKind) => NotificationCategory | undefined>
 
 export const entryCategory = (

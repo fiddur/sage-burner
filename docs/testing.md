@@ -362,6 +362,17 @@ phone" means 360px.
 - [ ] Leave the burn with a pledge outstanding: the hand is gone from the item
       and the item is not.
 
+## The rideshare board
+
+- [ ] ☰ → Rideshares, post a journey: a card appears on the feed under the **Rides** chip,
+      headed "Looking for a lift from <where>" (or "Offering a lift from <where>" for an
+      offer), with the when on it — the seats too on an offer — and the notes under it.
+- [ ] A second member who is coming to that burn and has turned `ride_posted` on is told
+      "<you> is looking for a lift from <where>"; you are not told about your own.
+- [ ] 💬 on the row opens the journey's conversation on the board; the same comments show on
+      its card on the feed, and the poster is told about a comment somebody else leaves.
+- [ ] Take a journey down: it leaves the board and its card leaves the feed.
+
 ## Food
 
 - [ ] ☰ → Pantry as a member: the seeded list is there, ordered by name, with where each

@@ -21,6 +21,7 @@ export type Ride = z.infer<typeof rideSchema>
 export const rideEntrySchema = rideSchema.extend({
   name: z.string().nullable(),
   contact: z.string().nullable(),
+  thread_id: idSchema.nullable(),
 })
 
 export type RideEntry = z.infer<typeof rideEntrySchema>

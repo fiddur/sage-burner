@@ -47,7 +47,8 @@ type definitions. All layers import from it — never duplicate a schema.
   which the songbook renders with), `roster.ts` (`withPlaces`, which draws the line between a
   place and the waiting list), `pantry.ts` (`whereSaid` and `bySpot`, which say where a thing
   lives and in what order a room is walked) and `cards.ts` (`whereItBelongs`, which names the burn a feed
-  card is about for the page and the digest alike). Nothing under `schemas/`.
+  card is about for the page and the digest alike, and `rideTitle` and `rideBody`, which say
+  what a journey's card is headed by and holds). Nothing under `schemas/`.
 - **Every endpoint lives in `routes.ts` and nowhere else.** The client builds its
   path from it and the route file registers `fastify` from it, so the two spellings
   of one endpoint cannot drift; `routes.test.ts` checks that each built path routes

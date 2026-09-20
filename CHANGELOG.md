@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-20
 
+- **A journey on the rideshare board is something people can talk about.** Posting one now
+  opens a card on the feed, headed by where you are coming from and when, it reaches the
+  email summary, and whoever has switched that notification on is told — so a lift going
+  spare is no longer seen only by whoever happened to open the page. 💬 on the row opens the
+  same conversation as the card, and hearts and comments work as on every other card,
+  and the journeys already on a board have had their cards opened for them. Taking a
+  journey down takes the card with it.
 - **The Pantry page reads as a list again.** With a hundred and ninety things on it, four
   buttons and a pen on every row made it a wall. A row now says the name, what it is, what
   it contains, where it lives and how much is left in plain words — `plenty`, `~2 kg`,

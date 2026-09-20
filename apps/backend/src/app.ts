@@ -337,7 +337,7 @@ export const createApp = async ({
   registerEventOptionRoutes(app, { db, sessions })
   registerQuestionRoutes(app, { db })
   registerPlaceRoutes(app, { db, sessions, now })
-  registerRideRoutes(app, { db, sessions, now })
+  registerRideRoutes(app, { db, sessions, now, notify: tellAccount })
   registerAvatarRoutes(app, { db, sessions, now })
   registerImageRoutes(app, { db, sessions, now })
   registerConnectionRoutes(app, { db, sessions })

@@ -1,3 +1,4 @@
+import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { eq } from 'drizzle-orm'
@@ -11,7 +12,8 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, event, ride } from '../db/schema.ts'
+import { account, accountRole, attendance, event, ride } from '../db/schema.ts'
+import { bell, setOn } from './threads.testing.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -133,6 +135,29 @@ const remove = (server: FastifyInstance, cookie: string | undefined, id: string)
     url: `/api/rides/${id}`,
     headers: cookie === undefined ? {} : { cookie },
   })
+
+const givenComing = async (accountId: string, eventId = OPEN_BURN) => {
+  await db()
+    .insert(attendance)
+    .values({ id: randomUUID(), event_id: eventId, account_id: accountId, joined_at: NOW })
+}
+
+const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
+  (await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })).json().threads
+
+const say = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
+  server.inject({
+    method: 'POST',
+    url: `/api/threads/${threadId}/comments`,
+    headers: { cookie },
+    payload: { body },
+  })
+
+const heart = (server: FastifyInstance, cookie: string, threadId: string) =>
+  server.inject({ method: 'POST', url: `/api/threads/${threadId}/support/me`, headers: { cookie } })
+
+const threadOf = async (server: FastifyInstance, cookie: string): Promise<string> =>
+  (await list(server, cookie)).json().rides[0]?.thread_id ?? ''
 
 describe('the rideshare board', () => {
   it('keeps both halves in one list, each saying which it is', async () => {
@@ -353,5 +378,219 @@ describe('the rideshare board', () => {
 
     expect(answered.statusCode).toBe(200)
     expect(answered.json().ride.from).toBe('Göteborg')
+  })
+})
+
+describe('a journey on the feed', () => {
+  it('opens a card headed by the journey, with the when on it and a line saying which it is', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+
+    await post(server, ada.cookie)
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.title).toBe('Looking for a lift from Göteborg')
+    expect(card?.body).toBe('Friday afternoon')
+    expect(card?.entries.map((entry) => [entry.kind, entry.author?.name, entry.body])).toEqual([
+      ['added', 'Ada', 'is looking for a lift'],
+    ])
+  })
+
+  it('puts the seats and the notes on the card of an offer', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+
+    await post(server, ada.cookie, { ...A_JOURNEY, kind: 'offers', seats: 3, notes: 'Two bags max' })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.title).toBe('Offering a lift from Göteborg')
+    expect(card?.body).toBe('Friday afternoon · 3 seats\n\nTwo bags max')
+    expect(card?.entries.map((entry) => entry.body)).toEqual(['is offering a lift'])
+  })
+
+  it('is one thing on the feed rather than two, since one journey is one thing', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+
+    await post(server, ada.cookie)
+
+    expect(await cards(server, ada.cookie)).toHaveLength(1)
+  })
+
+  it('links the card to the journey on the rideshare board', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+
+    const made = await post(server, ada.cookie)
+
+    expect((await cards(server, ada.cookie))[0]?.link).toBe(
+      `/rides?burn=${OPEN_BURN}&ride=${made.json().ride.id}`,
+    )
+  })
+
+  it('carries the card’s id on the list, so the board can open the conversation', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+    await post(server, ada.cookie)
+
+    const [card] = await cards(server, ada.cookie)
+
+    expect(await threadOf(server, ada.cookie)).toBe(card?.id)
+  })
+
+  it('tells whoever is coming that somebody is looking for a lift, and never the poster', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount(['member'], { name: 'Ada' })
+    const bea = await givenAccount(['member'], { name: 'Bea' })
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await setOn(server, ada.cookie, ['ride_posted'])
+    await setOn(server, bea.cookie, ['ride_posted'])
+
+    await post(server, ada.cookie)
+
+    expect((await bell(server, bea.cookie)).map((one) => one.body)).toEqual([
+      'Ada is looking for a lift from Göteborg',
+    ])
+    expect(await bell(server, ada.cookie)).toEqual([])
+  })
+
+  it('says instead that somebody is offering one, when that is what it is', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount(['member'], { name: 'Ada' })
+    const bea = await givenAccount(['member'], { name: 'Bea' })
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await setOn(server, bea.cookie, ['ride_posted'])
+
+    await post(server, ada.cookie, { ...A_JOURNEY, kind: 'offers', seats: 3 })
+
+    expect((await bell(server, bea.cookie)).map((one) => one.body)).toEqual([
+      'Ada is offering a lift from Göteborg',
+    ])
+  })
+
+  it('tells nobody who is not coming to that burn, however they have set the switch', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount(['member'], { name: 'Ada' })
+    const bea = await givenAccount(['member'], { name: 'Bea' })
+    await givenComing(ada.id)
+    await setOn(server, bea.cookie, ['ride_posted'])
+
+    await post(server, ada.cookie)
+
+    expect(await bell(server, bea.cookie)).toEqual([])
+  })
+
+  it('writes one line for a change, none for a save that changed nothing, and coalesces the rest', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+    const id = (await post(server, ada.cookie)).json().ride.id
+
+    await patch(server, ada.cookie, id, {})
+    await patch(server, ada.cookie, id, { when: 'Friday afternoon' })
+    expect((await cards(server, ada.cookie))[0]?.entries).toHaveLength(1)
+
+    await patch(server, ada.cookie, id, { when: 'Saturday morning' })
+    expect((await cards(server, ada.cookie))[0]?.entries.map((entry) => entry.kind)).toEqual([
+      'added',
+      'edited',
+    ])
+
+    await patch(server, ada.cookie, id, { notes: 'Two bags max' })
+    expect((await cards(server, ada.cookie))[0]?.entries).toHaveLength(2)
+  })
+
+  it('takes the card off the feed when the journey is taken down', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+    const id = (await post(server, ada.cookie)).json().ride.id
+    const [card] = await cards(server, ada.cookie)
+
+    await remove(server, ada.cookie, id)
+
+    expect(await cards(server, ada.cookie)).toEqual([])
+    expect(
+      (
+        await server.inject({
+          method: 'GET',
+          url: `/api/threads/${card?.id ?? ''}`,
+          headers: { cookie: ada.cookie },
+        })
+      ).statusCode,
+    ).toBe(404)
+  })
+
+  it('says the journey is the poster’s to change, and nobody else’s', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount(['member'], { name: 'Ada' })
+    const bea = await givenAccount(['member'], { name: 'Bea' })
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await post(server, ada.cookie)
+
+    expect((await cards(server, ada.cookie))[0]?.own).toBe(true)
+    expect((await cards(server, bea.cookie))[0]?.own).toBe(false)
+  })
+})
+
+describe('talking about a journey', () => {
+  it('tells the poster, and the rest only if they asked, and never the one who said it', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount(['member'], { name: 'Ada' })
+    const bea = await givenAccount(['member'], { name: 'Bea' })
+    const cai = await givenAccount(['member'], { name: 'Cai' })
+    for (const who of [ada, bea, cai]) await givenComing(who.id)
+    await setOn(server, cai.cookie, ['ride_comment_any'])
+    const made = await post(server, ada.cookie)
+    const threadId = await threadOf(server, ada.cookie)
+
+    await say(server, bea.cookie, threadId, 'I could take you')
+
+    expect((await bell(server, ada.cookie))[0]).toMatchObject({
+      category: 'ride_comment',
+      link: `/rides?burn=${OPEN_BURN}&ride=${made.json().ride.id}`,
+    })
+    expect((await bell(server, cai.cookie)).map((one) => one.category)).toEqual(['ride_comment_any'])
+    expect(await bell(server, bea.cookie)).toEqual([])
+  })
+
+  it('tells the poster about a heart on their journey, and nobody about their own', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount(['member'], { name: 'Ada' })
+    const bea = await givenAccount(['member'], { name: 'Bea' })
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await post(server, ada.cookie)
+    const threadId = await threadOf(server, ada.cookie)
+
+    await heart(server, ada.cookie, threadId)
+    expect(await bell(server, ada.cookie)).toEqual([])
+
+    await heart(server, bea.cookie, threadId)
+
+    expect((await bell(server, ada.cookie)).map((one) => [one.category, one.body])).toEqual([
+      ['hearted', 'Bea hearts Looking for a lift from Göteborg'],
+    ])
   })
 })

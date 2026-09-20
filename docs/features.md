@@ -87,7 +87,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Lodging and helping-out are per-burn lists with optional capacities — a full
   lodging option refuses politely, helping never runs out.
 - The rideshare board: who needs a lift, who has room, per burn, contact
-  resolved from the account.
+  resolved from the account. Each journey carries a conversation and a card on
+  the feed, and posting one tells whoever is coming.
 - The bring list: one shared list per burn of things the gathering wants and
   things people are bringing. An item with no hands up is an ask and is shown
   first; a hand makes it an offer, several hands to one thing are normal, and
@@ -134,8 +135,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 
 - The feed: what everyone has been doing and saying, as one kind of thing — a
   card carrying its whole history and the talk under it, for a dream, a person at
-  a burn, an announcement, a song, a bring item, a talking point, a meeting, a
-  lead role or a meal.
+  a burn, an announcement, a song, a bring item, a journey on the rideshare
+  board, a talking point, a meeting, a lead role or a meal.
 - A chip row filters the feed by kind, carried in the URL, defaulting to
   everything.
 - Comments on any card: markdown, edit your own, delete your own (an admin may

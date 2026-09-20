@@ -1,6 +1,7 @@
-import type { MyBurn, RideEntry } from '@sage-burner/shared'
+import type { MyBurn, RideEntry, Thread } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -42,14 +43,28 @@ const aRide = (over: Partial<RideEntry> & Pick<RideEntry, 'id'>): RideEntry => (
   created_at: '2026-07-02T00:00:00.000Z',
   name: 'Ada',
   contact: '070 111 22 33',
+  thread_id: 't-1',
   ...over,
 })
 
+const COMING = [
+  { account_id: 'a-1', name: 'Ada', avatar: null },
+  { account_id: 'a-2', name: 'Bea', avatar: null },
+]
+
 const stub = (over: Partial<RidesApi> = {}, rides: RideEntry[] = []): RidesApi => ({
   getRides: () => Promise.resolve({ rides }),
+  getEventAttendees: () => Promise.resolve({ attendees: COMING }),
   addRide: () => Promise.reject(new Error('addRide is not stubbed here')),
   updateRide: () => Promise.reject(new Error('updateRide is not stubbed here')),
   deleteRide: () => Promise.reject(new Error('deleteRide is not stubbed here')),
+  getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
+  updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
+  deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),
+  supportComment: () => Promise.reject(new Error('supportComment is not stubbed here')),
+  withdrawSupportForComment: () => Promise.reject(new Error('withdrawSupportForComment is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   ...over,
 })
 
@@ -63,6 +78,40 @@ const renderPage = (api: RidesApi, viewer: Viewer = ADA, burn: MyBurn | null = B
       </BurnProvider>
     </ViewerProvider>,
   )
+
+const renderPageAt = (at: string, api: RidesApi) => {
+  history.replaceState(null, '', at)
+
+  return render(
+    <LocationProvider>
+      <ViewerProvider viewer={ADA}>
+        <BurnProvider value={{ status: 'ready', burns: [BURN], selected: BURN }}>
+          <Rides api={api} />
+        </BurnProvider>
+      </ViewerProvider>
+    </LocationProvider>,
+  )
+}
+
+const aThread = (): Thread => ({
+  id: 't-1',
+  event_id: 'e-1',
+  burn: 'Summer burn',
+  entity_type: 'ride',
+  entity_id: 'r-1',
+  title: 'Looking for a lift from Göteborg',
+  link: null,
+  body: null,
+  gone: false,
+  own: true,
+  entry_count: 0,
+  last_at: null,
+  entries: [],
+  supporters: [],
+  support_count: 0,
+  supported_by_me: false,
+  followed_by_me: false,
+})
 
 describe('the rideshare board', () => {
   it('splits the two halves under headings of their own', async () => {
@@ -256,5 +305,26 @@ describe('the rideshare board', () => {
     renderPage(stub({ getRides: () => Promise.reject(new Error('nope')) }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load')
+  })
+
+  it('fetches the conversation only once somebody opens it', async () => {
+    const getThread = vi.fn<RidesApi['getThread']>(() => Promise.resolve({ thread: aThread() }))
+    renderPage(stub({ getThread }, [aRide({ id: 'r-1', from: 'Göteborg' })]))
+
+    const label = 'what has been said about Looking for a lift from Göteborg'
+    expect(await screen.findByRole('button', { name: `Show ${label}` })).toBeTruthy()
+    expect(getThread).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: `Show ${label}` }))
+
+    await waitFor(() => expect(getThread).toHaveBeenCalledWith('t-1', expect.anything()))
+    expect(await screen.findByRole('button', { name: `Hide ${label}` })).toBeTruthy()
+  })
+
+  it('opens the conversation the link points at, without a click', async () => {
+    const getThread = vi.fn<RidesApi['getThread']>(() => Promise.resolve({ thread: aThread() }))
+    renderPageAt('/rides?burn=e-1&ride=r-1', stub({ getThread }, [aRide({ id: 'r-1', from: 'Göteborg' })]))
+
+    await waitFor(() => expect(getThread).toHaveBeenCalledWith('t-1', expect.anything()))
   })
 })

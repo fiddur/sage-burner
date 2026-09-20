@@ -2019,3 +2019,90 @@ describe('the pantry places migration', () => {
     }
   })
 })
+
+const RIDE_CARDS = '20260920140000_ride_cards'
+
+describe('the ride-cards migration', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+
+  const withJourneysOnTheBoard = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(RIDE_CARDS)
+
+    expect(kept).not.toContain(RIDE_CARDS)
+    expect(kept.length).toBeGreaterThan(0)
+
+    runMigrations(fresh, staged)
+    expect(fresh.client.prepare("select count(*) as n from thread where entity_type = 'ride'").get()?.n).toBe(
+      0,
+    )
+
+    anEvent(fresh, 'e-1', 'a-burn', NOW)
+    fresh.client
+      .prepare('insert into account (id, email, created_at) values (?, ?, ?)')
+      .run('a-1', 'ada@example.org', NOW)
+    for (const [id, kind, from] of [
+      ['r-1', 'needs', 'Göteborg'],
+      ['r-2', 'offers', 'Malmö'],
+    ] as [string, string, string][]) {
+      fresh.client
+        .prepare(
+          'insert into ride (id, event_id, account_id, kind, "from", "when", seats, notes, created_at)' +
+            ' values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(id, 'e-1', 'a-1', kind, from, 'Friday afternoon', 0, '', '2026-07-01T00:00:00.000Z')
+    }
+
+    return fresh
+  }
+
+  it('opens a card for every journey already on a board, headed as the page heads it', () => {
+    const fresh = withJourneysOnTheBoard()
+    try {
+      runMigrations(fresh)
+
+      const rows = fresh.client
+        .prepare(
+          'select id, event_id, entity_id, title, subject_account_id from thread' +
+            " where entity_type = 'ride' order by entity_id",
+        )
+        .all()
+
+      expect(rows.map((row) => [row.entity_id, row.event_id, row.title, row.subject_account_id])).toEqual([
+        ['r-1', 'e-1', 'Looking for a lift from Göteborg', null],
+        ['r-2', 'e-1', 'Offering a lift from Malmö', null],
+      ])
+      expect(rows.every((row) => UUID.test(String(row.id)))).toBe(true)
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('opens each card with the line the poster would have written, at the time they posted', () => {
+    const fresh = withJourneysOnTheBoard()
+    try {
+      runMigrations(fresh)
+
+      const rows = fresh.client
+        .prepare(
+          'select e.id, e.kind, e.seq, e.author_account_id, e.body, e.created_at, e.edited_at,' +
+            ' t.entity_id from thread_entry e join thread t on t.id = e.thread_id' +
+            " where t.entity_type = 'ride' order by t.entity_id",
+        )
+        .all()
+
+      expect(rows.map((row) => [row.entity_id, row.kind, row.seq, row.author_account_id, row.body])).toEqual([
+        ['r-1', 'added', 1, 'a-1', 'is looking for a lift'],
+        ['r-2', 'added', 1, 'a-1', 'is offering a lift'],
+      ])
+      expect(rows.map((row) => [row.created_at, row.edited_at])).toEqual([
+        ['2026-07-01T00:00:00.000Z', null],
+        ['2026-07-01T00:00:00.000Z', null],
+      ])
+      expect(rows.every((row) => UUID.test(String(row.id)))).toBe(true)
+      expect(fresh.client.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      fresh.close()
+    }
+  })
+})
