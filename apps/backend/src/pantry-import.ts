@@ -12,6 +12,7 @@ export interface PantryLine {
   name: string
   kind: PantryKind
   unit: string
+  note: string
   spots: { place_id: string; spot: string }[]
   need_more: boolean
 }
@@ -32,11 +33,15 @@ const HEADER = ['name', 'kind', 'unit'] as const
 
 const NEED_MORE = 'need more'
 
+const NOTE = 'note'
+
 const DEFAULT_UNIT = 'pcs'
 
 const blank = (line: string): boolean => line.trim() === ''
 
-type Columns = { kind: 'bad'; problem: string } | { kind: 'ok'; places: (KnownPlace | undefined)[] }
+type Column = { kind: 'need_more' } | { kind: 'note' } | { kind: 'room'; place: KnownPlace }
+
+type Columns = { kind: 'bad'; problem: string } | { kind: 'ok'; columns: Column[] }
 
 const headerColumns = (cells: readonly string[], places: readonly KnownPlace[], at: number): Columns => {
   const named = cells.map((cell) => cell.trim().toLowerCase())
@@ -49,11 +54,16 @@ const headerColumns = (cells: readonly string[], places: readonly KnownPlace[], 
   }
 
   const rest = named.slice(HEADER.length)
-  const columns: (KnownPlace | undefined)[] = []
+  const columns: Column[] = []
 
   for (const [index, column] of rest.entries()) {
-    if (column === NEED_MORE && index === rest.length - 1) {
-      columns.push(undefined)
+    if (column === NEED_MORE) {
+      columns.push({ kind: 'need_more' })
+      continue
+    }
+
+    if (column === NOTE) {
+      columns.push({ kind: 'note' })
       continue
     }
 
@@ -67,10 +77,16 @@ const headerColumns = (cells: readonly string[], places: readonly KnownPlace[], 
       }
     }
 
-    columns.push(place)
+    columns.push({ kind: 'room', place })
   }
 
-  return { kind: 'ok', places: columns }
+  return { kind: 'ok', columns }
+}
+
+const cellUnder = (columns: readonly Column[], cells: readonly string[], wanted: Column['kind']): string => {
+  const at = columns.findIndex((column) => column.kind === wanted)
+
+  return at === -1 ? '' : (cells[at] ?? '')
 }
 
 export const readPantryTsv = (text: string, places: readonly KnownPlace[]): PantryReading => {
@@ -82,7 +98,7 @@ export const readPantryTsv = (text: string, places: readonly KnownPlace[]): Pant
   const header = headerColumns(first.cells, places, first.at)
   if (header.kind === 'bad') return header
 
-  const width = HEADER.length + header.places.length
+  const width = HEADER.length + header.columns.length
   const lines: PantryLine[] = []
 
   for (const { at, cells } of rest) {
@@ -100,24 +116,27 @@ export const readPantryTsv = (text: string, places: readonly KnownPlace[]): Pant
       return { kind: 'bad', problem: `Line ${at}: “${kind}” is none of ${pantryKinds.join(', ')}.` }
     }
 
-    const spots = header.places.flatMap((place, index) =>
-      place === undefined || (rooms[index] ?? '') === ''
+    const spots = header.columns.flatMap((column, index) =>
+      column.kind !== 'room' || (rooms[index] ?? '') === ''
         ? []
-        : [{ place_id: place.id, spot: rooms[index] ?? '' }],
+        : [{ place_id: column.place.id, spot: rooms[index] ?? '' }],
     )
-
-    const asked = header.places.findIndex((place) => place === undefined)
 
     lines.push({
       name,
       kind,
       unit: unit === '' ? DEFAULT_UNIT : unit,
+      note: cellUnder(header.columns, rooms, 'note'),
       spots,
-      need_more: asked !== -1 && (rooms[asked] ?? '') !== '',
+      need_more: cellUnder(header.columns, rooms, 'need_more') !== '',
     })
   }
 
-  return { kind: 'ok', lines, places: header.places.filter((one) => one !== undefined) }
+  return {
+    kind: 'ok',
+    lines,
+    places: header.columns.flatMap((column) => (column.kind === 'room' ? [column.place] : [])),
+  }
 }
 
 export interface PantryImport {
@@ -153,6 +172,7 @@ export const importPantry = async (
         .set({
           kind: fields.kind,
           unit: fields.unit,
+          ...(fields.note === '' ? {} : { note: fields.note }),
           ...(existing.need_more_at === null ? asking : {}),
         })
         .where(sql`${pantryItem.id} = ${existing.id}`)

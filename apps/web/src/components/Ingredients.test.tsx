@@ -14,6 +14,7 @@ const item = (over: Partial<PantryItem> = {}): PantryItem => ({
   kind: 'staple',
   name: 'Lemon',
   unit: 'pcs',
+  note: '',
   places: [{ place_id: 'pl-1', name: 'Kitchen', spot: 'fridge' }],
   stock_level: 'some',
   stock_amount: 6,
@@ -438,5 +439,54 @@ describe('who among the people there cannot eat a line', () => {
 
     expect(screen.getByText('Nuts')).toBeTruthy()
     expect(screen.getByText('Gluten')).toBeTruthy()
+  })
+})
+
+describe('what the pantry says about a thing while an amount is being typed', () => {
+  const DRY = 'Dry weight. 0.09 kg becomes ca 2.5 dl/230 g'
+
+  const beans = item({ id: 'p-9', name: 'Beans, black', unit: 'kg', note: DRY })
+
+  it('shows the note of the match under the cursor, before it is even taken', () => {
+    show({ pantry: [beans, item({ id: 'p-10', name: 'Beans, white' })] })
+
+    fireEvent.input(screen.getByLabelText('Add an ingredient to Dinner'), { target: { value: 'beans' } })
+
+    expect(screen.getByText(DRY)).toBeTruthy()
+  })
+
+  it('keeps showing it beside the amount box once the thing is taken', () => {
+    show({ pantry: [beans] })
+
+    fireEvent.input(screen.getByLabelText('Add an ingredient to Dinner'), { target: { value: 'beans' } })
+    fireEvent.click(screen.getByRole('button', { name: /Beans, black/ }))
+
+    expect(screen.getByLabelText('Amount of Beans, black')).toBeTruthy()
+    expect(screen.getByText(DRY)).toBeTruthy()
+  })
+
+  it('says nothing about a thing that carries no note', () => {
+    show({ pantry: [item({ id: 'p-10', name: 'Beans, white' })] })
+
+    fireEvent.input(screen.getByLabelText('Add an ingredient to Dinner'), { target: { value: 'beans' } })
+    fireEvent.click(screen.getByRole('button', { name: /Beans, white/ }))
+
+    expect(screen.queryByText(DRY)).toBeNull()
+  })
+
+  it('carries it behind the icon on a line already written, and on no other line', () => {
+    show({
+      pantry: [beans],
+      meal: aMeal({
+        ingredients: [
+          line({ id: 'i-9', pantry_item_id: 'p-9', name: 'Beans, black', unit: 'kg' }),
+          line({ id: 'i-10', pantry_item_id: null, name: 'Saffron', unit: 'g', pantry: null }),
+        ],
+      }),
+    })
+
+    expect(screen.getByLabelText('About Beans, black')).toBeTruthy()
+    expect(screen.getByText(DRY)).toBeTruthy()
+    expect(screen.queryByLabelText('About Saffron')).toBeNull()
   })
 })

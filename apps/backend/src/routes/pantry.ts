@@ -44,6 +44,7 @@ const columns = {
   kind: pantryItem.kind,
   name: pantryItem.name,
   unit: pantryItem.unit,
+  note: pantryItem.note,
   stock_level: pantryItem.stock_level,
   stock_amount: pantryItem.stock_amount,
   counted_by: pantryItem.counted_by,

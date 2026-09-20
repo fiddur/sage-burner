@@ -3277,11 +3277,13 @@ a.song-row:hover .song-what {
   margin: 0.5rem 0 1.5rem;
   padding: 0;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
+/* Tight enough that an overview row is one line on a desktop: a hundred and ninety of these
+   are read down, and the counting controls that need the room are behind the toggle. */
 .pantry-row {
-  padding: 0.6rem 0.8rem;
+  padding: 0.3rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
 }
@@ -3294,13 +3296,108 @@ a.song-row:hover .song-what {
   color: var(--muted);
 }
 
+/* One flex line that wraps, so the same markup reads both ways: above the breakpoint the state
+   is pushed to the end of the title line by the auto margin, and below it `flex-basis: 100%`
+   drops it onto a line of its own. Both rules must not apply at once, which is why the auto
+   margin is inside a media query rather than sitting on the element. */
 .pantry-what {
   margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .pantry-kind {
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.pantry-state {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+@media (min-width: 45.01rem) {
+  .pantry-state {
+    margin-inline-start: auto;
+  }
+}
+
+@media (max-width: 45rem) {
+  .pantry-state {
+    flex-basis: 100%;
+  }
+}
+
+/* A bubble without JS: the body is taken out of flow so opening one does not push the row
+   below it down a shelf. `position: relative` on the `details` is what it is measured from. */
+.pantry-note {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pantry-note > summary {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.pantry-note > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pantry-note[open] > summary {
+  color: var(--ember);
+}
+
+.pantry-note-said {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: 100%;
+  inset-inline-start: 0;
+  width: max-content;
+  max-width: min(24rem, 70vw);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  color: var(--ink);
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+}
+
+.pantry-adjust {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+}
+
+.pantry-adjust .row {
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.pantry-adjust input {
+  width: 6rem;
+  min-height: 44px;
+}
+
+/* The box and the unit it is counted in are one thing, so the line may wrap before them
+   and never between them. */
+.pantry-adjust-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .stock-choice {

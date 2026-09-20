@@ -54,6 +54,49 @@ Pressing the lit answer again clears the count, and clearing it also forgets who
 counted and when. Nothing was counted then, and a row reading "counted by Ada
 yesterday" above no answer is a worse record than no record.
 
+## The list is an overview; counting is a mode
+
+The first real import put a hundred and ninety rows on the page, and four 44px answers, a
+**Need more** and a pen on every one of them made it a wall nobody could read down (#819).
+The buttons are only wanted while somebody is actually counting, which is a few minutes
+a season; the rest of the time the question is "what does the house have, and where".
+
+So **Inventory management** is a chip beside the kind and room chips, off by default, plain
+component state — no storage, because the answer to "am I counting right now" is never yes
+tomorrow. Everybody approved sees it, since counting is everybody's; the pen and the bin
+inside it stay admin's as they were.
+
+With it off a row is the name, the kind, what it contains, the heart when a burn is chosen,
+and — muted, at the end of the same line above 45rem and on a line of its own below it —
+where it lives followed by the count **in words**: `plenty`, `some`, `~2 kg`, `out`, and
+`need more` when it is flagged. That is the same state the buttons carry, said rather than
+offered, so the page still answers at a glance what a walk through the cellar would.
+
+The **room walk** keeps its box tag leading the row in both modes. The box is what the eye
+follows down a shelf and it is not one of the counting controls; the walk is how somebody
+finds a thing, not only how they count it.
+
+## A note on a thing, for whoever is writing an amount
+
+A thing counted in one unit is often cooked in another: black beans are kept in kg and the
+cook wants `Dry weight. 0.09 kg becomes ca 2.5 dl/230 g`. A second unit on the row would be
+the wrong answer — the pantry row's unit is the true one, the one the count and the shopping
+list are both in, and a second one would mean deciding which of two figures a line's amount
+is in. A sentence decides nothing and is the cheapest thing that stops a cook typing dl into
+a kg box.
+
+So `pantry_item.note` is plain text, not markdown, bounded by `MAX_PANTRY_NOTE`, written in
+the add form and the pen and imported from an optional `note` column in the TSV. On a row it
+is an info icon after the kind, a `<details>` whose summary is the icon — a bubble that opens
+on a click and needs no JS — and the Inventory toggle does not touch it: a note is part of
+the overview, not of counting.
+
+It is shown **where the amount is typed**, which is the whole point: on a sitting, the note
+of the pantry thing under the cursor in the add box appears before the thing is even taken,
+stays beside the amount box once it is, and rides behind the same icon on a line already
+written. The shopping list gets none of it — the buyer reads the row's unit and the line's
+amount, and the note is for the person who wrote that amount.
+
 ## Places: a room, and a box in it
 
 The spreadsheet had a column per room — Kitchen, Hallway, Cellar, Party kitchen —
@@ -207,8 +250,8 @@ it is not on the list, and the page does not offer it.
 
 `pnpm --filter sage-burner-backend pantry:import <file.tsv>` takes a
 tab-separated file whose first line names `name`, `kind` and `unit`, then **one
-column per room**, and may end with `need more`, which is the spreadsheet's own
-column. It upserts by name, case-insensitively: a thing already on the list has its
+column per room**, and may carry `need more` — the spreadsheet's own column — and
+`note`. It upserts by name, case-insensitively: a thing already on the list has its
 kind, unit and spots updated, a new one is added, and **nothing touches the count**.
 A spreadsheet knows what the house keeps; it knows nothing about what is in the
 cellar today.
@@ -224,6 +267,11 @@ one leaves whatever is there alone, and a row already flagged keeps the name and
 the moment it has. Re-importing the sheet must not overwrite "asked by Cleo this
 morning" with "asked by nobody", and a column the sheet left blank is not the
 same statement as somebody pressing the button again.
+
+`note` follows the same rule for the same reason: a cell with something in it is
+written onto the row, an empty one leaves the note that is there. A sheet exported
+before anybody wrote a note carries a column of blanks, and blanking every note in
+the pantry is not what re-importing it means.
 
 **A room column is matched to the vocabulary by name, ignoring case, and a column
 naming no room refuses the whole file and says which column it was.** Guessing would
@@ -367,14 +415,30 @@ and the rooms it lives in, and no ingredient line can say either; the admin is t
 who knows. Saving is then the ordinary add followed by the adoption, which is why the
 outcome is a sentence about how many lines followed rather than a silent refresh.
 
-**The unit has to match the pantry thing's**, and that is checked against the row
-rather than against the form. A pick carries no unit of its own — the pantry row's is
-the true one — so adopting a line written in `g` into a thing counted in `pcs` would
-quietly change what the shopping list adds up, which is the one failure nobody would
-notice until the shop. A line in another unit therefore stays a special buy, still
-listed and still promotable under its own key. An admin who changes the unit in the
-form before saving gets the thing on the list and nothing moved across, and the page
-says so: the alternative is a promotion that looks like it worked.
+**Promotion takes the lines whatever the admin renamed**, including the unit (#819).
+The match runs on the remembered key — the name and unit the lines were written under —
+so renaming `Salsa` to `Salsa, chunky` on the way in has always worked; the unit used to
+be the one field that blocked, and a promotion that added the row and moved nothing was
+the outcome nobody pressed Promote for.
+
+What the unit still cannot do is change silently. A pick carries no unit of its own —
+the pantry row's is the true one — so a line written in `jars` joining a thing counted
+in `jars (300g)` would quietly change what the shopping list adds up. **The admin says
+what each line becomes**, in the `Adjust the amounts` step the form grows in place of
+**Add it** once the unit differs: one row per line, the sitting named, the old amount as
+it was written, and a box in the new unit prefilled with the old figure. Only the person
+promoting knows what a jar of salsa is in `jars (300g)`, so the form asks rather than
+converts.
+
+That is why the read carries `lines` and the adoption takes `amounts`, keyed by line id.
+An `amounts` key naming a line the adoption is not converting is a 400 rather than a
+silent skip: it means the page and the server disagree about what is being promoted, and
+the quiet version of that is a wrong figure in the shop. A line the step leaves alone
+keeps the amount it already had.
+
+A line written under **another key** — the same name in another unit — is a different
+special buy, still listed and still promotable under its own key. The key bounds the
+promotion; the pantry thing's own unit no longer does.
 
 What the line already carries is kept — the amount, and a tick somebody made in the
 shop. Only the name and the unit go, because the pantry row now supplies them.

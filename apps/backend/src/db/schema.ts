@@ -1065,6 +1065,7 @@ export const pantryItem = sqliteTable(
     kind: text('kind', { enum: pantryKinds }).notNull(),
     name: text('name').notNull(),
     unit: text('unit').notNull().default('pcs'),
+    note: text('note').notNull().default(''),
     stock_level: text('stock_level', { enum: stockLevels }),
     stock_amount: real('stock_amount'),
     counted_by: text('counted_by').references(() => account.id, { onDelete: 'set null' }),

@@ -22,6 +22,7 @@ const ROOMS: KnownPlace[] = [
 
 const HEADER = 'name\tkind\tunit\tHallway\tCellar'
 const WIDER = `${HEADER}\tneed more`
+const NOTED = `${HEADER}\tnote`
 
 let handle: DbHandle | undefined
 
@@ -59,6 +60,7 @@ const aLine = (over: Partial<PantryLine> = {}): PantryLine => ({
   kind: 'staple',
   name: 'Rice',
   unit: 'kg',
+  note: '',
   spots: [],
   need_more: false,
   ...over,
@@ -81,6 +83,7 @@ describe('reading a sheet somebody exported', () => {
           { place_id: HALLWAY, spot: 'bucket' },
           { place_id: CELLAR, spot: 'I' },
         ],
+        note: '',
         need_more: false,
       },
     ])
@@ -106,7 +109,7 @@ describe('reading a sheet somebody exported', () => {
 
   it('steps over blank lines, which every exported sheet has', () => {
     expect(lines(`\n${HEADER}\n\nDates\tsnack\tkg\t\t\n\n`)).toEqual([
-      { kind: 'snack', name: 'Dates', unit: 'kg', spots: [], need_more: false },
+      { kind: 'snack', name: 'Dates', unit: 'kg', note: '', spots: [], need_more: false },
     ])
   })
 
@@ -136,6 +139,17 @@ describe('reading a sheet somebody exported', () => {
 
   it('wants the last cell on every line once the header names it', () => {
     expect(problem(`${WIDER}\nRice\tstaple\tkg\t\tI`)).toContain('Line 2')
+  })
+
+  it('takes an optional note column, and leaves it empty where the header has none', () => {
+    expect(lines(`${NOTED}\nRice\tstaple\tkg\t\tI\tDry weight`)[0]?.note).toBe('Dry weight')
+    expect(lines(`${HEADER}\nRice\tstaple\tkg\t\tI`)[0]?.note).toBe('')
+  })
+
+  it('reads a note and an ask on one sheet, in whichever order the columns come', () => {
+    const both = `${HEADER}\tnote\tneed more\nRice\tstaple\tkg\t\tI\tDry weight\tx`
+
+    expect(lines(both)[0]).toMatchObject({ note: 'Dry weight', need_more: true })
   })
 
   it('refuses a file whose first line is not the header', () => {
@@ -251,6 +265,31 @@ describe('importing what was read', () => {
     const [row] = await db.select().from(pantryItem).where(eq(pantryItem.name, 'Rice'))
     expect(row?.need_more_at).toBe(NOW)
     expect(row?.need_more_by).toBeNull()
+  })
+
+  it('writes the note the sheet carries onto a row it adds', async () => {
+    const db = build()
+
+    await importPantry(db, sheet([aLine({ note: 'Dry weight' })]), () => new Date(NOW))
+
+    const [row] = await db.select().from(pantryItem).where(eq(pantryItem.name, 'Rice'))
+    expect(row?.note).toBe('Dry weight')
+  })
+
+  it('writes a note onto a row already there, and an empty cell leaves the one it has', async () => {
+    const db = build()
+    const id = randomUUID()
+    await db
+      .insert(pantryItem)
+      .values({ id, kind: 'staple', name: 'Rice', unit: 'kg', note: 'Dry weight', created_at: NOW })
+
+    await importPantry(db, sheet([aLine()]), () => new Date(NOW))
+    expect((await db.select().from(pantryItem).where(eq(pantryItem.id, id)))[0]?.note).toBe('Dry weight')
+
+    await importPantry(db, sheet([aLine({ note: '0.09 kg is ca 2.5 dl' })]), () => new Date(NOW))
+    expect((await db.select().from(pantryItem).where(eq(pantryItem.id, id)))[0]?.note).toBe(
+      '0.09 kg is ca 2.5 dl',
+    )
   })
 
   it('leaves a flag already on a row alone, whoever asked for it', async () => {

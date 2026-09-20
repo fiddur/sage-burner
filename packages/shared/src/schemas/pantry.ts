@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { pantryKinds, stockLevels } from '../enums.ts'
-import { MAX_OPTION_LABEL, MAX_SPOT, MAX_UNIT } from '../limits.ts'
+import { MAX_OPTION_LABEL, MAX_PANTRY_NOTE, MAX_SPOT, MAX_UNIT } from '../limits.ts'
 import { allergyTagSchema } from './allergy.ts'
 import { dateSchema, dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 import { supporterSchema } from './thread.ts'
@@ -50,6 +50,7 @@ const pantryFields = {
   name: nonEmptyText(MAX_OPTION_LABEL),
   kind: z.enum(pantryKinds),
   unit: nonEmptyText(MAX_UNIT),
+  note: z.string().trim().max(MAX_PANTRY_NOTE),
 }
 
 export const pantryItemSchema = z.object({
@@ -78,6 +79,7 @@ export const pantryCreateSchema = z
   .object({
     ...pantryFields,
     unit: pantryFields.unit.default('pcs'),
+    note: pantryFields.note.default(''),
     allergy_item_ids: z.array(idSchema).default([]),
     places: z.array(pantryPlacementSchema).default([]),
   })
@@ -129,6 +131,15 @@ export type EventPantryItem = z.infer<typeof eventPantryItemSchema>
 export const eventPantryResponseSchema = z.object({ items: z.array(eventPantryItemSchema) })
 export type EventPantryResponse = z.infer<typeof eventPantryResponseSchema>
 
+export const specialBuyLineSchema = z.object({
+  id: idSchema,
+  amount: z.number().nonnegative().nullable(),
+  meal_label: z.string(),
+  date: dateSchema,
+  event_name: z.string(),
+})
+export type SpecialBuyLine = z.infer<typeof specialBuyLineSchema>
+
 export const specialBuySchema = z.object({
   name: nonEmptyText(MAX_OPTION_LABEL),
   unit: nonEmptyText(MAX_UNIT),
@@ -138,6 +149,7 @@ export const specialBuySchema = z.object({
     date: dateSchema,
     event_name: z.string(),
   }),
+  lines: z.array(specialBuyLineSchema),
 })
 export type SpecialBuy = z.infer<typeof specialBuySchema>
 
@@ -145,7 +157,11 @@ export const specialBuysResponseSchema = z.object({ buys: z.array(specialBuySche
 export type SpecialBuysResponse = z.infer<typeof specialBuysResponseSchema>
 
 export const specialBuyAdoptSchema = z
-  .object({ name: nonEmptyText(MAX_OPTION_LABEL), unit: nonEmptyText(MAX_UNIT) })
+  .object({
+    name: nonEmptyText(MAX_OPTION_LABEL),
+    unit: nonEmptyText(MAX_UNIT),
+    amounts: z.record(idSchema, z.number().nonnegative().nullable()).default({}),
+  })
   .strict()
 export type SpecialBuyAdopt = z.infer<typeof specialBuyAdoptSchema>
 

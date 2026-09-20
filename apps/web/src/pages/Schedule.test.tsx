@@ -1533,6 +1533,7 @@ describe('the ingredients of a sitting, in the panel', () => {
               kind: 'staple' as const,
               name: 'Rice, basmati',
               unit: 'kg',
+              note: '',
               places: [{ place_id: 'pl-2', name: 'Hallway', spot: 'bucket' }],
               stock_level: null,
               stock_amount: null,

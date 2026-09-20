@@ -357,11 +357,17 @@ phone" means 360px.
 ## Food
 
 - [ ] ☰ → Pantry as a member: the seeded list is there, ordered by name, with where each
-      thing lives under it — the room and the box, rooms apart by a middot. Searching narrows it
-      as you type; the chips show one kind at a time, and **Not counted** shows only what nobody
-      has answered for.
-- [ ] Press **Plenty** on a row: it lights, and "Counted by <you> · <when>" appears under the
-      name. Press the lit one again and both the answer and the line go.
+      thing lives beside it — the room and the box, rooms apart by a middot — and no buttons on
+      the row at all. Searching narrows it as you type; the chips show one kind at a time, and
+      **Not counted** shows only what nobody has answered for.
+- [ ] Press **Inventory management** at the top: the count buttons, **Need more** and (as an
+      admin) the pen and the bin appear on every row. Press it again and they go. On a wide
+      window the overview row is one line, with where it lives and the state at the end of it;
+      narrow the window under about 45rem and that drops to a second line under the name.
+- [ ] With **Inventory management** on, press **Plenty** on a row: it lights, and "Counted by
+      <you> · <when>" appears under the name. Press the lit one again and both the answer and
+      the line go. Turn the toggle off: the row now reads `plenty` in words after where it lives,
+      and `need more` beside it for anything flagged.
 - [ ] Press **Some**: an amount box appears with the thing's unit beside it. Type a number and
       press Enter (or leave the box) — it sticks after a reload. The box is not offered beside
       Plenty or Out.
@@ -441,8 +447,13 @@ phone" means 360px.
       kind and save — the thing is on the list, the row is gone, the page says how many
       lines now point at the pantry, and both sittings show it as a pantry pick with
       their amounts intact and the sitting's card saying what it needs changed.
-- [ ] Promote one, change **Counted in** before saving: the thing is added and the page
-      says no line moved across. The special buy is still listed, unchanged.
+- [ ] Promote one, change **Counted in** before saving and press **Add it**: nothing is
+      saved yet — an **Adjust the amounts** step appears in place of the button, one row per
+      line, each naming its sitting and what it was written as, with a box in the new unit
+      prefilled with the old figure. **Back** returns to the form with everything still filled
+      in. Press **Add it** again, change one box, empty another and press **Promote**: the thing
+      is on the list, the page says how many lines now point at the pantry, and those sittings
+      show the amounts you typed — the emptied one reading _to taste_.
 - [ ] With nothing written by hand on any burn still to come, the section is not there
       at all — no heading over an empty list. As a member it is never there.
 - [ ] The sitting's card on the feed says the plan was edited **once**, however many lines you
@@ -468,6 +479,16 @@ phone" means 360px.
       under **From the pantry** saying "the pantry says: need more", rather than folded away
       under **Show the n things there is enough of**. Tick it bought and reload the Pantry
       page — the flag is gone, and unticking it does not bring the flag back.
+- [ ] As an admin, put a **Note** on **Beans, black** through the pen, saying that the kg is a
+      dry weight and what it comes to in dl, and save. A small info icon appears after the kind
+      on that row, in both toggle states and for every member; clicking it opens the sentence
+      and clicking again closes it. No other row has one.
+- [ ] Open a sitting from the Programme grid and type "beans" in the add box: the note shows
+      under the matches while **Beans, black** is the one highlighted, and stays beside the
+      amount box once it is taken. The line, once written, carries the same icon after its name.
+      The shopping list says nothing about it.
+- [ ] `pantry:import` a sheet with a `note` column: the cells land on the rows, and a row whose
+      cell is empty keeps the note it already had.
 - [ ] Type "cash" in the sitting's add box: the **Nuts** mark shows beside the match.
 - [ ] The shopping list on a wide screen: the _Asked for by_ cell of Cashew says "1 cannot
       eat this".

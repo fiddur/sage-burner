@@ -20,6 +20,7 @@ import {
 import { useState } from 'preact/hooks'
 
 import { IconButton } from './IconButton.tsx'
+import { PantryNote } from './PantryNote.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
 
 const MATCHES = 6
@@ -50,6 +51,9 @@ const amountOf = (text: string): number | null | undefined => {
 const shown = (amount: number | null): string => (amount === null ? '' : String(amount))
 
 const idOf = (tag: AllergyTag): string => tag.id
+
+const noteOn = (pantry: readonly PantryItem[], itemId: string | null): string =>
+  itemId === null ? '' : (pantry.find((item) => item.id === itemId)?.note ?? '')
 
 const standing = (item: {
   places: PantryItem['places']
@@ -86,6 +90,7 @@ export const Ingredients = ({
         <Row
           key={line.id}
           line={line}
+          note={noteOn(pantry, line.pantry_item_id)}
           date={meal.date}
           eventId={eventId}
           roster={roster}
@@ -141,6 +146,7 @@ const Serves = ({
 
 const Row = ({
   line,
+  note,
   date,
   eventId,
   roster,
@@ -150,6 +156,7 @@ const Row = ({
   onRemove,
 }: {
   line: MealIngredient
+  note: string
   date: string
   eventId: string
   roster: readonly Eater[]
@@ -172,7 +179,8 @@ const Row = ({
           {line.name}{' '}
           <span class={line.pantry === null ? 'ingredient-mark is-special' : 'ingredient-mark is-pantry'}>
             {line.pantry === null ? 'special buy' : 'pantry'}
-          </span>
+          </span>{' '}
+          <PantryNote what={line.name} note={note} />
         </span>
         {line.pantry !== null && (
           <span class="form-note">{standing({ ...line.pantry, unit: line.unit })}</span>
@@ -284,6 +292,8 @@ const AddIngredient = ({
     )
     .slice(0, MATCHES)
 
+  const highlightedNote = looking.trim() === '' ? '' : (matches[highlighted]?.note ?? '')
+
   const take = (at: number) => {
     const item = matches[at]
 
@@ -365,6 +375,8 @@ const AddIngredient = ({
           </button>
         </div>
       )}
+
+      {highlightedNote !== '' && <p class="form-note">{highlightedNote}</p>}
     </div>
   )
 }
@@ -415,6 +427,10 @@ const Filling = ({
         />
 
         {picked.kind === 'pick' && <span class="form-note ingredient-unit">{picked.item.unit}</span>}
+
+        {picked.kind === 'pick' && picked.item.note.trim() !== '' && (
+          <span class="form-note">{picked.item.note}</span>
+        )}
 
         <button
           type="button"
