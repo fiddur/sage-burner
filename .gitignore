@@ -19,8 +19,11 @@ data/
 
 # Local agent and shell config that lives in this working tree but is not the
 # project's. An unscoped `git add -A` swept these in once; ignoring them means it
-# cannot happen again. `develop` carries none of them.
-.claude/
+# cannot happen again. The session-start hook and the settings that register it
+# are the project's, so those two are let back in.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 .mcp.json
 .bash_profile
 .bashrc
