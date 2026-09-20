@@ -854,11 +854,18 @@ describe('an allergy item deleted while somebody is saving', () => {
     return build().then(async () => {
       const ada = await givenMember()
 
-      expect(() =>
-        db().transaction((tx) => {
-          writeAllergyTicks(tx, ada.id, [randomUUID()])
-        }),
-      ).toThrowError(/FOREIGN KEY/i)
+      const thrown = (() => {
+        try {
+          db().transaction((tx) => {
+            writeAllergyTicks(tx, ada.id, [randomUUID()])
+          })
+          return undefined
+        } catch (failure) {
+          return failure
+        }
+      })()
+
+      expect(isForeignKeyViolation(thrown)).toBe(true)
     })
   })
 

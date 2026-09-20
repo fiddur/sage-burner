@@ -551,3 +551,20 @@ describe('which domain a passkey is bound to', () => {
     expect(started.statusCode).toBe(400)
   })
 })
+
+describe('the algorithms a new passkey may use', () => {
+  it('are the three Node verifies without an experimental API, not ML-DSA', async () => {
+    const server = await build()
+    await givenAccount('ada@example.org', 'a good long passphrase')
+    const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')
+
+    const started = await server.inject({
+      method: 'POST',
+      url: '/api/me/passkeys/challenge',
+      headers: { cookie, origin: ORIGIN },
+    })
+
+    const offered: { alg: number }[] = started.json().options.pubKeyCredParams
+    expect(offered.map((param) => param.alg)).toEqual([-8, -7, -257])
+  })
+})

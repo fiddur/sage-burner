@@ -28,10 +28,12 @@ export const hardenNavigation = (
     if (link === undefined || !inApp(link, scope)) return
 
     const { href } = link
+    const from = globalThis.location.href
 
     const settle = setTimeout(() => {
       pending.delete(settle)
-      if (globalThis.location.href === href) go(href)
+      const now = globalThis.location.href
+      if (now === href && now !== from) go(href)
     }, 0)
 
     pending.add(settle)

@@ -531,9 +531,10 @@ phone" means 360px.
 - [ ] Without opening the bell, follow a notification's own link — a dream card from
       the bell's list, or "What's new" on the redeploy bar. The badge drops by one on
       arrival, and only that notification loses its emphasis.
-- [ ] While the redeploy bar is up, press the bell on a wide screen: the panel opens where
-      it always does rather than reloading the page. Follow a link from it, and that is a
-      full load, the bar gone on arrival.
+- [ ] While the redeploy bar is up, press the bell on a wide screen — on `/notifications`
+      too, the page the bell's own href points at: the panel opens where it always does
+      rather than reloading the page. Follow a link from it, and that is a full load, the
+      bar gone on arrival.
 - [ ] Leave that page open and cause a second notification for the same thing from
       another browser: the badge appears while the page is up, and clears itself
       within a minute — when the page has refetched and is showing the change.

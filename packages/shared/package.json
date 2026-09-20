@@ -12,13 +12,13 @@
   },
   "scripts": {
     "test": "vitest run",
-    "check": "tsgo --noEmit && oxlint -c ../../.oxlintrc.json --type-aware",
+    "check": "tsc --noEmit && oxlint -c ../../.oxlintrc.json --type-aware",
     "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix"
   },
   "dependencies": {
-    "zod": "^4.3.5"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "vitest": "^4"
+    "vitest": "^5"
   }
 }

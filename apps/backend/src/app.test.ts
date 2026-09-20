@@ -367,8 +367,8 @@ describe('trustProxy', () => {
     expect(await whoami({})).toEqual({ ip: '172.17.0.1' })
   })
 
-  it('with one hop, takes what the proxy appended and ignores what the client prepended', async () => {
-    expect(await whoami({ TRUST_PROXY: '1' })).toEqual({ ip: '203.0.113.7' })
+  it('trusting the proxy by address takes what it appended and ignores what the client prepended', async () => {
+    expect(await whoami({ TRUST_PROXY: 'uniquelocal' })).toEqual({ ip: '203.0.113.7' })
   })
 
   it('with `true`, believes the whole chain — which is why it is not the default', async () => {
