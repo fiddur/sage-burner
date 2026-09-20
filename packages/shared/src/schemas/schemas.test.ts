@@ -7,6 +7,7 @@ import {
   MAX_INTRODUCTION,
   MAX_LOCATION,
   MAX_NOTES,
+  MAX_PANTRY_NOTE,
   MAX_PERSON_NAME,
   MAX_QUESTION_LABEL,
   MAX_SLUG,
@@ -876,9 +877,18 @@ describe('a pantry thing', () => {
       kind: 'spice',
       name: 'Cumin',
       unit: 'pcs',
+      note: '',
       allergy_item_ids: [],
       places: [],
     })
+  })
+
+  it('trims the note and bounds it, and lets an update carry it alone', () => {
+    expect(pantryCreateSchema.safeParse(aThing({ note: '  Dry weight  ' })).data?.note).toBe('Dry weight')
+    expect(pantryCreateSchema.safeParse(aThing({ note: 'x'.repeat(MAX_PANTRY_NOTE + 1) })).success).toBe(
+      false,
+    )
+    expect(pantryUpdateSchema.safeParse({ note: 'Dry weight' }).data).toEqual({ note: 'Dry weight' })
   })
 
   it('refuses a kind nobody named and a name that is only spaces', () => {

@@ -1,4 +1,4 @@
-import type { SpecialBuy, SpecialBuyAdopted, SpecialBuysResponse } from '@sage-burner/shared'
+import type { SpecialBuy, SpecialBuyAdopted, SpecialBuyLine, SpecialBuysResponse } from '@sage-burner/shared'
 import type { AnyColumn } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
@@ -21,8 +21,10 @@ export interface SpecialBuyDeps extends GuardDeps {
 const written = (db: Database, today: string) =>
   db
     .select({
+      id: mealIngredient.id,
       name: mealIngredient.name,
       unit: mealIngredient.unit,
+      amount: mealIngredient.amount,
       meal_id: meal.id,
       meal_label: meal.label,
       date: meal.date,
@@ -39,6 +41,7 @@ interface Gathered {
   unit: string
   sittings: Set<string>
   sample: SpecialBuy['sample']
+  lines: SpecialBuyLine[]
 }
 
 const byCount = (one: SpecialBuy, other: SpecialBuy): number =>
@@ -58,14 +61,28 @@ export const specialBuysFor = async (db: Database, today: string): Promise<Speci
       unit: row.unit,
       sittings: new Set<string>(),
       sample: { meal_label: row.meal_label, date: row.date, event_name: row.event_name },
+      lines: [],
     }
 
     so_far.sittings.add(row.meal_id)
+    so_far.lines.push({
+      id: row.id,
+      amount: row.amount,
+      meal_label: row.meal_label,
+      date: row.date,
+      event_name: row.event_name,
+    })
     gathered.set(key, so_far)
   }
 
   return [...gathered.values()]
-    .map((one) => ({ name: one.name, unit: one.unit, sittings: one.sittings.size, sample: one.sample }))
+    .map((one) => ({
+      name: one.name,
+      unit: one.unit,
+      sittings: one.sittings.size,
+      sample: one.sample,
+      lines: one.lines,
+    }))
     .sort(byCount)
 }
 
@@ -99,19 +116,34 @@ export const registerSpecialBuyRoutes = (app: FastifyInstance, { db, sessions, n
       .innerJoin(event, eq(event.id, meal.event_id))
       .where(gte(event.end_date, todayIso(now)))
 
-    const taken = await db
-      .update(mealIngredient)
-      .set({ pantry_item_id: thing.id, name: null, unit: null })
+    const matching = await db
+      .select({ id: mealIngredient.id })
+      .from(mealIngredient)
       .where(
         and(
           isNull(mealIngredient.pantry_item_id),
           same(mealIngredient.name, body.name),
           same(mealIngredient.unit, body.unit),
-          same(mealIngredient.unit, thing.unit),
           inArray(mealIngredient.meal_id, open),
         ),
       )
-      .returning({ meal_id: mealIngredient.meal_id })
+
+    const converting = new Set(matching.map((line) => line.id))
+    const given = Object.entries(body.amounts)
+    if (given.some(([id]) => !converting.has(id))) return sendError(reply, 400)
+
+    const taken =
+      converting.size === 0
+        ? []
+        : await db
+            .update(mealIngredient)
+            .set({ pantry_item_id: thing.id, name: null, unit: null })
+            .where(inArray(mealIngredient.id, [...converting]))
+            .returning({ meal_id: mealIngredient.meal_id })
+
+    for (const [id, amount] of given) {
+      await db.update(mealIngredient).set({ amount }).where(eq(mealIngredient.id, id))
+    }
 
     const touched = [...new Set(taken.map((line) => line.meal_id))]
 

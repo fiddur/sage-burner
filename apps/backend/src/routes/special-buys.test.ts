@@ -281,6 +281,32 @@ describe('what is written on sittings but is not in the pantry', () => {
     ])
   })
 
+  it('carries every line under the key, with its amount and the sitting it is on', async () => {
+    const { server, bo } = await setUp()
+    const friday = await givenSitting({ date: '2026-08-01' })
+    const saturday = await givenSitting({ date: '2026-08-02', label: 'Lunch' })
+    const one = await givenWritten(friday, { name: 'Salsa', unit: 'jars', amount: 1 })
+    const other = await givenWritten(saturday, { name: ' SALSA ', unit: 'Jars' })
+
+    expect((await read(server, bo.cookie)).json().buys[0].lines).toEqual([
+      { id: one, amount: 1, meal_label: 'Dinner', date: '2026-08-01', event_name: 'Autumn burn' },
+      { id: other, amount: null, meal_label: 'Lunch', date: '2026-08-02', event_name: 'Autumn burn' },
+    ])
+  })
+
+  it('leaves a line of a burn that has ended out of the lines, as it leaves it out of the count', async () => {
+    const { server, bo } = await setUp()
+    await givenBurn(ENDED, 'Last summer', '2025')
+    const over = await givenSitting({ eventId: ENDED, date: '2025-08-01' })
+    const coming = await givenSitting({ date: '2026-08-01' })
+    await givenWritten(over, { name: 'Salsa', unit: 'jars' })
+    const soon = await givenWritten(coming, { name: 'Salsa', unit: 'jars' })
+
+    expect(
+      (await read(server, bo.cookie)).json().buys[0].lines.map((line: { id: string }) => line.id),
+    ).toEqual([soon])
+  })
+
   it('is the admin’s to read', async () => {
     const { server, ada } = await setUp()
 
@@ -325,16 +351,73 @@ describe('promoting a special buy to a pantry thing', () => {
     expect(await lineFrom(grams)).toMatchObject({ pantry_item_id: null, name: 'Saffron', unit: 'g' })
   })
 
-  it('adopts nothing when the thing is counted in another unit than the lines are', async () => {
+  it('takes the lines even when the thing is counted in another unit than they were written in', async () => {
     const { server, bo } = await setUp()
     const friday = await givenSitting({ date: '2026-08-01' })
-    const written = await givenWritten(friday, { name: 'Saffron', unit: 'pcs' })
+    const written = await givenWritten(friday, { name: 'Saffron', unit: 'pcs', amount: 2 })
     const thing = await givenThing('Saffron', 'g')
 
     const response = await adopt(server, bo.cookie, thing, { name: 'Saffron', unit: 'pcs' })
 
-    expect(response.json()).toEqual({ adopted: 0 })
-    expect((await lineFrom(written)).pantry_item_id).toBeNull()
+    expect(response.json()).toEqual({ adopted: 1 })
+    expect(await lineFrom(written)).toMatchObject({ pantry_item_id: thing, amount: 2 })
+  })
+
+  it('sets the amount a line was given and keeps the one it was not', async () => {
+    const { server, bo } = await setUp()
+    const friday = await givenSitting({ date: '2026-08-01' })
+    const saturday = await givenSitting({ date: '2026-08-02' })
+    const said = await givenWritten(friday, { name: 'Salsa', unit: 'jars', amount: 1 })
+    const left = await givenWritten(saturday, { name: 'Salsa', unit: 'jars', amount: 3 })
+    const emptied = await givenWritten(saturday, { name: 'Salsa', unit: 'jars', amount: 4 })
+    const thing = await givenThing('Salsa, chunky', 'jars (300g)')
+
+    const response = await adopt(server, bo.cookie, thing, {
+      name: 'Salsa',
+      unit: 'jars',
+      amounts: { [said]: 2.5, [emptied]: null },
+    })
+
+    expect(response.json()).toEqual({ adopted: 3 })
+    expect(await lineFrom(said)).toMatchObject({ pantry_item_id: thing, amount: 2.5 })
+    expect(await lineFrom(left)).toMatchObject({ pantry_item_id: thing, amount: 3 })
+    expect(await lineFrom(emptied)).toMatchObject({ pantry_item_id: thing, amount: null })
+  })
+
+  it('refuses an amount for a line it is not converting, and writes nothing at all', async () => {
+    const { server, bo } = await setUp()
+    const friday = await givenSitting({ date: '2026-08-01' })
+    const mine = await givenWritten(friday, { name: 'Salsa', unit: 'jars', amount: 1 })
+    const other = await givenWritten(friday, { name: 'Rosewater', unit: 'l', amount: 1 })
+    const thing = await givenThing('Salsa', 'jars (300g)')
+
+    const response = await adopt(server, bo.cookie, thing, {
+      name: 'Salsa',
+      unit: 'jars',
+      amounts: { [other]: 2 },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+    expect((await lineFrom(mine)).pantry_item_id).toBeNull()
+    expect(await lineFrom(other)).toMatchObject({ pantry_item_id: null, amount: 1 })
+  })
+
+  it('refuses an amount for a line on a burn that has ended', async () => {
+    const { server, bo } = await setUp()
+    await givenBurn(ENDED, 'Last summer', '2025')
+    const over = await givenSitting({ eventId: ENDED, date: '2025-08-01' })
+    const old = await givenWritten(over, { name: 'Salsa', unit: 'jars', amount: 1 })
+    const thing = await givenThing('Salsa', 'jars (300g)')
+
+    const response = await adopt(server, bo.cookie, thing, {
+      name: 'Salsa',
+      unit: 'jars',
+      amounts: { [old]: 2 },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(await lineFrom(old)).toMatchObject({ pantry_item_id: null, amount: 1 })
   })
 
   it('leaves a burn that has ended as it was written', async () => {

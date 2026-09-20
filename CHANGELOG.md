@@ -7,6 +7,22 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-20
+
+- **The Pantry page reads as a list again.** With a hundred and ninety things on it, four
+  buttons and a pen on every row made it a wall. A row now says the name, what it is, what
+  it contains, where it lives and how much is left in plain words — `plenty`, `~2 kg`,
+  `out`, `need more`. **Inventory management** at the top brings the counting buttons back
+  for as long as you are actually counting, and it is there for everybody.
+- **A thing can carry a note for whoever is writing an amount.** Black beans are kept in
+  kg and cooked in dl, and now the row can say so: `Dry weight. 0.09 kg becomes ca 2.5
+dl/230 g`. It sits behind a small ℹ️ on the pantry row, and — the point of it — appears
+  beside the amount box on a sitting the moment you pick that thing.
+- **Promoting a special buy now takes the lines even if you change the unit.** Promote
+  "Salsa · jars" and count it in `jars (300g)`, and the form asks what each line already
+  written becomes before it saves, instead of adding the thing and leaving every line
+  behind.
+
 # 2026-09-18
 
 - **What cooks keep writing by hand can join the pantry in one step.** At the foot of

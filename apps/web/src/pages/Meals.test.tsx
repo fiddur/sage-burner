@@ -52,6 +52,7 @@ const aThing = (over: Partial<EventPantryItem> = {}): EventPantryItem => ({
   kind: 'breakfast',
   name: 'Oatmeal',
   unit: 'kg',
+  note: '',
   places: [],
   stock_level: null,
   stock_amount: null,

@@ -5,6 +5,7 @@ import type {
   PantryKind,
   PantryPlace,
   SpecialBuy,
+  SpecialBuyLine,
   StockLevel,
 } from '@sage-burner/shared'
 import type { Ref } from 'preact'
@@ -14,6 +15,7 @@ import {
   dayName,
   isPantryKind,
   MAX_OPTION_LABEL,
+  MAX_PANTRY_NOTE,
   MAX_SPOT,
   MAX_UNIT,
   pantryKindLabel,
@@ -37,6 +39,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Heart } from '../components/Heart.tsx'
 import { IconButton } from '../components/IconButton.tsx'
+import { PantryNote } from '../components/PantryNote.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { NAMELESS } from '../components/PersonBadge.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
@@ -117,6 +120,7 @@ interface PantryDraft {
   kind: PantryKind
   name: string
   unit: string
+  note: string
   places: Placing[]
 }
 
@@ -124,7 +128,7 @@ interface PantryEdit extends PantryDraft {
   allergy_item_ids: string[]
 }
 
-const BLANK: PantryDraft = { kind: 'staple', name: '', unit: 'pcs', places: [] }
+const BLANK: PantryDraft = { kind: 'staple', name: '', unit: 'pcs', note: '', places: [] }
 
 const nothing = (): {
   items: readonly PantryItem[]
@@ -134,16 +138,43 @@ const nothing = (): {
   buys: readonly SpecialBuy[]
 } => ({ items: [], hearts: new Map(), allergies: [], places: [], buys: [] })
 
+const sittingSaid = (on: { meal_label: string; date: string; event_name: string }): string =>
+  `${on.event_name}: ${dayName(on.date, 'short')} ${on.meal_label}`
+
 const writtenOn = (buy: SpecialBuy): string =>
-  [
-    `${buy.sittings} sitting${buy.sittings === 1 ? '' : 's'}`,
-    `${buy.sample.event_name}: ${dayName(buy.sample.date, 'short')} ${buy.sample.meal_label}`,
-  ].join(' · ')
+  [`${buy.sittings} sitting${buy.sittings === 1 ? '' : 's'}`, sittingSaid(buy.sample)].join(' · ')
 
 const adoptedSaid = (adopted: number): string =>
-  adopted === 0
-    ? 'It is on the list, but no line moved across: they are written in another unit.'
-    : `${adopted} line${adopted === 1 ? '' : 's'} now point${adopted === 1 ? 's' : ''} at the pantry.`
+  `${adopted} line${adopted === 1 ? '' : 's'} now point${adopted === 1 ? 's' : ''} at the pantry.`
+
+const writtenAs = (line: SpecialBuyLine, unit: string): string =>
+  line.amount === null ? 'to taste' : `${line.amount} ${unit}`
+
+const unitOf = (draft: PantryDraft): string => (draft.unit.trim() === '' ? 'pcs' : draft.unit.trim())
+
+const sameUnit = (one: string, other: string): boolean =>
+  one.trim().toLowerCase() === other.trim().toLowerCase()
+
+const amountsFor = (
+  adjusting: boolean,
+  typed: Readonly<Record<string, string>>,
+): Record<string, number | null> =>
+  adjusting
+    ? Object.fromEntries(
+        Object.entries(typed).map(([id, text]) => [id, text.trim() === '' ? null : Number(text)]),
+      )
+    : {}
+
+const toAdjust = (
+  promoting: SpecialBuy | undefined,
+  adjusting: boolean,
+  unit: string,
+): Record<string, string> | undefined =>
+  promoting === undefined || adjusting || sameUnit(unit, promoting.unit)
+    ? undefined
+    : Object.fromEntries(
+        promoting.lines.map((line) => [line.id, line.amount === null ? '' : String(line.amount)]),
+      )
 
 export const Pantry = ({ api }: { api: PantryApi }) => {
   const viewer = useViewer()
@@ -180,9 +211,12 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
 
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<PantryFilter>('all')
+  const [counting, setCounting] = useState(false)
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [draft, setDraft] = useState(BLANK)
-  const [promoting, setPromoting] = useState<{ name: string; unit: string } | undefined>(undefined)
+  const [promoting, setPromoting] = useState<SpecialBuy | undefined>(undefined)
+  const [adjusting, setAdjusting] = useState(false)
+  const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [promoted, setPromoted] = useState<string | undefined>(undefined)
   const form = useRef<HTMLFormElement>(null)
 
@@ -225,28 +259,48 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
       return
     }
 
+    const unit = unitOf(draft)
+
+    const adjust = toAdjust(promoting, adjusting, unit)
+
+    if (adjust !== undefined) {
+      setAmounts(adjust)
+      setAdjusting(true)
+
+      return
+    }
+
     run(async () => {
       const added = await api.addPantryItem({
         kind: draft.kind,
         name: draft.name.trim(),
-        unit: draft.unit.trim() === '' ? 'pcs' : draft.unit.trim(),
+        unit,
+        note: draft.note.trim(),
         places: draft.places,
       })
 
       if (promoting !== undefined) {
-        const moved = await api.adoptSpecialBuy(added.item.id, promoting)
+        const moved = await api.adoptSpecialBuy(added.item.id, {
+          name: promoting.name,
+          unit: promoting.unit,
+          amounts: amountsFor(adjusting, amounts),
+        })
         setPromoted(adoptedSaid(moved.adopted))
       }
 
       setDraft(BLANK)
       setPromoting(undefined)
+      setAdjusting(false)
+      setAmounts({})
     }, nameClash('Could not add that.'))
   }
 
   const promote = (buy: SpecialBuy) => {
     setDraft({ ...BLANK, name: buy.name, unit: buy.unit })
-    setPromoting({ name: buy.name, unit: buy.unit })
+    setPromoting(buy)
     setPromoted(undefined)
+    setAdjusting(false)
+    setAmounts({})
     form.current?.scrollIntoView?.({ behavior: 'smooth' })
   }
 
@@ -280,6 +334,8 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
 
           <KindChips filter={filter} onFilter={setFilter} />
 
+          <CountingChip counting={counting} onCounting={setCounting} />
+
           <PlaceChips places={places} here={here} onChoose={(id) => route(pantryPage(id))} />
 
           {shown.length === 0 ? (
@@ -309,6 +365,7 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
                       item={item}
                       admin={admin}
                       busy={busy}
+                      counting={counting}
                       here={here}
                       hearts={hearts.get(item.id)}
                       onHeart={(hearting) => wanting(item.id, hearting)}
@@ -351,8 +408,12 @@ export const Pantry = ({ api }: { api: PantryApi }) => {
               busy={busy}
               promoting={promoting}
               promoted={promoted}
+              adjusting={adjusting}
+              amounts={amounts}
               form={form}
               onChange={setDraft}
+              onAmount={(id, amount) => setAmounts((held) => ({ ...held, [id]: amount }))}
+              onBack={() => setAdjusting(false)}
               onAdd={put}
             />
           )}
@@ -391,6 +452,25 @@ const KindChips = ({
         {one.label}
       </button>
     ))}
+  </p>
+)
+
+const CountingChip = ({
+  counting,
+  onCounting,
+}: {
+  counting: boolean
+  onCounting: (counting: boolean) => void
+}) => (
+  <p class="chip-row">
+    <button
+      type="button"
+      class={counting ? 'chip is-on' : 'chip'}
+      aria-pressed={counting}
+      onClick={() => onCounting(!counting)}
+    >
+      Inventory management
+    </button>
   </p>
 )
 
@@ -437,17 +517,25 @@ const AddAThing = ({
   busy,
   promoting,
   promoted,
+  adjusting,
+  amounts,
   form,
   onAdd,
+  onAmount,
+  onBack,
   onChange,
 }: {
   draft: PantryDraft
   places: readonly PantryPlace[]
   busy: boolean
-  promoting: { name: string; unit: string } | undefined
+  promoting: SpecialBuy | undefined
   promoted: string | undefined
+  adjusting: boolean
+  amounts: Readonly<Record<string, string>>
   form: Ref<HTMLFormElement>
   onAdd: () => void
+  onAmount: (lineId: string, amount: string) => void
+  onBack: () => void
   onChange: (change: (held: PantryDraft) => PantryDraft) => void
 }) => (
   <form
@@ -463,7 +551,6 @@ const AddAThing = ({
     {promoting !== undefined && (
       <p class="form-note">
         Saving puts it on the list and points every line written “{promoting.name} · {promoting.unit}” at it.
-        Change the unit and none of them can follow.
       </p>
     )}
 
@@ -507,6 +594,19 @@ const AddAThing = ({
       />
     </label>
 
+    <label class="field">
+      <span>Note</span>
+      <input
+        type="text"
+        name="note"
+        maxLength={MAX_PANTRY_NOTE}
+        value={draft.note}
+        onInput={(typed) => onChange((held) => ({ ...held, note: typed.currentTarget.value }))}
+      />
+    </label>
+
+    <p class="form-note">{NOTE_IS_FOR}</p>
+
     <PlaceFields
       what="the new thing"
       places={places}
@@ -515,10 +615,77 @@ const AddAThing = ({
       onChange={(wanted) => onChange((held) => ({ ...held, places: wanted }))}
     />
 
-    <PendingButton busy={busy} label="Add it" busyLabel="Adding…" type="submit" />
+    {adjusting && promoting !== undefined ? (
+      <AdjustAmounts
+        buy={promoting}
+        unit={unitOf(draft)}
+        amounts={amounts}
+        busy={busy}
+        onAmount={onAmount}
+        onBack={onBack}
+      />
+    ) : (
+      <PendingButton busy={busy} label="Add it" busyLabel="Adding…" type="submit" />
+    )}
 
     {promoted !== undefined && <p class="form-note">{promoted}</p>}
   </form>
+)
+
+const NOTE_IS_FOR =
+  'What a cook should know when writing an amount: how a kg turns into dl, that it is dry weight, what a jar holds.'
+
+const AdjustAmounts = ({
+  buy,
+  unit,
+  amounts,
+  busy,
+  onAmount,
+  onBack,
+}: {
+  buy: SpecialBuy
+  unit: string
+  amounts: Readonly<Record<string, string>>
+  busy: boolean
+  onAmount: (lineId: string, amount: string) => void
+  onBack: () => void
+}) => (
+  <fieldset class="pantry-adjust">
+    <legend>Adjust the amounts</legend>
+
+    <p class="form-note">
+      The pantry will count {buy.name} in {unit}, and the lines were written in {buy.unit}. Say what each one
+      becomes.
+    </p>
+
+    {buy.lines.map((line) => (
+      <p key={line.id} class="row">
+        <span>
+          {sittingSaid(line)} · {writtenAs(line, buy.unit)} →
+        </span>
+        <span class="pantry-adjust-amount">
+          <input
+            type="number"
+            min={0}
+            step="any"
+            inputMode="decimal"
+            aria-label={`How much ${buy.name} on ${sittingSaid(line)}, in ${unit}`}
+            disabled={busy}
+            value={amounts[line.id] ?? ''}
+            onInput={(typed) => onAmount(line.id, typed.currentTarget.value)}
+          />
+          <span>{unit}</span>
+        </span>
+      </p>
+    ))}
+
+    <p class="row">
+      <PendingButton busy={busy} label="Promote" busyLabel="Promoting…" type="submit" />
+      <button type="button" class="link-button" disabled={busy} onClick={onBack}>
+        Back
+      </button>
+    </p>
+  </fieldset>
 )
 
 const WrittenOnSittings = ({
@@ -615,10 +782,23 @@ const askedFor = (item: PantryItem): string | undefined => {
     : `Need more, asked by ${item.need_more.by_name ?? NAMELESS} · ${when}`
 }
 
+const countSaid = (item: PantryItem): string => {
+  if (item.stock_level === null) return ''
+  if (item.stock_level !== 'some') return stockLevelLabel[item.stock_level].toLowerCase()
+
+  return item.stock_amount === null ? 'some' : `~${item.stock_amount} ${item.unit}`
+}
+
+const stateSaid = (item: PantryItem, where: string): string =>
+  [where, countSaid(item), item.need_more === null ? '' : 'need more']
+    .filter((part) => part !== '')
+    .join(' · ')
+
 const Row = ({
   item,
   admin,
   busy,
+  counting,
   here,
   hearts,
   onCount,
@@ -632,6 +812,7 @@ const Row = ({
   item: PantryItem
   admin: boolean
   busy: boolean
+  counting: boolean
   here: PantryPlace | undefined
   hearts: PantryHearts | undefined
   onCount: (level: null | StockLevel, amount: number | null) => void
@@ -642,9 +823,8 @@ const Row = ({
   onSpot: (spot: string) => void
   onWithdraw: () => void
 }) => {
-  const said = countedBy(item)
-  const asked = askedFor(item)
   const where = here === undefined ? whereSaid(item.places) : elsewhere(item, here.id)
+  const state = stateSaid(item, where)
 
   return (
     <>
@@ -659,7 +839,9 @@ const Row = ({
             onOut={onOut}
           />
         )}
-        <strong>{item.name}</strong> <span class="pantry-kind">{pantryKindLabel[item.kind]}</span>{' '}
+        <strong>{item.name}</strong>
+        <span class="pantry-kind">{pantryKindLabel[item.kind]}</span>
+        <PantryNote what={item.name} note={item.note} />
         {item.allergies.map((tag) => (
           <span key={tag.id} class="allergy-tag">
             {tag.label}
@@ -675,8 +857,49 @@ const Row = ({
             onHeart={onHeart}
           />
         )}
+        {!counting && state !== '' && <span class="pantry-state">{state}</span>}
       </div>
 
+      {counting && (
+        <Counting
+          item={item}
+          admin={admin}
+          busy={busy}
+          where={where}
+          onCount={onCount}
+          onEdit={onEdit}
+          onNeedMore={onNeedMore}
+          onWithdraw={onWithdraw}
+        />
+      )}
+    </>
+  )
+}
+
+const Counting = ({
+  item,
+  admin,
+  busy,
+  where,
+  onCount,
+  onEdit,
+  onNeedMore,
+  onWithdraw,
+}: {
+  item: PantryItem
+  admin: boolean
+  busy: boolean
+  where: string
+  onCount: (level: null | StockLevel, amount: number | null) => void
+  onEdit: () => void
+  onNeedMore: () => void
+  onWithdraw: () => void
+}) => {
+  const said = countedBy(item)
+  const asked = askedFor(item)
+
+  return (
+    <>
       {where !== '' && <p class="form-note">{where}</p>}
       {said !== undefined && <p class="form-note">{said}</p>}
       {asked !== undefined && <p class="form-note">{asked}</p>}
@@ -1046,6 +1269,7 @@ const ItemFields = ({
     kind: item.kind,
     name: item.name,
     unit: item.unit,
+    note: item.note,
     allergy_item_ids: item.allergies.map((tag) => tag.id),
     places: item.places.map((one) => ({ place_id: one.place_id, spot: one.spot })),
   })
@@ -1100,6 +1324,19 @@ const ItemFields = ({
         />
       </label>
 
+      <label class="field">
+        <span>Note</span>
+        <input
+          type="text"
+          maxLength={MAX_PANTRY_NOTE}
+          aria-label={`Note, for ${item.name}`}
+          value={held.note}
+          onInput={(typed) => setHeld((was) => ({ ...was, note: typed.currentTarget.value }))}
+        />
+      </label>
+
+      <p class="form-note">{NOTE_IS_FOR}</p>
+
       <PlaceFields
         what={item.name}
         places={places}
@@ -1136,6 +1373,7 @@ const ItemFields = ({
               kind: held.kind,
               name: held.name.trim(),
               unit: held.unit.trim(),
+              note: held.note.trim(),
               allergy_item_ids: held.allergy_item_ids,
               places: held.places.map((one) => ({ place_id: one.place_id, spot: one.spot.trim() })),
             })

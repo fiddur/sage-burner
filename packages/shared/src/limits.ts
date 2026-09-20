@@ -87,3 +87,5 @@ export const MOST_PREVIEW_HOURS = 24 * 90
 export const MAX_UNIT = 20
 
 export const MAX_SPOT = 100
+
+export const MAX_PANTRY_NOTE = 500

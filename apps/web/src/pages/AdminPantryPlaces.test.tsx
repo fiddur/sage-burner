@@ -28,6 +28,7 @@ const ITEMS: PantryItem[] = [
     kind: 'staple',
     name: 'Rice',
     unit: 'kg',
+    note: '',
     stock_level: null,
     stock_amount: null,
     counted_by: null,

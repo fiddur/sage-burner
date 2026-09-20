@@ -30,6 +30,7 @@ const thing = (over: Partial<PantryItem> = {}): PantryItem => ({
   kind: 'breakfast',
   name: 'Oatmeal',
   unit: 'kg',
+  note: '',
   places: [
     { place_id: 'pl-2', name: 'Hallway', spot: 'bucket' },
     { place_id: 'pl-3', name: 'Cellar', spot: 'I' },
@@ -146,6 +147,10 @@ const renderPageAt = (at: string, api: PantryApi, viewer: Viewer = MEMBER) => {
   )
 }
 
+const counting = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Inventory management' }))
+}
+
 describe('the pantry page', () => {
   it('lists what the house has, with the rooms and boxes it lives in', async () => {
     renderPage(stub())
@@ -184,8 +189,9 @@ describe('the pantry page', () => {
   it('counts a thing in one tap', async () => {
     const setPantryStock = vi.fn(() => Promise.resolve({ item: thing({ stock_level: 'out' }) }))
     renderPage(stub({ setPantryStock }))
+    await counting()
 
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Out' }))[0] ?? document.body)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Out' })[0] ?? document.body)
 
     await waitFor(() => expect(setPantryStock).toHaveBeenCalledWith('p-1', { amount: null, level: 'out' }))
   })
@@ -193,8 +199,9 @@ describe('the pantry page', () => {
   it('shows which answer is lit, and clears it when that one is pressed again', async () => {
     const setPantryStock = vi.fn(() => Promise.resolve({ item: thing({ id: 'p-2' }) }))
     renderPage(stub({ setPantryStock }))
+    await counting()
 
-    const lit = await screen.findByRole('button', { name: 'Plenty', pressed: true })
+    const lit = screen.getByRole('button', { name: 'Plenty', pressed: true })
     fireEvent.click(lit)
 
     await waitFor(() => expect(setPantryStock).toHaveBeenCalledWith('p-2', { amount: null, level: null }))
@@ -203,8 +210,9 @@ describe('the pantry page', () => {
   it('takes a rough amount beside some, saved on Enter', async () => {
     const setPantryStock = vi.fn(() => Promise.resolve({ item: thing({ stock_level: 'some' }) }))
     renderPage(stub({ setPantryStock }, [thing({ stock_amount: 1, stock_level: 'some' })]))
+    await counting()
 
-    const amount = await screen.findByLabelText('How much Oatmeal, in kg')
+    const amount = screen.getByLabelText('How much Oatmeal, in kg')
     fireEvent.input(amount, { target: { value: '2.5' } })
     fireEvent.keyDown(amount, { key: 'Enter' })
 
@@ -223,7 +231,9 @@ describe('the pantry page', () => {
       ]),
     )
 
-    expect(await screen.findByText(/Counted by Ada/)).toBeTruthy()
+    await counting()
+
+    expect(screen.getByText(/Counted by Ada/)).toBeTruthy()
   })
 
   it('tells an account with no name yet apart from one that has left', async () => {
@@ -246,14 +256,15 @@ describe('the pantry page', () => {
       ]),
     )
 
-    expect(await screen.findByText(/Counted by Someone without a name yet/)).toBeTruthy()
+    await counting()
+
+    expect(screen.getByText(/Counted by Someone without a name yet/)).toBeTruthy()
     expect(screen.getByText(/Counted by somebody who has left/)).toBeTruthy()
   })
 
-  it('offers a member none of the admin controls', async () => {
+  it('offers a member none of the admin controls, counting or not', async () => {
     renderPage(stub())
-
-    await screen.findByText('Oatmeal')
+    await counting()
 
     expect(screen.queryByRole('button', { name: 'Add it' })).toBeNull()
     expect(screen.queryByLabelText('Edit Oatmeal')).toBeNull()
@@ -274,6 +285,7 @@ describe('the pantry page', () => {
         kind: 'staple',
         name: 'Rice',
         unit: 'kg',
+        note: '',
         places: [],
       }),
     )
@@ -294,8 +306,9 @@ describe('the pantry page', () => {
   it('lets an admin edit one in place', async () => {
     const updatePantryItem = vi.fn(() => Promise.resolve({ item: thing({ name: 'Oats' }) }))
     renderPage(stub({ updatePantryItem }), ADMIN)
+    await counting()
 
-    fireEvent.click(await screen.findByLabelText('Edit Oatmeal'))
+    fireEvent.click(screen.getByLabelText('Edit Oatmeal'))
     fireEvent.input(screen.getByLabelText('Name, for Oatmeal'), { target: { value: 'Oats' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -304,6 +317,7 @@ describe('the pantry page', () => {
         kind: 'breakfast',
         name: 'Oats',
         unit: 'kg',
+        note: '',
         allergy_item_ids: [],
         places: [
           { place_id: 'pl-2', spot: 'bucket' },
@@ -322,8 +336,9 @@ describe('the pantry page', () => {
   it('lets an admin tick what a thing contains, out of the allergy vocabulary', async () => {
     const updatePantryItem = vi.fn(() => Promise.resolve({ item: thing() }))
     renderPage(stub({ updatePantryItem }), ADMIN)
+    await counting()
 
-    fireEvent.click(await screen.findByLabelText('Edit Oatmeal'))
+    fireEvent.click(screen.getByLabelText('Edit Oatmeal'))
     fireEvent.click(screen.getByRole('button', { name: 'Gluten' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -338,8 +353,9 @@ describe('the pantry page', () => {
   it('starts the ticks from what the thing already carries, and untick takes one off', async () => {
     const updatePantryItem = vi.fn(() => Promise.resolve({ item: thing() }))
     renderPage(stub({ updatePantryItem }, [thing({ allergies: [{ id: 'al-1', label: 'Nuts' }] })]), ADMIN)
+    await counting()
 
-    fireEvent.click(await screen.findByLabelText('Edit Oatmeal'))
+    fireEvent.click(screen.getByLabelText('Edit Oatmeal'))
 
     expect(screen.getByRole('button', { name: 'Nuts' }).getAttribute('aria-pressed')).toBe('true')
 
@@ -361,8 +377,9 @@ describe('the pantry page', () => {
   it('asks before taking one off', async () => {
     const withdrawPantryItem = vi.fn(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawPantryItem }), ADMIN)
+    await counting()
 
-    fireEvent.click(await screen.findByLabelText('Take off Oatmeal'))
+    fireEvent.click(screen.getByLabelText('Take off Oatmeal'))
     fireEvent.click(screen.getByRole('button', { name: 'Really take off Oatmeal' }))
 
     await waitFor(() => expect(withdrawPantryItem).toHaveBeenCalledWith('p-1'))
@@ -398,19 +415,145 @@ describe('the pantry page', () => {
   })
 })
 
+describe('the list as an overview, and counting as a mode', () => {
+  it('keeps the counting controls out of the way until Inventory management is pressed', async () => {
+    renderPage(stub())
+
+    await screen.findByText('Oatmeal')
+    expect(screen.queryByRole('button', { name: 'Out' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ask for more Oatmeal' })).toBeNull()
+
+    await counting()
+    expect(screen.getAllByRole('button', { name: 'Out' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Ask for more Oatmeal' })).toBeTruthy()
+
+    await counting()
+    expect(screen.queryByRole('button', { name: 'Out' })).toBeNull()
+  })
+
+  it('keeps the pen and the bin inside the mode as well, for an admin', async () => {
+    renderPage(stub(), ADMIN)
+
+    await screen.findByText('Oatmeal')
+    expect(screen.queryByLabelText('Edit Oatmeal')).toBeNull()
+    expect(screen.queryByLabelText('Take off Oatmeal')).toBeNull()
+
+    await counting()
+    expect(screen.getByLabelText('Edit Oatmeal')).toBeTruthy()
+    expect(screen.getByLabelText('Take off Oatmeal')).toBeTruthy()
+  })
+
+  it('says where a thing lives and how much is left, in words, on the row itself', async () => {
+    renderPage(stub({}, [thing({ stock_level: 'some', stock_amount: 2 })]))
+
+    expect(await screen.findByText('Hallway bucket · Cellar I · ~2 kg')).toBeTruthy()
+  })
+
+  it('names the answer alone where it carries no amount', async () => {
+    renderPage(
+      stub({}, [
+        thing({ stock_level: 'plenty' }),
+        thing({ id: 'p-2', name: 'Cumin', stock_level: 'out', places: [] }),
+        thing({ id: 'p-3', name: 'Rice', stock_level: 'some', places: [] }),
+      ]),
+    )
+
+    expect(await screen.findByText('Hallway bucket · Cellar I · plenty')).toBeTruthy()
+    expect(screen.getByText('out')).toBeTruthy()
+    expect(screen.getByText('some')).toBeTruthy()
+  })
+
+  it('says need more on that same line, and nothing at all for a thing nobody has counted', async () => {
+    renderPage(
+      stub({}, [
+        thing({ places: [], need_more: { by: null, by_name: null, at: '2026-09-17T08:00:00.000Z' } }),
+        thing({ id: 'p-2', name: 'Cumin', places: [] }),
+      ]),
+    )
+
+    expect(await screen.findByText('need more')).toBeTruthy()
+    expect(screen.getAllByRole('listitem')[1]?.textContent).toBe('CuminBreakfast')
+  })
+
+  it('keeps the box leading the row of a walk, with nothing else on it', async () => {
+    renderPageAt('/pantry?place=pl-3', stub({}, [thing({ stock_level: 'out' })]))
+
+    expect(await screen.findByLabelText('Write where Oatmeal is in the Cellar')).toBeTruthy()
+    expect(screen.getByLabelText('Take Oatmeal out of the Cellar')).toBeTruthy()
+    expect(screen.getByText('Hallway bucket · out')).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'How much Oatmeal is left' })).toBeNull()
+  })
+})
+
+describe('a note on a pantry thing', () => {
+  const noted = thing({ note: 'Dry weight. 0.09 kg becomes ca 2.5 dl/230 g' })
+
+  it('is behind an icon on the row, in both modes, and only where there is one', async () => {
+    renderPage(stub({}, [noted, thing({ id: 'p-2', name: 'Cumin' })]))
+
+    expect(await screen.findByLabelText('About Oatmeal')).toBeTruthy()
+    expect(screen.queryByLabelText('About Cumin')).toBeNull()
+
+    await counting()
+    expect(screen.getByLabelText('About Oatmeal')).toBeTruthy()
+  })
+
+  it('holds what was written about it', async () => {
+    renderPage(stub({}, [noted]))
+
+    await screen.findByLabelText('About Oatmeal')
+
+    expect(screen.getByText('Dry weight. 0.09 kg becomes ca 2.5 dl/230 g')).toBeTruthy()
+  })
+
+  it('is written from the add form', async () => {
+    const addPantryItem = vi.fn<PantryApi['addPantryItem']>(() => Promise.resolve({ item: noted }))
+    renderPage(stub({ addPantryItem }), ADMIN)
+
+    fireEvent.input(await screen.findByLabelText('What is it?'), { target: { value: 'Beans, black' } })
+    fireEvent.input(screen.getByLabelText('Note'), { target: { value: '  Dry weight  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    await waitFor(() =>
+      expect(addPantryItem).toHaveBeenCalledWith(expect.objectContaining({ note: 'Dry weight' })),
+    )
+  })
+
+  it('is written from the pen, and starts from what the thing carries', async () => {
+    const updatePantryItem = vi.fn<PantryApi['updatePantryItem']>(() => Promise.resolve({ item: noted }))
+    renderPage(stub({ updatePantryItem }, [noted]), ADMIN)
+    await counting()
+
+    fireEvent.click(screen.getByLabelText('Edit Oatmeal'))
+    expect(screen.getByLabelText('Note, for Oatmeal')).toHaveProperty(
+      'value',
+      'Dry weight. 0.09 kg becomes ca 2.5 dl/230 g',
+    )
+
+    fireEvent.input(screen.getByLabelText('Note, for Oatmeal'), { target: { value: 'Dry weight' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updatePantryItem).toHaveBeenCalledWith('p-1', expect.objectContaining({ note: 'Dry weight' })),
+    )
+  })
+})
+
 describe('asking for more of something from the cellar', () => {
   it('offers the ask on every row, burn or no burn', async () => {
     renderPage(stub())
+    await counting()
 
-    expect(await screen.findByRole('button', { name: 'Ask for more Oatmeal' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ask for more Oatmeal' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Ask for more Cumin' })).toBeTruthy()
   })
 
   it('writes the ask', async () => {
     const flagPantryNeedMore = vi.fn<PantryApi['flagPantryNeedMore']>(() => Promise.resolve(undefined))
     renderPage(stub({ flagPantryNeedMore }))
+    await counting()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Ask for more Cumin' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask for more Cumin' }))
 
     await waitFor(() => expect(flagPantryNeedMore).toHaveBeenCalledWith('p-2'))
   })
@@ -420,7 +563,8 @@ describe('asking for more of something from the cellar', () => {
       stub({}, [thing({ need_more: { by: 'a-9', by_name: 'Cleo', at: '2026-09-17T08:00:00.000Z' } })]),
     )
 
-    const asked = await screen.findByRole('button', { name: 'Stop asking for more Oatmeal' })
+    await counting()
+    const asked = screen.getByRole('button', { name: 'Stop asking for more Oatmeal' })
 
     expect(asked.className).toContain('is-on')
     expect(screen.getByText(/^Need more, asked by Cleo · /)).toBeTruthy()
@@ -428,8 +572,9 @@ describe('asking for more of something from the cellar', () => {
 
   it('names nobody where nobody asked, which is what an import leaves', async () => {
     renderPage(stub({}, [thing({ need_more: { by: null, by_name: null, at: '2026-09-17T08:00:00.000Z' } })]))
+    await counting()
 
-    expect(await screen.findByText(/^Need more · /)).toBeTruthy()
+    expect(screen.getByText(/^Need more · /)).toBeTruthy()
   })
 
   it('takes the ask back when the lit button is pressed', async () => {
@@ -440,19 +585,19 @@ describe('asking for more of something from the cellar', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Stop asking for more Oatmeal' }))
+    await counting()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop asking for more Oatmeal' }))
 
     await waitFor(() => expect(unflagPantryNeedMore).toHaveBeenCalledWith('p-1'))
   })
 
   it('keeps the ask out of the group that says how much is left', async () => {
     renderPage(stub())
+    await counting()
 
-    await screen.findByText('Oatmeal')
-
-    const counting = screen.getByRole('group', { name: 'How much Oatmeal is left' })
-    expect(counting.textContent).toContain('Out')
-    expect(counting.textContent).not.toContain('Need more')
+    const group = screen.getByRole('group', { name: 'How much Oatmeal is left' })
+    expect(group.textContent).toContain('Out')
+    expect(group.textContent).not.toContain('Need more')
   })
 })
 
@@ -564,8 +709,7 @@ describe('taking inventory one room at a time', () => {
 
   it('offers the count and the ask on every row of the walk', async () => {
     renderPageAt('/pantry?place=pl-3', stub({}, spread))
-
-    await screen.findByText('Rice')
+    await counting()
 
     expect(screen.getByRole('group', { name: 'How much Rice is left' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Ask for more Rice' })).toBeTruthy()
@@ -641,6 +785,7 @@ describe('taking inventory one room at a time', () => {
         kind: 'staple',
         name: 'Quinoa',
         unit: 'pcs',
+        note: '',
         places: [{ place_id: 'pl-3', spot: 'R5' }],
       }),
     )
@@ -649,8 +794,9 @@ describe('taking inventory one room at a time', () => {
   it('takes a thing out of a room by unticking it in the pen', async () => {
     const updatePantryItem = vi.fn<PantryApi['updatePantryItem']>(() => Promise.resolve({ item: thing() }))
     renderPage(stub({ updatePantryItem }), ADMIN)
+    await counting()
 
-    fireEvent.click(await screen.findByLabelText('Edit Oatmeal'))
+    fireEvent.click(screen.getByLabelText('Edit Oatmeal'))
     fireEvent.click(screen.getByLabelText('In the Cellar, for Oatmeal'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -659,6 +805,7 @@ describe('taking inventory one room at a time', () => {
         kind: 'breakfast',
         name: 'Oatmeal',
         unit: 'kg',
+        note: '',
         allergy_item_ids: [],
         places: [{ place_id: 'pl-2', spot: 'bucket' }],
       }),
@@ -673,11 +820,18 @@ describe('taking inventory one room at a time', () => {
   })
 })
 
+const LINES = [
+  { id: 'li-1', amount: 1, meal_label: 'Dinner', date: '2026-08-01', event_name: 'Autumn burn' },
+  { id: 'li-2', amount: null, meal_label: 'Lunch', date: '2026-08-02', event_name: 'Autumn burn' },
+  { id: 'li-3', amount: 4, meal_label: 'Dinner', date: '2026-08-02', event_name: 'Autumn burn' },
+]
+
 const SAFFRON: SpecialBuy = {
   name: 'Saffron, 1 g sachets',
   unit: 'sachets',
   sittings: 3,
   sample: { meal_label: 'Dinner', date: '2026-08-01', event_name: 'Autumn burn' },
+  lines: LINES,
 }
 
 const promoting = (over: Partial<PantryApi> = {}, buys: SpecialBuy[] = [SAFFRON]) =>
@@ -730,19 +884,100 @@ describe('promoting a special buy', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
 
     await waitFor(() =>
-      expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', { name: 'Saffron, 1 g sachets', unit: 'sachets' }),
+      expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', {
+        name: 'Saffron, 1 g sachets',
+        unit: 'sachets',
+        amounts: {},
+      }),
     )
     expect(addPantryItem).toHaveBeenCalledWith({
       kind: 'staple',
       name: 'Saffron, 1 g sachets',
       unit: 'sachets',
+      note: '',
       places: [],
     })
     expect(await screen.findByText('3 lines now point at the pantry.')).toBeTruthy()
   })
 
-  it('still asks, and says nothing followed, when the unit was changed before saving', async () => {
-    const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 0 }))
+  it('asks what each line becomes before saving, once the unit has been changed', async () => {
+    const addPantryItem = vi.fn<PantryApi['addPantryItem']>(() =>
+      Promise.resolve({ item: thing({ id: 'p-9', name: 'Saffron, 1 g sachets' }) }),
+    )
+    renderPage(promoting({ addPantryItem }), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'g' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    expect(screen.getByText('Adjust the amounts')).toBeTruthy()
+    expect(addPantryItem).not.toHaveBeenCalled()
+    expect(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sat 1 Dinner, in g'),
+    ).toHaveProperty('value', '1')
+    expect(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sun 2 Lunch, in g'),
+    ).toHaveProperty('value', '')
+    expect(screen.getByText(/Autumn burn: Sun 2 Lunch · to taste/)).toBeTruthy()
+  })
+
+  it('sends what was typed against each line, an emptied box meaning no amount', async () => {
+    const addPantryItem = vi.fn<PantryApi['addPantryItem']>(() =>
+      Promise.resolve({ item: thing({ id: 'p-9', name: 'Saffron, 1 g sachets' }) }),
+    )
+    const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 3 }))
+    renderPage(promoting({ addPantryItem, adoptSpecialBuy }), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'g' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+    fireEvent.input(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sat 1 Dinner, in g'),
+      {
+        target: { value: '2' },
+      },
+    )
+    fireEvent.input(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sun 2 Lunch, in g'),
+      {
+        target: { value: '3' },
+      },
+    )
+    fireEvent.input(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sun 2 Dinner, in g'),
+      {
+        target: { value: '' },
+      },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+
+    await waitFor(() =>
+      expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', {
+        name: 'Saffron, 1 g sachets',
+        unit: 'sachets',
+        amounts: { 'li-1': 2, 'li-2': 3, 'li-3': null },
+      }),
+    )
+    expect(addPantryItem).toHaveBeenCalledWith(expect.objectContaining({ unit: 'g' }))
+    expect(await screen.findByText('3 lines now point at the pantry.')).toBeTruthy()
+  })
+
+  it('comes back from the step with what was filled in still there', async () => {
+    renderPage(promoting(), ADMIN)
+
+    fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'g' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(screen.queryByText('Adjust the amounts')).toBeNull()
+    expect(screen.getByLabelText('What is it?')).toHaveProperty('value', 'Saffron, 1 g sachets')
+    expect(screen.getByLabelText('Counted in')).toHaveProperty('value', 'g')
+    expect(screen.getByRole('button', { name: 'Add it' })).toBeTruthy()
+  })
+
+  it('forgets the amounts once the unit is put back, since nothing is being converted', async () => {
+    const adoptSpecialBuy = vi.fn<PantryApi['adoptSpecialBuy']>(() => Promise.resolve({ adopted: 3 }))
     renderPage(
       promoting({
         addPantryItem: () => Promise.resolve({ item: thing({ id: 'p-9', name: 'Saffron, 1 g sachets' }) }),
@@ -754,15 +989,23 @@ describe('promoting a special buy', () => {
     fireEvent.click(await screen.findByLabelText('Promote Saffron, 1 g sachets to the pantry'))
     fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'g' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+    fireEvent.input(
+      screen.getByLabelText('How much Saffron, 1 g sachets on Autumn burn: Sat 1 Dinner, in g'),
+      {
+        target: { value: '2' },
+      },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.input(screen.getByLabelText('Counted in'), { target: { value: 'sachets' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
 
     await waitFor(() =>
-      expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', { name: 'Saffron, 1 g sachets', unit: 'sachets' }),
+      expect(adoptSpecialBuy).toHaveBeenCalledWith('p-9', {
+        name: 'Saffron, 1 g sachets',
+        unit: 'sachets',
+        amounts: {},
+      }),
     )
-    expect(
-      await screen.findByText(
-        'It is on the list, but no line moved across: they are written in another unit.',
-      ),
-    ).toBeTruthy()
   })
 
   it('adds an ordinary thing without asking for any adoption', async () => {

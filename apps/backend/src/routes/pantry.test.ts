@@ -1,6 +1,7 @@
 import type { PantryItem, PantryListResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
+import { MAX_PANTRY_NOTE } from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -384,6 +385,50 @@ describe('what is on the list, which is the admin’s', () => {
     const again = await add(server, ada.cookie, { kind: 'spice', name: 'CUMIN' })
 
     expect(again.statusCode).toBe(409)
+  })
+
+  it('adds one with a note, trimmed, and leaves it empty where none was written', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin'])
+
+    const made = await add(server, ada.cookie, {
+      kind: 'staple',
+      name: 'Beans, black',
+      unit: 'kg',
+      note: '  Dry weight. 0.09 kg becomes ca 2.5 dl/230 g  ',
+    })
+
+    expect(made.json().item.note).toBe('Dry weight. 0.09 kg becomes ca 2.5 dl/230 g')
+    expect((await given(server, ada.cookie, 'Cumin', 'spice')).note).toBe('')
+  })
+
+  it('writes a note onto one already there, and every member reads it', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin'])
+    const bo = await givenAccount('Bo')
+    const beans = await given(server, ada.cookie, 'Beans, black')
+
+    const written = await edit(server, ada.cookie, beans.id, { note: 'Dry weight' })
+
+    expect(written.json().item.note).toBe('Dry weight')
+    expect((await list(server, bo.cookie)).items.find((one) => one.id === beans.id)?.note).toBe('Dry weight')
+  })
+
+  it('refuses a note longer than the bound the form is held to', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin'])
+    const beans = await given(server, ada.cookie, 'Beans, black')
+
+    expect(
+      (await add(server, ada.cookie, { kind: 'staple', name: 'Rice', note: 'x'.repeat(MAX_PANTRY_NOTE + 1) }))
+        .statusCode,
+    ).toBe(400)
+    expect(
+      (await edit(server, ada.cookie, beans.id, { note: 'x'.repeat(MAX_PANTRY_NOTE + 1) })).statusCode,
+    ).toBe(400)
+    expect((await edit(server, ada.cookie, beans.id, { note: 'x'.repeat(MAX_PANTRY_NOTE) })).statusCode).toBe(
+      200,
+    )
   })
 
   it('renames one, and the unit with it', async () => {

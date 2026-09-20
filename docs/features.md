@@ -177,9 +177,16 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - The pantry: what the house usually has, where it lives and roughly how much —
   one shared list belonging to no burn, replacing the spreadsheet's food and
   spice inventories. It starts with a couple of dozen everyday things on it.
+- The list reads as an overview: each thing with where it lives and how much is left
+  in words beside it. **Inventory management** at the top turns the counting controls
+  on for everybody, which is when the buttons, the notes and the admin's pen appear.
 - Counting is every member's and takes one tap a row: plenty, some (with a rough
   amount in the thing's own unit) or out, with who counted it and when beside it.
   Deciding what is on the list is admin's, and a thing taken off can be put back.
+- A thing can carry a **note** for whoever is writing an amount — that the kg is dry
+  weight, what a jar holds, how it turns into dl. It sits behind a small info icon on
+  the row, and appears beside the amount box on a sitting as soon as that thing is
+  picked.
 - Every thing lives in rooms — Kitchen, Hallway, Cellar, Party kitchen to start
   with, an admin's list under ⚙️ — with a box or a shelf named in each. Choosing a
   room on the Pantry page walks it box by box, in box order, where any member can
@@ -207,8 +214,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Special buys written again and again are listed for an admin at the foot of the
   Pantry page, with how many sittings ask for them. **Promote** fills the add form in
   from one, and saving both puts the thing on the list and points every line written
-  that way — in that unit, on a burn still to come — at it, keeping their amounts and
-  any shopping tick.
+  that way — on a burn still to come — at it, keeping their amounts and any shopping
+  tick. Rename it or count it in another unit and the lines still follow: changing the
+  unit asks what each line's amount becomes before it saves.
 - A pantry thing can be tagged with what it contains, from the same allergy list
   members tick about themselves. A sitting using one says how many of the people
   there that day cannot eat it and names them, with a count of whoever wrote
