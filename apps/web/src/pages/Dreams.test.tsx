@@ -275,7 +275,23 @@ describe('Dreams', () => {
     expect(screen.getByLabelText('Start of Cacao ceremony')).toHaveProperty('value', '2026-08-02T20:00')
   })
 
-  it('unschedules by choosing nowhere and clearing both ends', async () => {
+  it('keeps the times shut until a place is chosen, since a time has no lane to sit in', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openEditor('Sunrise yoga')
+
+    expect(screen.getByLabelText('Start of Sunrise yoga')).toHaveProperty('disabled', true)
+    expect(screen.getByLabelText('End of Sunrise yoga')).toHaveProperty('disabled', true)
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Place for Sunrise yoga' }), {
+      target: { value: 'p-1' },
+    })
+
+    expect(screen.getByLabelText('Start of Sunrise yoga')).toHaveProperty('disabled', false)
+    expect(screen.getByLabelText('End of Sunrise yoga')).toHaveProperty('disabled', false)
+  })
+
+  it('unschedules by choosing nowhere, which clears both ends by itself', async () => {
     const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -295,8 +311,10 @@ describe('Dreams', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Place for Cacao ceremony' }), {
       target: { value: '' },
     })
-    fireEvent.input(screen.getByLabelText('Start of Cacao ceremony'), { target: { value: '' } })
-    fireEvent.input(screen.getByLabelText('End of Cacao ceremony'), { target: { value: '' } })
+
+    expect(screen.getByLabelText('Start of Cacao ceremony')).toHaveProperty('value', '')
+    expect(screen.getByLabelText('End of Cacao ceremony')).toHaveProperty('value', '')
+
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() =>

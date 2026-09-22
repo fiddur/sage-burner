@@ -167,6 +167,7 @@ describe('migrations', () => {
     expect(indexes('thread_entry')).toEqual(['thread_entry_seq_idx'])
     expect(indexes('thread')).toEqual(['thread_entity_idx', 'thread_event_idx', 'thread_subject_idx'])
     expect(indexes('notification')).toEqual(['notification_account_idx'])
+    expect(indexes('session')).toEqual(['session_event_slot_idx'])
   })
 
   const leftovers = () =>
@@ -783,6 +784,26 @@ describe('check constraints', () => {
 
   it('accepts the same row with the dates in order', () => {
     expect(() => insertStay('2026-10-02', '2026-10-04')).not.toThrow()
+  })
+
+  const insertDream = (id: string, placeId: string | null) =>
+    handle.client
+      .prepare(
+        `INSERT INTO session (id, event_id, title, description, time_slot_start, time_slot_end, place_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(id, ids.event, 'Tonglen', '', '2026-10-03T07:00:00Z', '2026-10-03T08:00:00Z', placeId)
+
+  it('rejects a time slot on a dream that is nowhere', () => {
+    expect(() => insertDream('s-nowhere', null)).toThrow(/session_slot_needs_lane_check/)
+  })
+
+  it('accepts the same slot once the dream has a lane, so the rejection above is the CHECK and not the statement', () => {
+    handle.client
+      .prepare('INSERT INTO place (id, event_id, "order", name, emoji, color) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('p-temple', ids.event, 0, 'Temple', '🛕', 'yellow')
+
+    expect(() => insertDream('s-placed', 'p-temple')).not.toThrow()
   })
 
   it('rejects half a time slot', () => {
@@ -2101,6 +2122,63 @@ describe('the ride-cards migration', () => {
       ])
       expect(rows.every((row) => UUID.test(String(row.id)))).toBe(true)
       expect(fresh.client.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      fresh.close()
+    }
+  })
+})
+
+describe('the slot-needs-a-lane migration', () => {
+  const SLOT_NEEDS_LANE = '20260922100000_slot_needs_lane'
+
+  const timedDream = (db: DbHandle, id: string, placeId: string | null, withdrawnAt: string | null = null) =>
+    db.client
+      .prepare(
+        'insert into session (id, event_id, title, description, time_slot_start, time_slot_end, place_id, withdrawn_at) ' +
+          'values (?, ?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(id, 'e-1', id, '', '2026-10-03T07:00:00Z', '2026-10-03T08:00:00Z', placeId, withdrawnAt)
+
+  const slots = (db: DbHandle) =>
+    db.client
+      .prepare('select id, time_slot_start, time_slot_end, place_id, withdrawn_at from session order by id')
+      .all()
+
+  it('takes the time off every dream that had one with no lane, and leaves the placed ones alone', () => {
+    const fresh = createDb({ url: ':memory:' })
+    try {
+      const { staged, kept } = stagedThrough(SLOT_NEEDS_LANE)
+      expect(kept).not.toContain(SLOT_NEEDS_LANE)
+      runMigrations(fresh, staged)
+      anEvent(fresh, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+      fresh.client
+        .prepare('insert into place (id, event_id, "order", name, emoji, color) values (?, ?, ?, ?, ?, ?)')
+        .run('p-1', 'e-1', 0, 'Temple', '🛕', 'yellow')
+      timedDream(fresh, 's-nowhere', null)
+      timedDream(fresh, 's-placed', 'p-1')
+      timedDream(fresh, 's-withdrawn-nowhere', null, '2026-09-01T00:00:00Z')
+      expect(slots(fresh).map((row) => row.time_slot_start)).not.toContain(null)
+
+      runMigrations(fresh)
+
+      expect(slots(fresh)).toEqual([
+        { id: 's-nowhere', time_slot_start: null, time_slot_end: null, place_id: null, withdrawn_at: null },
+        {
+          id: 's-placed',
+          time_slot_start: '2026-10-03T07:00:00Z',
+          time_slot_end: '2026-10-03T08:00:00Z',
+          place_id: 'p-1',
+          withdrawn_at: null,
+        },
+        {
+          id: 's-withdrawn-nowhere',
+          time_slot_start: null,
+          time_slot_end: null,
+          place_id: null,
+          withdrawn_at: '2026-09-01T00:00:00Z',
+        },
+      ])
+      expect(() => timedDream(fresh, 's-after', null)).toThrow(/session_slot_needs_lane_check/)
     } finally {
       fresh.close()
     }

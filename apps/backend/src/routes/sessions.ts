@@ -152,6 +152,16 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
   supported_by_me: support.get(row.id)?.mine ?? false,
 })
 
+const OFF_THE_GRID = { time_slot_start: null, time_slot_end: null }
+
+const slotNeedsLane = <T extends { place_id?: string | null }>(
+  fields: T,
+  stored: { place_id: string | null } = { place_id: null },
+) =>
+  (fields.place_id === undefined ? stored.place_id : fields.place_id) === null
+    ? { ...fields, ...OFF_THE_GRID }
+    : fields
+
 const scheduleLine = (before: DreamRow, after: DreamRow): string => {
   if (before.time_slot_start === null && after.time_slot_start !== null) return 'put it in the schedule'
   if (before.time_slot_start !== null && after.time_slot_start === null) return 'took it off the schedule'
@@ -362,7 +372,8 @@ export const registerSessionRoutes = (
       const spot = await facilitatorSpot(db, open.id, body.facilitator_account_id)
       if (!spot.ok) return sendError(reply, 400, 'not_attending')
 
-      const { facilitator_account_id: wanted, ...fields } = body
+      const { facilitator_account_id: wanted, ...offered } = body
+      const fields = slotNeedsLane(offered)
       const row: DreamRow = {
         ...fields,
         id: randomUUID(),
@@ -465,7 +476,8 @@ export const registerSessionRoutes = (
 
       if (await refuseIfStale(request, reply, () => dreamsOf(existing.event_id, mine))) return reply
 
-      const { facilitator_account_id: _wanted, ...fields } = body
+      const { facilitator_account_id: _wanted, ...edits } = body
+      const fields = slotNeedsLane(edits, existing)
       const patch =
         spot.attendanceId === undefined ? fields : { ...fields, facilitator_attendance_id: spot.attendanceId }
 
