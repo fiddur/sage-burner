@@ -233,19 +233,6 @@ describe('the public calendar feed', () => {
     expect(body).not.toContain('Offered only')
   })
 
-  it('leaves out a dream with a time but no lane, which the grid does not draw either', async () => {
-    const server = await build()
-    const eventId = await givenEvent()
-    const host = await givenHost()
-    await givenDream(eventId, host, { title: 'Back in the pool', place_id: null })
-    await givenDream(eventId, host, { title: 'Placed' })
-
-    const body = (await feed(server, eventId)).body
-
-    expect(body).toContain('SUMMARY:Placed')
-    expect(body).not.toContain('Back in the pool')
-  })
-
   it('carries only this burn, not another one running alongside', async () => {
     const server = await build()
     const mine = await givenEvent('Summer burn')

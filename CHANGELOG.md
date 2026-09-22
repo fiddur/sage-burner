@@ -9,9 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-22
 
-- **The calendar feed drops a dream that was put back in the pool.** A dream taken off the
-  grid but left with its time kept showing in subscribed calendars; the feed now carries
-  only what is on the schedule, a time and a place both.
+- **Taking a dream out of the schedule clears its time as well as its place.** Choosing
+  "Nowhere yet" left the time on the dream, so subscribed calendars kept showing it for
+  weeks after it left the grid. The times now empty with the place, and stay shut in the
+  panel until a place is chosen; a dream already in that state has had its time cleared.
 
 # 2026-09-20
 

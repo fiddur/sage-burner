@@ -525,12 +525,26 @@ covered by a test**: the suite renders in happy-dom, which applies no CSS, so
 nothing here can tell a styled grid from an unstyled one.
 
 **The pool holds whatever the grid does not draw**, derived rather than guessed.
-Missing a time or a place is the common case, but a dream can also be timed
+Missing a time is the common case, but a dream can also be timed
 outside the days on show, and guessing "unplaced means a null field" left that one
 in neither the grid nor the pool — gone from the page while still fine on
-`/dreams`. Deriving it means nothing can vanish whatever the date. The calendar feed
-draws the same line: a dream needs a time and a lane to be in it, so one sent back to
-the pool leaves the subscribers' calendars with it ([burns.md](./burns.md#the-calendar-feed)).
+`/dreams`. Deriving it means nothing can vanish whatever the date.
+
+### Nowhere means no time
+
+A dream with a time has a lane. Choosing "Nowhere yet" in the panel is how a dream
+comes off the schedule without being withdrawn, and it used to leave the time on the
+row: the grid showed the dream in the pool, `/dreams` still said Saturday at nine, and
+the calendar feed — which reads the time — went on carrying it for weeks. Fredrik's
+call is that taking a dream out of the schedule clears the time as well.
+
+So the routes clear the slot whenever the lane comes out null, on an offer and on an
+edit alike, and `session_slot_needs_lane_check` makes the state unwritable; the
+migration that added it applied the same rule to the rows already in it. The panel
+follows: choosing nowhere empties both datetime fields, and they stay shut until a
+lane is chosen, so nothing typed there can be dropped on the way in. A lane with no
+time is still fine — "said where it would be" — because the grid draws nothing for it
+either way and a place is worth keeping.
 
 The grid runs from the burn's own `start_time` to its `end_time`, so an admin
 who says midday Friday to midday Sunday gets 49 rows rather than three whole days.

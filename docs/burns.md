@@ -355,12 +355,11 @@ What leaves the building is the title, the description, the times, and the place
 name, emoji and colour. No facilitator, no contact details, no allergies, no payment
 state.
 
-**The feed carries what the grid draws**: a dream with a time _and_ a lane. Clearing
-the lane in the panel puts a dream back in the pool while its time stays on the row —
-that is how a dream comes off the schedule without being withdrawn — and the feed used
-to read the time alone, so a calendar went on showing a dream the grid had dropped weeks
-before. The route requires `place_id` beside the slot now, so the two agree on what the
-programme is.
+**The feed carries what the grid draws**, and it reads the time alone because a time
+without a lane cannot be stored any more (`session_slot_needs_lane_check`,
+[schedule.md](./schedule.md#nowhere-means-no-time)). Before that rule, choosing "Nowhere
+yet" in the panel took a dream off the grid and left its time on the row, and a calendar
+went on showing it for weeks after the schedule had dropped it.
 
 Two guards, catching different things:
 

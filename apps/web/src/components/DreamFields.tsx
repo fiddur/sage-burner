@@ -122,7 +122,14 @@ export const DreamFields = ({
         <select
           aria-label={`Place for ${subject}`}
           value={placeId}
-          onChange={(changeEvent) => setPlaceId(changeEvent.currentTarget.value)}
+          onChange={(changeEvent) => {
+            const lane = changeEvent.currentTarget.value
+            setPlaceId(lane)
+            if (lane === '') {
+              setStart('')
+              setEnd('')
+            }
+          }}
         >
           <option value="">Nowhere yet</option>
           {places.map((row) => (
@@ -139,6 +146,7 @@ export const DreamFields = ({
           type="datetime-local"
           aria-label={`Start of ${subject}`}
           max={end === '' ? undefined : end}
+          disabled={placeId === ''}
           value={start}
           onInput={(inputEvent) => setStart(inputEvent.currentTarget.value)}
         />
@@ -150,6 +158,7 @@ export const DreamFields = ({
           type="datetime-local"
           aria-label={`End of ${subject}`}
           min={start === '' ? undefined : start}
+          disabled={placeId === ''}
           value={end}
           onInput={(inputEvent) => setEnd(inputEvent.currentTarget.value)}
         />

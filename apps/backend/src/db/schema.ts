@@ -534,6 +534,10 @@ export const session = sqliteTable(
       'session_slot_whole_check',
       sql`(${table.time_slot_start} is null) = (${table.time_slot_end} is null)`,
     ),
+    check(
+      'session_slot_needs_lane_check',
+      sql`(${table.place_id} is not null) or (${table.time_slot_start} is null)`,
+    ),
   ],
 )
 
