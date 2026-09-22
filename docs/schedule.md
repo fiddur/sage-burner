@@ -528,7 +528,9 @@ nothing here can tell a styled grid from an unstyled one.
 Missing a time or a place is the common case, but a dream can also be timed
 outside the days on show, and guessing "unplaced means a null field" left that one
 in neither the grid nor the pool — gone from the page while still fine on
-`/dreams`. Deriving it means nothing can vanish whatever the date.
+`/dreams`. Deriving it means nothing can vanish whatever the date. The calendar feed
+draws the same line: a dream needs a time and a lane to be in it, so one sent back to
+the pool leaves the subscribers' calendars with it ([burns.md](./burns.md#the-calendar-feed)).
 
 The grid runs from the burn's own `start_time` to its `end_time`, so an admin
 who says midday Friday to midday Sunday gets 49 rows rather than three whole days.

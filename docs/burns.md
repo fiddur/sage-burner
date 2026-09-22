@@ -355,6 +355,13 @@ What leaves the building is the title, the description, the times, and the place
 name, emoji and colour. No facilitator, no contact details, no allergies, no payment
 state.
 
+**The feed carries what the grid draws**: a dream with a time _and_ a lane. Clearing
+the lane in the panel puts a dream back in the pool while its time stays on the row —
+that is how a dream comes off the schedule without being withdrawn — and the feed used
+to read the time alone, so a calendar went on showing a dream the grid had dropped weeks
+before. The route requires `place_id` beside the slot now, so the two agree on what the
+programme is.
+
 Two guards, catching different things:
 
 - **The route parses every row through `publicSessionSchema`**, which strips what

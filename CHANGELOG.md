@@ -7,6 +7,12 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-22
+
+- **The calendar feed drops a dream that was put back in the pool.** A dream taken off the
+  grid but left with its time kept showing in subscribed calendars; the feed now carries
+  only what is on the schedule, a time and a place both.
+
 # 2026-09-20
 
 - **A journey on the rideshare board is something people can talk about.** Posting one now

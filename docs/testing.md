@@ -690,6 +690,8 @@ phone" means 360px.
 - [ ] Subscribe in a real calendar client: the scheduled dreams and meals
       appear with title, time and place; nothing personal — no contacts, no
       allergies, no payment.
+- [ ] Clear the lane on a scheduled dream so it lands back in "Not placed yet": the
+      feed no longer carries it on the next fetch.
 - [ ] Rotate the token: the old URL stops answering, the new one works.
 
 ## The icons
