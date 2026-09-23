@@ -355,6 +355,12 @@ What leaves the building is the title, the description, the times, and the place
 name, emoji and colour. No facilitator, no contact details, no allergies, no payment
 state.
 
+**The feed carries what the grid draws**, and it reads the time alone because a time
+without a lane cannot be stored any more (`session_slot_needs_lane_check`,
+[schedule.md](./schedule.md#nowhere-means-no-time)). Before that rule, choosing "Nowhere
+yet" in the panel took a dream off the grid and left its time on the row, and a calendar
+went on showing it for weeks after the schedule had dropped it.
+
 Two guards, catching different things:
 
 - **The route parses every row through `publicSessionSchema`**, which strips what

@@ -694,6 +694,9 @@ phone" means 360px.
 - [ ] Subscribe in a real calendar client: the scheduled dreams and meals
       appear with title, time and place; nothing personal — no contacts, no
       allergies, no payment.
+- [ ] Choose "Nowhere yet" on a scheduled dream: both times empty with it and stay shut
+      until a lane is chosen, the dream lands back in "Not placed yet", and the feed no
+      longer carries it on the next fetch.
 - [ ] Rotate the token: the old URL stops answering, the new one works.
 
 ## The icons

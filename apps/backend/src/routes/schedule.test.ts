@@ -117,7 +117,7 @@ const givenDream = async (
       description: over.description ?? 'Bring a cup.',
       time_slot_start: 'time_slot_start' in over ? over.time_slot_start : '2026-08-02T18:00:00.000Z',
       time_slot_end: 'time_slot_end' in over ? over.time_slot_end : '2026-08-02T20:00:00.000Z',
-      place_id: over.place_id ?? null,
+      place_id: 'place_id' in over ? over.place_id : await givenPlace(eventId),
     })
   return id
 }
@@ -231,18 +231,6 @@ describe('the public calendar feed', () => {
 
     expect(body).toContain('SUMMARY:Scheduled')
     expect(body).not.toContain('Offered only')
-  })
-
-  it('carries a dream with no place at all, rather than dropping it', async () => {
-    const server = await build()
-    const eventId = await givenEvent()
-    const host = await givenHost()
-    await givenDream(eventId, host, { title: 'Somewhere', place_id: null })
-
-    const body = (await feed(server, eventId)).body
-
-    expect(body).toContain('SUMMARY:Somewhere')
-    expect(body).not.toContain('LOCATION')
   })
 
   it('carries only this burn, not another one running alongside', async () => {

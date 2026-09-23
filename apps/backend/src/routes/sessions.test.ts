@@ -430,9 +430,10 @@ describe('dreams', () => {
 
   it('refuses a single end that would invert the stored slot', async () => {
     const server = await build()
-    await givenEvent()
+    const temple = await givenPlace(await givenEvent())
     const member = await givenAccount(['member'])
-    const id = (await offer(server, member.cookie, { title: 'Scheduled', ...SLOT })).json().session.id
+    const id = (await offer(server, member.cookie, { title: 'Scheduled', ...SLOT, place_id: temple })).json()
+      .session.id
 
     const late = await editDream(server, member.cookie, id, { time_slot_start: '2026-08-02T23:00:00.000Z' })
     const early = await editDream(server, member.cookie, id, { time_slot_end: '2026-08-02T09:00:00.000Z' })
@@ -445,9 +446,10 @@ describe('dreams', () => {
 
   it('accepts a single end that keeps the slot whole', async () => {
     const server = await build()
-    await givenEvent()
+    const temple = await givenPlace(await givenEvent())
     const member = await givenAccount(['member'])
-    const id = (await offer(server, member.cookie, { title: 'Scheduled', ...SLOT })).json().session.id
+    const id = (await offer(server, member.cookie, { title: 'Scheduled', ...SLOT, place_id: temple })).json()
+      .session.id
 
     const response = await editDream(server, member.cookie, id, {
       time_slot_end: '2026-08-02T21:00:00.000Z',
@@ -459,9 +461,10 @@ describe('dreams', () => {
 
   it('refuses clearing one end alone, and allows clearing both', async () => {
     const server = await build()
-    await givenEvent()
+    const temple = await givenPlace(await givenEvent())
     const member = await givenAccount(['member'])
-    const id = (await offer(server, member.cookie, { title: 'Scheduled', ...SLOT })).json().session.id
+    const id = (await offer(server, member.cookie, { title: 'Scheduled', ...SLOT, place_id: temple })).json()
+      .session.id
 
     expect((await editDream(server, member.cookie, id, { time_slot_start: null })).statusCode).toBe(400)
 
@@ -473,19 +476,54 @@ describe('dreams', () => {
     expect(cleared.json().session.time_slot_start).toBeNull()
   })
 
-  it('unschedules by clearing the place without touching the time', async () => {
+  it('clears the time along with the place, so nowhere means off the schedule entirely', async () => {
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenAccount(['member'])
     const temple = await givenPlace(eventId)
+    const offered = (await offer(server, member.cookie, { title: 'x', ...SLOT, place_id: temple })).json()
+      .session
+    expect(offered).toMatchObject({ ...SLOT, place_id: temple })
+
+    const response = await editDream(server, member.cookie, offered.id, { place_id: null })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session).toMatchObject({
+      place_id: null,
+      time_slot_start: null,
+      time_slot_end: null,
+    })
+  })
+
+  it('keeps the time when the dream only changes lanes', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    const temple = await givenPlace(eventId)
+    const sauna = await givenPlace(eventId, 'Sauna')
     const id = (await offer(server, member.cookie, { title: 'x', ...SLOT, place_id: temple })).json().session
       .id
 
-    const response = await editDream(server, member.cookie, id, { place_id: null })
+    const response = await editDream(server, member.cookie, id, { place_id: sauna })
 
-    expect(response.statusCode).toBe(200)
-    expect(response.json().session.place_id).toBeNull()
-    expect(response.json().session.time_slot_start).toBe(SLOT.time_slot_start)
+    expect(response.json().session).toMatchObject({ ...SLOT, place_id: sauna })
+  })
+
+  it('drops a time given with no lane to hold it, at the offer and on an edit alike', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+
+    const offered = (await offer(server, member.cookie, { title: 'x', ...SLOT })).json().session
+    expect(offered).toMatchObject({ place_id: null, time_slot_start: null, time_slot_end: null })
+
+    const edited = await editDream(server, member.cookie, offered.id, SLOT)
+    expect(edited.statusCode).toBe(200)
+    expect(edited.json().session).toMatchObject({
+      place_id: null,
+      time_slot_start: null,
+      time_slot_end: null,
+    })
   })
 
   it('treats an empty edit as a read rather than a 500', async () => {

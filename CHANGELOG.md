@@ -7,6 +7,13 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-22
+
+- **Taking a dream out of the schedule clears its time as well as its place.** Choosing
+  "Nowhere yet" left the time on the dream, so subscribed calendars kept showing it for
+  weeks after it left the grid. The times now empty with the place, and stay shut in the
+  panel until a place is chosen; a dream already in that state has had its time cleared.
+
 # 2026-09-20
 
 - **A journey on the rideshare board is something people can talk about.** Posting one now
