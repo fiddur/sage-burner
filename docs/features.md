@@ -84,6 +84,11 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   waiting-list movements notify the people they happen to.
 - Admins record payment; a paid member who cannot come hands their place (and
   payment) to somebody unpaid.
+- The roster counts who has signed up against the cap and how many have paid. A
+  member whose place is not paid for sees a strip on every page pointing at the
+  payment instructions, which they can hide for a day.
+- Admins can remind everybody who has not paid, with a subject and message of
+  their own: a notification and an email that no setting turns off.
 - Lodging and helping-out are per-burn lists with optional capacities — a full
   lodging option refuses politely, helping never runs out.
 - The rideshare board: who needs a lift, who has room, per burn, contact

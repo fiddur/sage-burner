@@ -549,7 +549,7 @@ next, and a member watching the page sees it move with nothing having changed.
 notification asked "is there a place nobody has paid for?" (`member_cap - paid`) while the roster
 asked "who is inside the cap?" (`withPlaces`, paid first and then by joining) — so on a burn with a
 cap of one and a single unpaid member, the bell said _1 place left, and it goes to whoever pays_
-while the page said _1 of 1 places taken_ and put that very member in it. Told to go and win a place
+while the page said the one place was taken and put that very member in it. Told to go and win a place
 they were already holding.
 
 `placesIn(entries, cap)` is now the one answer, and both surfaces read it: a place is **taken by
@@ -629,6 +629,24 @@ and returns early, in one place rather than at each caller: the member join rout
 `openEventNow`, but the admin-add and payment callers do not, so bookkeeping on last year's burn
 posted "…is full, you are on the waiting list until one is handed over" about a gathering that was
 over.
+
+### Reminding the unpaid
+
+The roster's count says **signed up** and **paid** rather than _places taken_: `placesIn` answers
+both, `paid` counting every entry whose payment is recorded, placed or not.
+
+A member whose attendance on the selected burn is unpaid sees `PaymentDue` above every page but
+the members page itself, which carries the instructions it points at. **Hide for today** writes the
+time to `localStorage` under `sage-burner:payment-due-hidden`; the strip is hidden while that is
+under a day old, and a stamp ahead of the clock or one that does not parse hides nothing. It is a
+per-device convenience and nothing else — the fee is still owed.
+
+`POST /api/admin/events/:eventId/payment-reminder` is the organisers' own nudge: a subject and a
+message, sent to every attendance on that burn whose payment is not recorded, **waiting list
+included**, minus the admin sending it. It refuses a burn that has ended, as `openEventNow` does
+everywhere. The subject is the bell's line and the email's subject; the email carries the message
+and a link to the members page. It is the `payment_reminder` category, which **no switch reaches**
+— see [accounts.md](./accounts.md#the-email-column).
 
 ## Handing a place over
 

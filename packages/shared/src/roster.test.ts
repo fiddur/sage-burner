@@ -67,7 +67,7 @@ describe('withPlaces', () => {
 
 describe('placesIn', () => {
   it('counts a place taken by whoever holds it, paid or not', () => {
-    expect(placesIn([at('1st')], 1)).toEqual({ taken: 1, left: 0, waiting: 0 })
+    expect(placesIn([at('1st')], 1)).toEqual({ taken: 1, left: 0, waiting: 0, paid: 0 })
   })
 
   it('agrees with withPlaces about who is not waiting, which is the whole point', () => {
@@ -82,14 +82,18 @@ describe('placesIn', () => {
   })
 
   it('leaves the places nobody is standing in', () => {
-    expect(placesIn([at('1st')], 4)).toEqual({ taken: 1, left: 3, waiting: 0 })
+    expect(placesIn([at('1st')], 4)).toEqual({ taken: 1, left: 3, waiting: 0, paid: 0 })
   })
 
   it('never reports a negative remainder on an over-subscribed burn', () => {
-    expect(placesIn([at('1st'), at('2nd'), at('3rd')], 1)).toEqual({ taken: 1, left: 0, waiting: 2 })
+    expect(placesIn([at('1st'), at('2nd'), at('3rd')], 1)).toEqual({ taken: 1, left: 0, waiting: 2, paid: 0 })
+  })
+
+  it('counts everybody who has paid, placed or not', () => {
+    expect(placesIn([at('1st', 'paid'), at('2nd', 'paid'), at('3rd')], 1).paid).toBe(2)
   })
 
   it('holds an empty burn open', () => {
-    expect(placesIn([], 42)).toEqual({ taken: 0, left: 42, waiting: 0 })
+    expect(placesIn([], 42)).toEqual({ taken: 0, left: 42, waiting: 0, paid: 0 })
   })
 })

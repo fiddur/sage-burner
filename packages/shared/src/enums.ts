@@ -131,11 +131,12 @@ export const notificationCategories = [
   'new_version',
   'application',
   'application_news',
+  'payment_reminder',
 ] as const
 export type NotificationCategory = (typeof notificationCategories)[number]
 
 export interface NotificationCategoryInfo {
-  about: 'admin' | 'app' | 'else' | 'you'
+  about: 'admin' | 'app' | 'else' | 'organisers' | 'you'
   label: string
   on: boolean
   email: boolean
@@ -258,6 +259,12 @@ export const notificationCategoryInfo = {
   new_version: { label: 'A new version of the app is out', on: false, email: false, about: 'app' },
   application: { label: 'Somebody applies to join', on: true, email: false, about: 'admin' },
   application_news: { label: 'News about your application', on: true, email: true, about: 'you' },
+  payment_reminder: {
+    label: 'A reminder from the organisers to pay',
+    on: true,
+    email: true,
+    about: 'organisers',
+  },
 } as const satisfies Record<NotificationCategory, NotificationCategoryInfo>
 
 export const notifiesByDefault = (category: NotificationCategory): boolean =>
@@ -265,6 +272,9 @@ export const notifiesByDefault = (category: NotificationCategory): boolean =>
 
 export const emailsByDefault = (category: NotificationCategory): boolean =>
   notificationCategoryInfo[category].email
+
+export const sentRegardless = (category: NotificationCategory): boolean =>
+  notificationCategoryInfo[category].about === 'organisers'
 
 export const notificationSections = [
   { about: 'you', heading: 'What happens to you' },

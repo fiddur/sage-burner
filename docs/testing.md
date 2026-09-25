@@ -204,7 +204,7 @@ phone" means 360px.
       one or on the waiting list. The notification opens that burn's roster, and a
       second payment does not say "full" again.
 - [ ] On a burn with a cap of one and a single unpaid member, read that member's bell against the
-      roster: the page says "1 of 1 places taken" with them in it, and the bell says they are in
+      roster: the page says "1 of 1 members signed up, 0 paid" with them in it, and the bell says they are in
       one for now — not that there is a place left to go and win (#726).
 - [ ] A paid member transfers their place to an unpaid one: the payment moves,
       the giver's stay is deleted, the taker is notified.
@@ -217,6 +217,19 @@ phone" means 360px.
       says otherwise (#726).
 - [ ] Do either of those on a burn whose dates have passed: nothing is posted to anybody's
       bell about its waiting list.
+- [ ] The members page and ⚙️ → Roster both say how many are signed up against the cap and how
+      many of them have paid — "26 of 42 members signed up, 8 paid." — and add ", 3 waiting"
+      only where somebody is past the cap.
+- [ ] As a member whose place is not paid for, every page but the members page carries a strip
+      saying the fee needs paying, linking to the members page. **Hide for today** takes it away
+      on this device, and it stays away on a reload; set the device clock a day on (or clear
+      `sage-burner:payment-due-hidden` from local storage) and it is back. Once the payment is
+      recorded it does not appear at all.
+- [ ] ⚙️ → Roster → **Remind those who have not paid**: the subject and message come prefilled
+      and can be edited. Sending says how many it reached — every unpaid attendee, the waiting
+      list included, never the admin who sent it. Each gets a bell row with the subject that
+      opens the members page, and, with SMTP set up, an email with the message and a button to
+      the members page — even one who has switched every email off.
 - [ ] ⚙️ → Events, on a burn whose dates have passed: **Meal times** lists the times with no
       clock, no bin, no add row and no **Fill the days in**, and says the burn has ended. On an
       open burn the whole editor is there.

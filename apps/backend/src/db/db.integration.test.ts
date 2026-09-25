@@ -156,6 +156,31 @@ describe('migrations', () => {
     }
   })
 
+  it('takes an organisers’ payment reminder in the bell and in a stored setting', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          'insert into notification (id, account_id, category, body, created_at) values (?, ?, ?, ?, ?)',
+        )
+        .run('n-1', ids.account, 'payment_reminder', 'Your place is not paid for yet', NOW),
+    ).not.toThrow()
+    expect(() =>
+      handle.client
+        .prepare('insert into notification_setting (account_id, category, enabled) values (?, ?, ?)')
+        .run(ids.account, 'payment_reminder', 0),
+    ).not.toThrow()
+  })
+
+  it('still refuses a category nobody has heard of', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          'insert into notification (id, account_id, category, body, created_at) values (?, ?, ?, ?, ?)',
+        )
+        .run('n-1', ids.account, 'payment_nag', 'Pay up', NOW),
+    ).toThrow()
+  })
+
   it('leaves each rebuilt table with the indexes it has now, not the ones it once had', () => {
     const indexes = (table: string): string[] =>
       handle.client

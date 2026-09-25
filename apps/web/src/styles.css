@@ -2711,8 +2711,12 @@ img.avatar {
   flex-wrap: wrap;
 }
 
-/* The app has been redeployed under this tab. Not dismissible — see the component. */
-.new-version {
+/*
+  The app has been redeployed under this tab, or the viewer's place is not paid for: ember, because
+  both are something wrong rather than an offer. The version strip is not dismissible — see the component.
+*/
+.new-version,
+.payment-due {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

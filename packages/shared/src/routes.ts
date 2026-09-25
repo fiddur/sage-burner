@@ -69,6 +69,7 @@ import type {
   PasskeyRegistration,
   PasswordReset,
   PasswordResetRequest,
+  PaymentReminder,
   PaymentUpdate,
   PlaceCreate,
   PlaceOrder,
@@ -265,6 +266,11 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/admin/events/:eventId/roster',
     path: (eventId: string) => `/api/admin/events/${encodeURIComponent(eventId)}/roster`,
+  },
+  remindUnpaid: {
+    method: 'POST',
+    fastify: '/api/admin/events/:eventId/payment-reminder',
+    path: (eventId: string) => `/api/admin/events/${encodeURIComponent(eventId)}/payment-reminder`,
   },
   approveApplication: {
     method: 'POST',
@@ -1432,6 +1438,7 @@ export interface RouteBodies {
   addSongCategory: SongCategoryCreateInput
   updateSongCategory: SongCategoryUpdate
   reorderSongCategories: SongCategoryOrder
+  remindUnpaid: PaymentReminder
 }
 
 export type BodyOf<K extends keyof RouteBodies> = RouteBodies[K]

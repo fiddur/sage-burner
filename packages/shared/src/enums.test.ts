@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   accountRoles,
   applicationStatuses,
+  categoriesAbout,
   connectionHref,
   connectionKindInfo,
   connectionKinds,
@@ -29,10 +30,12 @@ import {
   isPlaceColor,
   isStockLevel,
   notificationCategories,
+  notificationSections,
   pantryKindLabel,
   pantryKinds,
   paymentStatuses,
   placeColors,
+  sentRegardless,
   stockLevels,
   threadEntityTypes,
 } from './enums.ts'
@@ -404,8 +407,22 @@ describe('which categories are emailed before anybody has said anything', () => 
     expect(emailsByDefault('application_news')).toBe(true)
   })
 
-  it('emails nothing else, so an upgrade never starts posting to somebody’s inbox', () => {
-    expect(notificationCategories.filter(emailsByDefault)).toEqual(['application_news'])
+  it('emails nothing else a switch reaches, so an upgrade never starts posting to somebody’s inbox', () => {
+    expect(notificationCategories.filter((one) => !sentRegardless(one)).filter(emailsByDefault)).toEqual([
+      'application_news',
+    ])
+  })
+})
+
+describe('the one category no switch reaches', () => {
+  it('is the organisers’ reminder to pay', () => {
+    expect(notificationCategories.filter(sentRegardless)).toEqual(['payment_reminder'])
+  })
+
+  it('lists under no section, so the settings page never offers a switch for it', () => {
+    for (const section of notificationSections) {
+      expect(categoriesAbout(section.about)).not.toContain('payment_reminder')
+    }
   })
 })
 

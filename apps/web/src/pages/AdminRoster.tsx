@@ -1,5 +1,6 @@
 import type { RosterEntry } from '@sage-burner/shared'
 
+import { MAX_REMINDER_BODY, MAX_REMINDER_SUBJECT } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 import { useState } from 'preact/hooks'
 
@@ -8,17 +9,19 @@ import type { ApiClient } from '../api/client.ts'
 import { allergiesOf } from '../allergies.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { PersonCell } from '../components/PersonCell.tsx'
 import { PlacesTaken } from '../components/PlacesTaken.tsx'
 import { Table } from '../components/Table.tsx'
 import { startsTheWaitingList, WaitingListLine } from '../components/WaitingListLine.tsx'
 import { toCsv } from '../csv.ts'
 import { useAction, useLoad } from '../load.ts'
+import { rowsFor } from '../textarea.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type RosterApi = Pick<
   ApiClient,
-  'getActiveRoster' | 'setPayment' | 'getAdminAccounts' | 'adminAddAttendance'
+  'getActiveRoster' | 'setPayment' | 'getAdminAccounts' | 'adminAddAttendance' | 'remindUnpaid'
 >
 
 const COLUMNS = [
@@ -160,6 +163,12 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
               </tbody>
             </Table>
           )}
+
+          <RemindUnpaid
+            api={api}
+            event={roster.event}
+            unpaid={roster.entries.filter((entry) => entry.payment_status !== 'paid').length}
+          />
         </>
       )}
     </GuardedPage>
@@ -238,5 +247,84 @@ const AddToBurn = ({
         </p>
       )}
     </div>
+  )
+}
+
+export const REMINDER_BODY =
+  'To secure your spot, your membership fee needs to be paid. See the members page for instructions.'
+
+const RemindUnpaid = ({
+  api,
+  event,
+  unpaid,
+}: {
+  api: RosterApi
+  event: { id: string; name: string }
+  unpaid: number
+}) => {
+  const [subject, setSubject] = useState(`Your place at ${event.name} is not paid for yet`)
+  const [body, setBody] = useState(REMINDER_BODY)
+  const [sent, setSent] = useState<number | undefined>(undefined)
+  const { busy, error, run } = useAction()
+
+  const send = () => {
+    setSent(undefined)
+    run(async () => {
+      const { told } = await api.remindUnpaid(event.id, { subject, body })
+      setSent(told)
+    }, 'Could not send the reminder. Please try again.')
+  }
+
+  return (
+    <section>
+      <h3>Remind those who have not paid</h3>
+      <p class="form-note">
+        {unpaid === 1 ? '1 has not paid yet.' : `${unpaid} have not paid yet.`} They are told in the app, and
+        by email where a mail server is set up, whatever their notification settings say.
+      </p>
+
+      <ErrorText message={error} />
+
+      <form
+        onSubmit={(submitted) => {
+          submitted.preventDefault()
+          send()
+        }}
+      >
+        <label class="field">
+          <span>Subject</span>
+          <input
+            type="text"
+            maxLength={MAX_REMINDER_SUBJECT}
+            value={subject}
+            onInput={(typed) => setSubject(typed.currentTarget.value)}
+          />
+        </label>
+
+        <label class="field">
+          <span>Message</span>
+          <textarea
+            maxLength={MAX_REMINDER_BODY}
+            rows={rowsFor(body)}
+            value={body}
+            onInput={(typed) => setBody(typed.currentTarget.value)}
+          />
+        </label>
+
+        <PendingButton
+          type="submit"
+          busy={busy}
+          label="Send the reminder"
+          busyLabel="Sending…"
+          disabled={unpaid === 0 || subject.trim() === '' || body.trim() === ''}
+        />
+      </form>
+
+      {sent !== undefined && (
+        <p class="form-note" role="status">
+          Sent to {sent}.
+        </p>
+      )}
+    </section>
   )
 }

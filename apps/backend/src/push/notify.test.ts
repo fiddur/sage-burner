@@ -119,6 +119,37 @@ describe('what an account that has said nothing is due', () => {
   })
 })
 
+describe('the organisers’ reminder to pay, which no switch reaches', () => {
+  it('rings the bell and posts the mail even for somebody who switched both off', async () => {
+    build()
+    const accountId = await givenSilent()
+    await db()
+      .insert(notificationSetting)
+      .values({ account_id: accountId, category: 'payment_reminder', enabled: false, email: false })
+
+    expect(await wants(db(), accountId, 'payment_reminder')).toEqual({ bell: true, email: true })
+  })
+
+  it('still honours a stored off for a category somebody can switch', async () => {
+    build()
+    const accountId = await givenSilent()
+    await db()
+      .insert(notificationSetting)
+      .values({ account_id: accountId, category: 'payment', enabled: false, email: false })
+
+    expect(await wants(db(), accountId, 'payment')).toEqual({ bell: false, email: false })
+  })
+
+  it('is left out of the settings, having no switch to show', async () => {
+    build()
+    const accountId = await givenSilent()
+    const settings = await switchedOn(db(), accountId)
+
+    expect(settings.on).not.toContain('payment_reminder')
+    expect(settings.email).not.toContain('payment_reminder')
+  })
+})
+
 describe('telling everybody coming to a burn', () => {
   it('does not make the request wait on one mail server wait per person', async () => {
     const deps = build()

@@ -20,10 +20,16 @@ export interface Places {
   taken: number
   left: number
   waiting: number
+  paid: number
 }
 
-export const placesIn = (entries: readonly unknown[], cap: number): Places => {
+export const placesIn = (entries: readonly Pick<Placeable, 'payment_status'>[], cap: number): Places => {
   const taken = Math.min(entries.length, Math.max(0, cap))
 
-  return { taken, left: Math.max(0, cap - taken), waiting: entries.length - taken }
+  return {
+    taken,
+    left: Math.max(0, cap - taken),
+    waiting: entries.length - taken,
+    paid: entries.filter((entry) => entry.payment_status === 'paid').length,
+  }
 }

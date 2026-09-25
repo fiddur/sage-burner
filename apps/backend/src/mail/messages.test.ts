@@ -6,6 +6,7 @@ import {
   digestMessage,
   inviteMessage,
   notificationMessage,
+  paymentReminderMessage,
   replyMessage,
   resetMessage,
   testMessage,
@@ -126,6 +127,47 @@ describe('a notification', () => {
     })
 
     expect(message.text).not.toContain('http')
+  })
+})
+
+describe('the organisers’ reminder to pay', () => {
+  const reminder = (over: { body?: string; link?: string | undefined } = {}) =>
+    paymentReminderMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      name: 'Ada',
+      subject: 'Your place at Summer burn is not paid for yet',
+      body: 'Please pay.',
+      link: 'https://burn.example.org/members?burn=e-1',
+      ...over,
+    })
+
+  it('is headed by the subject the organisers wrote, as it stands', () => {
+    expect(reminder().subject).toBe('Your place at Summer burn is not paid for yet')
+  })
+
+  it('greets the reader and says what the organisers wrote, a paragraph per blank line', () => {
+    const message = reminder({ body: 'First paragraph.\n\nSecond paragraph.' })
+
+    expect(message.text).toContain('Hello Ada,')
+    expect(message.html).toContain('>First paragraph.</p>')
+    expect(message.html).toContain('>Second paragraph.</p>')
+  })
+
+  it('links to the members page, where the instructions are', () => {
+    expect(reminder().text).toContain('https://burn.example.org/members?burn=e-1')
+    expect(reminder().html).toContain('>See how to pay</a>')
+  })
+
+  it('leaves out the link rather than writing a relative one', () => {
+    expect(reminder({ link: undefined }).text).not.toContain('http')
+  })
+
+  it('says who sent it and why, and offers no switch it does not have', () => {
+    const message = reminder()
+
+    expect(message.text).toContain('Sent by the organisers of The Burning Sage')
+    expect(message.text).not.toContain('Your details → Notifications')
   })
 })
 

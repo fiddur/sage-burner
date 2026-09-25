@@ -89,3 +89,7 @@ export const MAX_UNIT = 20
 export const MAX_SPOT = 100
 
 export const MAX_PANTRY_NOTE = 500
+
+export const MAX_REMINDER_SUBJECT = 150
+
+export const MAX_REMINDER_BODY = 5000

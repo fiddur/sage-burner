@@ -69,6 +69,7 @@ import type {
   PantryPlace,
   PantryPlacesResponse,
   PasskeysResponse,
+  PaymentReminderResponse,
   PersonProfileResponse,
   PlaceOrder,
   PlaceResponse,
@@ -1302,6 +1303,12 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     setPayment: (eventId: string, accountId: string, body: BodyOf<'setPayment'>) =>
       request<AttendanceResponse>(apiRoutes.setPayment.path(eventId, accountId), {
         method: apiRoutes.setPayment.method,
+        body,
+      }),
+
+    remindUnpaid: (eventId: string, body: BodyOf<'remindUnpaid'>) =>
+      request<PaymentReminderResponse>(apiRoutes.remindUnpaid.path(eventId), {
+        method: apiRoutes.remindUnpaid.method,
         body,
       }),
 

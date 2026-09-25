@@ -1405,6 +1405,14 @@ already means "has not said", so nobody's stored choices are touched and the def
 on its own. Somebody who has been to the settings page has a stored row for every category and
 keeps whatever it says.
 
+**`payment_reminder` is the one category no switch reaches**, bell or email. It is only ever sent
+by an admin's hand, from ⚙️ → Roster, to the attendees of a burn whose payment is not recorded —
+the organisers need to reach exactly the people who are not opening the app, and a reminder
+somebody can switch off is one the people it is for switch off. `sentRegardless` marks it through
+its `about: 'organisers'`, which no section of the settings page lists, so no switch is drawn;
+`wants` answers both channels on without reading a stored row, and `switchedOn` leaves it out of
+what the settings read answers. The email still goes only where SMTP is configured.
+
 **One event, one bell row, at most one email** (#741). Every mail about an application now goes
 through this channel rather than beside it, and the switch above decides _whether_ one goes while
 the event decides what it _says_. `Told` may carry a `letter` — a function of

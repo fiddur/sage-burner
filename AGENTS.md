@@ -271,6 +271,9 @@ These are member records, so treat them as such:
   carries the complete `{ on: [...] }` rather than a delta. **Attendance is the whole
   audience** for the burn-wide ones: somebody who has not said they are coming hears
   nothing about that burn, whatever their switches say.
+  **`payment_reminder` is the one category no switch reaches**, bell or email: it is sent
+  only by an admin's hand, to the unpaid attendees of a burn, and `sentRegardless` keeps
+  it off the settings page and out of `wants`' stored rows.
 - **Any role somebody else can change tells the person it happened to** (#247). One
   control everywhere several people sign up — 🙋 takes the spot, 👉 appoints somebody
   else, ✕ takes them off — and every route behind it notifies, on being _given_ a job
@@ -354,7 +357,9 @@ These are member records, so treat them as such:
   do anything reads as a promise. The one exception is `application_news` (#739), because
   an applicant has no browser registered for push and no habit of opening the app, so a
   reply on their application reached nobody at all; the default sits in
-  `notificationCategoryInfo` beside `on`, so the next category has to decide both.
+  `notificationCategoryInfo` beside `on`, so the next category has to decide both. The
+  organisers' `payment_reminder` is emailed too, but it is not a default: no switch
+  reaches it at all.
 - **One event, one bell row, at most one email** (#741). A `Told` may carry a `letter`, and
   `emailChannel` posts that in place of the one-line copy — so the switch decides _whether_ a
   mail goes and the event decides what it _says_, through one code path that checks the mail
