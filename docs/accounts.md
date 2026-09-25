@@ -1408,8 +1408,9 @@ keeps whatever it says.
 **`payment_reminder` is the one category no switch reaches**, bell or email. It is only ever sent
 by an admin's hand, from ⚙️ → Roster, to the attendees of a burn whose payment is not recorded —
 the organisers need to reach exactly the people who are not opening the app, and a reminder
-somebody can switch off is one the people it is for switch off. `sentRegardless` marks it through
-its `about: 'organisers'`, which no section of the settings page lists, so no switch is drawn;
+somebody can switch off is one the people it is for switch off. `sentRegardless` reads its
+`unswitchable` flag in `notificationCategoryInfo`, `categoriesAbout` leaves it out of every
+section, so no switch is drawn;
 `wants` answers both channels on without reading a stored row, and `switchedOn` leaves it out of
 what the settings read answers. The email still goes only where SMTP is configured.
 

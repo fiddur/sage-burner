@@ -167,7 +167,11 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
           <RemindUnpaid
             api={api}
             event={roster.event}
-            unpaid={roster.entries.filter((entry) => entry.payment_status !== 'paid').length}
+            unpaid={
+              roster.entries.filter(
+                (entry) => entry.payment_status !== 'paid' && entry.account_id !== viewer.account?.id,
+              ).length
+            }
           />
         </>
       )}
@@ -250,7 +254,7 @@ const AddToBurn = ({
   )
 }
 
-export const REMINDER_BODY =
+const REMINDER_BODY =
   'To secure your spot, your membership fee needs to be paid. See the members page for instructions.'
 
 const RemindUnpaid = ({

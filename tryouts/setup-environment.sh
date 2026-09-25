@@ -49,7 +49,7 @@ as_root env PUPPETEER_CACHE_DIR="${PUPPETEER_CACHE_DIR}" PATH="${PATH}" \
   npx puppeteer browsers install chrome --install-deps
 as_root chown -R "$(id -u):$(id -g)" "${TRYOUT_HOME}"
 
-CHROME="$(node -e 'process.stdout.write(require("puppeteer").executablePath())')"
+CHROME="$(node -e 'Promise.resolve(require("puppeteer").executablePath()).then((found) => process.stdout.write(found))')"
 [ -x "${CHROME}" ] || {
   echo "❌ puppeteer reports ${CHROME}, which is not executable" >&2
   exit 1
