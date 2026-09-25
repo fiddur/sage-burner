@@ -1,6 +1,11 @@
 import type { NotificationSettings } from '@sage-burner/shared'
 
-import { categoriesAbout, notificationCategories, notificationCategoryInfo } from '@sage-burner/shared'
+import {
+  categoriesAbout,
+  notificationCategories,
+  notificationCategoryInfo,
+  sentRegardless,
+} from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -65,13 +70,15 @@ describe('what to be told about', () => {
     expect(screen.queryByText('What you look after')).toBeNull()
   })
 
-  it('has a switch for every category a member is ever told about, once the sections are open', async () => {
+  it('has a switch for every category a member can switch, once the sections are open', async () => {
     render(<NotificationSettingsField api={stub()} />)
 
     await open('What happens to you')
     await open('What others are doing')
 
-    for (const category of notificationCategories.filter((one) => !categoriesAbout('admin').includes(one))) {
+    for (const category of notificationCategories.filter(
+      (one) => !categoriesAbout('admin').includes(one) && !sentRegardless(one),
+    )) {
       expect(screen.getByLabelText(`${notificationCategoryInfo[category].label} — Here`)).toBeTruthy()
     }
     expect(screen.queryByLabelText('Somebody applies to join — Here')).toBeNull()

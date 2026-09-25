@@ -1,0 +1,35 @@
+PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE `__new_notification` (
+	`id` text PRIMARY KEY NOT NULL,
+	`account_id` text NOT NULL,
+	`category` text NOT NULL,
+	`body` text NOT NULL,
+	`link` text,
+	`created_at` text NOT NULL,
+	`seen_at` text,
+	CONSTRAINT `fk_notification_account_id_account_id_fk` FOREIGN KEY (`account_id`) REFERENCES `account`(`id`) ON DELETE CASCADE,
+	CONSTRAINT "notification_category_check" CHECK("category" in ('meal_role', 'dream_role', 'lead_role', 'payment', 'waiting_list_near', 'waiting_list_pushed', 'dream_offered', 'dream_comment', 'dream_comment_any', 'member_joined', 'introduction_written', 'introduction_comment', 'introduction_comment_any', 'post_written', 'post_comment', 'post_comment_any', 'song_added', 'song_comment', 'song_comment_any', 'bring_added', 'bring_answered', 'bring_role', 'bring_comment', 'bring_comment_any', 'ride_posted', 'ride_comment', 'ride_comment_any', 'point_raised', 'point_decided', 'point_comment', 'point_comment_any', 'meeting_scheduled', 'meeting_comment', 'meeting_comment_any', 'mentioned', 'lead_role_added', 'lead_role_filled', 'lead_role_comment', 'lead_role_comment_any', 'meal_taken', 'meal_comment', 'meal_comment_any', 'hearted', 'new_version', 'application', 'application_news', 'payment_reminder'))
+);
+--> statement-breakpoint
+INSERT INTO `__new_notification` (`id`, `account_id`, `category`, `body`, `link`, `created_at`, `seen_at`)
+SELECT `id`, `account_id`, `category`, `body`, `link`, `created_at`, `seen_at` FROM `notification`;
+--> statement-breakpoint
+DROP TABLE `notification`;--> statement-breakpoint
+ALTER TABLE `__new_notification` RENAME TO `notification`;--> statement-breakpoint
+CREATE INDEX `notification_account_idx` ON `notification` (`account_id`,`created_at`);--> statement-breakpoint
+CREATE TABLE `__new_notification_setting` (
+	`account_id` text NOT NULL,
+	`category` text NOT NULL,
+	`enabled` integer NOT NULL,
+	`email` integer DEFAULT false NOT NULL,
+	CONSTRAINT `notification_setting_pk` PRIMARY KEY(`account_id`, `category`),
+	CONSTRAINT `fk_notification_setting_account_id_account_id_fk` FOREIGN KEY (`account_id`) REFERENCES `account`(`id`) ON DELETE CASCADE,
+	CONSTRAINT "notification_setting_category_check" CHECK("category" in ('meal_role', 'dream_role', 'lead_role', 'payment', 'waiting_list_near', 'waiting_list_pushed', 'dream_offered', 'dream_comment', 'dream_comment_any', 'member_joined', 'introduction_written', 'introduction_comment', 'introduction_comment_any', 'post_written', 'post_comment', 'post_comment_any', 'song_added', 'song_comment', 'song_comment_any', 'bring_added', 'bring_answered', 'bring_role', 'bring_comment', 'bring_comment_any', 'ride_posted', 'ride_comment', 'ride_comment_any', 'point_raised', 'point_decided', 'point_comment', 'point_comment_any', 'meeting_scheduled', 'meeting_comment', 'meeting_comment_any', 'mentioned', 'lead_role_added', 'lead_role_filled', 'lead_role_comment', 'lead_role_comment_any', 'meal_taken', 'meal_comment', 'meal_comment_any', 'hearted', 'new_version', 'application', 'application_news', 'payment_reminder'))
+);
+--> statement-breakpoint
+INSERT INTO `__new_notification_setting` (`account_id`, `category`, `enabled`, `email`)
+SELECT `account_id`, `category`, `enabled`, `email` FROM `notification_setting`;
+--> statement-breakpoint
+DROP TABLE `notification_setting`;--> statement-breakpoint
+ALTER TABLE `__new_notification_setting` RENAME TO `notification_setting`;--> statement-breakpoint
+PRAGMA foreign_keys=ON;

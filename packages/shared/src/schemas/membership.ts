@@ -1,7 +1,15 @@
 import { z } from 'zod'
 
 import { paymentStatuses } from '../enums.ts'
-import { MAX_CONTACT, MAX_INTRODUCTION, MAX_NOTES, MAX_OPTION_LABEL, MAX_PERSON_NAME } from '../limits.ts'
+import {
+  MAX_CONTACT,
+  MAX_INTRODUCTION,
+  MAX_NOTES,
+  MAX_OPTION_LABEL,
+  MAX_PERSON_NAME,
+  MAX_REMINDER_BODY,
+  MAX_REMINDER_SUBJECT,
+} from '../limits.ts'
 import { emailSchema } from './auth.ts'
 import { dateSchema, dateTimeSchema, idSchema, nonEmptyText, optionalText } from './common.ts'
 import { eventFields } from './event.ts'
@@ -156,6 +164,15 @@ export const paymentUpdateSchema = z
   .strict()
 
 export const placeTransferSchema = z.object({ to_account_id: idSchema }).strict()
+
+export const paymentReminderSchema = z
+  .object({ subject: nonEmptyText(MAX_REMINDER_SUBJECT), body: nonEmptyText(MAX_REMINDER_BODY) })
+  .strict()
+
+export const paymentReminderResponseSchema = z.object({ told: z.number().int().nonnegative() })
+
+export type PaymentReminder = z.infer<typeof paymentReminderSchema>
+export type PaymentReminderResponse = z.infer<typeof paymentReminderResponseSchema>
 
 export type PlaceTransfer = z.infer<typeof placeTransferSchema>
 

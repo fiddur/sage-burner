@@ -22,6 +22,7 @@ import { FetchedBurnProvider } from './burn.tsx'
 import { InstallApp } from './components/InstallApp.tsx'
 import { Layout } from './components/Layout.tsx'
 import { NewVersion } from './components/NewVersion.tsx'
+import { PaymentDue } from './components/PaymentDue.tsx'
 import { PushNudge } from './components/PushNudge.tsx'
 import { RouteOnMessage } from './components/RouteOnMessage.tsx'
 import { StaleData } from './components/StaleData.tsx'
@@ -176,6 +177,7 @@ export type RoutesApi = Pick<
   | 'transferMyPlace'
   | 'getActiveRoster'
   | 'adminAddAttendance'
+  | 'remindUnpaid'
   | 'getMembers'
   | 'setPayment'
   | 'getPlaces'
@@ -447,6 +449,7 @@ export const App = ({
         <Layout api={client}>
           <NewVersion api={client} />
           <InstallApp watch={installs} />
+          <PaymentDue />
           <StaleData freshness={freshness} />
           <Routes api={client} />
           <PushNudge api={client} />

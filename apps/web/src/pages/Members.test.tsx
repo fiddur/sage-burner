@@ -122,7 +122,7 @@ describe('Members', () => {
     expect(rows[1]).toContain('not yet')
   })
 
-  it('marks who is waiting and counts the places taken', async () => {
+  it('marks who is waiting and counts the members signed up', async () => {
     renderPage(
       stub(
         aRoster({
@@ -138,13 +138,13 @@ describe('Members', () => {
       ),
     )
 
-    expect(await screen.findByText(/1 of 1 places taken, 1 waiting/)).toBeTruthy()
+    expect(await screen.findByText(/1 of 1 members signed up, 0 paid, 1 waiting\./)).toBeTruthy()
   })
 
   it('says nothing of a waiting list where nobody is on one', async () => {
     renderPage(stub(aRoster({ entries: [anEntry({ name: 'In' })] })))
 
-    expect(await screen.findByText(/1 of 2 places taken\./)).toBeTruthy()
+    expect(await screen.findByText(/1 of 2 members signed up, 0 paid\./)).toBeTruthy()
   })
 
   it('shows the face beside the name, which the roster now carries', async () => {

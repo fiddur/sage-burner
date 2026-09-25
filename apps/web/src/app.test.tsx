@@ -128,6 +128,7 @@ const clientWith = (
   getMyPasskeys: () => Promise.reject(new Error('getMyPasskeys is not stubbed in this file')),
   removePasskey: () => Promise.reject(new Error('removePasskey is not stubbed in this file')),
   adminAddAttendance: () => Promise.reject(new Error('adminAddAttendance is not stubbed in this file')),
+  remindUnpaid: () => Promise.reject(new Error('remindUnpaid is not stubbed in this file')),
   getVersion: () => Promise.resolve({ build_sha: 'the-one-this-page-loaded' }),
   getChangelog: () => Promise.resolve({ markdown: '## 2026-08-07\n\n- Something changed.\n' }),
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),

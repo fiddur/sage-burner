@@ -188,6 +188,42 @@ export const notificationMessage = ({
     ],
   })
 
+const paragraphsOf = (text: string): Block[] =>
+  text
+    .split(/\n\s*\n/u)
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+    .map((paragraph) => ({ paragraph }))
+
+export const paymentReminderMessage = ({
+  installation,
+  to,
+  name,
+  subject,
+  body,
+  link,
+}: {
+  installation: string
+  to: string
+  name: string | null
+  subject: string
+  body: string
+  link: string | undefined
+}): Message =>
+  written({
+    installation,
+    to,
+    subject,
+    blocks: [
+      greeting(name),
+      ...paragraphsOf(body),
+      ...action(link, 'See how to pay'),
+      {
+        note: `Sent by the organisers of ${installation} to everybody whose payment is not recorded yet.`,
+      },
+    ],
+  })
+
 const countOf = (sections: readonly { total: number }[]): number =>
   sections.reduce((sofar, section) => sofar + section.total, 0)
 

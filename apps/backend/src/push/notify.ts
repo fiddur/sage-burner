@@ -7,6 +7,7 @@ import {
   mentionsEverybody,
   notificationCategories,
   notifiesByDefault,
+  sentRegardless,
 } from '@sage-burner/shared'
 import { and, count, desc, eq, inArray, isNull, lt, lte, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
@@ -116,6 +117,8 @@ export const wants = async (
   accountId: string,
   category: NotificationCategory,
 ): Promise<Channels> => {
+  if (sentRegardless(category)) return { bell: true, email: true }
+
   const [row] = await db
     .select({ enabled: notificationSetting.enabled, email: notificationSetting.email })
     .from(notificationSetting)
@@ -196,6 +199,7 @@ export const switchedOn = async (
     .where(eq(notificationSetting.account_id, accountId))
 
   const said = new Map(rows.map((row) => [row.category, row]))
+  const switchable = notificationCategories.filter((category) => !sentRegardless(category))
 
   const [who] = await db
     .select({ digest: account.digest })
@@ -204,12 +208,8 @@ export const switchedOn = async (
     .limit(1)
 
   return {
-    on: notificationCategories.filter(
-      (category) => said.get(category)?.enabled ?? notifiesByDefault(category),
-    ),
-    email: notificationCategories.filter(
-      (category) => said.get(category)?.email ?? emailsByDefault(category),
-    ),
+    on: switchable.filter((category) => said.get(category)?.enabled ?? notifiesByDefault(category)),
+    email: switchable.filter((category) => said.get(category)?.email ?? emailsByDefault(category)),
     digest: who?.digest ?? DEFAULT_DIGEST,
   }
 }

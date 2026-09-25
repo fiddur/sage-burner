@@ -72,6 +72,7 @@ import { registerPantryPlaceRoutes } from './routes/pantry-places.ts'
 import { registerPantryRoutes } from './routes/pantry.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPasswordResetRoutes } from './routes/password-reset.ts'
+import { registerPaymentReminderRoutes } from './routes/payment-reminder.ts'
 import { registerPeopleRoutes } from './routes/people.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerPostRoutes } from './routes/posts.ts'
@@ -385,6 +386,7 @@ export const createApp = async ({
   registerPostRoutes(app, { db, sessions, now, notify: tellAccount })
   registerProfileRoutes(app, { db, sessions, now, notify: tellAccount })
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerPaymentReminderRoutes(app, { db, sessions, config, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
   registerFaqRoutes(app, { db, sessions, now })
   registerFeedRoutes(app, { db, sessions })

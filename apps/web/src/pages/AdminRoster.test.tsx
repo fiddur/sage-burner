@@ -8,7 +8,7 @@ import type { RosterApi } from './AdminRoster.tsx'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
-import { AdminRoster } from './AdminRoster.tsx'
+import { AdminRoster, REMINDER_BODY } from './AdminRoster.tsx'
 
 afterEach(cleanup)
 
@@ -49,6 +49,7 @@ const stub = (over: Partial<RosterApi> = {}, roster = aRoster()): RosterApi => (
   setPayment: () => Promise.reject(new Error('setPayment is not stubbed here')),
   getAdminAccounts: () => Promise.resolve({ accounts: [] }),
   adminAddAttendance: () => Promise.reject(new Error('adminAddAttendance is not stubbed here')),
+  remindUnpaid: () => Promise.reject(new Error('remindUnpaid is not stubbed here')),
   ...over,
 })
 
@@ -78,19 +79,20 @@ describe('AdminRoster', () => {
     expect(cells[1]).toContain('First')
   })
 
-  it('counts places taken against the cap', async () => {
+  it('counts members signed up and paid against the cap', async () => {
     renderPage(
       stub(
         {},
         aRoster({
           event: { id: 'e-1', name: 'Summer burn', member_cap: 1 },
-          entries: [anEntry({ name: 'In' }), anEntry({ name: 'Out', waiting: true })],
+          entries: [anEntry({ name: 'In', payment_status: 'paid' }), anEntry({ name: 'Out', waiting: true })],
         }),
       ),
     )
 
-    expect((await screen.findByText(/places taken/)).textContent).toContain('1 of 1 places taken')
-    expect(screen.getByText(/places taken/).textContent).toContain('1 waiting')
+    expect((await screen.findByText(/members signed up/)).textContent).toContain(
+      '1 of 1 members signed up, 1 paid, 1 waiting.',
+    )
   })
 
   it('counts a place taken by somebody who has not paid for it (#726)', async () => {
@@ -104,8 +106,9 @@ describe('AdminRoster', () => {
       ),
     )
 
-    expect((await screen.findByText(/places taken/)).textContent).toContain('1 of 1 places taken.')
-    expect(screen.getByText(/places taken/).textContent).not.toContain('1 waiting')
+    expect((await screen.findByText(/members signed up/)).textContent).toContain(
+      '1 of 1 members signed up, 0 paid.',
+    )
   })
 
   it('marks who is on the waiting list, in their own row', async () => {
@@ -314,5 +317,65 @@ describe('adding somebody to the burn', () => {
 
     expect(await screen.findByText('Ana')).toBeTruthy()
     expect(screen.queryByLabelText('Who to add to this burn')).toBeNull()
+  })
+})
+
+describe('reminding those who have not paid', () => {
+  it('posts the edited subject and message to the burn on screen, and says how many it reached', async () => {
+    const remindUnpaid = vi.fn<RosterApi['remindUnpaid']>(() => Promise.resolve({ told: 2 }))
+    renderPage(
+      stub(
+        { remindUnpaid },
+        aRoster({
+          entries: [
+            anEntry({ name: 'Ana', payment_status: 'paid' }),
+            anEntry({ name: 'Bo' }),
+            anEntry({ name: 'Cy', waiting: true }),
+          ],
+        }),
+      ),
+    )
+
+    expect(await screen.findByText(/2 have not paid yet\./)).toBeTruthy()
+    expect(screen.getByLabelText<HTMLInputElement>('Subject').value).toBe(
+      'Your place at Summer burn is not paid for yet',
+    )
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Message').value).toBe(REMINDER_BODY)
+
+    fireEvent.input(screen.getByLabelText('Subject'), { target: { value: 'Pay up, please' } })
+    fireEvent.input(screen.getByLabelText('Message'), { target: { value: 'The fee is due.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send the reminder' }))
+
+    expect(await screen.findByText('Sent to 2.')).toBeTruthy()
+    expect(remindUnpaid).toHaveBeenCalledWith('e-1', { subject: 'Pay up, please', body: 'The fee is due.' })
+  })
+
+  it('offers nothing to send where everybody has paid', async () => {
+    renderPage(stub({}, aRoster({ entries: [anEntry({ name: 'Ana', payment_status: 'paid' })] })))
+
+    expect(await screen.findByText(/0 have not paid yet\./)).toBeTruthy()
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Send the reminder' }).disabled).toBe(true)
+  })
+
+  it('will not send a blank subject', async () => {
+    renderPage(stub({}, aRoster({ entries: [anEntry({ name: 'Bo' })] })))
+
+    fireEvent.input(await screen.findByLabelText('Subject'), { target: { value: '  ' } })
+
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Send the reminder' }).disabled).toBe(true)
+  })
+
+  it('says so when the reminder could not be sent', async () => {
+    renderPage(
+      stub(
+        { remindUnpaid: () => Promise.reject(new Error('down')) },
+        aRoster({ entries: [anEntry({ name: 'Bo' })] }),
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send the reminder' }))
+
+    expect(await screen.findByText('Could not send the reminder. Please try again.')).toBeTruthy()
+    expect(screen.queryByText(/Sent to/)).toBeNull()
   })
 })

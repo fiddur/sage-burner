@@ -7,6 +7,18 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-25
+
+- **The members page says how many have paid.** The count under the list now reads
+  "26 of 42 members signed up, 8 paid", with the waiting list after it when there is one.
+- **A reminder when your place is not paid for.** Until your payment is recorded, a strip
+  at the top of the app says the membership fee secures your spot and links to the members
+  page, where the instructions are. **Hide for today** puts it away until tomorrow.
+- **Organisers can remind everybody who has not paid.** Under ⚙️ → Roster they write a
+  subject and a message and send it to everyone whose payment is not recorded yet, the
+  waiting list included. It arrives in the bell and by email, and it is the one message the
+  notification settings do not switch off.
+
 # 2026-09-22
 
 - **Taking a dream out of the schedule clears its time as well as its place.** Choosing
