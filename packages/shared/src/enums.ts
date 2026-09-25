@@ -136,10 +136,11 @@ export const notificationCategories = [
 export type NotificationCategory = (typeof notificationCategories)[number]
 
 export interface NotificationCategoryInfo {
-  about: 'admin' | 'app' | 'else' | 'organisers' | 'you'
+  about: 'admin' | 'app' | 'else' | 'you'
   label: string
   on: boolean
   email: boolean
+  unswitchable?: true
 }
 
 export const notificationCategoryInfo = {
@@ -263,7 +264,8 @@ export const notificationCategoryInfo = {
     label: 'A reminder from the organisers to pay',
     on: true,
     email: true,
-    about: 'organisers',
+    about: 'you',
+    unswitchable: true,
   },
 } as const satisfies Record<NotificationCategory, NotificationCategoryInfo>
 
@@ -273,8 +275,11 @@ export const notifiesByDefault = (category: NotificationCategory): boolean =>
 export const emailsByDefault = (category: NotificationCategory): boolean =>
   notificationCategoryInfo[category].email
 
-export const sentRegardless = (category: NotificationCategory): boolean =>
-  notificationCategoryInfo[category].about === 'organisers'
+export const sentRegardless = (category: NotificationCategory): boolean => {
+  const info: NotificationCategoryInfo = notificationCategoryInfo[category]
+
+  return info.unswitchable === true
+}
 
 export const notificationSections = [
   { about: 'you', heading: 'What happens to you' },
@@ -284,7 +289,9 @@ export const notificationSections = [
 ] as const satisfies readonly { about: NotificationCategoryInfo['about']; heading: string }[]
 
 export const categoriesAbout = (about: NotificationCategoryInfo['about']): NotificationCategory[] =>
-  notificationCategories.filter((category) => notificationCategoryInfo[category].about === about)
+  notificationCategories.filter(
+    (category) => notificationCategoryInfo[category].about === about && !sentRegardless(category),
+  )
 
 export const threadEntityTypes = [
   'session',

@@ -8,7 +8,7 @@ import type { RosterApi } from './AdminRoster.tsx'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
-import { AdminRoster, REMINDER_BODY } from './AdminRoster.tsx'
+import { AdminRoster } from './AdminRoster.tsx'
 
 afterEach(cleanup)
 
@@ -340,7 +340,9 @@ describe('reminding those who have not paid', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Subject').value).toBe(
       'Your place at Summer burn is not paid for yet',
     )
-    expect(screen.getByLabelText<HTMLTextAreaElement>('Message').value).toBe(REMINDER_BODY)
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Message').value).toBe(
+      'To secure your spot, your membership fee needs to be paid. See the members page for instructions.',
+    )
 
     fireEvent.input(screen.getByLabelText('Subject'), { target: { value: 'Pay up, please' } })
     fireEvent.input(screen.getByLabelText('Message'), { target: { value: 'The fee is due.' } })
@@ -355,6 +357,14 @@ describe('reminding those who have not paid', () => {
 
     expect(await screen.findByText(/0 have not paid yet\./)).toBeTruthy()
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Send the reminder' }).disabled).toBe(true)
+  })
+
+  it('leaves the admin out of the count, as the reminder does', async () => {
+    renderPage(
+      stub({}, aRoster({ entries: [anEntry({ name: 'Bo' }), anEntry({ name: 'Me', account_id: 'a-1' })] })),
+    )
+
+    expect(await screen.findByText(/1 has not paid yet\./)).toBeTruthy()
   })
 
   it('will not send a blank subject', async () => {

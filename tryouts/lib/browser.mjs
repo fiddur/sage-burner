@@ -24,7 +24,7 @@ const loadPuppeteer = () => {
   return found
 }
 
-const chromePath = (puppeteer) => {
+const chromePath = async (puppeteer) => {
   const asked = process.env.TRYOUT_CHROME
   if (asked !== undefined && asked !== '') return asked
 
@@ -32,7 +32,7 @@ const chromePath = (puppeteer) => {
   const recorded = existsSync(marker) ? readFileSync(marker, 'utf8').trim() : ''
   if (recorded !== '') return recorded
 
-  const bundled = attempt(() => puppeteer.executablePath?.())
+  const bundled = await Promise.resolve(attempt(() => puppeteer.executablePath?.())).catch(() => undefined)
   if (typeof bundled === 'string' && bundled !== '') return bundled
 
   throw new Error('no Chrome to launch — set TRYOUT_CHROME or run tryouts/setup-environment.sh')
@@ -42,7 +42,7 @@ export const launchBrowser = async (options = {}) => {
   const puppeteer = loadPuppeteer()
   const { args = [], ...rest } = options
   return await puppeteer.launch({
-    executablePath: chromePath(puppeteer),
+    executablePath: await chromePath(puppeteer),
     args: [...args, '--no-sandbox'],
     ...rest,
   })
