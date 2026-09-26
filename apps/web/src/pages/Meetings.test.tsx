@@ -1,6 +1,7 @@
-import type { Meeting, MeetingPointEntry } from '@sage-burner/shared'
+import type { MeetingEntry, MeetingPointEntry, Thread } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -47,7 +48,7 @@ const aPoint = (over: Partial<MeetingPointEntry> = {}): MeetingPointEntry => ({
   ...over,
 })
 
-const aMeeting = (over: Partial<Meeting> = {}): Meeting => ({
+const aMeeting = (over: Partial<MeetingEntry> = {}): MeetingEntry => ({
   id: 'm-1',
   event_id: 'e-1',
   author_account_id: 'a-1',
@@ -57,7 +58,40 @@ const aMeeting = (over: Partial<Meeting> = {}): Meeting => ({
   link: null,
   notes: '',
   created_at: '2026-07-02T00:00:00.000Z',
+  thread_id: 't-m',
   ...over,
+})
+
+const aThread = (id: string, said: string): Thread => ({
+  id,
+  event_id: 'e-1',
+  burn: 'Summer burn',
+  entity_type: 'meeting',
+  entity_id: 'm-1',
+  title: 'Planning call',
+  link: null,
+  body: null,
+  gone: false,
+  own: true,
+  entry_count: 1,
+  last_at: '2026-07-03T00:00:00.000Z',
+  entries: [
+    {
+      id: `${id}-c`,
+      kind: 'comment',
+      author: { account_id: 'a-2', name: 'Bo' },
+      body: said,
+      created_at: '2026-07-03T00:00:00.000Z',
+      edited_at: null,
+      supporters: [],
+      support_count: 0,
+      supported_by_me: false,
+    },
+  ],
+  supporters: [],
+  support_count: 0,
+  supported_by_me: false,
+  followed_by_me: false,
 })
 
 const stub = (over: Partial<MeetingsApi> = {}): MeetingsApi => ({
@@ -414,6 +448,110 @@ describe('the meetings page', () => {
     await waitFor(() =>
       expect(decidePoint).toHaveBeenCalledWith('p-1', { decision: null, decided_note: null }),
     )
+  })
+})
+
+describe('what has been said about a meeting', () => {
+  const renderPageAt = (at: string, api: MeetingsApi) => {
+    history.replaceState(null, '', at)
+
+    return render(
+      <LocationProvider>
+        <ViewerProvider viewer={MEMBER}>
+          <BurnProvider value={{ status: 'ready', burns: [MINE], selected: MINE }}>
+            <Meetings api={api} />
+          </BurnProvider>
+        </ViewerProvider>
+      </LocationProvider>,
+    )
+  }
+
+  const saidOn = (threadId: string) => Promise.resolve({ thread: aThread(threadId, `said on ${threadId}`) })
+
+  it('shows under the next meeting on its 💬, and goes again on a second press', async () => {
+    const getThread = vi.fn<MeetingsApi['getThread']>((id) => saidOn(id))
+    renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), getThread }))
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /^Show what has been said about Planning call, / }),
+    )
+
+    expect(await screen.findByText('said on t-m')).toBeTruthy()
+    expect(getThread).toHaveBeenCalledWith('t-m', expect.anything())
+
+    fireEvent.click(screen.getByRole('button', { name: /^Hide what has been said about Planning call, / }))
+
+    await waitFor(() => expect(screen.queryByText('said on t-m')).toBeNull())
+  })
+
+  it('fetches nothing until somebody asks', async () => {
+    const getThread = vi.fn<MeetingsApi['getThread']>((id) => saidOn(id))
+    renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), getThread }))
+
+    await screen.findByRole('button', { name: /^Show what has been said about Planning call, / })
+
+    expect(getThread).not.toHaveBeenCalled()
+  })
+
+  it('shows on a meeting further down the diary too, not only the next one', async () => {
+    const getThread = vi.fn<MeetingsApi['getThread']>((id) => saidOn(id))
+    renderPage(
+      stub({
+        getMeetings: () =>
+          Promise.resolve({
+            meetings: [
+              aMeeting(),
+              aMeeting({
+                id: 'm-2',
+                title: 'Toves meeting',
+                starts_at: '2099-08-25T17:00:00.000Z',
+                thread_id: 't-m2',
+              }),
+            ],
+          }),
+        getThread,
+      }),
+    )
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /^Show what has been said about Toves meeting, / }),
+    )
+
+    const said = await screen.findByText('said on t-m2')
+    expect(said.closest('.meeting-list > li')?.textContent).toContain('Toves meeting')
+    expect(getThread).toHaveBeenCalledWith('t-m2', expect.anything())
+  })
+
+  it('opens the meeting the link points at, without a click', async () => {
+    const getThread = vi.fn<MeetingsApi['getThread']>((id) => saidOn(id))
+    renderPageAt(
+      '/meetings?burn=e-1&meeting=m-1',
+      stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), getThread }),
+    )
+
+    expect(await screen.findByText('said on t-m')).toBeTruthy()
+    expect(getThread).toHaveBeenCalledWith('t-m', expect.anything())
+  })
+
+  it('shows one conversation at a time, a point’s taking the place of a meeting’s', async () => {
+    const getThread = vi.fn<MeetingsApi['getThread']>((id) => saidOn(id))
+    renderPage(
+      stub({
+        getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }),
+        getMeetingPoints: () => Promise.resolve({ points: [aPoint()] }),
+        getThread,
+      }),
+    )
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /^Show what has been said about Planning call, / }),
+    )
+    expect(await screen.findByText('said on t-m')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show what has been said about Where do we park?' }))
+
+    expect(await screen.findByText('said on t-1')).toBeTruthy()
+    expect(screen.queryByText('said on t-m')).toBeNull()
   })
 })
 

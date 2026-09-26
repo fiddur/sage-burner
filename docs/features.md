@@ -236,6 +236,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Meetings in the diary: the page says when the next one is and how to join it, every
   meeting appears in the burn's calendar feed beside the dreams, and each one is a feed
   card you can reply to — for the _I can't make that time_ nobody had anywhere to say.
+  The same conversation opens under the meeting on the Meetings page, and a notification
+  about it opens it there.
 
 - Anything that cannot be undone asks first — one question in place of the control, naming
   the thing and what else goes with it. What a second press would undo does not ask.

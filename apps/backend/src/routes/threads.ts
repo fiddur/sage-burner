@@ -20,6 +20,7 @@ import {
   feedPage,
   followSchema,
   mealsPage,
+  meetingPage,
   meetingsPage,
   mentionedAccounts,
   profilePage,
@@ -763,7 +764,7 @@ const pointFacts = (row: CardRow): CardFacts => ({
 
 const meetingFacts = (row: CardRow): CardFacts => ({
   title: row.meeting_title ?? row.title,
-  link: row.meeting_title === null || row.event_id === null ? null : meetingsPage(row.event_id),
+  link: row.meeting_title === null || row.event_id === null ? null : meetingPage(row.event_id, row.entity_id),
   body: written(row.meeting_notes),
   gone: row.meeting_title === null,
 })
@@ -1403,7 +1404,7 @@ export const registerThreadRoutes = (
       what: await titleOf(meetingPoint, found),
     }),
     meeting: async (found: Subject) => ({
-      link: found.event_id === null ? null : meetingsPage(found.event_id),
+      link: atItsBurn(found, meetingPage),
       what: await titleOf(meeting, found),
     }),
     attendance: async (found: Subject) => {
