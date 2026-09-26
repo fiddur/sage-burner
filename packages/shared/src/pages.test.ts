@@ -9,6 +9,7 @@ import {
   invitePage,
   linkingOutcomes,
   loginPage,
+  meetingPage,
   meetingsPage,
   oauthOutcomes,
   RESET_PATTERN,
@@ -84,6 +85,14 @@ describe('the meetings page', () => {
 
   it('encodes both, so an id cannot invent a parameter', () => {
     expect(meetingsPage('a&b', 'c=d')).toBe('/meetings?burn=a%26b&point=c%3Dd')
+  })
+
+  it('names the meeting to open, at its burn', () => {
+    expect(meetingPage('burn-1', 'm-2')).toBe('/meetings?burn=burn-1&meeting=m-2')
+  })
+
+  it('encodes the meeting as well as the burn, so neither can invent a parameter', () => {
+    expect(meetingPage('a&b', 'c=d')).toBe('/meetings?burn=a%26b&meeting=c%3Dd')
   })
 })
 

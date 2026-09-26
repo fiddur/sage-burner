@@ -7,6 +7,11 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-26
+
+- **What is said about a meeting is on the Meetings page too.** Each meeting has a 💬 that
+  opens its conversation under it, and a notification about a comment on one opens it there.
+
 # 2026-09-25
 
 - **The members page says how many have paid.** The count under the list now reads

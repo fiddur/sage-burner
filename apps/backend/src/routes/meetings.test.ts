@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { everybodyToken } from '@sage-burner/shared'
+import { everybodyToken, meetingPage, meetingsPage } from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -114,6 +114,8 @@ const listing = async (
 ): Promise<{ id: string; thread_id: string | null }[]> => (await points(server, cookie)).json().points
 
 interface Card {
+  id: string
+  link: string | null
   entity_type: string
   entity_id: string
   title: string
@@ -131,6 +133,21 @@ const cardFor = async (server: FastifyInstance, cookie: string, meetingId: strin
 
 const meetings = (server: FastifyInstance, cookie: string, eventId = BURN) =>
   server.inject({ method: 'GET', url: `/api/events/${eventId}/meetings`, headers: { cookie } })
+
+const comment = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
+  server.inject({
+    method: 'POST',
+    url: `/api/threads/${threadId}/comments`,
+    headers: { cookie },
+    payload: { body },
+  })
+
+const bellOf = async (
+  server: FastifyInstance,
+  cookie: string,
+): Promise<{ category: string; body: string; link: string | null }[]> =>
+  (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
+    .notifications
 
 describe('talking points', () => {
   it('takes one from any approved member, the agenda being shared furniture', async () => {
@@ -732,5 +749,105 @@ describe('the meetings themselves', () => {
 
     expect(gone.statusCode).toBe(204)
     expect((await meetings(server, ada.cookie)).json().meetings).toEqual([])
+  })
+
+  it('carries its thread in the listing, the one its card is', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    const [listed] = (await meetings(server, ada.cookie)).json().meetings
+
+    expect(listed.thread_id).toBe((await cardFor(server, ada.cookie, id)).id)
+  })
+
+  it('carries its thread when it goes in the diary and when it changes', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const put = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting
+
+    const changed = await server.inject({
+      method: 'PATCH',
+      url: `/api/meetings/${put.id}`,
+      headers: { cookie: ada.cookie },
+      payload: { title: 'Planning call', starts_at: '2026-07-21T18:00:00.000Z', ends_at: null, notes: '' },
+    })
+
+    const card = await cardFor(server, ada.cookie, put.id)
+    expect(put.thread_id).toBe(card.id)
+    expect(changed.json().meeting.thread_id).toBe(card.id)
+  })
+
+  it('links its card at the meeting itself, so following it opens that conversation', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    expect((await cardFor(server, ada.cookie, id)).link).toBe(meetingPage(BURN, id))
+  })
+
+  it('links the word that it is in the diary at the meeting itself', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bo = await givenAccount('Bo')
+    await givenComing(ada.id)
+    await givenComing(bo.id)
+
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    expect((await bellOf(server, bo.cookie)).map((one) => [one.category, one.link])).toEqual([
+      ['meeting_scheduled', meetingPage(BURN, id)],
+    ])
+  })
+
+  it('links a comment on it at the meeting, where the comment now shows', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bo = await givenAccount('Bo')
+    await givenComing(ada.id)
+    await givenComing(bo.id)
+    const put = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting
+
+    await comment(server, bo.cookie, put.thread_id, 'can we start later?')
+
+    expect((await bellOf(server, ada.cookie)).map((one) => [one.category, one.link])).toEqual([
+      ['meeting_comment', meetingPage(BURN, put.id)],
+    ])
+  })
+})
+
+describe('a conversation about a point', () => {
+  it('links a comment on it at the point, not at a meeting', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bo = await givenAccount('Bo')
+    await givenComing(ada.id)
+    await givenComing(bo.id)
+    const point = (await raise(server, ada.cookie, { title: 'Where do we park?' })).json().point
+
+    await comment(server, bo.cookie, point.thread_id, 'by the barn')
+
+    expect((await bellOf(server, ada.cookie)).map((one) => [one.category, one.link])).toEqual([
+      ['point_comment', meetingsPage(BURN, point.id)],
+    ])
   })
 })

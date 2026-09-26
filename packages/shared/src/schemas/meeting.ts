@@ -72,10 +72,13 @@ export const meetingSchema = z.object({
 })
 export type Meeting = z.infer<typeof meetingSchema>
 
-export const meetingsResponseSchema = z.object({ meetings: z.array(meetingSchema) })
+export const meetingEntrySchema = meetingSchema.extend({ thread_id: idSchema.nullable() })
+export type MeetingEntry = z.infer<typeof meetingEntrySchema>
+
+export const meetingsResponseSchema = z.object({ meetings: z.array(meetingEntrySchema) })
 export type MeetingsResponse = z.infer<typeof meetingsResponseSchema>
 
-export const meetingResponseSchema = z.object({ meeting: meetingSchema })
+export const meetingResponseSchema = z.object({ meeting: meetingEntrySchema })
 export type MeetingResponse = z.infer<typeof meetingResponseSchema>
 
 const joinedOn = optionalText(MAX_MEETING_LINK).refine((url) => url === null || isProfileUrl(url), {

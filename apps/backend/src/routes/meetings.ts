@@ -1,5 +1,6 @@
 import type {
   Meeting,
+  MeetingEntry,
   MeetingPoint,
   MeetingPointEntry,
   MeetingPointResponse,
@@ -13,6 +14,7 @@ import {
   apiRoutes,
   decisionSchema,
   meetingCreateSchema,
+  meetingPage,
   meetingPointCreateSchema,
   meetingPointUpdateSchema,
   meetingsPage,
@@ -66,6 +68,31 @@ const pointsFor = async (db: Database, eventId: string): Promise<MeetingPointEnt
 
 const onePoint = async (db: Database, id: string): Promise<MeetingPointEntry | undefined> => {
   const [row] = await listing(db).where(eq(meetingPoint.id, id)).limit(1)
+
+  return row
+}
+
+const meetingColumns = {
+  id: meeting.id,
+  event_id: meeting.event_id,
+  author_account_id: meeting.author_account_id,
+  title: meeting.title,
+  starts_at: meeting.starts_at,
+  ends_at: meeting.ends_at,
+  link: meeting.link,
+  notes: meeting.notes,
+  created_at: meeting.created_at,
+  thread_id: thread.id,
+}
+
+const diary = (db: Database) =>
+  db
+    .select(meetingColumns)
+    .from(meeting)
+    .leftJoin(thread, and(eq(thread.entity_type, 'meeting'), eq(thread.entity_id, meeting.id)))
+
+const oneMeeting = async (db: Database, id: string): Promise<MeetingEntry | undefined> => {
+  const [row] = await diary(db).where(eq(meeting.id, id)).limit(1)
 
   return row
 }
@@ -139,7 +166,7 @@ export const registerMeetingRoutes = (
       db,
       notify,
       row.event_id,
-      { category: 'meeting_scheduled', body: said, link: meetingsPage(row.event_id) },
+      { category: 'meeting_scheduled', body: said, link: meetingPage(row.event_id, row.id) },
       { except: [by] },
     )
   }
@@ -339,9 +366,7 @@ export const registerMeetingRoutes = (
   app.get<{ Params: { eventId: string } }>(apiRoutes.getMeetings.fastify, guarded, async (request, reply) => {
     void noStore(reply)
 
-    const meetings = await db
-      .select()
-      .from(meeting)
+    const meetings = await diary(db)
       .where(eq(meeting.event_id, request.params.eventId))
       .orderBy(asc(meeting.starts_at), asc(meeting.id))
 
@@ -386,7 +411,10 @@ export const registerMeetingRoutes = (
       viewer.account_id,
     )
 
-    return reply.code(201).send({ meeting: row } satisfies MeetingResponse)
+    const answered = await oneMeeting(db, row.id)
+    if (answered === undefined) return sendError(reply, 404)
+
+    return reply.code(201).send({ meeting: answered } satisfies MeetingResponse)
   })
 
   app.patch<{ Params: { id: string } }>(apiRoutes.updateMeeting.fastify, guarded, async (request, reply) => {
@@ -429,7 +457,10 @@ export const registerMeetingRoutes = (
       await renameThread(db, await threadFor(db, 'meeting', row), row.title)
     }
 
-    return { meeting: row } satisfies MeetingResponse
+    const answered = await oneMeeting(db, row.id)
+    if (answered === undefined) return sendError(reply, 404)
+
+    return { meeting: answered } satisfies MeetingResponse
   })
 
   app.delete<{ Params: { id: string } }>(apiRoutes.deleteMeeting.fastify, guarded, async (request, reply) => {

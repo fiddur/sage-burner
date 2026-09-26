@@ -1,4 +1,4 @@
-import type { Meeting, MeetingPointEntry } from '@sage-burner/shared'
+import type { Meeting, MeetingEntry, MeetingPointEntry } from '@sage-burner/shared'
 
 import {
   MAX_DECIDED_NOTE,
@@ -6,6 +6,7 @@ import {
   MAX_NOTES,
   MAX_POST,
   MAX_TITLE,
+  MEETING_PARAM,
   meetingEnds,
   nextMeeting,
   POINT_PARAM,
@@ -66,6 +67,37 @@ interface MeetingDraft {
   notes: string
 }
 
+interface MeetingTalk {
+  opened: string | undefined
+  talk: DreamTalk
+  viewerId: string | undefined
+  admin: boolean
+  attendees: readonly { account_id: string; name: string | null }[]
+  onOpen: (id: string) => void
+}
+
+const useOpenedFromLink = (open: (id: string) => void) => {
+  const query = useLocation().query
+  const point: string | undefined = query?.[POINT_PARAM]
+  const meeting: string | undefined = query?.[MEETING_PARAM]
+
+  useEffect(() => {
+    if (point !== undefined) open(point)
+  }, [point])
+
+  useEffect(() => {
+    if (meeting !== undefined) open(meeting)
+  }, [meeting])
+}
+
+const threadOfOpened = (
+  points: readonly MeetingPointEntry[],
+  meetings: readonly MeetingEntry[],
+  opened: string | undefined,
+): string | null | undefined =>
+  points.find((point) => point.id === opened)?.thread_id ??
+  meetings.find((one) => one.id === opened)?.thread_id
+
 export const whenItIs = (meeting: Meeting, today: Date = new Date()): string => {
   const day = shortDayOf(meeting.starts_at)
 
@@ -110,17 +142,20 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
   const attendees = loaded.status === 'ready' ? loaded.data.attendees : []
   const viewerId = viewer.account?.id
 
-  const asked: string | undefined = useLocation().query?.[POINT_PARAM]
+  useOpenedFromLink(setOpened)
 
-  useEffect(() => {
-    if (asked !== undefined) setOpened(asked)
-  }, [asked])
+  const talk = useDreamThread({ api, threadId: threadOfOpened(points, meetings, opened), run })
 
-  const talk = useDreamThread({
-    api,
-    threadId: points.find((point) => point.id === opened)?.thread_id,
-    run,
-  })
+  const toggle = (id: string) => setOpened(opened === id ? undefined : id)
+
+  const talking: MeetingTalk = {
+    opened,
+    talk,
+    viewerId,
+    admin: isAdmin(viewer),
+    attendees,
+    onOpen: toggle,
+  }
 
   const remove = (id: string) => {
     run(() => api.deleteMeeting(id), 'Could not take that out.')
@@ -154,10 +189,11 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
   const ahead = rest.filter((one) => Date.parse(meetingEnds(one.starts_at, one.ends_at)) > now.getTime())
   const over = rest.filter((one) => Date.parse(meetingEnds(one.starts_at, one.ends_at)) <= now.getTime())
 
-  const diary = (heading: string, shown: readonly Meeting[]) => (
+  const diary = (heading: string, shown: readonly MeetingEntry[]) => (
     <TheDiary
       heading={heading}
       meetings={shown}
+      talking={talking}
       busy={busy}
       editing={amending}
       upload={api.uploadImage}
@@ -179,7 +215,7 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
       talk={talk}
       upload={api.uploadImage}
       attendees={attendees}
-      onOpen={(id) => setOpened(opened === id ? undefined : id)}
+      onOpen={toggle}
       onEdit={(id, wanted) => setEditing(wanted ? id : undefined)}
       onSave={(id, changes) =>
         run(async () => {
@@ -216,6 +252,7 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
         <>
           <NextMeeting
             next={next}
+            talking={talking}
             busy={busy}
             editing={amending}
             upload={api.uploadImage}
@@ -263,9 +300,54 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
   )
 }
 
+const TalkAboutIt = ({
+  meeting,
+  talking,
+  busy,
+}: {
+  meeting: MeetingEntry
+  talking: MeetingTalk
+  busy: boolean
+}) => (
+  <IconButton
+    icon="comment"
+    label={`${talking.opened === meeting.id ? 'Hide' : 'Show'} what has been said about ${meeting.title}, ${whenItIs(meeting)}`}
+    disabled={busy}
+    onClick={() => talking.onOpen(meeting.id)}
+  />
+)
+
+const WhatWasSaid = ({
+  meeting,
+  talking,
+  busy,
+  upload,
+}: {
+  meeting: MeetingEntry
+  talking: MeetingTalk
+  busy: boolean
+  upload: UploadImage
+}) =>
+  talking.opened === meeting.id ? (
+    <DreamThread
+      thread={talking.talk.thread}
+      viewerId={talking.viewerId}
+      admin={talking.admin}
+      busy={busy}
+      more={false}
+      upload={upload}
+      people={talking.attendees}
+      onSay={talking.talk.say}
+      onRewrite={talking.talk.rewrite}
+      onRemove={talking.talk.remove}
+      onHeart={talking.talk.heart}
+    />
+  ) : null
+
 const TheDiary = ({
   heading,
   meetings,
+  talking,
   busy,
   editing,
   upload,
@@ -274,7 +356,8 @@ const TheDiary = ({
   onDelete,
 }: {
   heading: string
-  meetings: readonly Meeting[]
+  meetings: readonly MeetingEntry[]
+  talking: MeetingTalk
   busy: boolean
   editing: string | undefined
   upload: UploadImage
@@ -291,6 +374,7 @@ const TheDiary = ({
             <span>
               <strong>{one.title}</strong> — {whenItIs(one)}
             </span>
+            <TalkAboutIt meeting={one} talking={talking} busy={busy} />
             <IconButton
               icon="edit"
               label={`Edit ${one.title}, ${whenItIs(one)}`}
@@ -312,6 +396,7 @@ const TheDiary = ({
                 onSave={(fields) => onSave(one.id, fields)}
               />
             )}
+            <WhatWasSaid meeting={one} talking={talking} busy={busy} upload={upload} />
           </li>
         ))}
       </ul>
@@ -453,6 +538,7 @@ const ScheduleOne = ({
 
 const NextMeeting = ({
   next,
+  talking,
   busy,
   editing,
   upload,
@@ -460,7 +546,8 @@ const NextMeeting = ({
   onSave,
   onDelete,
 }: {
-  next: Meeting | undefined
+  next: MeetingEntry | undefined
+  talking: MeetingTalk
   busy: boolean
   editing: string | undefined
   upload: UploadImage
@@ -493,6 +580,7 @@ const NextMeeting = ({
 
     {next !== undefined && (
       <p class="row">
+        <TalkAboutIt meeting={next} talking={talking} busy={busy} />
         <IconButton
           icon="edit"
           label={`Edit ${next.title}, ${whenItIs(next)}`}
@@ -517,6 +605,8 @@ const NextMeeting = ({
         onSave={(fields) => onSave(next.id, fields)}
       />
     )}
+
+    {next !== undefined && <WhatWasSaid meeting={next} talking={talking} busy={busy} upload={upload} />}
   </section>
 )
 

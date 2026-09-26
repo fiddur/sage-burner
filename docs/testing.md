@@ -667,6 +667,10 @@ phone" means 360px.
 - [ ] The feed carries a **card** for it, headed with the meeting's name and carrying
       "put it in the diary". Comment on it, heart it, and use its 🔔 — a meeting is not a
       second-class thing on the feed. There is no separate line beside the card.
+- [ ] Comment on that meeting's card from the feed: on the Meetings page the meeting's 💬
+      shows the comment — one thread, not two. A line further down the diary has its own 💬,
+      opening that meeting's conversation. The notification a second member gets for the comment
+      opens the Meetings page with that meeting's conversation already open.
 - [ ] Take the meeting out of the diary: its card goes off the feed with it, and so does what
       was said on it. The same for a talking point.
 - [ ] Move the meeting: the card says "moved it" and comes back to the top. Moving it again

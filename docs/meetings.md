@@ -54,6 +54,10 @@ It had no thread for a day, on the reasoning that a meeting is scheduled rather 
 That was wrong in the way that mattered: the discussion a meeting needs is _whether that time
 works_, and there was nowhere to say it.
 
+The thread shows under the meeting on the Meetings page as well as on the feed, opened by its 💬
+the way a point's is. Every link about a meeting — its card, the notification that it is in the
+diary, and one about a comment on it — carries `?meeting=`, so following it opens that thread.
+
 **Derived from the end, not the start.** A meeting people are joining as it runs is exactly when
 the link is wanted, so it stays the next meeting until it has finished — dropping it the moment it
 began would take the banner away at 19:00 for a call at 19:00.
