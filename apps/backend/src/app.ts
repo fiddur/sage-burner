@@ -50,6 +50,7 @@ import { cookieHeader, registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
 import { registerBringRoutes } from './routes/bring.ts'
+import { registerBuildRoutes } from './routes/build.ts'
 import { registerCalendarRoutes } from './routes/calendar.ts'
 import { registerConnectionRoutes } from './routes/connections.ts'
 import { readDocument, registerDocumentRoutes } from './routes/documents.ts'
@@ -388,6 +389,7 @@ export const createApp = async ({
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })
   registerPaymentReminderRoutes(app, { db, sessions, config, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerBuildRoutes(app, { db, sessions, now, notify: tellAccount })
   registerFaqRoutes(app, { db, sessions, now })
   registerFeedRoutes(app, { db, sessions })
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })

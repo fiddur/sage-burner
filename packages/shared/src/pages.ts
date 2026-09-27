@@ -37,6 +37,13 @@ export const ridesPage = (eventId: string, rideId?: string): string =>
     rideId === undefined ? '' : `&${RIDE_PARAM}=${encodeURIComponent(rideId)}`
   }`
 
+export const BUILD_PARAM = 'project'
+
+export const buildPage = (eventId: string, projectId?: string): string =>
+  `/build?${BURN_PARAM}=${encodeURIComponent(eventId)}${
+    projectId === undefined ? '' : `&${BUILD_PARAM}=${encodeURIComponent(projectId)}`
+  }`
+
 export const POINT_PARAM = 'point'
 
 export const meetingsPage = (eventId: string, pointId?: string): string =>

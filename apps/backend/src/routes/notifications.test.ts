@@ -301,6 +301,8 @@ describe('what somebody has switched on', () => {
     'bring_role',
     'bring_comment',
     'ride_comment',
+    'build_role',
+    'build_comment',
     'point_comment',
     'meeting_scheduled',
     'meeting_comment',

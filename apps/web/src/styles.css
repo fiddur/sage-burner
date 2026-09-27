@@ -3776,3 +3776,100 @@ a.song-row:hover .song-what {
 .ingredient-match.is-on {
   background: color-mix(in srgb, var(--ember) 12%, transparent);
 }
+
+/* The grip sits at the top for the FAQ's reason: a project is a card several lines tall, and a
+   grip centred against its checklist reads as belonging to the checklist. */
+.build-row {
+  align-items: flex-start;
+}
+
+.build-project {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.build-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.build-head h3 {
+  margin: 0;
+}
+
+.build-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.build-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.build-item-what {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Greyed and struck through rather than moved or hidden: a ticked thing keeps its place so the
+   list does not shuffle under somebody's thumb, and stays readable so it can be unticked. */
+.build-item.is-done .build-item-what,
+.build-item.is-done .build-priority {
+  opacity: 0.6;
+}
+
+.build-item.is-done .build-item-what span {
+  text-decoration-line: line-through;
+}
+
+.build-priority {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.build-priority.is-needed {
+  border-color: var(--ember);
+  color: var(--ember);
+}
+
+.build-priority.is-good {
+  border-color: var(--sage);
+  color: var(--sage);
+}
+
+.build-priority.is-bonus {
+  color: var(--muted);
+}
+
+.build-item-add,
+.build-item-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.build-item-add input[type='text'],
+.build-item-edit input[type='text'] {
+  flex: 1;
+  min-width: 10rem;
+}

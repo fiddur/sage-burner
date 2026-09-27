@@ -186,6 +186,26 @@ describe('migrations', () => {
     ).not.toThrow()
   })
 
+  it('takes a build project’s card and its categories', () => {
+    expect(() =>
+      handle.client
+        .prepare('insert into thread (id, event_id, entity_type, entity_id, title) values (?, ?, ?, ?, ?)')
+        .run('t-1', ids.event, 'build', 'b-1', 'Dome'),
+    ).not.toThrow()
+    expect(() =>
+      handle.client
+        .prepare(
+          'insert into notification (id, account_id, category, body, created_at) values (?, ?, ?, ?, ?)',
+        )
+        .run('n-1', ids.account, 'build_role', 'You are now leading Dome.', NOW),
+    ).not.toThrow()
+    expect(() =>
+      handle.client
+        .prepare('insert into notification_setting (account_id, category, enabled) values (?, ?, ?)')
+        .run(ids.account, 'build_comment_any', 1),
+    ).not.toThrow()
+  })
+
   it('still refuses a category nobody has heard of', () => {
     expect(() =>
       handle.client
@@ -2222,5 +2242,63 @@ describe('the slot-needs-a-lane migration', () => {
     } finally {
       fresh.close()
     }
+  })
+})
+
+describe('the build tables', () => {
+  const insertProject = (id: string, title: string, tier: string) =>
+    handle.client
+      .prepare(
+        'insert into build_project (id, event_id, title, tier, "order", created_at) values (?, ?, ?, ?, ?, ?)',
+      )
+      .run(id, ids.event, title, tier, 0, NOW)
+
+  const insertItem = (
+    text: string,
+    priority: string,
+    done: { by: string | null; at: string | null } = { by: null, at: null },
+  ) =>
+    handle.client
+      .prepare(
+        'insert into build_item (id, project_id, text, priority, done_by_account_id, done_at, created_at)' +
+          ' values (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(`i-${Math.random()}`, 'b-1', text, priority, done.by, done.at, NOW)
+
+  it('refuses a project under neither header, and takes one under each', () => {
+    expect(() => insertProject('b-0', 'Dome', 'someday')).toThrow(/build_project_tier_check/)
+    expect(() => insertProject('b-1', 'Dome', 'reality')).not.toThrow()
+    expect(() => insertProject('b-2', 'Swing', 'nice_to_have')).not.toThrow()
+  })
+
+  it('refuses a project with nothing but whitespace for a title', () => {
+    expect(() => insertProject('b-0', '   ', 'reality')).toThrow(/build_project_title_check/)
+    expect(() => insertProject('b-1', 'Dome', 'reality')).not.toThrow()
+  })
+
+  it('refuses a checklist line of no priority it knows, and takes each it does', () => {
+    insertProject('b-1', 'Dome', 'reality')
+
+    expect(() => insertItem('Struts', 'urgent')).toThrow(/build_item_priority_check/)
+    for (const priority of ['needed', 'good', 'bonus']) {
+      expect(() => insertItem('Struts', priority), priority).not.toThrow()
+    }
+  })
+
+  it('refuses a checklist line with nothing but whitespace in it', () => {
+    insertProject('b-1', 'Dome', 'reality')
+
+    expect(() => insertItem('  ', 'needed')).toThrow(/build_item_text_check/)
+    expect(() => insertItem('Struts', 'needed')).not.toThrow()
+  })
+
+  it('refuses somebody ticking a line with no time, and takes a tick whose ticker has gone', () => {
+    insertProject('b-1', 'Dome', 'reality')
+
+    expect(() => insertItem('Struts', 'needed', { by: ids.account, at: null })).toThrow(
+      /build_item_done_check/,
+    )
+    expect(() => insertItem('Struts', 'needed', { by: ids.account, at: NOW })).not.toThrow()
+    expect(() => insertItem('Struts', 'needed', { by: null, at: NOW })).not.toThrow()
   })
 })

@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-27
 
+- **A Build page for what gets built on site.** ☰ → Build lists the burn's projects under
+  **Realities** and **Nice to have**, in whatever order you arrange them. Each has a
+  description, a lead and helpers, a heart, a conversation that is also a card on the feed,
+  and a checklist of what it needs marked Needed, Good or Bonus. Tick a thing off and it
+  greys out where it stands. Taking a project off can be undone for thirty days.
 - **Paid but cannot come? You can leave your payment to the hosts.** Under your burn in Your
   details, give up the place without handing it to anybody: there is no refund, the payment
   goes to the hosts and the facilities, the place goes to whoever is next in line, and the

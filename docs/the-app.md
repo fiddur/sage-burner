@@ -522,9 +522,9 @@ because between burns the app was quiet and quiet reads as nothing-to-do.
 
 **One thing on the page, in the end.** Everything on it is a **card** carrying its whole
 history and the talk under it — a dream, a person at a burn (#426), an announcement (#438),
-a song, a bring item, a talking point, a meeting (#597), a lead role (#610), a meal (#667)
-and a journey on the rideshare board (#831). It took ten goes to get there: the page began
-as one card kind beside a table of
+a song, a bring item, a talking point, a meeting (#597), a lead role (#610), a meal (#667),
+a journey on the rideshare board (#831) and a build project (#847). It took eleven goes to get
+there: the page began as one card kind beside a table of
 one-line `activity` rows for the burn's news that nobody could talk to, and each release
 turned another line into something with a conversation under it until the table had two
 writers left and then none. The line's argument — that collapsing everything by thread
@@ -879,7 +879,7 @@ that reason — the first cut notified from one of them, and the same heart on t
 from the card and was silent from the panel.
 
 **Who wrote it** is `cardAuthor`, per entity type, because there is no one column for it. `post`,
-`song`, `bring`, `point` and `meeting` carry `author_account_id` and a `ride` carries
+`song`, `bring`, `point`, `meeting` and `build` carry `author_account_id` and a `ride` carries
 `account_id`; an `attendance` card is its `subject_account_id`. A dream has neither — it has
 a facilitator, who can be handed the job by
 somebody else — so the author is the thread's own `offered` line, which is the only record of whose
@@ -1080,7 +1080,7 @@ problem #311 fixed for the banner. Offline you get the card's newest lines; the 
 the conversation needs the network.
 
 What is _not_ on it yet: an unread mark per thread and reactions on a line. Every shared
-list now has a card kind, the rideshare board being the last of them (#831). The digest is
+list has a card kind, and a build project's checklist deliberately has none (#847). The digest is
 this page by email, and `docs/accounts.md` has it.
 `entity_type` is what makes each of those a value in the vocabulary and a branch in three
 places — the link, the participants, and the comment's categories. Those three are lookups
