@@ -1,5 +1,6 @@
-import type { MemberRosterEntry, MemberRosterResponse } from '@sage-burner/shared'
+import type { MemberRosterEntry, MemberRosterResponse, MyBurn } from '@sage-burner/shared'
 
+import { stayPage } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
@@ -16,7 +17,7 @@ import { Table } from '../components/Table.tsx'
 import { startsTheWaitingList, WaitingListLine } from '../components/WaitingListLine.tsx'
 import { useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
-import { isApproved, useViewer } from '../viewer.tsx'
+import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
 export type MembersApi = Pick<ApiClient, 'getMembers'>
 
@@ -58,6 +59,8 @@ export const Members = ({ api }: { api: MembersApi }) => {
 
           <HowToPay event={roster.event} entries={roster.entries} me={viewer.account?.id} />
 
+          {burn !== undefined && isMember(viewer) && <YourAttendance burn={burn} />}
+
           {roster.entries.length === 0 ? (
             <p class="form-note">Nobody has said they are coming yet.</p>
           ) : (
@@ -90,6 +93,18 @@ const HowToPay = ({
     </div>
   )
 }
+
+const YourAttendance = ({ burn }: { burn: MyBurn }) =>
+  burn.attendance === null ? (
+    <p class="form-note">
+      Coming? Say so on <a href={stayPage(burn.event.id)}>your details page</a>.
+    </p>
+  ) : (
+    <p class="form-note">
+      Arriving late, leaving early or not coming after all? Change it on{' '}
+      <a href={stayPage(burn.event.id)}>your details page</a>.
+    </p>
+  )
 
 const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => (
   <Table>

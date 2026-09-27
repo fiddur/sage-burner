@@ -1,6 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
-import { attendanceResponseSchema } from '@sage-burner/shared'
+import { attendanceResponseSchema, membersPage } from '@sage-burner/shared'
 import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -821,5 +821,164 @@ describe('the hand-over’s own guard, under the checks that precede it', () => 
     expect(moved).toBe(true)
     expect(await rowFor(giver.id, eventId)).toBeUndefined()
     expect((await rowFor(taker.id, eventId))?.payment_status).toBe('paid')
+  })
+})
+
+describe('leaving a paid place to the hosts', () => {
+  const donate = (server: FastifyInstance, cookie: string | undefined, eventId: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/events/${eventId}/attendance/me/donation`,
+      headers: cookie === undefined ? {} : { cookie },
+    })
+
+  const rowFor = async (accountId: string, eventId: string) => {
+    const [row] = await db()
+      .select()
+      .from(attendance)
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+      .limit(1)
+
+    return row
+  }
+
+  const setPaid = (accountId: string, eventId: string) =>
+    db()
+      .update(attendance)
+      .set({ payment_status: 'paid', payment_date: '2026-07-01' })
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+
+  const paidMember = async (server: FastifyInstance, roles: ('admin' | 'member')[] = ['member']) => {
+    const eventId = await givenEvent()
+    const donor = await givenAccount(roles, 'Ada')
+    await join(server, donor.cookie, eventId)
+    await setPaid(donor.id, eventId)
+
+    return { eventId, donor }
+  }
+
+  const toldAbout = (accountId: string) =>
+    db().select().from(notification).where(eq(notification.account_id, accountId))
+
+  it('takes a paid member off the burn, and off the roster everybody reads', async () => {
+    const server = await build()
+    const { eventId, donor } = await paidMember(server)
+    const other = await givenAccount(['member'])
+    await join(server, other.cookie, eventId)
+
+    expect((await donate(server, donor.cookie, eventId)).statusCode).toBe(204)
+
+    expect(await rowFor(donor.id, eventId)).toBeUndefined()
+    const roster = await server.inject({
+      method: 'GET',
+      url: `/api/events/${eventId}/members`,
+      headers: { cookie: other.cookie },
+    })
+    expect(roster.json().entries.map((one: { account_id: string }) => one.account_id)).toEqual([other.id])
+  })
+
+  it('refuses somebody who has not paid, who can simply leave, and keeps their row', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    await join(server, member.cookie, eventId)
+
+    expect((await donate(server, member.cookie, eventId)).statusCode).toBe(409)
+    expect(await rowFor(member.id, eventId)).toBeDefined()
+  })
+
+  it('answers 404 for somebody who was never coming', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+
+    expect((await donate(server, member.cookie, eventId)).statusCode).toBe(404)
+  })
+
+  it('answers 404 for a burn that has ended, and keeps the stay it had', async () => {
+    const server = await build()
+    const gone = await givenEvent({ start_date: '2025-08-01', end_date: '2025-08-05', slug: 'gone' })
+    const member = await givenAccount(['member'])
+    await db().insert(attendance).values({
+      id: randomUUID(),
+      event_id: gone,
+      account_id: member.id,
+      joined_at: '2025-07-01T00:00:00.000Z',
+      payment_status: 'paid',
+    })
+
+    expect((await donate(server, member.cookie, gone)).statusCode).toBe(404)
+    expect(await rowFor(member.id, gone)).toBeDefined()
+  })
+
+  it('tells every organiser, naming the member and the burn and linking the roster', async () => {
+    const server = await build()
+    const { eventId, donor } = await paidMember(server)
+    const first = await givenAccount(['admin'])
+    const second = await givenAccount(['admin'])
+
+    await donate(server, donor.cookie, eventId)
+
+    for (const admin of [first, second]) {
+      const told = await toldAbout(admin.id)
+      expect(told).toHaveLength(1)
+      expect(told[0]?.category).toBe('place_donated')
+      expect(told[0]?.link).toBe(membersPage(eventId))
+      expect(told[0]?.body).toBe('Ada is not coming to Summer burn and leaves their payment to the hosts.')
+    }
+  })
+
+  it('says nothing to the donor, even an organiser, who did click', async () => {
+    const server = await build()
+    const { eventId, donor } = await paidMember(server, ['admin', 'member'])
+    const other = await givenAccount(['admin'])
+
+    expect((await donate(server, donor.cookie, eventId)).statusCode).toBe(204)
+
+    expect(await toldAbout(donor.id)).toEqual([])
+    expect(await toldAbout(other.id)).toHaveLength(1)
+  })
+
+  it('tells nobody when it refuses', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    const admin = await givenAccount(['admin'])
+    await join(server, member.cookie, eventId)
+
+    await donate(server, member.cookie, eventId)
+
+    expect(await toldAbout(admin.id)).toEqual([])
+  })
+
+  it('refuses somebody who is not signed in', async () => {
+    const server = await build()
+    const { eventId, donor } = await paidMember(server)
+
+    expect((await donate(server, undefined, eventId)).statusCode).toBe(401)
+    expect(await rowFor(donor.id, eventId)).toBeDefined()
+  })
+
+  it('refuses an account that is not a member of the community', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const stranger = await givenAccount([])
+
+    expect((await donate(server, stranger.cookie, eventId)).statusCode).toBe(403)
+  })
+
+  it('empties the dream the donor was going to facilitate', async () => {
+    const server = await build()
+    const { eventId, donor } = await paidMember(server)
+    const mine = await rowFor(donor.id, eventId)
+    await db()
+      .insert(session)
+      .values({ id: 's-1', event_id: eventId, title: 'Cacao ceremony', facilitator_attendance_id: mine?.id })
+
+    await donate(server, donor.cookie, eventId)
+
+    const [dream] = await db().select().from(session).where(eq(session.id, 's-1'))
+    expect(dream?.facilitator_attendance_id).toBeNull()
+    expect(dream?.title).toBe('Cacao ceremony')
   })
 })

@@ -17,6 +17,7 @@ import {
   rolesPage,
   shoppingPage,
   signingInOutcomes,
+  stayPage,
 } from './pages.ts'
 
 describe('where an outcome can land', () => {
@@ -74,6 +75,16 @@ describe('the shopping page', () => {
 
   it('encodes it, so an id cannot invent a parameter', () => {
     expect(shoppingPage('a&b')).toBe('/shopping?burn=a%26b')
+  })
+})
+
+describe('your details, at one burn', () => {
+  it('is the details page, naming the burn whose stay it lands on', () => {
+    expect(stayPage('burn-1')).toBe('/profile?burn=burn-1')
+  })
+
+  it('encodes it, so an id cannot invent a parameter', () => {
+    expect(stayPage('a&b')).toBe('/profile?burn=a%26b')
   })
 })
 

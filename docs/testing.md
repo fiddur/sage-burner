@@ -208,6 +208,12 @@ phone" means 360px.
       one for now — not that there is a place left to go and win (#726).
 - [ ] A paid member transfers their place to an unpaid one: the payment moves,
       the giver's stay is deleted, the taker is notified.
+- [ ] A paid member gives up their place from Your details and leaves the payment to the hosts:
+      the confirmation says there is no refund, their stay is gone, the next in line is told they
+      have a place, and every organiser's bell says who left which burn. An unpaid member is not
+      offered it.
+- [ ] On the members page, the line under the count links to Your details, landing on that burn's
+      section — "not coming after all?" when you are on the list, "Coming?" when you are not.
 - [ ] With every place paid for and somebody waiting, un-record one of those payments: the
       waiting member is told the line has moved. Removing a paid member from ⚙️ → Roster does
       the same.

@@ -43,6 +43,7 @@ const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi 
   getEventOptions: () => Promise.reject(new Error('getEventOptions is not stubbed here')),
   joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed here')),
   leaveEvent: () => Promise.reject(new Error('leaveEvent is not stubbed here')),
+  donateMyPlace: () => Promise.reject(new Error('donateMyPlace is not stubbed here')),
   getMembers: () => Promise.reject(new Error('getMembers is not stubbed here')),
   transferMyPlace: () => Promise.reject(new Error('transferMyPlace is not stubbed here')),
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),

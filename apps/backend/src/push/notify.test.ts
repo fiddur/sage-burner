@@ -7,9 +7,9 @@ import type { EmailChannel, Told } from './notify.ts'
 import type { PushDeps } from './push.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, attendance, event, notification, notificationSetting } from '../db/schema.ts'
+import { account, accountRole, attendance, event, notification, notificationSetting } from '../db/schema.ts'
 import { createEmailQueue } from '../mail/queue.ts'
-import { recordAndPush, switchedOn, tellAttendees, wants } from './notify.ts'
+import { notifyAdmins, recordAndPush, switchedOn, tellAttendees, wants } from './notify.ts'
 
 const NOW = '2026-08-03T00:00:00.000Z'
 const BURN = '9f1c2f2a-6f1a-4a2e-9c6d-2f0a1b3c4d5e'
@@ -202,6 +202,41 @@ describe('telling everybody coming to a burn', () => {
     await queue.drain()
 
     expect(most).toBe(1)
+  })
+})
+
+describe('telling the organisers', () => {
+  const givenAdmin = async (): Promise<string> => {
+    const id = await givenSilent()
+    await db().insert(accountRole).values({ account_id: id, role: 'admin' })
+
+    return id
+  }
+
+  it('tells every admin', async () => {
+    build()
+    const first = await givenAdmin()
+    const second = await givenAdmin()
+    const told: string[] = []
+
+    const count = await notifyAdmins(db(), async (accountId) => told.push(accountId), TOLD)
+
+    expect(count).toBe(2)
+    expect(told.toSorted()).toEqual([first, second].toSorted())
+  })
+
+  it('leaves out an admin named as an exception, so nobody hears about their own click', async () => {
+    build()
+    const clicked = await givenAdmin()
+    const other = await givenAdmin()
+    const told: string[] = []
+
+    const count = await notifyAdmins(db(), async (accountId) => told.push(accountId), TOLD, {
+      except: [clicked],
+    })
+
+    expect(count).toBe(1)
+    expect(told).toEqual([other])
   })
 })
 

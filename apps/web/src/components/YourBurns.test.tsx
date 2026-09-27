@@ -1,6 +1,7 @@
 import type { Attendance, MemberRosterEntry, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { YourBurnsApi } from './YourBurns.tsx'
@@ -45,6 +46,7 @@ const stub = (over: Partial<YourBurnsApi> = {}, burns: MyBurnsResponse = { comin
   getEventOptions: () => Promise.resolve({ options: [] }),
   joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed here')),
   leaveEvent: () => Promise.reject(new Error('leaveEvent is not stubbed here')),
+  donateMyPlace: () => Promise.reject(new Error('donateMyPlace is not stubbed here')),
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
   getMembers: () => Promise.reject(new Error('getMembers is not stubbed here')),
   transferMyPlace: () => Promise.reject(new Error('transferMyPlace is not stubbed here')),
@@ -341,5 +343,114 @@ describe('handing on a place that has been paid for', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hand it over' }))
 
     expect(await screen.findByRole('alert')).toBeTruthy()
+  })
+})
+
+describe('leaving a paid place to the hosts', () => {
+  const paidBurn = () => ({
+    coming: [aBurn('e-1', 'Summer', anAttendance({ payment_status: 'paid', payment_date: '2026-07-01' }))],
+    past: [],
+  })
+
+  const LEAVE = 'I cannot come — leave my payment to the hosts'
+
+  it('is offered beside the hand-over once they have paid', async () => {
+    render(<YourBurns api={stub({}, paidBurn())} />)
+
+    expect(await screen.findByRole('button', { name: LEAVE })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Hand my place to somebody else' })).toBeTruthy()
+  })
+
+  it('is not offered while nothing has been paid, the plain give-up being there instead', async () => {
+    render(<YourBurns api={stub({}, { coming: [aBurn('e-1', 'Summer', anAttendance())], past: [] })} />)
+
+    expect(await screen.findByRole('button', { name: 'I cannot come after all' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: LEAVE })).toBeNull()
+  })
+
+  it('says there is no refund before it is confirmed', async () => {
+    render(<YourBurns api={stub({}, paidBurn())} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: LEAVE }))
+
+    expect(screen.getByText(/There is no refund/u)).toBeTruthy()
+  })
+
+  it('gives up that burn’s place once confirmed, and asks for the bar’s list again', async () => {
+    const reload = vi.fn()
+    const donateMyPlace = vi.fn<YourBurnsApi['donateMyPlace']>(() => Promise.resolve(undefined))
+    render(
+      <BurnProvider value={{ status: 'ready', burns: [], selected: undefined, reload }}>
+        <YourBurns api={stub({ donateMyPlace }, paidBurn())} />
+      </BurnProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: LEAVE }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
+
+    await waitFor(() => expect(donateMyPlace).toHaveBeenCalledWith('e-1'))
+    expect(reload).toHaveBeenCalled()
+  })
+
+  it('says the payment is not recorded when the server refuses it as unpaid', async () => {
+    const donateMyPlace = vi.fn(() => Promise.reject(apiError(409, 'conflict', 'nope')))
+    render(<YourBurns api={stub({ donateMyPlace }, paidBurn())} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: LEAVE }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Your payment is not recorded')
+  })
+})
+
+describe('arriving from a link to one burn', () => {
+  const renderAt = (at: string) => {
+    history.replaceState(null, '', at)
+
+    return render(
+      <LocationProvider>
+        <YourBurns
+          api={stub(
+            {},
+            {
+              coming: [aBurn('e-1', 'Summer', anAttendance()), aBurn('e-2', 'Winter', anAttendance())],
+              past: [],
+            },
+          )}
+        />
+      </LocationProvider>,
+    )
+  }
+
+  const scrolled = () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+
+    return scroll
+  }
+
+  afterEach(() => {
+    history.replaceState(null, '', '/')
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  })
+
+  it('scrolls to that burn’s section', async () => {
+    const scroll = scrolled()
+    renderAt('/profile?burn=e-2')
+
+    await screen.findAllByLabelText('Arriving')
+
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1))
+    const section = scroll.mock.contexts[0]
+    expect(section instanceof HTMLElement ? section.id : undefined).toBe('burn-e-2')
+  })
+
+  it('stays where it is without one', async () => {
+    const scroll = scrolled()
+    renderAt('/profile')
+
+    await screen.findAllByLabelText('Arriving')
+
+    expect(scroll).not.toHaveBeenCalled()
   })
 })

@@ -1246,6 +1246,8 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     leaveEvent: (eventId: string) =>
       request<undefined>(apiRoutes.leaveEvent.path(eventId), { method: apiRoutes.leaveEvent.method }),
+    donateMyPlace: (eventId: string) =>
+      request<undefined>(apiRoutes.donateMyPlace.path(eventId), { method: apiRoutes.donateMyPlace.method }),
 
     transferMyPlace: (eventId: string, body: BodyOf<'transferMyPlace'>) =>
       request<undefined>(apiRoutes.transferMyPlace.path(eventId), {

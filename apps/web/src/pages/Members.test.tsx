@@ -201,6 +201,52 @@ describe('Members', () => {
   })
 })
 
+describe('where to change whether you are coming', () => {
+  const COMING: MyBurn = {
+    ...CHOSEN,
+    attendance: {
+      id: 'att-1',
+      event_id: 'e-1',
+      account_id: 'a-1',
+      joined_at: '2026-07-01T00:00:00.000Z',
+      arrival_date: null,
+      departure_date: null,
+      lodging_option_id: null,
+      helping_option_ids: [],
+      helping_other: null,
+      notes: null,
+      payment_status: 'paid',
+      payment_date: null,
+    },
+  }
+
+  it('sends somebody coming to that burn on their details page', async () => {
+    renderPage(stub(), MEMBER, COMING)
+
+    const link = await screen.findByRole('link', { name: 'your details page' })
+    expect(link.getAttribute('href')).toBe('/profile?burn=e-1')
+    expect(link.closest('p')?.textContent).toContain('not coming after all')
+  })
+
+  it('asks a member who has not said so to say so there', async () => {
+    renderPage(stub(), MEMBER, CHOSEN)
+
+    const link = await screen.findByRole('link', { name: 'your details page' })
+    expect(link.getAttribute('href')).toBe('/profile?burn=e-1')
+    expect(link.closest('p')?.textContent).toContain('Coming?')
+  })
+
+  it('offers nothing to an organiser who is not a member, who cannot come', async () => {
+    renderPage(stub(aRoster({ entries: [anEntry({ name: 'Ana' })] })), {
+      status: 'signed-in',
+      account: { id: 'a-2', name: null, avatar: null, roles: ['admin'] },
+    })
+
+    await screen.findByText('Ana')
+    expect(screen.queryByRole('link', { name: 'your details page' })).toBeNull()
+  })
+})
+
 describe('how to pay', () => {
   const paying = (over: Partial<MemberRosterEntry> = {}) =>
     anEntry({ account_id: 'a-1', payment_status: 'unpaid', ...over })

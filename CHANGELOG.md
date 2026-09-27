@@ -7,6 +7,15 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-27
+
+- **Paid but cannot come? You can leave your payment to the hosts.** Under your burn in Your
+  details, give up the place without handing it to anybody: there is no refund, the payment
+  goes to the hosts and the facilities, the place goes to whoever is next in line, and the
+  organisers are told.
+- **The members page links to where you change whether you are coming.** It opens Your
+  details at that burn, for arriving late, leaving early or not coming after all.
+
 # 2026-09-26
 
 - **What is said about a meeting is on the Meetings page too.** Each meeting has a 💬 that

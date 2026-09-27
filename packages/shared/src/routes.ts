@@ -387,6 +387,11 @@ export const apiRoutes = {
     fastify: '/api/admin/song-categories/:id',
     path: (id: string) => `/api/admin/song-categories/${encodeURIComponent(id)}`,
   },
+  donateMyPlace: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/attendance/me/donation',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/attendance/me/donation`,
+  },
   finishOauth: {
     method: 'GET',
     fastify: '/api/auth/oauth/:provider/callback',

@@ -421,15 +421,23 @@ A member says it for themselves on their own details page, one section per burn:
 - `DELETE /api/events/:eventId/attendance/me` — withdrawing, but **only while nothing
   has been paid**. What a refund means is a real decision and #31 owns it; deleting
   the row here would quietly discard the record that money changed hands.
+- `POST /api/events/:eventId/attendance/me/donation` — the paid member's way out when
+  nobody takes the place: the row goes and the payment stays with the hosts, and the
+  organisers are told. See [Handing a place over](#handing-a-place-over).
 - `PATCH /api/events/:eventId/attendance/me` — the stay itself.
+
+The Members page links here as well, to the burn it is showing: `stayPage(eventId)` is
+`/profile?burn=<id>`, which selects that burn in the bar and scrolls the details page to
+its section — "not coming after all?" for somebody on the list, "Coming?" for a member who
+is not.
 
 **Named by event id, not by "active"** (#184). These were `…/events/active/attendance`
 while there was one place to see a burn and it was whichever came next. The details
 page lists every burn still to come and offers to join any of them, and the second
 one on that list is by definition not the soonest-ending — so an active-scoped join
-could not say yes to it. All three refuse a burn that has **ended**, and answer 404
-for that and for an id that never existed alike, so an id cannot be probed for
-existence.
+could not say yes to it. The join, the withdrawal, the stay and the donation all
+refuse a burn that has **ended**, and answer 404 for that and for an id that never
+existed alike, so an id cannot be probed for existence.
 
 An admin can do it for someone, because people ask over Discord and an
 admin should not have to talk them through a UI:
@@ -608,9 +616,9 @@ an admin removing an **unpaid** member, and the transfer.
 A place taken by whoever is standing in it makes all three move the line. With a cap of two and
 `[A paid, B unpaid, C unpaid]`, C has been told they are on the waiting list; B leaving by any of
 those doors puts C in a place on the roster, and without the recompute their bell would go on saying
-otherwise — the same disagreement this counting exists to close. All five doors now call
+otherwise — the same disagreement this counting exists to close. All six doors now call
 `tellAboutTheWaitingList`: joining, an admin adding, a payment changing in either direction, a row
-being deleted by either route, and the transfer.
+being deleted by either route, the transfer, and a paid place left to the hosts.
 
 **Un-recording a payment counts too** (#647), where the `PATCH` used to recompute only on the
 transition _to_ paid. It is `nowPaid !== wasPaid`, so the condition is the change rather than one
@@ -651,13 +659,20 @@ and a link to the members page. It is the `payment_reminder` category, which **n
 ## Handing a place over
 
 Withdrawing is refused once you have paid, because what a refund means is #31's
-question. That left a paid member who could not come with no way out and their
-place unreachable by the waiting list, so `POST
-/api/events/:eventId/attendance/me/transfer` is the exit: it moves the payment to
-somebody unpaid at that burn and **deletes the giver's attendance row**.
+question. A paid member who cannot come has two other exits, and both **delete their
+attendance row**, so the place reaches the waiting list either way:
 
-One-sided and immediate — the money is settled between the two of them offline,
-which is what the burn's transfer text tells them to do, so an accept step would
+- `POST /api/events/:eventId/attendance/me/transfer` moves the payment to somebody
+  unpaid at that burn.
+- `POST /api/events/:eventId/attendance/me/donation` (#845) moves it nowhere. **There
+  is no refund**: what was paid stays with the hosts and the facilities, and the place
+  goes to whoever is next in line. Every admin but the donor is told in the bell, under
+  `place_donated`, and that notification is the record that money changed hands, since
+  the row that carried `payment_date` is gone. An unpaid row is refused with 409 — the
+  plain withdrawal is its way out.
+
+The transfer is one-sided and immediate — the money is settled between the two of
+them offline, which is what the burn's transfer text tells them to do, so an accept step would
 only let a place sit in limbo. The taker is notified; the giver is not, having
 clicked it themselves.
 

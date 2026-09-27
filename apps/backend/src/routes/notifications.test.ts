@@ -309,6 +309,7 @@ describe('what somebody has switched on', () => {
     'meal_comment',
     'hearted',
     'application',
+    'place_donated',
     'application_news',
   ]
 
@@ -708,6 +709,34 @@ describe('the waiting list', () => {
       payload: { to_account_id: taker.id },
     })
     expect(handed.statusCode).toBe(204)
+
+    expect(await bodies(server, behind.cookie)).toContainEqual(
+      expect.stringContaining('You are in one for now'),
+    )
+  })
+
+  it('does the same when a paid member leaves their payment to the hosts', async () => {
+    const server = await build()
+    await givenBurn(2)
+    const admin = await givenAccount(['admin'])
+    const donor = await givenAccount()
+    const paid = await givenAccount()
+    const behind = await givenAccount()
+    for (const [at, who] of [donor, paid, behind].entries()) {
+      await givenComing(who.id, false, joinedAt(at))
+    }
+    await setPaid(server, admin.cookie, donor.id)
+    await setPaid(server, admin.cookie, paid.id)
+    expect(await bodies(server, behind.cookie)).toContainEqual(
+      expect.stringContaining('you are on the waiting list'),
+    )
+
+    const given = await server.inject({
+      method: 'POST',
+      url: `/api/events/${BURN}/attendance/me/donation`,
+      headers: { cookie: donor.cookie },
+    })
+    expect(given.statusCode).toBe(204)
 
     expect(await bodies(server, behind.cookie)).toContainEqual(
       expect.stringContaining('You are in one for now'),

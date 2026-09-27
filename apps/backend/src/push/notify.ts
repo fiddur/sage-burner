@@ -293,16 +293,23 @@ export const namedBy = async (
   return mentionedAccounts(body).filter((id) => audience.has(id))
 }
 
-export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): Promise<number> => {
+export const notifyAdmins = async (
+  db: Database,
+  notify: Notifier,
+  told: Told,
+  { except = [] }: { except?: readonly (string | undefined)[] } = {},
+): Promise<number> => {
   const rows = await db
     .select({ account_id: accountRole.account_id })
     .from(accountRole)
     .where(eq(accountRole.role, 'admin'))
 
+  const silent = new Set(except)
+  const audience = rows.filter((row) => !silent.has(row.account_id))
   const one = oneBatch(told)
-  for (const row of rows) await notify(row.account_id, one)
+  for (const row of audience) await notify(row.account_id, one)
 
-  return rows.length
+  return audience.length
 }
 
 export const notifyEveryone = async (db: Database, notify: Notifier, told: Told): Promise<number> => {
