@@ -5,6 +5,8 @@ import type { AnySQLiteColumn, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
   accountRoles,
   applicationStatuses,
+  buildPriorities,
+  buildTiers,
   connectionKinds,
   digestChoices,
   effortLevels,
@@ -1007,6 +1009,67 @@ export const bringHand = sqliteTable(
       .references(() => attendance.id, { onDelete: 'cascade' }),
   },
   (table) => [primaryKey({ columns: [table.item_id, table.attendance_id] })],
+)
+
+export const buildProject = sqliteTable(
+  'build_project',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    description: text('description').notNull().default(''),
+    tier: text('tier', { enum: buildTiers }).notNull(),
+    order: integer('order').notNull(),
+    lead_attendance_id: text('lead_attendance_id').references(() => attendance.id, {
+      onDelete: 'set null',
+    }),
+    withdrawn_at: text('withdrawn_at'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('build_project_event_idx').on(table.event_id, table.tier, table.order),
+    check('build_project_title_check', sql`length(trim(${table.title})) > 0`),
+    check('build_project_tier_check', oneOf(table.tier, buildTiers)),
+  ],
+)
+
+export const buildHelper = sqliteTable(
+  'build_helper',
+  {
+    project_id: text('project_id')
+      .notNull()
+      .references(() => buildProject.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.project_id, table.attendance_id] })],
+)
+
+export const buildItem = sqliteTable(
+  'build_item',
+  {
+    id: text('id').notNull(),
+    project_id: text('project_id')
+      .notNull()
+      .references(() => buildProject.id, { onDelete: 'cascade' }),
+    text: text('text').notNull(),
+    priority: text('priority', { enum: buildPriorities }).notNull(),
+    done_by_account_id: text('done_by_account_id').references(() => account.id, { onDelete: 'set null' }),
+    done_at: text('done_at'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('build_item_project_idx').on(table.project_id),
+    check('build_item_text_check', sql`length(trim(${table.text})) > 0`),
+    check('build_item_priority_check', oneOf(table.priority, buildPriorities)),
+    check('build_item_done_check', sql`${table.done_at} is not null or ${table.done_by_account_id} is null`),
+  ],
 )
 
 // No `event_id`: a song outlives any one burn, so the book is global.

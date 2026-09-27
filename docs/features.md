@@ -137,6 +137,12 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - The lead-roles register: the burn's jobs, any member takes one, hands one
   over or appoints somebody — and whoever it happens to is told. Each role has a
   card on the feed, so "who can take this?" has somewhere to be asked.
+- Build: what gets built on site, per burn, under two headers — **Realities** and
+  **Nice to have** — each in an order somebody arranged. A project has a
+  description, a lead, helpers, a heart, a conversation and a card on the feed,
+  and a checklist of what it needs, each thing Needed, Good or Bonus; ticking one
+  greys it where it stands. Taking a project off is soft, and for thirty days the
+  page offers it back.
 - Editing is scoped to burns that have not ended; a finished burn is a record.
 
 ## Talking — [the-app.md](./the-app.md)
@@ -144,7 +150,7 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - The feed: what everyone has been doing and saying, as one kind of thing — a
   card carrying its whole history and the talk under it, for a dream, a person at
   a burn, an announcement, a song, a bring item, a journey on the rideshare
-  board, a talking point, a meeting, a lead role or a meal.
+  board, a build project, a talking point, a meeting, a lead role or a meal.
 - A chip row filters the feed by kind, carried in the URL, defaulting to
   everything.
 - Comments on any card: markdown, edit your own, delete your own (an admin may

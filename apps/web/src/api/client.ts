@@ -15,6 +15,8 @@ import type {
   BodyOf,
   BringListResponse,
   BringResponse,
+  BuildProjectResponse,
+  BuildProjectsResponse,
   CalendarFeedResponse,
   ChangelogResponse,
   ConnectionResponse,
@@ -167,6 +169,7 @@ const failureToReach = (cause: unknown): ApiError =>
 
 export type Guarded =
   | 'active-event'
+  | 'build'
   | 'faq'
   | 'lead-roles'
   | 'meals'
@@ -1122,6 +1125,73 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     deleteMeeting: (id: string) =>
       request<undefined>(apiRoutes.deleteMeeting.path(id), {
         method: apiRoutes.deleteMeeting.method,
+      }),
+
+    getBuildProjects: (eventId: string, signal?: AbortSignal) =>
+      request<BuildProjectsResponse>(apiRoutes.getBuildProjects.path(eventId), { signal, version: 'build' }),
+
+    addBuildProject: (eventId: string, body: BodyOf<'addBuildProject'>) =>
+      request<BuildProjectResponse>(apiRoutes.addBuildProject.path(eventId), {
+        method: apiRoutes.addBuildProject.method,
+        body,
+      }),
+
+    updateBuildProject: (id: string, body: BodyOf<'updateBuildProject'>) =>
+      request<BuildProjectResponse>(apiRoutes.updateBuildProject.path(id), {
+        method: apiRoutes.updateBuildProject.method,
+        body,
+        version: 'build',
+      }),
+
+    reorderBuildProjects: (eventId: string, body: BodyOf<'reorderBuildProjects'>) =>
+      request<BuildProjectsResponse>(apiRoutes.reorderBuildProjects.path(eventId), {
+        method: apiRoutes.reorderBuildProjects.method,
+        body,
+        version: 'build',
+      }),
+
+    deleteBuildProject: (id: string) =>
+      request<undefined>(apiRoutes.deleteBuildProject.path(id), {
+        method: apiRoutes.deleteBuildProject.method,
+      }),
+
+    restoreBuildProject: (id: string) =>
+      request<BuildProjectResponse>(apiRoutes.restoreBuildProject.path(id), {
+        method: apiRoutes.restoreBuildProject.method,
+      }),
+
+    setBuildLead: (id: string, accountId: string | null) =>
+      request<BuildProjectResponse>(apiRoutes.setBuildLead.path(id), {
+        method: apiRoutes.setBuildLead.method,
+        body: { account_id: accountId } satisfies BodyOf<'setBuildLead'>,
+      }),
+
+    addBuildHelper: (id: string, accountId: string) =>
+      request<BuildProjectResponse>(apiRoutes.addBuildHelper.path(id), {
+        method: apiRoutes.addBuildHelper.method,
+        body: { account_id: accountId } satisfies BodyOf<'addBuildHelper'>,
+      }),
+
+    removeBuildHelper: (id: string, accountId: string) =>
+      request<undefined>(apiRoutes.removeBuildHelper.path(id, accountId), {
+        method: apiRoutes.removeBuildHelper.method,
+      }),
+
+    addBuildItem: (id: string, body: BodyOf<'addBuildItem'>) =>
+      request<BuildProjectResponse>(apiRoutes.addBuildItem.path(id), {
+        method: apiRoutes.addBuildItem.method,
+        body,
+      }),
+
+    updateBuildItem: (itemId: string, body: BodyOf<'updateBuildItem'>) =>
+      request<BuildProjectResponse>(apiRoutes.updateBuildItem.path(itemId), {
+        method: apiRoutes.updateBuildItem.method,
+        body,
+      }),
+
+    deleteBuildItem: (itemId: string) =>
+      request<undefined>(apiRoutes.deleteBuildItem.path(itemId), {
+        method: apiRoutes.deleteBuildItem.method,
       }),
 
     getBringList: (eventId: string, signal?: AbortSignal) =>

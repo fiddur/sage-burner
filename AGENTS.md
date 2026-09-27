@@ -95,6 +95,10 @@ by reading Rollup's docs.
   redeploy.
 - Store data normalized: reference entities by id rather than duplicating
   mutable fields, and resolve names at query time.
+- **Soft-delete anything that takes more than about fifteen seconds to type again.**
+  Weigh it for every new thing members can remove: a dream, a song, a build project is
+  withdrawn and offered back; a one-line checklist entry is simply deleted. Soft means
+  kept with its conversation and offered back on the page, not merely hidden.
 
 ## Code style
 

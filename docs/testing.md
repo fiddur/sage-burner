@@ -396,6 +396,29 @@ phone" means 360px.
       its card on the feed, and the poster is told about a comment somebody else leaves.
 - [ ] Take a journey down: it leaves the board and its card leaves the feed.
 
+## Build
+
+- [ ] ☰ → Build, add a project under **Realities**: it lands at the end of that header, and a
+      card appears on the feed under the **Build** chip. A second member who is coming and has
+      turned `build_added` on is told "A new build project: <title>"; you are not.
+- [ ] Edit it and move it to **Nice to have**: it lands at the end of that header, and its
+      card says "moved it to Nice to have".
+- [ ] With two projects under one header, move one with ▲/▼ and by dragging: the order holds
+      after a reload.
+- [ ] 🙋 on its Lead takes the lead; 👉 on Helpers appoints somebody else, who is told. The
+      card says who is leading and helping.
+- [ ] Add three checklist lines as Bonus, Good and Needed: they list Needed, Good, Bonus. Tick
+      the Good one: it greys and strikes through where it stands, and the feed card gains no
+      line.
+- [ ] With the page open in two tabs, edit the description in one and save, then edit it in
+      the other: the second save is refused, showing the first tab's words. Ticking a line in
+      one tab does not make an edit in the other refused.
+- [ ] 💬 on the project opens its conversation; a comment from a second member reaches whoever
+      added, leads or helps with it. ♡ on the page and on the feed card is one heart.
+- [ ] Take it off: it leaves its header and its card leaves the feed, and it is listed under
+      **Recently taken off**. Bring it back: it returns at the end of its header with its
+      checklist, its people and its conversation.
+
 ## Food
 
 - [ ] ☰ → Pantry as a member: the seeded list is there, ordered by name, with where each

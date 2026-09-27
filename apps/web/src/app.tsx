@@ -43,6 +43,7 @@ import { AdminSettings } from './pages/AdminSettings.tsx'
 import { AdminSongCategories } from './pages/AdminSongCategories.tsx'
 import { Apply } from './pages/Apply.tsx'
 import { Bring } from './pages/Bring.tsx'
+import { Build } from './pages/Build.tsx'
 import { Changelog } from './pages/Changelog.tsx'
 import { Dreams } from './pages/Dreams.tsx'
 import { Faq } from './pages/Faq.tsx'
@@ -218,6 +219,18 @@ export type RoutesApi = Pick<
   | 'reorderPantryPlaces'
   | 'putPantrySpot'
   | 'removePantrySpot'
+  | 'getBuildProjects'
+  | 'addBuildProject'
+  | 'updateBuildProject'
+  | 'reorderBuildProjects'
+  | 'deleteBuildProject'
+  | 'restoreBuildProject'
+  | 'setBuildLead'
+  | 'addBuildHelper'
+  | 'removeBuildHelper'
+  | 'addBuildItem'
+  | 'updateBuildItem'
+  | 'deleteBuildItem'
   | 'getBringList'
   | 'addBringItem'
   | 'updateBringItem'
@@ -339,6 +352,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
   const RidesRoute = useMemo(() => () => <Rides api={api} />, [api])
   const BringRoute = useMemo(() => () => <Bring api={api} />, [api])
+  const BuildRoute = useMemo(() => () => <Build api={api} />, [api])
   const PantryRoute = useMemo(() => () => <Pantry api={api} />, [api])
   const ShoppingRoute = useMemo(() => () => <Shopping api={api} />, [api])
   const MeetingsRoute = useMemo(() => () => <Meetings api={api} />, [api])
@@ -390,6 +404,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/roles" component={RolesRoute} />
       <Route path="/rides" component={RidesRoute} />
       <Route path="/bring" component={BringRoute} />
+      <Route path="/build" component={BuildRoute} />
       <Route path={pantryPage()} component={PantryRoute} />
       <Route path="/shopping" component={ShoppingRoute} />
       <Route path="/meetings" component={MeetingsRoute} />

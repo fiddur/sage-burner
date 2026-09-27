@@ -12,6 +12,13 @@ import type {
   AttendanceUpdate,
   BringCreateInput,
   BringUpdate,
+  BuildHelper,
+  BuildItemCreateInput,
+  BuildItemUpdate,
+  BuildLead,
+  BuildProjectCreateInput,
+  BuildProjectUpdate,
+  BuildReorder,
   CommentInput,
   ConnectionCreate,
   ConnectionOrder,
@@ -165,6 +172,67 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/events/:eventId/bring',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/bring`,
+  },
+  getBuildProjects: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/build',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/build`,
+  },
+  addBuildProject: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/build',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/build`,
+  },
+  reorderBuildProjects: {
+    method: 'PUT',
+    fastify: '/api/events/:eventId/build/order',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/build/order`,
+  },
+  updateBuildProject: {
+    method: 'PATCH',
+    fastify: '/api/build/:id',
+    path: (id: string) => `/api/build/${encodeURIComponent(id)}`,
+  },
+  deleteBuildProject: {
+    method: 'DELETE',
+    fastify: '/api/build/:id',
+    path: (id: string) => `/api/build/${encodeURIComponent(id)}`,
+  },
+  restoreBuildProject: {
+    method: 'POST',
+    fastify: '/api/build/:id/restore',
+    path: (id: string) => `/api/build/${encodeURIComponent(id)}/restore`,
+  },
+  setBuildLead: {
+    method: 'PUT',
+    fastify: '/api/build/:id/lead',
+    path: (id: string) => `/api/build/${encodeURIComponent(id)}/lead`,
+  },
+  addBuildHelper: {
+    method: 'POST',
+    fastify: '/api/build/:id/helpers',
+    path: (id: string) => `/api/build/${encodeURIComponent(id)}/helpers`,
+  },
+  removeBuildHelper: {
+    method: 'DELETE',
+    fastify: '/api/build/:id/helpers/:accountId',
+    path: (id: string, accountId: string) =>
+      `/api/build/${encodeURIComponent(id)}/helpers/${encodeURIComponent(accountId)}`,
+  },
+  addBuildItem: {
+    method: 'POST',
+    fastify: '/api/build/:id/items',
+    path: (id: string) => `/api/build/${encodeURIComponent(id)}/items`,
+  },
+  updateBuildItem: {
+    method: 'PATCH',
+    fastify: '/api/build-items/:itemId',
+    path: (itemId: string) => `/api/build-items/${encodeURIComponent(itemId)}`,
+  },
+  deleteBuildItem: {
+    method: 'DELETE',
+    fastify: '/api/build-items/:itemId',
+    path: (itemId: string) => `/api/build-items/${encodeURIComponent(itemId)}`,
   },
   addEventOption: {
     method: 'POST',
@@ -1349,6 +1417,13 @@ export interface RouteBodies {
   updateMyConnection: ConnectionUpdate
   reorderMyConnections: ConnectionOrder
   addBringItem: BringCreateInput
+  addBuildProject: BuildProjectCreateInput
+  updateBuildProject: BuildProjectUpdate
+  reorderBuildProjects: BuildReorder
+  setBuildLead: BuildLead
+  addBuildHelper: BuildHelper
+  addBuildItem: BuildItemCreateInput
+  updateBuildItem: BuildItemUpdate
   addMeeting: MeetingCreateInput
   addMeetingPoint: MeetingPointCreateInput
   addEventOption: EventOptionCreateInput

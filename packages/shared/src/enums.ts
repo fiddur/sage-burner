@@ -12,6 +12,23 @@ export const isPlaceColor = (value: unknown): value is PlaceColor => isOneOf(pla
 export const rideKinds = ['needs', 'offers'] as const
 export type RideKind = (typeof rideKinds)[number]
 
+export const buildTiers = ['reality', 'nice_to_have'] as const
+export type BuildTier = (typeof buildTiers)[number]
+
+export const buildTierLabel = {
+  reality: 'Realities',
+  nice_to_have: 'Nice to have',
+} as const satisfies Record<BuildTier, string>
+
+export const buildPriorities = ['needed', 'good', 'bonus'] as const
+export type BuildPriority = (typeof buildPriorities)[number]
+
+export const buildPriorityLabel = {
+  needed: 'Needed',
+  good: 'Good',
+  bonus: 'Bonus',
+} as const satisfies Record<BuildPriority, string>
+
 export const eventOptionKinds = ['lodging', 'helping'] as const
 export type EventOptionKind = (typeof eventOptionKinds)[number]
 export const isEventOptionKind = (value: unknown): value is EventOptionKind =>
@@ -112,6 +129,10 @@ export const notificationCategories = [
   'ride_posted',
   'ride_comment',
   'ride_comment_any',
+  'build_added',
+  'build_role',
+  'build_comment',
+  'build_comment_any',
   'point_raised',
   'point_decided',
   'point_comment',
@@ -222,6 +243,20 @@ export const notificationCategoryInfo = {
     email: false,
     about: 'else',
   },
+  build_added: { label: 'Somebody adds a build project', on: false, email: false, about: 'else' },
+  build_role: { label: 'Put on or taken off a build project', on: true, email: false, about: 'you' },
+  build_comment: {
+    label: 'Somebody comments on a build project you started, lead or help with',
+    on: true,
+    email: false,
+    about: 'you',
+  },
+  build_comment_any: {
+    label: 'Somebody comments on any build project',
+    on: false,
+    email: false,
+    about: 'else',
+  },
   point_raised: { label: 'Somebody raises a talking point', on: false, email: false, about: 'else' },
   point_decided: { label: 'A talking point is decided', on: false, email: false, about: 'else' },
   point_comment: { label: 'Somebody comments on a point you raised', on: true, email: false, about: 'you' },
@@ -311,6 +346,7 @@ export const threadEntityTypes = [
   'role',
   'meal',
   'ride',
+  'build',
 ] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
@@ -331,6 +367,7 @@ export const feedKindLabel = {
   role: 'Leads',
   meal: 'Meals',
   ride: 'Rides',
+  build: 'Build',
 } as const satisfies Record<FeedKind, string>
 
 export const KINDS_PARAM = 'kinds'
@@ -444,6 +481,13 @@ const rideCategory = (kind: ThreadEntryKind): NotificationCategory | undefined =
   return undefined
 }
 
+const buildCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'build_comment_any'
+  if (kind === 'added') return 'build_added'
+
+  return undefined
+}
+
 const categoriesFor = {
   session: sessionCategory,
   attendance: attendanceCategory,
@@ -455,6 +499,7 @@ const categoriesFor = {
   role: roleCategory,
   meal: mealCategory,
   ride: rideCategory,
+  build: buildCategory,
 } as const satisfies Record<ThreadEntityType, (kind: ThreadEntryKind) => NotificationCategory | undefined>
 
 export const entryCategory = (

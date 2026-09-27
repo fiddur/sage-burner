@@ -866,3 +866,47 @@ reason the bring list does not take one.
 over the wording three times is one line rather than three; a save that changed nothing
 writes none. Notes are plain text with no mention picker, so nothing here calls `namedBy` —
 a comment on the card is where naming somebody belongs.
+
+## Build
+
+What gets built on site (#847): the dome, the kitchen, the swing, and the list of what each
+one needs. It replaces a spreadsheet tab, so the default is the shared-furniture one — any
+approved member adds, edits, arranges and takes off a project, and ticks its checklist.
+
+**Two headers, arranged by hand.** A project is under **Realities** or **Nice to have**, and
+within each the order is the one somebody dragged it into; a new project, and one moved to the
+other header, goes to the end. The order is an `order` column scoped to `(event_id, tier)`,
+the FAQ's scheme with a second key.
+
+**A lead and helpers, as a lead role has.** One lead, any number of helpers, both must be
+coming to the burn, and the same one control appoints, volunteers and takes off — with
+`build_role` telling whoever it happened to, never whoever clicked. There is no burn-wide
+"somebody took the lead" news: a project's lead is its own business in a way a role's is not.
+
+**A checklist, kept off the feed.** Each line is Needed, Good or Bonus and is listed in that
+order, then by when it was written. A tick records who and when, and nothing else — there is
+no assignee per line, because the helpers already say who is on it. Ticking greys and strikes
+a line through where it stands rather than moving it: a list that reshuffles under somebody's
+thumb is one they tick the wrong line on. Adding, rewording, ticking and deleting a line write
+nothing on the project's card and notify nobody: forty ticks on build day would bury every
+conversation on the feed under noise. A line is a hard delete, being quick to type again.
+
+**A project is a feed card, and a heart is the card's heart.** Adding one opens a `build`
+thread and tells whoever is coming under `build_added`; its heart is `thread_support`, so the
+♡ on the page and on the card are one. Comments reach whoever added, leads or helps with it
+under `build_comment`.
+
+**Taking one off is soft**, the dreams' way: `withdrawn_at` is set, the card is marked gone
+and leaves the feed, and for thirty days the page offers it back with its checklist, people,
+hearts and conversation intact. A project takes more than a moment to write again, which is
+where this app draws the line between a hard delete and a soft one. Restoring puts it at the
+end of its header. Every other write refuses a project that has been taken off.
+
+**`If-Match` guards only what an edit can clobber**: the live projects' titles, descriptions,
+headers and order. Ticks, lines, leads, helpers and hearts are not in the version, so ticking a
+box never makes somebody else's description edit come back refused — those writes are each
+one small fact that a second writer cannot silently undo. A refused edit answers with what is
+saved now, keyed by project, which the page shows beside the draft.
+
+Not carried between burns: a build is particular to its site and its year, so there is no
+copy-from-a-previous-burn as the FAQ and the lead roles have.
