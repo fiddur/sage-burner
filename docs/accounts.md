@@ -1194,11 +1194,13 @@ differently:
   one category in it the header row _is_ the row: no expander, and the switch on it is
   that category's own.
 
-- **What you look after** — an application arriving, and **only an admin is shown it**
+- **What you look after** — an application arriving, and a paid member leaving their
+  payment to the hosts (`place_donated`, #845), and **only an admin is shown it**
   (#326). Nobody else is ever told, and a switch that cannot do anything reads as a
   promise. On, like the first section: an application stays open until somebody reviews
-  it. The wire still carries it for everybody, because the settings are per account and
-  know nothing about roles — so a member unticking a row does not switch it off for
+  it, and a donated payment is money the organisers' books have to account for. The
+  wire still carries it for everybody, because the settings are per account and know
+  nothing about roles — so a member unticking a row does not switch it off for
   whoever does hold `admin`.
 
 That split is what decides the storage. `notification_mute` held only the categories
@@ -1492,7 +1494,7 @@ which is why `digestPreviewFor` takes no account id.
 
 **What the feed cannot carry drops out of the digest with it.** Nothing writes a thread entry
 for `payment`, `waiting_list_near`, `waiting_list_pushed`, `meal_role`, `new_version`,
-`application` or `application_news`, so none of them is in a digest. Those stay
+`application`, `place_donated` or `application_news`, so none of them is in a digest. Those stay
 the bell's and the per-category email column's. Meals are the one shared list with no feed
 presence at all, which is a gap in the feed rather than in the digest — #667 is where it is
 tracked, and giving a meal a card puts it in the digest with no change here.

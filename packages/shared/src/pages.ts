@@ -132,6 +132,8 @@ export const loginPage = (outcome?: OAuthOutcome, ref?: string): string =>
 export const detailsPage = (outcome?: OAuthOutcome, ref?: string): string =>
   `/profile${outcomeQuery(outcome, ref)}`
 
+export const stayPage = (eventId: string): string => `/profile?${BURN_PARAM}=${encodeURIComponent(eventId)}`
+
 export const notificationsPage = (): string => '/notifications'
 
 export const forgottenPage = (): string => '/forgotten'

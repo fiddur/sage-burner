@@ -83,7 +83,10 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   join order, with the line drawn where the cap runs out. Paying moves you up;
   waiting-list movements notify the people they happen to.
 - Admins record payment; a paid member who cannot come hands their place (and
-  payment) to somebody unpaid.
+  payment) to somebody unpaid, or gives it up and leaves the payment to the hosts,
+  which tells the organisers.
+- The Members page links to your details, opened at that burn, for saying you are
+  coming or changing when — or whether — you are.
 - The roster counts who has signed up against the cap and how many have paid. A
   member whose place is not paid for sees a strip on every page pointing at the
   payment instructions, which they can hide for a day.

@@ -171,6 +171,21 @@ describe('migrations', () => {
     ).not.toThrow()
   })
 
+  it('takes a place left to the hosts in the bell and in a stored setting', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          'insert into notification (id, account_id, category, body, created_at) values (?, ?, ?, ?, ?)',
+        )
+        .run('n-1', ids.account, 'place_donated', 'Ann is not coming and leaves their payment', NOW),
+    ).not.toThrow()
+    expect(() =>
+      handle.client
+        .prepare('insert into notification_setting (account_id, category, enabled) values (?, ?, ?)')
+        .run(ids.account, 'place_donated', 0),
+    ).not.toThrow()
+  })
+
   it('still refuses a category nobody has heard of', () => {
     expect(() =>
       handle.client

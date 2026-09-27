@@ -1,6 +1,8 @@
 import type { EventOptionsResponse, MyBurn, PaymentStatus } from '@sage-burner/shared'
 
-import { useState } from 'preact/hooks'
+import { BURN_PARAM } from '@sage-burner/shared'
+import { useLocation } from 'preact-iso'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
@@ -18,6 +20,7 @@ export type YourBurnsApi = Pick<
   | 'getMyBurns'
   | 'joinEvent'
   | 'leaveEvent'
+  | 'donateMyPlace'
   | 'updateMyStay'
   | 'getEventOptions'
   | 'getMembers'
@@ -55,6 +58,18 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
 
   const { busy, error, run } = useAction(reload)
 
+  const asked: string | undefined = useLocation().query?.[BURN_PARAM]
+  const target = useRef<HTMLElement>(null)
+  const scrolledTo = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (loaded.status !== 'ready' || asked === undefined || scrolledTo.current === asked) return
+    if (target.current === null) return
+
+    scrolledTo.current = asked
+    target.current.scrollIntoView?.({ block: 'start' })
+  }, [loaded.status, asked])
+
   const act = (change: () => Promise<unknown>, refusals: Readonly<Record<number, string>>) => {
     run(
       change,
@@ -83,7 +98,11 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
 
       {loaded.status === 'ready' &&
         loaded.data.burns.map((burn) => (
-          <section key={burn.event.id}>
+          <section
+            key={burn.event.id}
+            id={`burn-${burn.event.id}`}
+            ref={burn.event.id === asked ? target : undefined}
+          >
             <hr />
             <h2>{burn.event.name}</h2>
             <p class="form-note">
@@ -135,15 +154,38 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                 />
 
                 {burn.attendance.payment_status === 'paid' ? (
-                  <HandOverPlace
-                    api={api}
-                    eventId={burn.event.id}
-                    myAccountId={viewer.account?.id}
-                    onDone={() => {
-                      refreshBurns()
-                      void reload()
-                    }}
-                  />
+                  <>
+                    <HandOverPlace
+                      api={api}
+                      eventId={burn.event.id}
+                      myAccountId={viewer.account?.id}
+                      onDone={() => {
+                        refreshBurns()
+                        void reload()
+                      }}
+                    />
+                    <p class="row">
+                      <Destroy
+                        what={`your place at ${burn.event.name}`}
+                        verb="Give up"
+                        because="There is no refund: what you paid goes to the hosts and the facilities, and your place goes to whoever is next in line."
+                        trigger="I cannot come — leave my payment to the hosts"
+                        busy={busy}
+                        onDestroy={() =>
+                          act(
+                            async () => {
+                              await api.donateMyPlace(burn.event.id)
+                              refreshBurns()
+                            },
+                            {
+                              409: 'Your payment is not recorded — you can simply give the place up.',
+                              404: 'That burn is over, so there is nothing left to withdraw from.',
+                            },
+                          )
+                        }
+                      />
+                    </p>
+                  </>
                 ) : (
                   <p class="row">
                     <Destroy

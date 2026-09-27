@@ -130,6 +130,7 @@ export const notificationCategories = [
   'hearted',
   'new_version',
   'application',
+  'place_donated',
   'application_news',
   'payment_reminder',
 ] as const
@@ -259,6 +260,12 @@ export const notificationCategoryInfo = {
   hearted: { label: 'Somebody hearts something you wrote', on: true, email: false, about: 'you' },
   new_version: { label: 'A new version of the app is out', on: false, email: false, about: 'app' },
   application: { label: 'Somebody applies to join', on: true, email: false, about: 'admin' },
+  place_donated: {
+    label: 'Somebody leaves a paid place to the hosts',
+    on: true,
+    email: false,
+    about: 'admin',
+  },
   application_news: { label: 'News about your application', on: true, email: true, about: 'you' },
   payment_reminder: {
     label: 'A reminder from the organisers to pay',

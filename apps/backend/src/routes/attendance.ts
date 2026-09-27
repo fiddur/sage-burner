@@ -14,7 +14,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, accountAvatar, attendance, event } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, tellAttendees } from '../push/notify.ts'
+import { displayName, notifyAdmins, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
 import { cardEntry, JOINED } from './threads.ts'
@@ -264,6 +264,54 @@ export const registerAttendanceRoutes = (
       })
 
       await tellAboutTheWaitingList(db, open.id, notify, now)
+
+      return reply.code(204).send()
+    },
+  )
+
+  app.post<{ Params: { eventId: string } }>(
+    apiRoutes.donateMyPlace.fastify,
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const found = await openEventNow(db, now, request.params.eventId)
+      if (found === undefined) return sendError(reply, 404)
+
+      const removed = await db
+        .delete(attendance)
+        .where(
+          and(
+            eq(attendance.event_id, found.id),
+            eq(attendance.account_id, viewer.account_id),
+            eq(attendance.payment_status, 'paid'),
+          ),
+        )
+        .returning({ id: attendance.id })
+
+      if (removed.length === 0) {
+        const existing = await joinedRow(found.id, viewer.account_id)
+
+        return existing === undefined ? sendError(reply, 404) : sendError(reply, 409)
+      }
+
+      const name = await displayName(db, viewer.account_id)
+
+      await notifyAdmins(
+        db,
+        notify,
+        {
+          category: 'place_donated',
+          body: `${name} is not coming to ${found.name} and leaves their payment to the hosts.`,
+          link: membersPage(found.id),
+        },
+        { except: [viewer.account_id] },
+      )
+
+      await tellAboutTheWaitingList(db, found.id, notify, now)
 
       return reply.code(204).send()
     },

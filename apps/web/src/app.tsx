@@ -1,6 +1,7 @@
 import {
   ADMIN_ACCOUNT_PATTERN,
   changelogPage,
+  detailsPage,
   forgottenPage,
   formattingPage,
   INVITE_PATTERN,
@@ -174,6 +175,7 @@ export type RoutesApi = Pick<
   | 'copyFaq'
   | 'joinEvent'
   | 'leaveEvent'
+  | 'donateMyPlace'
   | 'transferMyPlace'
   | 'getActiveRoster'
   | 'adminAddAttendance'
@@ -394,7 +396,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/faq" component={FaqRoute} />
       <Route path="/feed" component={FeedRoute} />
       <Route path={notificationsPage()} component={NotificationsRoute} />
-      <Route path="/profile" component={ProfileRoute} />
+      <Route path={detailsPage()} component={ProfileRoute} />
       <Route path={INVITE_PATTERN} component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />
       <Route path={forgottenPage()} component={ForgottenRoute} />

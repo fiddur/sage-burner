@@ -25,6 +25,7 @@ const DEFAULTS = [
   'waiting_list_near',
   'waiting_list_pushed',
   'application',
+  'place_donated',
 ] as const
 
 const asAdmin = (api: NotificationSettingsApi) => (
@@ -227,7 +228,7 @@ describe('what to be told about', () => {
 
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({
-        on: ['application', ...categoriesAbout('you')],
+        on: ['application', 'place_donated', ...categoriesAbout('you')],
         email: [],
         digest: 'daily',
       })
