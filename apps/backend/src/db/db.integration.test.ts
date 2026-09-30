@@ -206,6 +206,54 @@ describe('migrations', () => {
     ).not.toThrow()
   })
 
+  it('takes a FAQ question’s card, the lines it opens with and its categories', () => {
+    expect(() =>
+      handle.client
+        .prepare('insert into thread (id, event_id, entity_type, entity_id, title) values (?, ?, ?, ?, ?)')
+        .run('t-1', ids.event, 'faq', 'f-1', 'How do I get there?'),
+    ).not.toThrow()
+    for (const kind of ['asked', 'answered']) {
+      expect(
+        () =>
+          handle.client
+            .prepare(
+              'insert into thread_entry (id, thread_id, kind, seq, author_account_id, body, created_at)' +
+                ' values (?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(`te-${kind}`, 't-1', kind, kind === 'asked' ? 1 : 2, ids.account, kind, NOW),
+        kind,
+      ).not.toThrow()
+    }
+    expect(() =>
+      handle.client
+        .prepare(
+          'insert into notification (id, account_id, category, body, created_at) values (?, ?, ?, ?, ?)',
+        )
+        .run('n-1', ids.account, 'faq_asked', 'Ada asks: How do I get there?', NOW),
+    ).not.toThrow()
+    expect(() =>
+      handle.client
+        .prepare('insert into notification_setting (account_id, category, enabled) values (?, ?, ?)')
+        .run(ids.account, 'faq_comment_any', 1),
+    ).not.toThrow()
+  })
+
+  it('leaves a FAQ question with no asker when the asker’s account goes', () => {
+    seedAccount(ids.otherAccount, 'asker@example.org')
+    handle.client
+      .prepare(
+        'insert into faq_entry (id, event_id, question, answer, "order", author_account_id, created_at)' +
+          ' values (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run('f-1', ids.event, 'How do I get there?', '', 0, ids.otherAccount, NOW)
+
+    handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()
+
+    expect(
+      handle.client.prepare('select question, author_account_id from faq_entry where id = ?').get('f-1'),
+    ).toEqual({ question: 'How do I get there?', author_account_id: null })
+  })
+
   it('still refuses a category nobody has heard of', () => {
     expect(() =>
       handle.client
@@ -2300,5 +2348,87 @@ describe('the build tables', () => {
     )
     expect(() => insertItem('Struts', 'needed', { by: ids.account, at: NOW })).not.toThrow()
     expect(() => insertItem('Struts', 'needed', { by: null, at: NOW })).not.toThrow()
+  })
+})
+
+describe('the faq-cards migration', () => {
+  const FAQ_CARDS = '20260930100000_faq_cards'
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+
+  const withQuestionsOnThePage = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(FAQ_CARDS)
+
+    expect(kept).not.toContain(FAQ_CARDS)
+    expect(kept.length).toBeGreaterThan(0)
+
+    runMigrations(fresh, staged)
+    expect(fresh.client.prepare("select count(*) as n from thread where entity_type = 'faq'").get()?.n).toBe(
+      0,
+    )
+
+    anEvent(fresh, 'e-1', 'a-burn', NOW)
+    for (const [id, question, answer] of [
+      ['f-1', 'How do I get there?', 'The 609 bus.'],
+      ['f-2', 'What do I bring?', ''],
+    ] as [string, string, string][]) {
+      fresh.client
+        .prepare(
+          'insert into faq_entry (id, event_id, question, answer, "order", created_at) values (?, ?, ?, ?, ?, ?)',
+        )
+        .run(id, 'e-1', question, answer, 0, '2026-07-01T00:00:00.000Z')
+    }
+
+    return fresh
+  }
+
+  it('opens a card for every question already on the page, headed by the question', () => {
+    const fresh = withQuestionsOnThePage()
+    try {
+      runMigrations(fresh)
+
+      const rows = fresh.client
+        .prepare(
+          'select id, event_id, entity_id, title, subject_account_id from thread' +
+            " where entity_type = 'faq' order by entity_id",
+        )
+        .all()
+
+      expect(rows.map((row) => [row.entity_id, row.event_id, row.title, row.subject_account_id])).toEqual([
+        ['f-1', 'e-1', 'How do I get there?', null],
+        ['f-2', 'e-1', 'What do I bring?', null],
+      ])
+      expect(rows.every((row) => UUID.test(String(row.id)))).toBe(true)
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('opens each card with an asking line by nobody, dated when the question was', () => {
+    const fresh = withQuestionsOnThePage()
+    try {
+      runMigrations(fresh)
+
+      const rows = fresh.client
+        .prepare(
+          'select e.id, e.kind, e.seq, e.author_account_id, e.body, e.created_at, e.edited_at,' +
+            ' t.entity_id from thread_entry e join thread t on t.id = e.thread_id' +
+            " where t.entity_type = 'faq' order by t.entity_id",
+        )
+        .all()
+
+      expect(rows.map((row) => [row.entity_id, row.kind, row.seq, row.author_account_id, row.body])).toEqual([
+        ['f-1', 'asked', 1, null, 'asked this'],
+        ['f-2', 'asked', 1, null, 'asked this'],
+      ])
+      expect(rows.map((row) => [row.created_at, row.edited_at])).toEqual([
+        ['2026-07-01T00:00:00.000Z', null],
+        ['2026-07-01T00:00:00.000Z', null],
+      ])
+      expect(rows.every((row) => UUID.test(String(row.id)))).toBe(true)
+      expect(fresh.client.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      fresh.close()
+    }
   })
 })

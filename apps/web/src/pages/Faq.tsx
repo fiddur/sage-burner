@@ -1,19 +1,24 @@
-import type { FaqEntry } from '@sage-burner/shared'
+import type { EventAttendeesResponse, FaqEntry } from '@sage-burner/shared'
 
-import { MAX_FAQ_ANSWER, MAX_FAQ_QUESTION } from '@sage-burner/shared'
-import { useState } from 'preact/hooks'
+import { FAQ_PARAM, MAX_FAQ_ANSWER, MAX_FAQ_QUESTION, profilePage } from '@sage-burner/shared'
+import { useLocation } from 'preact-iso'
+import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { CopySource } from '../components/CopyFrom.tsx'
+import type { DreamTalk, DreamTalkApi } from '../components/OpenedDream.tsx'
 import type { UploadImage } from '../image-upload.ts'
 import type { Loaded } from '../load.ts'
 
 import { useBurns, useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
 import { Destroy } from '../components/Destroy.tsx'
+import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
+import { useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
 import { stillUploading } from '../image-upload.ts'
@@ -31,8 +36,17 @@ export type FaqApi = Pick<
   | 'getFaqSources'
   | 'copyFaq'
   | 'getActiveEvent'
+  | 'getEventAttendees'
+  | 'getThread'
+  | 'postComment'
+  | 'updateComment'
+  | 'deleteComment'
+  | 'supportComment'
+  | 'withdrawSupportForComment'
   | 'uploadImage'
 >
+
+type Attendee = EventAttendeesResponse['attendees'][number]
 
 interface Shown {
   eventId: string
@@ -40,11 +54,38 @@ interface Shown {
   picked: boolean
   entries: readonly FaqEntry[]
   sources: readonly CopySource[]
+  attendees: readonly Attendee[]
 }
 
 type Questions = Shown | null
 
 const UNANSWERED = 'Nobody has answered this yet.'
+
+const useQuestionTalk = (
+  api: DreamTalkApi,
+  entries: readonly FaqEntry[],
+  run: (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => void,
+) => {
+  const [opened, setOpened] = useState<string | undefined>(undefined)
+  const linked: string | undefined = useLocation().query?.[FAQ_PARAM]
+
+  useEffect(() => {
+    if (linked !== undefined) setOpened(linked)
+  }, [linked])
+
+  const talk = useDreamThread({
+    api,
+    threadId: entries.find((entry) => entry.id === opened)?.thread_id,
+    run,
+  })
+
+  return {
+    linked,
+    opened,
+    talk,
+    toggle: (id: string) => setOpened(opened === id ? undefined : id),
+  }
+}
 
 export const Faq = ({ api }: { api: FaqApi }) => {
   const viewer = useViewer()
@@ -60,9 +101,10 @@ export const Faq = ({ api }: { api: FaqApi }) => {
       const shown = picked ?? (await api.getActiveEvent(signal)).event
       if (shown === null) return null
 
-      const [faq, sources] = await Promise.all([
+      const [faq, sources, coming] = await Promise.all([
         api.getFaq(shown.id, signal),
         api.getFaqSources(shown.id, signal),
+        api.getEventAttendees(shown.id, signal),
       ])
 
       return {
@@ -71,6 +113,7 @@ export const Faq = ({ api }: { api: FaqApi }) => {
         picked: picked !== undefined,
         entries: faq.entries,
         sources: sources.sources,
+        attendees: coming.attendees,
       }
     },
     {
@@ -84,6 +127,8 @@ export const Faq = ({ api }: { api: FaqApi }) => {
 
   const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
   const entries = ready?.entries ?? []
+  const attendees = ready?.attendees ?? []
+  const { linked, opened, talk, toggle } = useQuestionTalk(api, entries, run)
 
   const reorderTo = (wanted: string[]) => {
     if (ready === undefined) return
@@ -143,6 +188,7 @@ export const Faq = ({ api }: { api: FaqApi }) => {
               entry={row}
               busy={busy}
               upload={api.uploadImage}
+              people={attendees}
               onCancel={() => setEditing(undefined)}
               onSave={(changes) => {
                 run(async () => {
@@ -155,6 +201,14 @@ export const Faq = ({ api }: { api: FaqApi }) => {
             <FaqRow
               entry={row}
               busy={busy}
+              linked={linked === row.id}
+              opened={opened === row.id}
+              talk={talk}
+              viewerId={viewer.account?.id}
+              admin={isAdmin(viewer)}
+              upload={api.uploadImage}
+              people={attendees}
+              onOpen={() => toggle(row.id)}
               onEdit={() => setEditing(row.id)}
               onRemove={() => run(() => api.deleteFaqEntry(row.id), 'Could not remove that question.')}
             />
@@ -201,18 +255,34 @@ export const Faq = ({ api }: { api: FaqApi }) => {
 const FaqRow = ({
   entry,
   busy,
+  linked,
+  opened,
+  talk,
+  viewerId,
+  admin,
+  upload,
+  people,
+  onOpen,
   onEdit,
   onRemove,
 }: {
   entry: FaqEntry
   busy: boolean
+  linked: boolean
+  opened: boolean
+  talk: DreamTalk
+  viewerId: string | undefined
+  admin: boolean
+  upload: UploadImage
+  people: readonly Attendee[]
+  onOpen: () => void
   onEdit: () => void
   onRemove: () => void
 }) => {
   const answered = entry.answer.trim() !== ''
 
   return (
-    <details class="faq-entry">
+    <details class="faq-entry" open={linked}>
       <summary>{entry.question}</summary>
 
       {answered ? (
@@ -221,13 +291,47 @@ const FaqRow = ({
         <p class="form-note">{UNANSWERED}</p>
       )}
 
+      {entry.author_account_id !== null && (
+        <p class="form-note">
+          Asked by <a href={profilePage(entry.author_account_id)}>{entry.author_name ?? 'somebody'}</a>
+        </p>
+      )}
+
       <p class="row">
+        <IconButton
+          icon="comment"
+          label={`${opened ? 'Hide' : 'Show'} what has been said about ${entry.question}`}
+          disabled={busy}
+          onClick={onOpen}
+        />
+
         <button type="button" class="link-button" disabled={busy} onClick={onEdit}>
           {answered ? 'Edit' : 'Answer it'}
         </button>
 
-        <Destroy what={entry.question} because="Its answer goes too." busy={busy} onDestroy={onRemove} />
+        <Destroy
+          what={entry.question}
+          because="Its answer and what has been said about it go too."
+          busy={busy}
+          onDestroy={onRemove}
+        />
       </p>
+
+      {opened && (
+        <DreamThread
+          thread={talk.thread}
+          viewerId={viewerId}
+          admin={admin}
+          busy={busy}
+          more={false}
+          upload={upload}
+          people={people}
+          onSay={talk.say}
+          onRewrite={talk.rewrite}
+          onRemove={talk.remove}
+          onHeart={talk.heart}
+        />
+      )}
     </details>
   )
 }
@@ -263,12 +367,14 @@ const FaqFields = ({
   entry,
   busy,
   upload,
+  people,
   onSave,
   onCancel,
 }: {
   entry: FaqEntry
   busy: boolean
   upload: UploadImage
+  people: readonly Attendee[]
   onSave: (changes: { question?: string; answer?: string }) => void
   onCancel: () => void
 }) => {
@@ -293,6 +399,7 @@ const FaqFields = ({
         value={answer}
         maxLength={MAX_FAQ_ANSWER}
         upload={upload}
+        people={people}
         onInput={setAnswer}
       />
 

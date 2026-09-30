@@ -1179,14 +1179,20 @@ differently:
   where every dream and every arrival pings forty-two people is a channel people learn
   to ignore, which costs the notifications that are actually about them.
 
-  **One exception, and what makes it one: a meeting has a time you have to be at.**
-  Everything else in this section can be read whenever you next look — a dream offered, a
-  song added, somebody saying they are coming — so nothing is lost by finding out late. A
-  planning call at 19:00 on Sunday is either heard before Sunday or missed, and the whole
-  point of putting it in the diary is that people come. So `meeting_scheduled` is on by
-  default while sitting here rather than under _what happens to you_, which is about your
-  own record changing. The section still says where a category belongs; `on` says whether
-  it can wait.
+  **Two exceptions, and what makes each one.** Everything else in this section can be read
+  whenever you next look — a dream offered, a song added, somebody saying they are coming —
+  so nothing is lost by finding out late.
+
+  _A meeting has a time you have to be at._ A planning call at 19:00 on Sunday is either
+  heard before Sunday or missed, and the whole point of putting it in the diary is that
+  people come. So `meeting_scheduled` is on by default while sitting here rather than under
+  _what happens to you_, which is about your own record changing.
+
+  _A question waits for whoever happens to know._ `faq_asked` is on because the FAQ is the
+  one place where something is asked of nobody in particular, and a question nobody hears
+  about is the one that stays unanswered — which is how an unanswered one went unnoticed.
+
+  The section still says where a category belongs; `on` says whether it can wait.
 
 - **A new version of the app is out** — its own `about: 'app'` rather than a special
   case in the page (#682). It is neither something that happened to you nor something

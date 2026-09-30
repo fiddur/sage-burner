@@ -31,6 +31,8 @@ const marks = {
   withdrawn: '🗑️',
   raised: '🗣️',
   decided: '⚖️',
+  asked: '❓',
+  answered: '💡',
 } as const satisfies Record<ThreadEntryKind, string>
 
 const nameOf = (entry: ThreadEntry) => entry.author?.name ?? (entry.author === null ? 'Somebody' : NAMELESS)

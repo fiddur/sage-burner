@@ -308,6 +308,36 @@ guard was never attendance.
 **Removing one takes two clicks** (#323), like a lead role and unlike a schedule lane.
 One row holds a paragraph somebody else wrote and nobody has another copy of.
 
+**A question is a feed card**, because one nobody noticed went unanswered. Asking opens a
+`faq` thread — the twelfth entity type — with an `asked` line by the asker, and the card's
+body is the answer once there is one. Two entry kinds came with it, `asked` and `answered`,
+rather than borrowing a talking point's `raised` and `decided`, so the migration rebuilds
+`thread`, `thread_entry`, `notification` and `notification_setting` for their CHECKs. The
+same conversation sits under each question on the page, as it does under a thing on the bring
+list, and a link to the question opens it there.
+
+**The burn hears a question, and `faq_asked` is on by default.** Everything else that happens
+_around_ you is off until asked for; this is the second exception, beside
+`meeting_scheduled`. The FAQ is the one place where a question waits for whoever happens to
+know, and a question nobody hears about is the one that stays unanswered. The audience is the
+burn's attendees, as for every burn-wide category, even though the page itself is readable
+without attending.
+
+**The asker hears the answer** under `faq_answered`, when the answer goes from blank to
+written — never for their own answer, and not again when it is reworded, which is an `edited`
+line on the card and nothing in anybody's bell. Whoever answered is part of the conversation
+from then on, so a comment reaches the asker and the answerer under `faq_comment`, and
+everybody else only if they asked for `faq_comment_any`.
+
+**Who asked is `author_account_id`**, nullable: questions from before it was recorded have
+none, a copy carries none — seeding a burn from last year's is not asking anything — and an
+account that goes leaves the question behind. A copied question still gets its card, with an
+`added` line by whoever copied it, and nobody's bell rings for a copy. Questions from
+before are backfilled by the migration, as journeys were: a card each, opened with an
+`asked` line by nobody, dated when the question was — so no question on a page ever has a
+conversation control that leads nowhere. Removing a question is
+still a hard delete, and its card and conversation go with it in the same transaction.
+
 ## The calendar feed
 
 `GET /calendar/:token/schedule.ics` is the programme as a calendar subscription,

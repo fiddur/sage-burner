@@ -390,7 +390,7 @@ export const createApp = async ({
   registerPaymentReminderRoutes(app, { db, sessions, config, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
   registerBuildRoutes(app, { db, sessions, now, notify: tellAccount })
-  registerFaqRoutes(app, { db, sessions, now })
+  registerFaqRoutes(app, { db, sessions, now, notify: tellAccount })
   registerFeedRoutes(app, { db, sessions })
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerPantryRoutes(app, { db, sessions, now })

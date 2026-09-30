@@ -284,6 +284,13 @@ phone" means 360px.
       day's Dinner: two cards, headed differently. A comment on it reaches whoever is
       cooking, and names the sitting the same way — and so does the bell line for being put
       on a crew or handed the lead.
+- [ ] Ask a question in the FAQ: every attendee's bell but yours rings, and its card is
+      under the **FAQ** chip with the ❓ line. Answer it as somebody else: the asker's bell
+      rings, naming who answered, and the card grows a 💡 line and carries the answer.
+      Reword the answer: no second bell line.
+- [ ] Comment under a question on the FAQ page: the same conversation shows on its feed
+      card. Follow the bell line for it: the FAQ opens with that question unfolded and its
+      conversation showing.
 - [ ] Comment on a dream's card; the same conversation shows in the dream's
       panel. Edit your own comment; delete it; an admin can delete anyone's.
 - [ ] Mention the member by name from the picker — they are notified once, not
@@ -630,7 +637,7 @@ phone" means 360px.
       it, its header row is the row.
 - [ ] On an account that has never saved: **What happens to you** is plainly ticked, every
       one of its kinds being on by default, and **What others are doing** is **mixed**,
-      `meeting_scheduled` being the one of its kinds that is on. Press the mixed one: every
+      `meeting_scheduled` and `faq_asked` being the two of its kinds that are on. Press the mixed one: every
       row under it comes back ticked, and one save went out. Press it again: all off.
 - [ ] Open a section and untick one row: the switch above it goes mixed without a reload.
 - [ ] Open the ⋯ on the **last** row of a **full** bell panel: the menu opens upward and both

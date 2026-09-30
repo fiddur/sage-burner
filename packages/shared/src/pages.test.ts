@@ -4,6 +4,7 @@ import {
   applyingOutcomes,
   applyPage,
   bringPage,
+  faqPage,
   formattingPage,
   INVITE_PATTERN,
   invitePage,
@@ -65,6 +66,17 @@ describe('the bring list', () => {
 
   it('encodes both, so an id cannot invent a parameter', () => {
     expect(bringPage('a&b', 'c=d')).toBe('/bring?burn=a%26b&item=c%3Dd')
+  })
+})
+
+describe('the FAQ', () => {
+  it('names the burn it belongs to, and the question when there is one to open', () => {
+    expect(faqPage('burn-1')).toBe('/faq?burn=burn-1')
+    expect(faqPage('burn-1', 'entry-2')).toBe('/faq?burn=burn-1&question=entry-2')
+  })
+
+  it('encodes both, so an id cannot invent a parameter', () => {
+    expect(faqPage('a&b', 'c=d')).toBe('/faq?burn=a%26b&question=c%3Dd')
   })
 })
 

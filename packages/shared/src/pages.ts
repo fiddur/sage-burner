@@ -44,6 +44,13 @@ export const buildPage = (eventId: string, projectId?: string): string =>
     projectId === undefined ? '' : `&${BUILD_PARAM}=${encodeURIComponent(projectId)}`
   }`
 
+export const FAQ_PARAM = 'question'
+
+export const faqPage = (eventId: string, entryId?: string): string =>
+  `/faq?${BURN_PARAM}=${encodeURIComponent(eventId)}${
+    entryId === undefined ? '' : `&${FAQ_PARAM}=${encodeURIComponent(entryId)}`
+  }`
+
 export const POINT_PARAM = 'point'
 
 export const meetingsPage = (eventId: string, pointId?: string): string =>
