@@ -76,4 +76,27 @@ SELECT `account_id`, `category`, `enabled`, `email` FROM `notification_setting`;
 --> statement-breakpoint
 DROP TABLE `notification_setting`;--> statement-breakpoint
 ALTER TABLE `__new_notification_setting` RENAME TO `notification_setting`;--> statement-breakpoint
+INSERT INTO `thread` (`id`, `event_id`, `entity_type`, `entity_id`, `title`, `subject_account_id`)
+SELECT
+	lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))),
+	`f`.`event_id`,
+	'faq',
+	`f`.`id`,
+	`f`.`question`,
+	NULL
+FROM `faq_entry` `f`;
+--> statement-breakpoint
+INSERT INTO `thread_entry` (`id`, `thread_id`, `kind`, `seq`, `author_account_id`, `body`, `created_at`, `edited_at`)
+SELECT
+	lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))),
+	`t`.`id`,
+	'asked',
+	1,
+	NULL,
+	'asked this',
+	`f`.`created_at`,
+	NULL
+FROM `faq_entry` `f`
+JOIN `thread` `t` ON `t`.`entity_type` = 'faq' AND `t`.`entity_id` = `f`.`id`;
+--> statement-breakpoint
 PRAGMA foreign_keys=ON;

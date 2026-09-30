@@ -2350,3 +2350,85 @@ describe('the build tables', () => {
     expect(() => insertItem('Struts', 'needed', { by: null, at: NOW })).not.toThrow()
   })
 })
+
+describe('the faq-cards migration', () => {
+  const FAQ_CARDS = '20260930100000_faq_cards'
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+
+  const withQuestionsOnThePage = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(FAQ_CARDS)
+
+    expect(kept).not.toContain(FAQ_CARDS)
+    expect(kept.length).toBeGreaterThan(0)
+
+    runMigrations(fresh, staged)
+    expect(fresh.client.prepare("select count(*) as n from thread where entity_type = 'faq'").get()?.n).toBe(
+      0,
+    )
+
+    anEvent(fresh, 'e-1', 'a-burn', NOW)
+    for (const [id, question, answer] of [
+      ['f-1', 'How do I get there?', 'The 609 bus.'],
+      ['f-2', 'What do I bring?', ''],
+    ] as [string, string, string][]) {
+      fresh.client
+        .prepare(
+          'insert into faq_entry (id, event_id, question, answer, "order", created_at) values (?, ?, ?, ?, ?, ?)',
+        )
+        .run(id, 'e-1', question, answer, 0, '2026-07-01T00:00:00.000Z')
+    }
+
+    return fresh
+  }
+
+  it('opens a card for every question already on the page, headed by the question', () => {
+    const fresh = withQuestionsOnThePage()
+    try {
+      runMigrations(fresh)
+
+      const rows = fresh.client
+        .prepare(
+          'select id, event_id, entity_id, title, subject_account_id from thread' +
+            " where entity_type = 'faq' order by entity_id",
+        )
+        .all()
+
+      expect(rows.map((row) => [row.entity_id, row.event_id, row.title, row.subject_account_id])).toEqual([
+        ['f-1', 'e-1', 'How do I get there?', null],
+        ['f-2', 'e-1', 'What do I bring?', null],
+      ])
+      expect(rows.every((row) => UUID.test(String(row.id)))).toBe(true)
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('opens each card with an asking line by nobody, dated when the question was', () => {
+    const fresh = withQuestionsOnThePage()
+    try {
+      runMigrations(fresh)
+
+      const rows = fresh.client
+        .prepare(
+          'select e.id, e.kind, e.seq, e.author_account_id, e.body, e.created_at, e.edited_at,' +
+            ' t.entity_id from thread_entry e join thread t on t.id = e.thread_id' +
+            " where t.entity_type = 'faq' order by t.entity_id",
+        )
+        .all()
+
+      expect(rows.map((row) => [row.entity_id, row.kind, row.seq, row.author_account_id, row.body])).toEqual([
+        ['f-1', 'asked', 1, null, 'asked this'],
+        ['f-2', 'asked', 1, null, 'asked this'],
+      ])
+      expect(rows.map((row) => [row.created_at, row.edited_at])).toEqual([
+        ['2026-07-01T00:00:00.000Z', null],
+        ['2026-07-01T00:00:00.000Z', null],
+      ])
+      expect(rows.every((row) => UUID.test(String(row.id)))).toBe(true)
+      expect(fresh.client.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      fresh.close()
+    }
+  })
+})

@@ -332,7 +332,10 @@ everybody else only if they asked for `faq_comment_any`.
 **Who asked is `author_account_id`**, nullable: questions from before it was recorded have
 none, a copy carries none — seeding a burn from last year's is not asking anything — and an
 account that goes leaves the question behind. A copied question still gets its card, with an
-`added` line by whoever copied it, and nobody's bell rings for a copy. Removing a question is
+`added` line by whoever copied it, and nobody's bell rings for a copy. Questions from
+before are backfilled by the migration, as journeys were: a card each, opened with an
+`asked` line by nobody, dated when the question was — so no question on a page ever has a
+conversation control that leads nowhere. Removing a question is
 still a hard delete, and its card and conversation go with it in the same transaction.
 
 ## The calendar feed
