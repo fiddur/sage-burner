@@ -1557,8 +1557,9 @@ as before to anybody actually watching it.
 
 **A section carries at most `MOST_PER_SECTION` lines** and says "and N more" for the rest, and
 the count in the subject is what is waiting rather than what was printed. The read is bounded
-before that too, by the same `FEED_LIMIT` the page uses, so somebody away six months gets the
-newest fifty things rather than the whole history of the burn.
+before that too, by the same `recentFeed` the page uses, so somebody away six months gets the
+newest fifty items rather than the whole history of the burn — a burst of one kind folded into one
+of them, as on the page.
 
 **That remainder line is the one thing in the message that has to lead somewhere** (#652). Every
 printed line carries its own link and the remainder announces what is not printed, so before it

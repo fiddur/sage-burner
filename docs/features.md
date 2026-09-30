@@ -153,6 +153,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   card carrying its whole history and the talk under it, for a dream, a person at
   a burn, an announcement, a song, a bring item, a journey on the rideshare
   board, a build project, a talking point, a meeting, a lead role or a meal.
+  Five or more of one kind in a row fold into one item that counts and lists
+  them, and opens them as cards on a press.
 - A chip row filters the feed by kind, carried in the URL, defaulting to
   everything.
 - Comments on any card: markdown, edit your own, delete your own (an admin may

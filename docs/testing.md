@@ -276,6 +276,10 @@ phone" means 360px.
 - [ ] The chip row: first tap solos a kind, the URL carries the filter, back
       undoes it, clearing the last chip lands on everything. **Leads** is one of the
       chips and shows the roles.
+- [ ] Add five songs in a row: the feed shows one item, "5 songs", listing them, each
+      linking to its song, and **Show them as cards** opens the five cards in its place.
+      Say something on one and reload: it stands on its own at the top, out of the fold,
+      and the four left are cards.
 - [ ] A lead role has a card: adding one opens it, taking the lead and handing it
       over add a line each, and saying something on it reaches whoever is on it.
 - [ ] A generated meal plan puts **nothing** on the feed. Take a sitting's cooking on and

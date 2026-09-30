@@ -1,7 +1,7 @@
-import type { MyBurn, Thread, ThreadEntry } from '@sage-burner/shared'
+import type { FeedFold, MyBurn, Thread, ThreadEntry } from '@sage-burner/shared'
 
 import { mentionsIn, mentionToken, notificationCategoryInfo } from '@sage-burner/shared'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -63,8 +63,8 @@ const DEFAULTS = [
   'application',
 ] as const
 
-const stub = (over: Partial<FeedApi> = {}, threads: Thread[] = []): FeedApi => ({
-  getFeed: () => Promise.resolve({ threads }),
+const stub = (over: Partial<FeedApi> = {}, threads: Thread[] = [], folds: FeedFold[] = []): FeedApi => ({
+  getFeed: () => Promise.resolve({ threads, folds }),
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [], digest: 'daily' }),
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [], digest: 'daily' }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
@@ -137,7 +137,7 @@ const renderPageAt = (at: string, api: FeedApi) => {
 
 describe('the chip row over the feed', () => {
   it('asks the server for nothing in particular until somebody taps a chip', async () => {
-    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ threads: [] }))
+    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ threads: [], folds: [] }))
     renderPageAt('/feed', stub({ getFeed }))
 
     await screen.findByRole('button', { name: 'Everything' })
@@ -153,7 +153,7 @@ describe('the chip row over the feed', () => {
   })
 
   it('asks the server for what the address says, since the page reads only the newest fifty', async () => {
-    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ threads: [] }))
+    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ threads: [], folds: [] }))
     renderPageAt('/feed?kinds=song', stub({ getFeed }))
 
     await screen.findByRole('button', { name: 'Songs' })
@@ -1176,8 +1176,9 @@ describe('what everyone has been doing', () => {
       .fn<FeedApi['getFeed']>()
       .mockResolvedValueOnce({
         threads: [aCard({ id: 'c-1', title: 'Planning call', entity_type: 'meeting' })],
+        folds: [],
       })
-      .mockResolvedValue({ threads: [] })
+      .mockResolvedValue({ threads: [], folds: [] })
     renderPage(stub({ getFeed, postComment: posted }))
 
     const box = await screen.findByLabelText('Say something about Planning call')
@@ -1199,7 +1200,7 @@ describe('what everyone has been doing', () => {
       entry_count: 2,
       entries: [raised, anEntry({ id: 't-2', body: 'that time does not work' })],
     })
-    const getFeed = vi.fn<FeedApi['getFeed']>().mockResolvedValue({ threads: [withComment] })
+    const getFeed = vi.fn<FeedApi['getFeed']>().mockResolvedValue({ threads: [withComment], folds: [] })
     const getThread = vi
       .fn<FeedApi['getThread']>()
       .mockResolvedValue({ thread: { ...withComment, entries: [raised], entry_count: 1 } })
@@ -1232,7 +1233,13 @@ describe('what everyone has been doing', () => {
     const updateComment = vi.fn<FeedApi['updateComment']>(() =>
       Promise.reject(apiError(404, 'not_found', 'Not found.')),
     )
-    renderPage(stub({ getFeed: () => Promise.resolve({ threads: [withComment] }), getThread, updateComment }))
+    renderPage(
+      stub({
+        getFeed: () => Promise.resolve({ threads: [withComment], folds: [] }),
+        getThread,
+        updateComment,
+      }),
+    )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Rewrite what you said' }))
     fireEvent.input(screen.getByLabelText('Rewrite what you said'), { target: { value: 'nor does Sunday' } })
@@ -1253,8 +1260,8 @@ describe('what everyone has been doing', () => {
     })
     const getFeed = vi
       .fn<FeedApi['getFeed']>()
-      .mockResolvedValueOnce({ threads: [withComment] })
-      .mockResolvedValue({ threads: [] })
+      .mockResolvedValueOnce({ threads: [withComment], folds: [] })
+      .mockResolvedValue({ threads: [], folds: [] })
     const gone = () => Promise.reject(apiError(404, 'not_found', 'Not found.'))
     renderPage(stub({ getFeed, getThread: gone, deleteComment: gone }))
 
@@ -1452,5 +1459,100 @@ describe('what everyone has been doing', () => {
     const { container } = renderPage(stub())
 
     expect(container.querySelector('section')?.className).toBe('page column')
+  })
+})
+
+describe('many of a kind folded into one', () => {
+  const aSong = (index: number, over: Partial<Thread> = {}): Thread =>
+    aCard({
+      id: `s-${index}`,
+      title: `Song ${index}`,
+      entity_type: 'song',
+      entity_id: `song-${index}`,
+      event_id: null,
+      burn: null,
+      link: `/songs/song-${index}`,
+      entries: [anEntry({ id: `e-${index}`, body: 'added this song', kind: 'added' })],
+      ...over,
+    })
+
+  const songs = [1, 2, 3, 4, 5].map((index) => aSong(index))
+  const fold: FeedFold = { entity_type: 'song', thread_ids: songs.map((card) => card.id) }
+  const before = aCard({ id: 'c-1', title: 'Sauna at dawn' })
+  const after = aCard({ id: 'c-2', title: 'Bea', entity_type: 'attendance' })
+
+  it('draws a fold as how many and of what, with each title linked where its card links', async () => {
+    renderPage(stub({}, [...songs.slice(0, 4), aSong(5, { link: null })], [fold]))
+
+    expect(await screen.findByText('5 songs')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Song 1' }).getAttribute('href')).toBe('/songs/song-1')
+    expect(screen.queryByRole('link', { name: 'Song 5' })).toBeNull()
+    expect(screen.getByText('Song 5')).toBeTruthy()
+    expect(document.querySelector('.feed-fold .feed-when')?.textContent).toBe('Songbook · 7 Aug')
+  })
+
+  it('draws no card for anything inside the fold', async () => {
+    renderPage(stub({}, songs, [fold]))
+
+    await screen.findByText('5 songs')
+    expect(document.querySelectorAll('.feed-card')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: /Notification settings/ })).toBeNull()
+  })
+
+  it('keeps the cards around a fold as cards, in the order the server sends them', async () => {
+    renderPage(stub({}, [before, ...songs, after], [fold]))
+
+    await screen.findByText('5 songs')
+    expect(
+      [...document.querySelectorAll('.feed > li')].map(
+        (one) => one.querySelector('.feed-card-head')?.textContent,
+      ),
+    ).toEqual(['Sauna at dawn', '5 songs', 'Bea'])
+  })
+
+  it('shows them as cards in its place on a press, and the button goes with the fold', async () => {
+    renderPage(stub({}, [before, ...songs, after], [fold]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show them as cards: 5 songs' }))
+
+    await waitFor(() =>
+      expect([...document.querySelectorAll('.feed-card-head')].map((one) => one.textContent)).toEqual([
+        'Sauna at dawn',
+        'Song 1',
+        'Song 2',
+        'Song 3',
+        'Song 4',
+        'Song 5',
+        'Bea',
+      ]),
+    )
+    expect(screen.queryByText('5 songs')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Show them as cards/ })).toBeNull()
+  })
+
+  it('lets somebody say something on a card from a fold once it is shown, and shows what came back', async () => {
+    const posted = vi.fn<FeedApi['postComment']>((id) =>
+      Promise.resolve({
+        thread: aSong(3, {
+          id,
+          entry_count: 2,
+          entries: [
+            anEntry({ id: 'e-3', body: 'added this song', kind: 'added' }),
+            anEntry({ id: 'e-9', body: 'this one is in D' }),
+          ],
+        }),
+      }),
+    )
+    renderPage(stub({ postComment: posted }, songs, [fold]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show them as cards: 5 songs' }))
+    const box = await screen.findByLabelText('Say something about Song 3')
+    fireEvent.input(box, { target: { value: 'this one is in D' } })
+    const card = box.closest('li.feed-card')
+    if (!(card instanceof HTMLElement)) throw new Error('the box is on no card')
+    fireEvent.click(within(card).getByRole('button', { name: 'Say it' }))
+
+    await waitFor(() => expect(posted).toHaveBeenCalledWith('s-3', { body: 'this one is in D' }))
+    expect(await screen.findByText('this one is in D')).toBeTruthy()
   })
 })

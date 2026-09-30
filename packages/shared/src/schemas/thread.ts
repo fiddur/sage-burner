@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-import { threadEntityTypes, threadEntryKinds } from '../enums.ts'
+import { FOLD_AT } from '../cards.ts'
+import { feedKinds, threadEntityTypes, threadEntryKinds } from '../enums.ts'
 import { MAX_COMMENT, MAX_TITLE } from '../limits.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 
@@ -48,7 +49,13 @@ export type Thread = z.infer<typeof threadSchema>
 export const threadResponseSchema = z.object({ thread: threadSchema })
 export type ThreadResponse = z.infer<typeof threadResponseSchema>
 
-export const feedResponseSchema = z.object({ threads: z.array(threadSchema) })
+export const feedFoldSchema = z.object({
+  entity_type: z.enum(feedKinds),
+  thread_ids: z.array(idSchema).min(FOLD_AT),
+})
+export type FeedFold = z.infer<typeof feedFoldSchema>
+
+export const feedResponseSchema = z.object({ threads: z.array(threadSchema), folds: z.array(feedFoldSchema) })
 export type FeedResponse = z.infer<typeof feedResponseSchema>
 
 export const commentSchema = z.object({ body: nonEmptyText(MAX_COMMENT) }).strict()
