@@ -14,8 +14,8 @@ import type { MailDeps, Posted } from './mail.ts'
 
 import { account } from '../db/schema.ts'
 import { approvedAccounts } from '../push/notify.ts'
-import { FEED_LIMIT } from '../routes/feed.ts'
-import { readThreads, recentThreads } from '../routes/threads.ts'
+import { recentFeed } from '../routes/feed.ts'
+import { readThreads } from '../routes/threads.ts'
 import { installationTitle, mailSettingsFor, post } from './mail.ts'
 import { absolute, digestMessage } from './messages.ts'
 
@@ -136,7 +136,7 @@ export const feedSince = async (
   db: Database,
   { after, origin }: { after: string | null; origin: string | undefined },
 ): Promise<DigestSection[]> => {
-  const recent = await recentThreads(db, FEED_LIMIT, threadEntityTypes)
+  const { rows: recent } = await recentFeed(db, threadEntityTypes)
 
   const cards = await readThreads(
     db,
@@ -154,11 +154,9 @@ export const feedSince = async (
     return [{ id: card.id, at, kind: card.entity_type, body, burn: whereItBelongs(card), link: card.link }]
   })
 
-  const kept = said
-    .sort((one, other) =>
-      one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
-    )
-    .slice(0, FEED_LIMIT)
+  const kept = said.sort((one, other) =>
+    one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
+  )
 
   return feedKinds.flatMap((kind) => {
     const mine = kept.filter((one) => one.kind === kind)

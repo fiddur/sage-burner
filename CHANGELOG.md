@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-09-30
 
+- **Many things of one kind at once fold into one line on the feed.** Add a pile of songs and
+  the feed shows "40 songs" with their titles, instead of forty cards pushing everything else
+  off the page — and off the digest. **Show them as cards** opens them. A song somebody is
+  talking about stays a card of its own.
 - **Questions in the FAQ now have a conversation and a card on the feed.** Everyone coming
   to the burn hears when somebody asks one, so it does not sit there unanswered, and you
   hear when yours is answered. Either can be switched off under Notifications.

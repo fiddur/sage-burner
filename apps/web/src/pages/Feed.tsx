@@ -1,4 +1,4 @@
-import type { NotificationCategory, NotificationSettings, Thread } from '@sage-burner/shared'
+import type { FeedFold, NotificationCategory, NotificationSettings, Thread } from '@sage-burner/shared'
 
 import {
   BURN_PARAM,
@@ -7,6 +7,7 @@ import {
   feedKinds,
   feedKindsFrom,
   feedPage,
+  foldHead,
   KINDS_PARAM,
   MAX_POST,
   MAX_TITLE,
@@ -60,7 +61,36 @@ export type FeedApi = Pick<
 
 interface Happening {
   threads: readonly Thread[]
+  folds: readonly FeedFold[]
   settings: NotificationSettings
+}
+
+type Shown = { card: Thread } | { fold: FeedFold; cards: readonly Thread[] }
+
+const shownFrom = (
+  threads: readonly Thread[],
+  folds: readonly FeedFold[],
+  unfolded: ReadonlySet<string>,
+): Shown[] => {
+  const opening = new Map(
+    folds.flatMap((fold) => (fold.thread_ids[0] === undefined ? [] : [[fold.thread_ids[0], fold]])),
+  )
+  const shown: Shown[] = []
+  for (let at = 0; at < threads.length;) {
+    const card = threads[at]
+    if (card === undefined) break
+
+    const fold = unfolded.has(card.id) ? undefined : opening.get(card.id)
+    if (fold === undefined) {
+      shown.push({ card })
+      at += 1
+    } else {
+      shown.push({ fold, cards: threads.slice(at, at + fold.thread_ids.length) })
+      at += fold.thread_ids.length
+    }
+  }
+
+  return shown
 }
 
 export const Feed = ({ api }: { api: FeedApi }) => {
@@ -76,7 +106,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         api.getMyNotificationSettings(signal),
       ])
 
-      return { threads: feed.threads, settings }
+      return { threads: feed.threads, folds: feed.folds, settings }
     },
     { enabled: approved, key: lit.join(','), fallback: 'Could not load what has been going on.' },
   )
@@ -84,6 +114,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   const { busy, error, run } = useAction(reload)
 
   const [whole, setWhole] = useState<Record<string, Thread>>({})
+  const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set())
 
   const settings = loaded.status === 'ready' ? loaded.data.settings : undefined
 
@@ -244,7 +275,9 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     },
   }
 
-  const cards = loaded.status === 'ready' ? loaded.data.threads : []
+  const page = loaded.status === 'ready' ? loaded.data : { threads: [], folds: [] }
+  const cards = page.threads
+  const shown = shownFrom(cards, page.folds, unfolded)
   const selected = useSelectedBurn()
   const eventId = selected?.event.id
 
@@ -316,20 +349,29 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 
       {cards.length > 0 && (
         <ul class="feed">
-          {cards.map((item) => (
-            <Card
-              key={item.id}
-              card={whole[item.id] ?? item}
-              viewerId={viewer.account?.id}
-              admin={isAdmin(viewer)}
-              busy={busy}
-              on={settings?.on}
-              talk={talk}
-              upload={api.uploadImage}
-              people={mentionable(item)}
-              onToggle={toggle}
-            />
-          ))}
+          {shown.map((item) =>
+            'fold' in item ? (
+              <Fold
+                key={`fold-${item.cards[0]?.id ?? ''}`}
+                kind={item.fold.entity_type}
+                cards={item.cards}
+                onUnfold={(first) => setUnfolded((sofar) => new Set([...sofar, first]))}
+              />
+            ) : (
+              <Card
+                key={item.card.id}
+                card={whole[item.card.id] ?? item.card}
+                viewerId={viewer.account?.id}
+                admin={isAdmin(viewer)}
+                busy={busy}
+                on={settings?.on}
+                talk={talk}
+                upload={api.uploadImage}
+                people={mentionable(item.card)}
+                onToggle={toggle}
+              />
+            ),
+          )}
         </ul>
       )}
     </GuardedPage>
@@ -492,6 +534,47 @@ const Announce = ({
         </button>
       </p>
     </form>
+  )
+}
+
+const Fold = ({
+  kind,
+  cards,
+  onUnfold,
+}: {
+  kind: FeedFold['entity_type']
+  cards: readonly Thread[]
+  onUnfold: (first: string) => void
+}) => {
+  const [first] = cards
+  if (first === undefined) return null
+
+  const head = foldHead(kind, cards.length)
+
+  return (
+    <li class="feed-fold">
+      <p class="feed-card-head">{head}</p>
+      <p class="feed-when">
+        {[whereItBelongs(first), first.last_at === null ? undefined : localDay(first.last_at)]
+          .filter((part) => part !== undefined)
+          .join(' · ')}
+      </p>
+
+      <ul class="feed-fold-list">
+        {cards.map((card) => (
+          <li key={card.id}>{card.link === null ? card.title : <a href={card.link}>{card.title}</a>}</li>
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        class="link-button"
+        aria-label={`Show them as cards: ${head}`}
+        onClick={() => onUnfold(first.id)}
+      >
+        Show them as cards
+      </button>
+    </li>
   )
 }
 

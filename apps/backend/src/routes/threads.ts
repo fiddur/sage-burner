@@ -34,6 +34,7 @@ import {
   withMentionNames,
 } from '@sage-burner/shared'
 import { and, asc, count, desc, eq, gt, inArray, isNull, lte, max, ne, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/sqlite-core'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -269,14 +270,31 @@ export const cardEntry = async (
   return await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
 }
 
+const newestEntry = alias(threadEntry, 'newest_entry')
+
 export const recentThreads = async (
   db: Database,
   limit: number,
   entities: readonly ThreadEntityType[],
-): Promise<{ id: string; last_at: string; entry_count: number }[]> => {
+): Promise<
+  {
+    id: string
+    entity_type: ThreadEntityType
+    last_kind: ThreadEntryKind
+    last_at: string
+    entry_count: number
+  }[]
+> => {
   const rows = await db
     .select({
       id: threadEntry.thread_id,
+      entity_type: thread.entity_type,
+      last_kind: sql<ThreadEntryKind>`(${db
+        .select({ kind: newestEntry.kind })
+        .from(newestEntry)
+        .where(eq(newestEntry.thread_id, thread.id))
+        .orderBy(desc(newestEntry.seq))
+        .limit(1)})`,
       last_at: max(threadEntry.created_at),
       entry_count: count(),
     })
@@ -288,7 +306,17 @@ export const recentThreads = async (
     .limit(limit)
 
   return rows.flatMap((row) =>
-    row.last_at === null ? [] : [{ id: row.id, last_at: row.last_at, entry_count: row.entry_count }],
+    row.last_at === null
+      ? []
+      : [
+          {
+            id: row.id,
+            entity_type: row.entity_type,
+            last_kind: row.last_kind,
+            last_at: row.last_at,
+            entry_count: row.entry_count,
+          },
+        ],
   )
 }
 

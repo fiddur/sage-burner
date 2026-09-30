@@ -1,7 +1,7 @@
-import type { FeedKind, Thread } from '@sage-burner/shared'
+import type { FeedFold, FeedKind, Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { feedPath, mentionToken } from '@sage-burner/shared'
+import { feedPath, FOLD_AT, mentionToken, threadEntityTypes } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -22,12 +22,15 @@ import {
   event,
   leadRole,
   place,
+  post,
   session,
+  song,
   thread,
   threadEntry,
 } from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 import { CARD_ENTRIES, FEED_LIMIT } from './feed.ts'
+import { recentThreads } from './threads.ts'
 
 const SECRET = 'v'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -133,6 +136,83 @@ const givenDreamCard = async (
   })
 }
 
+const givenSongCard = async (
+  title: string,
+  created_at: string,
+  { id = randomUUID(), saidBy, deleted = false }: { id?: string; saidBy?: string; deleted?: boolean } = {},
+) => {
+  const tune = randomUUID()
+
+  await db()
+    .insert(song)
+    .values({ id: tune, title, created_at, ...(deleted ? { deleted_at: created_at } : {}) })
+  await db().insert(thread).values({
+    id,
+    event_id: null,
+    entity_type: 'song',
+    entity_id: tune,
+    subject_account_id: null,
+    title,
+  })
+  await db()
+    .insert(threadEntry)
+    .values({
+      id: randomUUID(),
+      thread_id: id,
+      kind: saidBy === undefined ? 'added' : 'comment',
+      seq: 1,
+      author_account_id: saidBy ?? null,
+      body: saidBy === undefined ? 'added this song' : 'this one is in D',
+      created_at,
+    })
+
+  return id
+}
+
+const givenPostCard = async (title: string, created_at: string) => {
+  const id = randomUUID()
+  const said = randomUUID()
+
+  await db().insert(post).values({ id: said, event_id: BURN, author_account_id: null, title, created_at })
+  await db().insert(thread).values({
+    id,
+    event_id: BURN,
+    entity_type: 'post',
+    entity_id: said,
+    subject_account_id: null,
+    title,
+  })
+  await db().insert(threadEntry).values({
+    id: randomUUID(),
+    thread_id: id,
+    kind: 'posted',
+    seq: 1,
+    author_account_id: null,
+    body: 'posted this',
+    created_at,
+  })
+
+  return id
+}
+
+const minute = (index: number) =>
+  `2026-07-01T${String(10 + Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}:00.000Z`
+
+const givenSongs = async (count: number, from = 0): Promise<string[]> => {
+  const ids: string[] = []
+  for (let index = from; index < from + count; index += 1) {
+    ids.push(await givenSongCard(`Song ${index}`, minute(index)))
+  }
+
+  return ids.toReversed()
+}
+
+const givenMixedCards = async (count: number, title = 'Card') => {
+  for (let index = 0; index < count; index += 1) {
+    await (index % 2 === 0 ? givenDreamCard : givenSongCard)(`${title} ${index}`, minute(index))
+  }
+}
+
 const titles = async (
   server: FastifyInstance,
   cookie: string,
@@ -166,6 +246,12 @@ const cards = async (
   cookie: string,
   kinds: readonly FeedKind[] = [],
 ): Promise<Thread[]> => (await feed(server, cookie, kinds)).json().threads
+
+const folded = async (
+  server: FastifyInstance,
+  cookie: string,
+  kinds: readonly FeedKind[] = [],
+): Promise<FeedFold[]> => (await feed(server, cookie, kinds)).json().folds
 
 const say = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
   server.inject({
@@ -383,9 +469,7 @@ describe('the feed', () => {
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
-    for (let index = 0; index <= FEED_LIMIT; index += 1) {
-      await givenDreamCard(`Card ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
-    }
+    await givenMixedCards(FEED_LIMIT + 1)
 
     const rows = await titles(server, ada.cookie)
     expect(rows).toHaveLength(FEED_LIMIT)
@@ -634,9 +718,7 @@ describe('the feed', () => {
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
-    for (let index = 0; index < FEED_LIMIT; index += 1) {
-      await givenDreamCard(`Card ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
-    }
+    await givenMixedCards(FEED_LIMIT)
 
     stamp = '2026-07-03T00:00:00.000Z'
     await addLeadRole(server, ada.cookie, 'Firewood')
@@ -926,14 +1008,13 @@ describe('the kinds a viewer asks for', () => {
     ).toEqual(['attendance', 'session'])
   })
 
-  it('loses a person’s card behind a run of dreams when nothing is filtered', async () => {
+  it('loses a person’s card behind a page of other cards when nothing is filtered', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
+    stamp = '2026-06-30T00:00:00.000Z'
     await joinBurn(server, ada.cookie)
-    for (let index = 0; index < FEED_LIMIT; index += 1) {
-      await givenDreamCard(`Dream ${index}`, `2026-07-03T10:${String(index).padStart(2, '0')}:00.000Z`)
-    }
+    await givenMixedCards(FEED_LIMIT)
 
     expect((await cards(server, ada.cookie)).map((card) => card.entity_type)).not.toContain('attendance')
   })
@@ -942,12 +1023,24 @@ describe('the kinds a viewer asks for', () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
+    stamp = '2026-06-30T00:00:00.000Z'
     await joinBurn(server, ada.cookie)
-    for (let index = 0; index < FEED_LIMIT; index += 1) {
-      await givenDreamCard(`Dream ${index}`, `2026-07-03T10:${String(index).padStart(2, '0')}:00.000Z`)
-    }
+    await givenMixedCards(FEED_LIMIT)
 
     expect((await cards(server, ada.cookie, ['attendance'])).map((card) => card.title)).toEqual(['Ada'])
+  })
+
+  it('folds within what was asked for, where the kinds between them are left out', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    await givenMixedCards(FOLD_AT * 2)
+
+    expect(await folded(server, ada.cookie)).toEqual([])
+    expect((await folded(server, ada.cookie, ['song'])).map((fold) => fold.thread_ids.length)).toEqual([
+      FOLD_AT,
+    ])
   })
 
   it('ignores a kind it does not know, rather than failing the read', async () => {
@@ -964,5 +1057,167 @@ describe('the kinds a viewer asks for', () => {
 
     expect(answered.statusCode).toBe(200)
     expect(answered.json().threads).toHaveLength(1)
+  })
+})
+
+describe('many of a kind in a row', () => {
+  const reader = async () => {
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+
+    return ada
+  }
+
+  it('comes back as one fold naming its cards in the order they are on the page', async () => {
+    const server = await build()
+    const ada = await reader()
+    const songs = await givenSongs(FOLD_AT)
+
+    expect(await folded(server, ada.cookie)).toEqual([{ entity_type: 'song', thread_ids: songs }])
+    expect((await cards(server, ada.cookie)).map((card) => card.id)).toEqual(songs)
+  })
+
+  it('leaves one short of that as cards', async () => {
+    const server = await build()
+    const ada = await reader()
+    await givenSongs(FOLD_AT - 1)
+
+    expect(await folded(server, ada.cookie)).toEqual([])
+    expect(await cards(server, ada.cookie)).toHaveLength(FOLD_AT - 1)
+  })
+
+  it('leaves out a song somebody has just said something on, and folds either side only where five remain', async () => {
+    const server = await build()
+    const ada = await reader()
+    const older = await givenSongs(FOLD_AT)
+    const talked = await givenSongCard('Talked about', minute(FOLD_AT), { saidBy: ada.id })
+    const newer = await givenSongs(FOLD_AT - 1, FOLD_AT + 1)
+
+    expect(await folded(server, ada.cookie)).toEqual([{ entity_type: 'song', thread_ids: older }])
+    expect((await cards(server, ada.cookie)).map((card) => card.id)).toEqual([...newer, talked, ...older])
+  })
+
+  it('never folds announcements, however many there are', async () => {
+    const server = await build()
+    const ada = await reader()
+    for (let index = 0; index < FOLD_AT * 2; index += 1) {
+      await givenPostCard(`Notice ${index}`, minute(index))
+    }
+
+    expect(await folded(server, ada.cookie)).toEqual([])
+    expect(await cards(server, ada.cookie)).toHaveLength(FOLD_AT * 2)
+  })
+
+  it('counts a fold as one item against the cut, so what is older stays on the page', async () => {
+    const server = await build()
+    const ada = await reader()
+    await givenDreamCard('Sauna at dawn', '2026-06-30T10:00:00.000Z')
+    const songs = await givenSongs(FEED_LIMIT + 10)
+
+    expect(await folded(server, ada.cookie)).toEqual([{ entity_type: 'song', thread_ids: songs }])
+    expect((await titles(server, ada.cookie)).at(-1)).toBe('Sauna at dawn')
+  })
+
+  it('names only cards that are on the page, each fold a run of them side by side', async () => {
+    const server = await build()
+    const ada = await reader()
+    await givenDreamCard('First', minute(0))
+    await givenSongs(3, 1)
+    const withdrawn = await givenSongCard('Withdrawn', minute(4), { deleted: true })
+    await givenSongs(3, 5)
+    for (let index = 0; index < FOLD_AT + 1; index += 1) {
+      await givenDreamCard(`Dream ${index}`, minute(8 + index))
+    }
+
+    const answered = (await feed(server, ada.cookie)).json()
+    const ids: string[] = answered.threads.map((card: Thread) => card.id)
+    const folds: FeedFold[] = answered.folds
+
+    expect(folds.map((fold) => [fold.entity_type, fold.thread_ids.length])).toEqual([
+      ['session', FOLD_AT + 1],
+      ['song', 6],
+    ])
+    expect(folds.flatMap((fold) => fold.thread_ids)).not.toContain(withdrawn)
+    for (const fold of folds) {
+      const start = ids.indexOf(fold.thread_ids[0] ?? '')
+      expect(ids.slice(start, start + fold.thread_ids.length)).toEqual(fold.thread_ids)
+    }
+  })
+
+  it('drops a withdrawn song from the page and from its fold, and keeps the fold where five remain', async () => {
+    const server = await build()
+    const ada = await reader()
+    const older = await givenSongs(3)
+    const withdrawn = await givenSongCard('Withdrawn', minute(3), { deleted: true })
+    const newer = await givenSongs(2, 4)
+
+    const shown = (await cards(server, ada.cookie)).map((card) => card.id)
+    expect(shown).not.toContain(withdrawn)
+    expect(await folded(server, ada.cookie)).toEqual([
+      { entity_type: 'song', thread_ids: [...newer, ...older] },
+    ])
+  })
+
+  it('dissolves a fold that a withdrawal leaves under five, and shows the rest as cards', async () => {
+    const server = await build()
+    const ada = await reader()
+    const older = await givenSongs(2)
+    await givenSongCard('Withdrawn', minute(2), { deleted: true })
+    const newer = await givenSongs(2, 3)
+
+    expect(await folded(server, ada.cookie)).toEqual([])
+    expect((await cards(server, ada.cookie)).map((card) => card.id)).toEqual([...newer, ...older])
+  })
+})
+
+describe('the rows the feed is cut from', () => {
+  it('say what kind of thing each card is about, and the kind of its newest entry', async () => {
+    await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const talked = await givenSongCard('Talked about', minute(0), { saidBy: ada.id })
+    const dream = randomUUID()
+    await givenDreamCard('Sauna at dawn', minute(1), { id: dream })
+    await db()
+      .insert(threadEntry)
+      .values({
+        id: randomUUID(),
+        thread_id: dream,
+        kind: 'renamed',
+        seq: 2,
+        author_account_id: null,
+        body: 'renamed it',
+        created_at: minute(0),
+      })
+
+    expect(
+      (await recentThreads(db(), 10, threadEntityTypes)).map(({ id, entity_type, last_kind }) => ({
+        id,
+        entity_type,
+        last_kind,
+      })),
+    ).toEqual([
+      { id: dream, entity_type: 'session', last_kind: 'renamed' },
+      { id: talked, entity_type: 'song', last_kind: 'comment' },
+    ])
+  })
+
+  it('answer nothing for a thread nothing has happened on', async () => {
+    await build()
+    const quiet = randomUUID()
+    await db()
+      .insert(song)
+      .values({ id: quiet, title: 'Quiet', created_at: minute(0) })
+    await db().insert(thread).values({
+      id: randomUUID(),
+      event_id: null,
+      entity_type: 'song',
+      entity_id: quiet,
+      subject_account_id: null,
+      title: 'Quiet',
+    })
+
+    expect(await recentThreads(db(), 10, threadEntityTypes)).toEqual([])
   })
 })

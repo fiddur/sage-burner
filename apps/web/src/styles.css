@@ -1939,6 +1939,18 @@ a.person-badge:focus-visible span:last-child {
   padding: 0.5rem 0.75rem;
 }
 
+.feed-fold {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.feed-fold-list {
+  margin: 0 0 0.4rem;
+  padding-inline-start: 1.2rem;
+  font-size: 0.95rem;
+}
+
 /* The bell sits in the card's corner, so `.feed-card` is what it is positioned against. */
 .card-bell {
   position: absolute;

@@ -532,9 +532,45 @@ would hide the news behind one card per burn — held only while "the news" was 
 its own rather than a thing. A lead role _is_ a thing: it has people on it, and "who can
 take this?" is a conversation.
 
-The server sorts by when each card last moved and cuts to fifty, so a burn full of talk on
-one card cannot show up as fifty copies of it and a quiet one does not leave the page half
-empty.
+The server sorts by when each card last moved and cuts to fifty items — a card, or a fold of
+many cards — so a burn full of talk on one card cannot show up as fifty copies of it and a quiet
+one does not leave the page half empty.
+
+### Many of a kind fold
+
+Importing the songbook opens a card per song, and a few hundred songs in an afternoon made the
+page — and the digest, which is the same read — fifty songs and nothing else. So **a run of five
+or more cards of one kind in a row folds into one item** that says how many ("14 songs", "6 people
+coming") and lists them, each title linking where its card would. `foldRuns` in `cards.ts` is the
+whole rule, and `FOLD_AT` is the five.
+
+**A card being talked about never folds.** A card whose newest entry is a comment breaks the run
+and stands on its own, since a conversation is what the page is for and a fold would hide the one
+card with somebody waiting on an answer in it. Its neighbours fold on either side only where each
+piece is still five long. **An announcement never folds either**: it is written to be read, and its
+link leads back to the feed itself, so a fold of them would list titles pointing at the page they
+are on.
+
+**The server folds, after the kinds filter and before the cut**, so fifty counts items rather than
+cards, and a burst of one kind costs the page one slot. It folds over a window of the newest
+`FEED_WINDOW` threads — ten times the limit — which are cheap rows (an id, a kind, the newest
+entry's kind); only what survives the cut is read as cards. The cards inside a fold are read in
+full like every other card, so opening one needs no request.
+
+**`threads` stays flat on the wire.** `FeedResponse` is `{ threads, folds }`: `threads` holds every
+card in feed order, folded ones included, and each fold names a consecutive slice of it by id. The
+page's per-card state — the expanded copy, the one a write answered with — is keyed by thread id,
+and a flat list keeps it so; a nested one would have needed a second place to look for each card. A
+fold whose member turns out to be gone drops that id, and dissolves into cards if that leaves it
+under five.
+
+**The digest shares the fold-then-cut**, through `recentFeed`, so a burst of songs no longer pushes
+the rest out of it either. Its sections already print five lines per kind with a total, so a fold
+needs nothing of its own there.
+
+**On the page a fold is one item**: its head, the burn and day of its newest card, the list of
+titles, and **Show them as cards**, which puts the cards in its place for as long as the page is
+open. It carries no bell and no heart; the cards carry theirs once shown.
 
 ### Something taken back is off the page (#617)
 
@@ -593,16 +629,16 @@ rewrite box under ✏️ had the same fault one form up and takes the same `done
 ### The chip row
 
 Filling the songbook makes the page songs for a week; a scheduling run makes it dreams for
-an evening. The floods are bursty and temporary, so the answer is a viewer-side lens rather
-than collapsing (#472) — a rollup hides cards that are each individually worth having, and
-needs an answer for a comment landing inside the pile. Coalescing already tempers the flood
-one level down: ten edits to one song are one card. What it cannot help with is thirty
-genuine happenings of one kind drowning the other kinds.
+an evening. The floods are bursty and temporary, so the first answer was a viewer-side lens
+(#472). Coalescing tempers the flood one level down: ten edits to one song are one card. The
+fold above tempers it one level up, answering both of the objections that kept a rollup out at
+first — the folded cards are one press away rather than hidden, and a comment landing inside the
+pile takes that card out of it. What neither does is let somebody look at one kind alone.
 
-**The filter is the server's**, because the page reads the newest fifty: during exactly the
-sprees above all fifty are one kind, so hiding them in the browser would show an empty
-_Dreams_ while dream cards sat just past the window. `kinds` is a query parameter on the
-feed read and the limit is applied after it, so fifty means fifty of the kinds asked for.
+**The filter is the server's**, because the page reads only the newest fifty items: hiding a
+kind in the browser would show an empty _Dreams_ while dream cards sat just past the cut.
+`kinds` is a query parameter on the feed read and the fold and the limit are applied after it,
+so fifty means fifty of the kinds asked for.
 
 **One chip per kind of thing on the page**, derived from `threadEntityTypes` plus one for
 the lines, so a future card kind gets its chip by construction rather than by somebody
@@ -1010,7 +1046,7 @@ Mentions stay untouched: naming somebody addresses them, and the category switch
 everything else.
 
 **The checkbox shows the effective state**, so what it says is always what will happen — which
-means `readThreads` has to compute participant-or-follower for a page of fifty cards. Three
+means `readThreads` has to compute participant-or-follower for every card on a page. Three
 queries do it (spoken on, facilitating, helping) and the rest reads off columns the card query
 already selects, rather than `participantsOf`'s several queries per card.
 
@@ -1073,7 +1109,8 @@ conversation is kept as long as the song is.
 **What the installed app keeps on disk.** The feed is at most two cache keys, each replaced
 in place: the unfiltered read, and the newest filtered one — `trim` keeps only the newest
 query string per path, so a chip row tapped all afternoon does not accumulate a key per
-combination. Each is bounded by construction: fifty things, at most three lines a card, and
+combination. Each is bounded by construction: fifty items, never more cards than the fold's
+window of five hundred, at most three lines a card, and
 `MAX_COMMENT` is 2000. The whole thread is a read of its own and is **never cached** —
 that would be a key per dream ever opened, kept until sign-out, which is the shape of the
 problem #311 fixed for the banner. Offline you get the card's newest lines; the rest of

@@ -557,6 +557,26 @@ describe('what a digest holds', () => {
     expect(section?.entries).toHaveLength(MOST_PER_SECTION)
   })
 
+  it('keeps what is older in it when a burst of songs lands on top, folding them as the feed does', async () => {
+    build()
+    const burn = await givenBurn()
+    await givenRoleCard(burn, { title: 'Kitchen', at: ago(3 * HOUR) })
+    for (let index = 0; index < 60; index += 1) {
+      await givenEntry(await givenSongCard({ title: `Song ${index}` }), {
+        kind: 'added',
+        body: 'added this song',
+        at: ago(2 * HOUR - index * 1000),
+      })
+    }
+
+    const sections = await feedSince(db(), { after: null, origin: undefined })
+
+    expect(sections.map((section) => [section.label, section.total, section.entries.length])).toEqual([
+      ['Songs', 60, MOST_PER_SECTION],
+      ['Leads', 1, 1],
+    ])
+  })
+
   it('carries what no notification would have been written for, nobody having asked', async () => {
     build()
     const card = await givenPointCard(await givenBurn())
