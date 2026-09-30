@@ -612,6 +612,7 @@ const wentAway = {
   meal: 'Somebody took that sitting off the plan. It is off the page now.',
   ride: 'Somebody took that journey down. It is off the page now.',
   build: 'Somebody took that project off the build plan. It is off the page now.',
+  faq: 'Somebody took that question off the FAQ. It is off the page now.',
 } as const satisfies Record<Thread['entity_type'], string>
 
 const GONE_COMMENT = 'That comment is no longer there.'
@@ -628,6 +629,7 @@ const goneLabel = {
   meal: ' · off the plan',
   ride: ' · taken down',
   build: ' · off the build plan',
+  faq: ' · off the FAQ',
 } as const satisfies Record<Thread['entity_type'], string>
 
 const isGone = (failure: unknown): boolean => isApiError(failure) && failure.status === 404

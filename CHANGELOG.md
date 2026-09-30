@@ -7,6 +7,12 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-09-30
+
+- **Questions in the FAQ now have a conversation and a card on the feed.** Everyone coming
+  to the burn hears when somebody asks one, so it does not sit there unanswered, and you
+  hear when yours is answered. Either can be switched off under Notifications.
+
 # 2026-09-27
 
 - **A Build page for what gets built on site.** ☰ → Build lists the burn's projects under

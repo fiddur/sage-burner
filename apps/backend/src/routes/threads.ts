@@ -18,6 +18,7 @@ import {
   commentSchema,
   dayName,
   dreamPage,
+  faqPage,
   feedPage,
   followSchema,
   mealsPage,
@@ -53,6 +54,7 @@ import {
   buildProject,
   entrySupport,
   event,
+  faqEntry,
   leadRole,
   leadRoleMember,
   meal,
@@ -372,7 +374,7 @@ const participantThreads = async (
       and(
         inArray(threadEntry.thread_id, [...ids]),
         eq(threadEntry.author_account_id, viewer.account_id),
-        inArray(threadEntry.kind, ['comment', 'offered']),
+        inArray(threadEntry.kind, ['comment', 'offered', 'answered']),
       ),
     )
 
@@ -573,6 +575,9 @@ export const readThreads = async (
       build_description: buildProject.description,
       build_withdrawn_at: buildProject.withdrawn_at,
       build_author: buildProject.author_account_id,
+      faq_question: faqEntry.question,
+      faq_answer: faqEntry.answer,
+      faq_author: faqEntry.author_account_id,
     })
     .from(thread)
     .leftJoin(event, eq(event.id, thread.event_id))
@@ -588,6 +593,7 @@ export const readThreads = async (
     .leftJoin(meal, and(eq(thread.entity_type, 'meal'), eq(meal.id, thread.entity_id)))
     .leftJoin(ride, and(eq(thread.entity_type, 'ride'), eq(ride.id, thread.entity_id)))
     .leftJoin(buildProject, and(eq(thread.entity_type, 'build'), eq(buildProject.id, thread.entity_id)))
+    .leftJoin(faqEntry, and(eq(thread.entity_type, 'faq'), eq(faqEntry.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const ranked = db
@@ -704,6 +710,7 @@ const authorOf = (row: CardRow): string | null => {
   if (row.entity_type === 'meeting') return row.meeting_author
   if (row.entity_type === 'ride') return row.ride_account
   if (row.entity_type === 'build') return row.build_author
+  if (row.entity_type === 'faq') return row.faq_author
 
   return null
 }
@@ -757,6 +764,9 @@ interface CardRow {
   build_description: string | null
   build_withdrawn_at: string | null
   build_author: string | null
+  faq_question: string | null
+  faq_answer: string | null
+  faq_author: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
@@ -872,6 +882,13 @@ const buildFacts = (row: CardRow): CardFacts => {
   }
 }
 
+const faqFacts = (row: CardRow): CardFacts => ({
+  title: row.faq_question ?? row.title,
+  link: row.faq_question === null || row.event_id === null ? null : faqPage(row.event_id, row.entity_id),
+  body: written(row.faq_answer),
+  gone: row.faq_question === null,
+})
+
 const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
   facts.body === null ? facts : { ...facts, body: named(facts.body) }
 
@@ -903,6 +920,7 @@ const factsFor = (row: CardRow): CardFacts =>
     meal: mealFacts,
     ride: rideFacts,
     build: buildFacts,
+    faq: faqFacts,
   })[row.entity_type](row)
 
 export const nameOf = async (db: Database, accountId: string): Promise<string | null> => {
@@ -942,6 +960,7 @@ const authorRow = async (
   table:
     | typeof bringItem
     | typeof buildProject
+    | typeof faqEntry
     | typeof meeting
     | typeof meetingPoint
     | typeof post
@@ -988,6 +1007,7 @@ const cardAuthor = {
   ride: async (db: Database, found: Whose) => (await riderOf(db, found.entity_id))[0] ?? null,
   build: async (db: Database, found: Whose) =>
     (await authorRow(db, buildProject, found.entity_id))[0] ?? null,
+  faq: async (db: Database, found: Whose) => (await authorRow(db, faqEntry, found.entity_id))[0] ?? null,
   role: () => Promise.resolve(null),
   meal: () => Promise.resolve(null),
 } as const satisfies Record<ThreadEntityType, (db: Database, found: Whose) => Promise<string | null>>
@@ -1097,6 +1117,7 @@ const alsoInIt = {
       ...[...leading, ...helping].map((row) => row.account_id),
     ]
   },
+  faq: async (db: Database, found: Whose) => await authorRow(db, faqEntry, found.entity_id),
 } as const satisfies Record<
   ThreadEntityType,
   (db: Database, found: Whose) => Promise<string[]> | Promise<readonly string[]>
@@ -1106,7 +1127,9 @@ export const participantsOf = async (db: Database, found: Whose): Promise<Set<st
   const spoke = await db
     .selectDistinct({ account_id: threadEntry.author_account_id })
     .from(threadEntry)
-    .where(and(eq(threadEntry.thread_id, found.id), inArray(threadEntry.kind, ['comment', 'offered'])))
+    .where(
+      and(eq(threadEntry.thread_id, found.id), inArray(threadEntry.kind, ['comment', 'offered', 'answered'])),
+    )
 
   const people = new Set(spoke.flatMap((row) => (row.account_id === null ? [] : [row.account_id])))
 
@@ -1507,6 +1530,15 @@ export const registerThreadRoutes = (
       link: atItsBurn(found, buildPage),
       what: await titleOf(buildProject, found),
     }),
+    faq: async (found: Subject) => {
+      const [row] = await db
+        .select({ question: faqEntry.question })
+        .from(faqEntry)
+        .where(eq(faqEntry.id, found.entity_id))
+        .limit(1)
+
+      return { link: atItsBurn(found, faqPage), what: row?.question ?? found.title }
+    },
     ride: async (found: Subject) => {
       const [row] = await db
         .select({ kind: ride.kind, from: ride.from })
@@ -1551,6 +1583,7 @@ export const registerThreadRoutes = (
     meal: { mine: 'meal_comment', anybody: 'meal_comment_any' },
     ride: { mine: 'ride_comment', anybody: 'ride_comment_any' },
     build: { mine: 'build_comment', anybody: 'build_comment_any' },
+    faq: { mine: 'faq_comment', anybody: 'faq_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {

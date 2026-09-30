@@ -269,7 +269,8 @@ These are member records, so treat them as such:
 - **A stored setting is an explicit choice, not a mute** (#259). What happens _to you_
   is on unless refused; what happens _around you_ is off unless asked for, bar
   `meeting_scheduled`, which is on because a meeting nobody heard about is a meeting
-  nobody comes to. One list of
+  nobody comes to, and `faq_asked`, which is on because a question nobody heard about is
+  a question nobody answers. One list of
   exceptions cannot mean both, so `notification_setting` carries `enabled` and absence
   means "has not said" — the default lives in `notificationCategoryInfo`, and the wire
   carries the complete `{ on: [...] }` rather than a delta. **Attendance is the whole

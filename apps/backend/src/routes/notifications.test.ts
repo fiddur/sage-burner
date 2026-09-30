@@ -303,6 +303,9 @@ describe('what somebody has switched on', () => {
     'ride_comment',
     'build_role',
     'build_comment',
+    'faq_asked',
+    'faq_answered',
+    'faq_comment',
     'point_comment',
     'meeting_scheduled',
     'meeting_comment',
@@ -464,7 +467,7 @@ describe('what somebody has switched on', () => {
     expect(refused.statusCode).toBe(400)
   })
 
-  it('defaults to what happens to you, and the one thing around you that cannot wait', async () => {
+  it('defaults to what happens to you, and the two things around you that cannot wait', async () => {
     const server = await build()
     const ada = await givenAccount()
 

@@ -133,6 +133,10 @@ export const notificationCategories = [
   'build_role',
   'build_comment',
   'build_comment_any',
+  'faq_asked',
+  'faq_answered',
+  'faq_comment',
+  'faq_comment_any',
   'point_raised',
   'point_decided',
   'point_comment',
@@ -257,6 +261,20 @@ export const notificationCategoryInfo = {
     email: false,
     about: 'else',
   },
+  faq_asked: { label: 'Somebody asks a question in the FAQ', on: true, email: false, about: 'else' },
+  faq_answered: { label: 'Somebody answers a question you asked', on: true, email: false, about: 'you' },
+  faq_comment: {
+    label: 'Somebody comments on a question you asked or answered',
+    on: true,
+    email: false,
+    about: 'you',
+  },
+  faq_comment_any: {
+    label: 'Somebody comments on any question in the FAQ',
+    on: false,
+    email: false,
+    about: 'else',
+  },
   point_raised: { label: 'Somebody raises a talking point', on: false, email: false, about: 'else' },
   point_decided: { label: 'A talking point is decided', on: false, email: false, about: 'else' },
   point_comment: { label: 'Somebody comments on a point you raised', on: true, email: false, about: 'you' },
@@ -347,6 +365,7 @@ export const threadEntityTypes = [
   'meal',
   'ride',
   'build',
+  'faq',
 ] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
@@ -368,6 +387,7 @@ export const feedKindLabel = {
   meal: 'Meals',
   ride: 'Rides',
   build: 'Build',
+  faq: 'FAQ',
 } as const satisfies Record<FeedKind, string>
 
 export const KINDS_PARAM = 'kinds'
@@ -400,6 +420,8 @@ export const threadEntryKinds = [
   'withdrawn',
   'raised',
   'decided',
+  'asked',
+  'answered',
 ] as const
 export type ThreadEntryKind = (typeof threadEntryKinds)[number]
 export const isThreadEntryKind = (value: unknown): value is ThreadEntryKind =>
@@ -488,6 +510,13 @@ const buildCategory = (kind: ThreadEntryKind): NotificationCategory | undefined 
   return undefined
 }
 
+const faqCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'faq_comment_any'
+  if (kind === 'asked') return 'faq_asked'
+
+  return undefined
+}
+
 const categoriesFor = {
   session: sessionCategory,
   attendance: attendanceCategory,
@@ -500,6 +529,7 @@ const categoriesFor = {
   meal: mealCategory,
   ride: rideCategory,
   build: buildCategory,
+  faq: faqCategory,
 } as const satisfies Record<ThreadEntityType, (kind: ThreadEntryKind) => NotificationCategory | undefined>
 
 export const entryCategory = (

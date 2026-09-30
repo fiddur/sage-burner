@@ -1,5 +1,7 @@
+import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
+import { faqPage } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -11,8 +13,9 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, event, faqEntry } from '../db/schema.ts'
+import { account, accountRole, attendance, event, faqEntry, thread } from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
+import { bell, cardOf, setOn } from './threads.testing.ts'
 
 const SECRET = 'f'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -66,15 +69,21 @@ const givenEvent = async (name = 'Summer burn', start = '2026-08-01') => {
   return id
 }
 
-const givenAccount = async (roles: ('admin' | 'member')[] = ['member']) => {
+const givenAccount = async (roles: ('admin' | 'member')[] = ['member'], name = 'Ada') => {
   const id = randomUUID()
   await db()
     .insert(account)
-    .values({ id, email: `${id}@example.org`, password_hash: null, name: 'Ada', created_at: NOW })
+    .values({ id, email: `${id}@example.org`, password_hash: null, name, created_at: NOW })
   for (const role of roles) await db().insert(accountRole).values({ account_id: id, role })
 
   const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+}
+
+const givenComing = async (accountId: string, eventId: string) => {
+  await db()
+    .insert(attendance)
+    .values({ id: randomUUID(), event_id: eventId, account_id: accountId, joined_at: NOW })
 }
 
 const list = (server: FastifyInstance, cookie: string | undefined, eventId: string) =>
@@ -131,6 +140,19 @@ const copy = (server: FastifyInstance, cookie: string, eventId: string, from_eve
 
 const questions = (response: LightMyRequestResponse): string[] =>
   response.json().entries.map((entry: { question: string }) => entry.question)
+
+const faqCards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
+  (await server.inject({ method: 'GET', url: '/api/feed?kinds=faq', headers: { cookie } })).json().threads
+
+const lines = (card: Thread) => card.entries.map((entry) => [entry.kind, entry.author?.name, entry.body])
+
+const say = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
+  server.inject({
+    method: 'POST',
+    url: `/api/threads/${threadId}/comments`,
+    headers: { cookie },
+    payload: { body },
+  })
 
 describe('the burn’s Q&A', () => {
   it('is empty before anybody asks anything', async () => {
@@ -537,5 +559,276 @@ describe('what the database refuses on its own', () => {
     await db().delete(event).where(eq(event.id, eventId))
 
     expect(await db().select().from(faqEntry)).toEqual([])
+  })
+})
+
+describe('a question on the feed', () => {
+  const givenNobodysQuestion = async (eventId: string) => {
+    const id = randomUUID()
+    await db().insert(faqEntry).values({
+      id,
+      event_id: eventId,
+      question: 'Is there a shower?',
+      answer: '',
+      order: 0,
+      author_account_id: null,
+      created_at: NOW,
+    })
+
+    return id
+  }
+
+  it('records who asked, and the list answers their name', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount()
+
+    const asked = await ask(server, ada.cookie, eventId)
+    const [listed] = (await list(server, ada.cookie, eventId)).json().entries
+
+    expect(asked.json().entry).toMatchObject({ author_account_id: ada.id, author_name: 'Ada' })
+    expect(listed).toMatchObject({ author_account_id: ada.id, author_name: 'Ada' })
+  })
+
+  it('opens a card on the feed headed by the question, with the asking line and a link to it', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount()
+
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+    const [card] = await faqCards(server, ada.cookie)
+
+    expect(card).toMatchObject({
+      id: entry.thread_id,
+      entity_type: 'faq',
+      entity_id: entry.id,
+      title: 'How do I get there?',
+      link: faqPage(eventId, entry.id),
+      body: null,
+      own: true,
+      followed_by_me: true,
+    })
+    expect(card === undefined ? [] : lines(card)).toEqual([['asked', 'Ada', 'asked this']])
+  })
+
+  it('rings every attendee’s bell but the asker’s, and not somebody who is not coming', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'], 'Ada')
+    const bea = await givenAccount(['member'], 'Bea')
+    const cid = await givenAccount(['member'], 'Cid')
+    await givenComing(ada.id, eventId)
+    await givenComing(bea.id, eventId)
+
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+
+    expect(await bell(server, bea.cookie)).toMatchObject([
+      { category: 'faq_asked', body: 'Ada asks: How do I get there?', link: faqPage(eventId, entry.id) },
+    ])
+    expect(await bell(server, ada.cookie)).toEqual([])
+    expect(await bell(server, cid.cookie)).toEqual([])
+  })
+
+  it('rings nobody’s bell for a burn-wide question somebody has switched off', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'], 'Ada')
+    const bea = await givenAccount(['member'], 'Bea')
+    await givenComing(bea.id, eventId)
+    await setOn(server, bea.cookie, [])
+
+    await ask(server, ada.cookie, eventId)
+
+    expect(await bell(server, bea.cookie)).toEqual([])
+  })
+
+  it('rings the asker’s bell when somebody answers, naming who answered', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'], 'Ada')
+    const bea = await givenAccount(['member'], 'Bea')
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+
+    await edit(server, bea.cookie, entry.id, { answer: 'The 609 bus.' })
+
+    expect(await bell(server, ada.cookie)).toMatchObject([
+      {
+        category: 'faq_answered',
+        body: 'Bea answered: How do I get there?',
+        link: faqPage(eventId, entry.id),
+      },
+    ])
+    expect(lines(await cardOf(server, ada.cookie, entry.thread_id))).toEqual([
+      ['asked', 'Ada', 'asked this'],
+      ['answered', 'Bea', 'answered this'],
+    ])
+  })
+
+  it('never rings the asker’s bell for their own answer, and still records it on the card', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount()
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+
+    await edit(server, ada.cookie, entry.id, { answer: 'Found it: the 609 bus.' })
+
+    expect(await bell(server, ada.cookie)).toEqual([])
+    expect(lines(await cardOf(server, ada.cookie, entry.thread_id))).toEqual([
+      ['asked', 'Ada', 'asked this'],
+      ['answered', 'Ada', 'answered this'],
+    ])
+  })
+
+  it('does not ring again when the answer is reworded, and notes the rewording once', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'], 'Ada')
+    const bea = await givenAccount(['member'], 'Bea')
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+
+    await edit(server, bea.cookie, entry.id, { answer: 'The 609 bus.' })
+    await edit(server, bea.cookie, entry.id, { answer: 'The 609 bus, then a walk.' })
+    await edit(server, bea.cookie, entry.id, { answer: 'The 609 bus, then a short walk.' })
+
+    expect(await bell(server, ada.cookie)).toHaveLength(1)
+    expect(lines(await cardOf(server, ada.cookie, entry.thread_id))).toEqual([
+      ['asked', 'Ada', 'asked this'],
+      ['answered', 'Bea', 'answered this'],
+      ['edited', 'Bea', 'went over it'],
+    ])
+  })
+
+  it('answers a question nobody is recorded as asking without ringing a bell, and gives it a card', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const bea = await givenAccount(['member'], 'Bea')
+    const cid = await givenAccount(['member'], 'Cid')
+    await givenComing(cid.id, eventId)
+    const id = await givenNobodysQuestion(eventId)
+
+    const answered = await edit(server, bea.cookie, id, { answer: 'Yes, by the sauna.' })
+
+    expect(answered.statusCode).toBe(200)
+    expect(answered.json().entry).toMatchObject({ author_account_id: null, author_name: null })
+    expect(await bell(server, cid.cookie)).toEqual([])
+    expect(lines(await cardOf(server, bea.cookie, answered.json().entry.thread_id))).toEqual([
+      ['answered', 'Bea', 'answered this'],
+    ])
+  })
+
+  it('renames the card when the question is reworded', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount()
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+
+    await edit(server, ada.cookie, entry.id, { question: 'How do I get there by train?' })
+
+    const [held] = await db()
+      .select({ title: thread.title })
+      .from(thread)
+      .where(eq(thread.id, entry.thread_id))
+    const card = await cardOf(server, ada.cookie, entry.thread_id)
+
+    expect(held?.title).toBe('How do I get there by train?')
+    expect(card.title).toBe('How do I get there by train?')
+    expect(lines(card)).toEqual([
+      ['asked', 'Ada', 'asked this'],
+      ['edited', 'Ada', 'went over it'],
+    ])
+  })
+
+  it('carries the answer as the card’s body once there is one', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount()
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+
+    expect((await cardOf(server, ada.cookie, entry.thread_id)).body).toBeNull()
+
+    await edit(server, ada.cookie, entry.id, { answer: 'The **609** bus.' })
+
+    expect((await cardOf(server, ada.cookie, entry.thread_id)).body).toBe('The **609** bus.')
+  })
+
+  it('tells whoever the answer newly names, rather than telling them twice', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'], 'Ada')
+    const bea = await givenAccount(['member'], 'Bea')
+    await givenComing(ada.id, eventId)
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+
+    await edit(server, bea.cookie, entry.id, { answer: `Ask @[Ada](mention:${ada.id}), she drove it.` })
+
+    expect(await bell(server, ada.cookie)).toMatchObject([
+      {
+        category: 'mentioned',
+        body: 'Bea named you about: How do I get there?',
+        link: faqPage(eventId, entry.id),
+      },
+    ])
+  })
+
+  it('reaches the asker and whoever answered with a comment, and somebody listening to every question', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'], 'Ada')
+    const bea = await givenAccount(['member'], 'Bea')
+    const cid = await givenAccount(['member'], 'Cid')
+    const dan = await givenAccount(['member'], 'Dan')
+    const eve = await givenAccount(['member'], 'Eve')
+    for (const one of [ada, bea, cid, dan, eve]) await givenComing(one.id, eventId)
+    await setOn(server, cid.cookie, ['faq_comment_any'])
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+    await edit(server, bea.cookie, entry.id, { answer: 'The 609 bus.' })
+
+    await say(server, dan.cookie, entry.thread_id, 'Or cycle, it is flat.')
+
+    const about = async (cookie: string) =>
+      (await bell(server, cookie))
+        .filter((told) => told.body === 'Dan said something about How do I get there?')
+        .map((told) => told.category)
+
+    expect(await about(ada.cookie)).toEqual(['faq_comment'])
+    expect(await about(bea.cookie)).toEqual(['faq_comment'])
+    expect(await about(cid.cookie)).toEqual(['faq_comment_any'])
+    expect(await about(eve.cookie)).toEqual([])
+    expect(await about(dan.cookie)).toEqual([])
+  })
+
+  it('takes its card off the feed with it when the question is removed', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount()
+    const { entry } = (await ask(server, ada.cookie, eventId)).json()
+
+    await remove(server, ada.cookie, entry.id)
+
+    expect(await faqCards(server, ada.cookie)).toEqual([])
+    expect(await db().select().from(thread)).toEqual([])
+  })
+
+  it('gives every copied question a card and no asker, and rings nobody’s bell', async () => {
+    const server = await build()
+    const ada = await givenAccount(['member'], 'Ada')
+    const bea = await givenAccount(['member'], 'Bea')
+    const past = await givenEvent('Last summer', '2026-07-03')
+    await ask(server, ada.cookie, past, { question: 'What do I bring?', answer: 'A sleeping bag.' })
+    await ask(server, ada.cookie, past, { question: 'How do I get there?' })
+    const next = await givenEvent('Autumn burn')
+    await givenComing(ada.id, next)
+
+    const copied = await copy(server, bea.cookie, next, past)
+    const entries: { author_account_id: string | null; thread_id: string | null }[] = copied.json().entries
+
+    expect(entries.map((entry) => entry.author_account_id)).toEqual([null, null])
+    for (const entry of entries) {
+      expect(entry.thread_id).not.toBeNull()
+      expect(lines(await cardOf(server, bea.cookie, entry.thread_id ?? ''))).toEqual([
+        ['added', 'Bea', 'brought this over from a previous burn'],
+      ])
+    }
+    expect(await bell(server, ada.cookie)).toEqual([])
   })
 })

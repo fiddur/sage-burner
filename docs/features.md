@@ -103,7 +103,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   the person who asked is told the moment somebody answers. Each item carries a
   conversation and a card on the feed; leaving the burn withdraws your pledges.
 - The FAQ: per burn, seedable from a previous one, any member asks and any
-  member answers, in an order somebody arranged.
+  member answers, in an order somebody arranged. Each question carries a
+  conversation and a card on the feed; asking one tells whoever is coming, and
+  the asker hears when it is answered.
 - The calendar feed: the programme as an `.ics` subscription per burn —
   `webcal://` link and an `https://` copy button — protected by a rotatable
   token, carrying titles, times and places and nothing personal.

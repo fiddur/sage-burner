@@ -206,6 +206,54 @@ describe('migrations', () => {
     ).not.toThrow()
   })
 
+  it('takes a FAQ question’s card, the lines it opens with and its categories', () => {
+    expect(() =>
+      handle.client
+        .prepare('insert into thread (id, event_id, entity_type, entity_id, title) values (?, ?, ?, ?, ?)')
+        .run('t-1', ids.event, 'faq', 'f-1', 'How do I get there?'),
+    ).not.toThrow()
+    for (const kind of ['asked', 'answered']) {
+      expect(
+        () =>
+          handle.client
+            .prepare(
+              'insert into thread_entry (id, thread_id, kind, seq, author_account_id, body, created_at)' +
+                ' values (?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(`te-${kind}`, 't-1', kind, kind === 'asked' ? 1 : 2, ids.account, kind, NOW),
+        kind,
+      ).not.toThrow()
+    }
+    expect(() =>
+      handle.client
+        .prepare(
+          'insert into notification (id, account_id, category, body, created_at) values (?, ?, ?, ?, ?)',
+        )
+        .run('n-1', ids.account, 'faq_asked', 'Ada asks: How do I get there?', NOW),
+    ).not.toThrow()
+    expect(() =>
+      handle.client
+        .prepare('insert into notification_setting (account_id, category, enabled) values (?, ?, ?)')
+        .run(ids.account, 'faq_comment_any', 1),
+    ).not.toThrow()
+  })
+
+  it('leaves a FAQ question with no asker when the asker’s account goes', () => {
+    seedAccount(ids.otherAccount, 'asker@example.org')
+    handle.client
+      .prepare(
+        'insert into faq_entry (id, event_id, question, answer, "order", author_account_id, created_at)' +
+          ' values (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run('f-1', ids.event, 'How do I get there?', '', 0, ids.otherAccount, NOW)
+
+    handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()
+
+    expect(
+      handle.client.prepare('select question, author_account_id from faq_entry where id = ?').get('f-1'),
+    ).toEqual({ question: 'How do I get there?', author_account_id: null })
+  })
+
   it('still refuses a category nobody has heard of', () => {
     expect(() =>
       handle.client

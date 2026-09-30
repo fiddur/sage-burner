@@ -602,6 +602,7 @@ export const faqEntry = sqliteTable(
     question: text('question').notNull(),
     answer: text('answer').notNull(),
     order: integer('order').notNull(),
+    author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'set null' }),
     created_at: text('created_at').notNull(),
   },
   (table) => [
