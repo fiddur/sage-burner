@@ -1,4 +1,5 @@
 import type { AttendanceResponse, EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
+import type { SQL } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, attendanceCreateSchema, membersPage, placeTransferSchema } from '@sage-burner/shared'
@@ -17,6 +18,7 @@ import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName, notifyAdmins, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
+import { forgetRidesOf } from './rides.ts'
 import { cardEntry, JOINED } from './threads.ts'
 import { tellAboutTheWaitingList } from './waiting-list.ts'
 
@@ -62,7 +64,7 @@ export const joinBurn = async (db: Database, eventId: string, accountId: string,
 
 export const handOverPlace = (
   db: Database,
-  giver: { id: string; payment_date: string | null },
+  giver: { id: string; event_id: string; account_id: string; payment_date: string | null },
   takerAttendanceId: string,
 ): boolean => {
   try {
@@ -81,6 +83,8 @@ export const handOverPlace = (
         .all()
 
       if (taken.length === 0 || given.length === 0) tx.rollback()
+
+      forgetRidesOf(tx, giver.event_id, giver.account_id)
     })
 
     return true
@@ -127,6 +131,19 @@ export const registerAttendanceRoutes = (
   const { requireApproved, requireMember } = createGuards({ db, sessions })
 
   const joinedRow = (eventId: string, accountId: string) => stayAt(db, eventId, accountId)
+
+  const endStays = (which: SQL | undefined) =>
+    db.transaction((tx) => {
+      const removed = tx
+        .delete(attendance)
+        .where(which)
+        .returning({ event_id: attendance.event_id, account_id: attendance.account_id })
+        .all()
+
+      for (const row of removed) forgetRidesOf(tx, row.event_id, row.account_id)
+
+      return removed
+    })
 
   app.get(apiRoutes.getMyBurns.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
@@ -209,16 +226,13 @@ export const registerAttendanceRoutes = (
       const found = await openEventNow(db, now, request.params.eventId)
       if (found === undefined) return sendError(reply, 404)
 
-      const removed = await db
-        .delete(attendance)
-        .where(
-          and(
-            eq(attendance.event_id, found.id),
-            eq(attendance.account_id, viewer.account_id),
-            eq(attendance.payment_status, 'unpaid'),
-          ),
-        )
-        .returning({ id: attendance.id })
+      const removed = endStays(
+        and(
+          eq(attendance.event_id, found.id),
+          eq(attendance.account_id, viewer.account_id),
+          eq(attendance.payment_status, 'unpaid'),
+        ),
+      )
 
       if (removed.length > 0) {
         await tellAboutTheWaitingList(db, found.id, notify, now)
@@ -281,16 +295,13 @@ export const registerAttendanceRoutes = (
       const found = await openEventNow(db, now, request.params.eventId)
       if (found === undefined) return sendError(reply, 404)
 
-      const removed = await db
-        .delete(attendance)
-        .where(
-          and(
-            eq(attendance.event_id, found.id),
-            eq(attendance.account_id, viewer.account_id),
-            eq(attendance.payment_status, 'paid'),
-          ),
-        )
-        .returning({ id: attendance.id })
+      const removed = endStays(
+        and(
+          eq(attendance.event_id, found.id),
+          eq(attendance.account_id, viewer.account_id),
+          eq(attendance.payment_status, 'paid'),
+        ),
+      )
 
       if (removed.length === 0) {
         const existing = await joinedRow(found.id, viewer.account_id)
@@ -384,15 +395,12 @@ export const registerAttendanceRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const removed = await db
-        .delete(attendance)
-        .where(
-          and(
-            eq(attendance.event_id, request.params.eventId),
-            eq(attendance.account_id, request.params.accountId),
-          ),
-        )
-        .returning({ id: attendance.id })
+      const removed = endStays(
+        and(
+          eq(attendance.event_id, request.params.eventId),
+          eq(attendance.account_id, request.params.accountId),
+        ),
+      )
 
       if (removed.length === 0) return sendError(reply, 404)
 

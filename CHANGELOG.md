@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-10-01
 
+- **Lifts go when the person stops coming.** Leave a burn, hand your place over or leave it
+  to the hosts, and any lift you posted for it comes off the rideshare board and the feed
+  with it — so nobody rings about a seat in a car that is not going. Posting one now needs
+  you to have joined the burn first.
 - **Appointing somebody to a meal shows what they already have.** The list behind 👉 on
   the Meals page reads like `Bea (1 L · 0 H · 2 C)` — one lead, no helping, two cleanups —
   so the jobs can be spread out without counting the table by hand.

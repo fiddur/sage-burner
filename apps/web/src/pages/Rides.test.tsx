@@ -230,6 +230,30 @@ describe('the rideshare board', () => {
     expect(addRide).not.toHaveBeenCalled()
   })
 
+  const postFrom = async (where: string) => {
+    fireEvent.input(await screen.findByRole('textbox', { name: 'From where?' }), { target: { value: where } })
+    fireEvent.input(screen.getByRole('textbox', { name: 'When, roughly?' }), { target: { value: 'Friday' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Post it' }))
+  }
+
+  it('says to join first when somebody who is not coming posts, and leads to where that is done', async () => {
+    renderPage(stub({ addRide: () => Promise.reject(apiError(400, 'not_attending', 'Bad request')) }))
+
+    await postFrom('Oslo')
+
+    expect((await screen.findByRole('alert')).textContent).toContain('You need to join this burn')
+    expect(screen.getByRole('link', { name: 'Your details' })).toBeTruthy()
+  })
+
+  it('shows any other refusal of a post as the server put it, with nowhere to go', async () => {
+    renderPage(stub({ addRide: () => Promise.reject(apiError(404, 'not_found', 'That burn is over.')) }))
+
+    await postFrom('Oslo')
+
+    expect((await screen.findByRole('alert')).textContent).toContain('That burn is over.')
+    expect(screen.queryByRole('link', { name: 'Your details' })).toBeNull()
+  })
+
   it('offers the pen and the bin on your own journey only', async () => {
     renderPage(
       stub({}, [
