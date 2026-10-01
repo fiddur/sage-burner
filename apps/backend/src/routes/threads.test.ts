@@ -29,6 +29,7 @@ import {
   threadEntry,
 } from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
+import { scheduleLine } from './threads.ts'
 
 const SECRET = 't'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -1327,5 +1328,32 @@ describe('following a card, and muting one', () => {
     const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
 
     expect((await follow(server, ada.cookie, id, 'yes' as unknown as boolean)).statusCode).toBe(400)
+  })
+})
+
+describe('the line a move in the schedule writes', () => {
+  const nowhere = { start: null, end: null, place: null }
+  const sauna = { start: null, end: null, place: 'The sauna' }
+  const nine = { start: '2026-08-01T09:00:00.000Z', end: '2026-08-01T09:30:00.000Z', place: 'The sauna' }
+  const ten = { start: '2026-08-01T10:00:00.000Z', end: '2026-08-01T10:30:00.000Z', place: 'The sauna' }
+
+  it('puts it in the schedule when it had no time', () => {
+    expect(scheduleLine({ from: sauna, to: nine })).toBe('put it in the schedule')
+  })
+
+  it('takes it off the schedule when it loses its time', () => {
+    expect(scheduleLine({ from: nine, to: sauna })).toBe('took it off the schedule')
+  })
+
+  it('says where it would be when it gains a place and no time', () => {
+    expect(scheduleLine({ from: nowhere, to: sauna })).toBe('said where it would be')
+  })
+
+  it('takes the place off it when it loses a place it had no time in', () => {
+    expect(scheduleLine({ from: sauna, to: nowhere })).toBe('took the place off it')
+  })
+
+  it('moves it when it had a time and still has one', () => {
+    expect(scheduleLine({ from: nine, to: ten })).toBe('moved it in the schedule')
   })
 })

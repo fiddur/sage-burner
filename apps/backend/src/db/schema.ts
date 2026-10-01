@@ -1,4 +1,4 @@
-import type { SongLink, StoredAnswers } from '@sage-burner/shared'
+import type { SlotChange, SongLink, StoredAnswers } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { AnySQLiteColumn, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 
@@ -824,6 +824,7 @@ export const threadEntry = sqliteTable(
     body: text('body').notNull(),
     created_at: text('created_at').notNull(),
     edited_at: text('edited_at'),
+    change: text('change', { mode: 'json' }).$type<SlotChange | null>(),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),

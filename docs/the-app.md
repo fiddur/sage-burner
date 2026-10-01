@@ -971,7 +971,10 @@ reorders itself reads as a different conversation.
 
 **No formatted time is ever written into a line.** The server does not know the reader's
 zone, so "moved it to Sat 14:00" stored here would be Saturday in UTC. The line says
-something moved; the dream says when.
+something moved, and `change` beside it carries the slot before and after — two instants
+and the place's name as it was then — which the browser formats in the reader's own zone
+when the line is opened. Coalescing keeps the `from` of the first move and the `to` of the
+last, and a run that ends where it began leaves no line at all, since nothing changed.
 
 ### Talking, and being told about it
 

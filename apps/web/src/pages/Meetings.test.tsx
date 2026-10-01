@@ -83,6 +83,7 @@ const aThread = (id: string, said: string): Thread => ({
       body: said,
       created_at: '2026-07-03T00:00:00.000Z',
       edited_at: null,
+      change: null,
       supporters: [],
       support_count: 0,
       supported_by_me: false,

@@ -12,6 +12,16 @@ export const supporterSchema = z.object({
 })
 export type Supporter = z.infer<typeof supporterSchema>
 
+export const slotSchema = z.object({
+  start: dateTimeSchema.nullable(),
+  end: dateTimeSchema.nullable(),
+  place: z.string().nullable(),
+})
+export type Slot = z.infer<typeof slotSchema>
+
+export const slotChangeSchema = z.object({ from: slotSchema, to: slotSchema })
+export type SlotChange = z.infer<typeof slotChangeSchema>
+
 export const threadEntrySchema = z.object({
   id: idSchema,
   kind: z.enum(threadEntryKinds),
@@ -19,6 +29,7 @@ export const threadEntrySchema = z.object({
   body: z.string(),
   created_at: dateTimeSchema,
   edited_at: dateTimeSchema.nullable(),
+  change: slotChangeSchema.nullable(),
   supporters: z.array(supporterSchema),
   support_count: z.int().min(0),
   supported_by_me: z.boolean(),

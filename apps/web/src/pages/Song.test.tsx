@@ -61,6 +61,7 @@ const aThread = (over: Partial<Thread> = {}): Thread => ({
       body: 'put it in the book',
       created_at: '2026-07-02T00:00:00.000Z',
       edited_at: null,
+      change: null,
       supporters: [],
       support_count: 0,
       supported_by_me: false,

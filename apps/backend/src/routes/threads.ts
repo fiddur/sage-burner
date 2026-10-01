@@ -1,6 +1,8 @@
 import type {
   NotificationCategory,
   RideKind,
+  Slot,
+  SlotChange,
   Supporter,
   Thread,
   ThreadEntityType,
@@ -81,6 +83,7 @@ export interface NewEntry {
   kind: ThreadEntryKind
   author_account_id: string | null
   body: string
+  change?: SlotChange | null
 }
 
 export const threadIdFor = (
@@ -129,6 +132,22 @@ export const renameThread = async (db: Database, threadId: string, title: string
 
 export type Written = 'coalesced' | 'inserted'
 
+export const scheduleLine = ({ from, to }: SlotChange): string => {
+  if (from.start === null && to.start !== null) return 'put it in the schedule'
+  if (from.start !== null && to.start === null) return 'took it off the schedule'
+  if (from.start === null && to.start === null) {
+    return to.place === null ? 'took the place off it' : 'said where it would be'
+  }
+
+  return 'moved it in the schedule'
+}
+
+const sameSlot = (one: Slot, other: Slot): boolean =>
+  one.start === other.start && one.end === other.end && one.place === other.place
+
+const mergedChange = (earlier: SlotChange | null, later: SlotChange | null): SlotChange | null =>
+  earlier !== null && later !== null ? { from: earlier.from, to: later.to } : later
+
 export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise<Written> => {
   if (coalesces(entry.kind)) {
     const [newest] = await db
@@ -136,6 +155,7 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise
         id: threadEntry.id,
         kind: threadEntry.kind,
         author_account_id: threadEntry.author_account_id,
+        change: threadEntry.change,
       })
       .from(threadEntry)
       .where(eq(threadEntry.thread_id, entry.thread_id))
@@ -143,9 +163,21 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise
       .limit(1)
 
     if (newest?.kind === entry.kind && newest.author_account_id === entry.author_account_id) {
+      const change = mergedChange(newest.change ?? null, entry.change ?? null)
+
+      if (change !== null && sameSlot(change.from, change.to)) {
+        await db.delete(threadEntry).where(eq(threadEntry.id, newest.id))
+
+        return 'coalesced'
+      }
+
       await db
         .update(threadEntry)
-        .set({ body: entry.body, created_at: at.toISOString() })
+        .set({
+          body: change === null ? entry.body : scheduleLine(change),
+          change,
+          created_at: at.toISOString(),
+        })
         .where(eq(threadEntry.id, newest.id))
 
       return 'coalesced'
@@ -187,6 +219,7 @@ export const openWith = (tx: Database | Transaction, entry: NewEntry, at: Date) 
       body: entry.body,
       created_at: at.toISOString(),
       edited_at: null,
+      change: entry.change ?? null,
     })
     .run()
 }
@@ -632,6 +665,7 @@ export const readThreads = async (
       body: threadEntry.body,
       created_at: threadEntry.created_at,
       edited_at: threadEntry.edited_at,
+      change: threadEntry.change,
       author_id: threadEntry.author_account_id,
       seq: threadEntry.seq,
       newness:
@@ -656,6 +690,7 @@ export const readThreads = async (
       body: ranked.body,
       created_at: ranked.created_at,
       edited_at: ranked.edited_at,
+      change: ranked.change,
       author_id: ranked.author_id,
       author_name: account.name,
     })
@@ -682,6 +717,7 @@ export const readThreads = async (
         body: row.body,
         created_at: row.created_at,
         edited_at: row.edited_at,
+        change: row.change ?? null,
         supporters: given,
         support_count: given.length,
         supported_by_me: given.some((person) => person.account_id === viewer?.account_id),

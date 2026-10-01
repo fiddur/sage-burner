@@ -120,7 +120,7 @@ interface Card {
   entity_id: string
   title: string
   last_at: string | null
-  entries: { kind: string; body: string }[]
+  entries: { kind: string; body: string; change: unknown }[]
 }
 
 const cardFor = async (server: FastifyInstance, cookie: string, meetingId: string): Promise<Card> => {
@@ -514,6 +514,7 @@ describe('the meetings themselves', () => {
 
     const card = await cardFor(server, ada.cookie, id)
     expect(card.entries.map((entry) => entry.body)).toEqual(['moved it'])
+    expect(card.entries.map((entry) => entry.change)).toEqual([null])
   })
 
   it('says nothing more when the time is untouched, a reworded note not being news', async () => {

@@ -282,6 +282,33 @@ const moveTo = (server: FastifyInstance, cookie: string, dream: string, hour: st
     time_slot_end: `2026-08-01T${hour}:30:00.000Z`,
   })
 
+const at = (hour: string) => `2026-08-01T${hour}:00:00.000Z`
+const halfPast = (hour: string) => `2026-08-01T${hour}:30:00.000Z`
+
+const givenLane = async (name = 'The sauna') => {
+  const lane = randomUUID()
+  await db().insert(place).values({ id: lane, event_id: BURN, order: 0, name, emoji: '🔥', color: 'red' })
+
+  return lane
+}
+
+const givenSlot = async (dream: string, lane: string, hour: string | null) => {
+  await db()
+    .update(session)
+    .set({
+      place_id: lane,
+      time_slot_start: hour === null ? null : at(hour),
+      time_slot_end: hour === null ? null : halfPast(hour),
+    })
+    .where(eq(session.id, dream))
+}
+
+const scheduled = async (server: FastifyInstance, cookie: string) => {
+  const [card] = await cards(server, cookie)
+
+  return { card, line: card?.entries.find((entry) => entry.kind === 'scheduled') }
+}
+
 describe('the feed', () => {
   it('carries a card for a dream nobody asked to hear about', async () => {
     const server = await build()
@@ -543,14 +570,112 @@ describe('the feed', () => {
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await givenSlot(dream, await givenLane(), '09')
 
-    await moveTo(server, ada.cookie, dream, '09')
     await moveTo(server, ada.cookie, dream, '10')
     await moveTo(server, ada.cookie, dream, '11')
 
-    const [card] = await cards(server, ada.cookie)
+    const { card, line } = await scheduled(server, ada.cookie)
     expect(card?.entries.map((entry) => entry.kind)).toEqual(['offered', 'scheduled'])
     expect(card?.entry_count).toBe(2)
+    expect(line?.body).toBe('moved it in the schedule')
+    expect(line?.change).toEqual({
+      from: { start: at('09'), end: halfPast('09'), place: 'The sauna' },
+      to: { start: at('11'), end: halfPast('11'), place: 'The sauna' },
+    })
+  })
+
+  it('carries where a dream put on the grid was and where it went, the place by its name', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    const lane = await givenLane()
+
+    await editDream(server, ada.cookie, dream, {
+      place_id: lane,
+      time_slot_start: at('09'),
+      time_slot_end: halfPast('09'),
+    })
+
+    const { line } = await scheduled(server, ada.cookie)
+    expect(line?.body).toBe('put it in the schedule')
+    expect(line?.change).toEqual({
+      from: { start: null, end: null, place: null },
+      to: { start: at('09'), end: halfPast('09'), place: 'The sauna' },
+    })
+  })
+
+  it('calls a dream put on the grid and then moved putting it in the schedule', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await givenSlot(dream, await givenLane(), null)
+
+    await moveTo(server, ada.cookie, dream, '09')
+    await moveTo(server, ada.cookie, dream, '10')
+
+    const { line } = await scheduled(server, ada.cookie)
+    expect(line?.body).toBe('put it in the schedule')
+    expect(line?.change?.from.start).toBeNull()
+    expect(line?.change?.to.start).toBe(at('10'))
+  })
+
+  it('leaves no line for a dream dragged away and back where it was', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await givenSlot(dream, await givenLane(), '09')
+
+    await moveTo(server, ada.cookie, dream, '10')
+    await moveTo(server, ada.cookie, dream, '09')
+
+    const { card, line } = await scheduled(server, ada.cookie)
+    expect(line).toBeUndefined()
+    expect(card?.entry_count).toBe(1)
+  })
+
+  it('keeps the line of a dream brought back to its time in another place', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await givenSlot(dream, await givenLane(), '09')
+    const lake = await givenLane('The lake')
+
+    await moveTo(server, ada.cookie, dream, '10')
+    await editDream(server, ada.cookie, dream, {
+      place_id: lake,
+      time_slot_start: at('09'),
+      time_slot_end: halfPast('09'),
+    })
+
+    const { card, line } = await scheduled(server, ada.cookie)
+    expect(line?.change).toEqual({
+      from: { start: at('09'), end: halfPast('09'), place: 'The sauna' },
+      to: { start: at('09'), end: halfPast('09'), place: 'The lake' },
+    })
+    expect(card?.entry_count).toBe(2)
+  })
+
+  it('writes no line for a time that cannot be kept without a place', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await moveTo(server, ada.cookie, dream, '09')
+
+    const { card, line } = await scheduled(server, ada.cookie)
+    expect(line).toBeUndefined()
+    expect(card?.entry_count).toBe(1)
   })
 
   it('calls a place with no time a place rather than a move in the schedule', async () => {
@@ -559,10 +684,7 @@ describe('the feed', () => {
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
-    const lane = randomUUID()
-    await db()
-      .insert(place)
-      .values({ id: lane, event_id: BURN, order: 0, name: 'The sauna', emoji: '🔥', color: 'red' })
+    const lane = await givenLane()
 
     await editDream(server, ada.cookie, dream, { place_id: lane })
 
@@ -576,11 +698,7 @@ describe('the feed', () => {
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
-    const lane = randomUUID()
-    await db()
-      .insert(place)
-      .values({ id: lane, event_id: BURN, order: 0, name: 'The sauna', emoji: '🔥', color: 'red' })
-    await editDream(server, ada.cookie, dream, { place_id: lane })
+    await givenSlot(dream, await givenLane(), null)
 
     await editDream(server, ada.cookie, dream, { place_id: null })
 
@@ -594,6 +712,7 @@ describe('the feed', () => {
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await givenSlot(dream, await givenLane(), null)
 
     await editDream(server, ada.cookie, dream, { title: 'Sauna at dusk' })
     await moveTo(server, ada.cookie, dream, '09')

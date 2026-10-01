@@ -3,6 +3,8 @@ import type {
   SessionResponse,
   SessionsResponse,
   SessionUpdate,
+  Slot,
+  SlotChange,
   ThreadEntryKind,
 } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
@@ -46,7 +48,15 @@ import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow } from './events.ts'
-import { addEntry, openWith, renameThread, tellHeartedDream, threadFor, threadIdFor } from './threads.ts'
+import {
+  addEntry,
+  openWith,
+  renameThread,
+  scheduleLine,
+  tellHeartedDream,
+  threadFor,
+  threadIdFor,
+} from './threads.ts'
 
 export interface SessionDeps extends GuardDeps {
   now: () => Date
@@ -162,14 +172,22 @@ const slotNeedsLane = <T extends { place_id?: string | null }>(
     ? { ...fields, ...OFF_THE_GRID }
     : fields
 
-const scheduleLine = (before: DreamRow, after: DreamRow): string => {
-  if (before.time_slot_start === null && after.time_slot_start !== null) return 'put it in the schedule'
-  if (before.time_slot_start !== null && after.time_slot_start === null) return 'took it off the schedule'
-  if (before.time_slot_start === null && after.time_slot_start === null) {
-    return after.place_id === null ? 'took the place off it' : 'said where it would be'
-  }
+const slotOf = (row: DreamRow, names: Map<string, string>): Slot => ({
+  start: row.time_slot_start,
+  end: row.time_slot_end,
+  place: row.place_id === null ? null : (names.get(row.place_id) ?? null),
+})
 
-  return 'moved it in the schedule'
+const placeNames = async (db: Database, ids: (string | null)[]): Promise<Map<string, string>> => {
+  const wanted = ids.filter((id) => id !== null)
+  if (wanted.length === 0) return new Map()
+
+  const rows = await db
+    .select({ id: place.id, name: place.name })
+    .from(place)
+    .where(inArray(place.id, wanted))
+
+  return new Map(rows.map((row) => [row.id, row.name]))
 }
 
 const sessionsFor = async (db: Database, eventId: string, mine: string | undefined): Promise<Session[]> => {
@@ -300,6 +318,7 @@ export const registerSessionRoutes = (
     by: string | undefined,
     body: string,
     talkedOn?: string,
+    change?: SlotChange,
   ) => {
     await addEntry(
       db,
@@ -308,6 +327,7 @@ export const registerSessionRoutes = (
         kind,
         author_account_id: by ?? null,
         body,
+        change,
       },
       now(),
     )
@@ -326,11 +346,15 @@ export const registerSessionRoutes = (
     }
 
     const moved =
-      (body.time_slot_start !== undefined && body.time_slot_start !== before.time_slot_start) ||
-      (body.time_slot_end !== undefined && body.time_slot_end !== before.time_slot_end) ||
-      (body.place_id !== undefined && body.place_id !== before.place_id)
+      after.time_slot_start !== before.time_slot_start ||
+      after.time_slot_end !== before.time_slot_end ||
+      after.place_id !== before.place_id
 
-    if (moved) await noteOnDream(before, 'scheduled', by, scheduleLine(before, after))
+    if (moved) {
+      const names = await placeNames(db, [before.place_id, after.place_id])
+      const change = { from: slotOf(before, names), to: slotOf(after, names) }
+      await noteOnDream(before, 'scheduled', by, scheduleLine(change), undefined, change)
+    }
 
     const detailed =
       (body.description !== undefined && body.description !== before.description) ||
