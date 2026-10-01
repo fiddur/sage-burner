@@ -156,6 +156,23 @@ describe('HelperStrip', () => {
     expect(screen.queryByLabelText('Who to appoint to the sauna')).toBeNull()
   })
 
+  it('follows each name in the picker with its tally, when given one', () => {
+    strip({ viewerId: 'a-1', tally: (accountId) => `tally of ${accountId}` })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Appoint someone to the sauna' }))
+
+    expect(screen.getByRole('option', { name: 'Bea (tally of a-2)' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'Cai (tally of a-3)' })).toBeTruthy()
+  })
+
+  it('names only the person in the picker without a tally', () => {
+    strip({ viewerId: 'a-1' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Appoint someone to the sauna' }))
+
+    expect(screen.getByRole('option', { name: 'Bea' })).toBeTruthy()
+  })
+
   it('takes somebody off', () => {
     const onRemove = vi.fn()
     strip({ people: [ADA, BEA], onRemove })

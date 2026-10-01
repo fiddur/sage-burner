@@ -35,6 +35,7 @@ import { stillUploading } from '../image-upload.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
+import { mealTally } from '../meal-tally.ts'
 import { useViewer } from '../viewer.tsx'
 
 export type MealsApi = Pick<
@@ -258,87 +259,96 @@ const MealTable = ({
   onLead: (id: string, accountId: string | null) => void
   onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
   onIdea: (id: string, idea: string) => void
-}) => (
-  <div class="meal-table-wrap">
-    <table class="meal-table">
-      <thead>
-        <tr>
-          <th scope="col">Meal</th>
-          <th scope="col">Food</th>
-          <th scope="col">Lead</th>
-          <th scope="col">Help</th>
-          <th scope="col">Cleanup</th>
-        </tr>
-      </thead>
-      <tbody>
-        {meals.map((meal, index) => (
-          <tr key={meal.id}>
-            <th scope="row">
-              {meals[index - 1]?.date === meal.date ? null : (
-                <>
-                  {dayName(meal.date, 'short')}
-                  <br />
-                </>
-              )}
-              <span class="meal-at">{meal.at}</span>
-            </th>
-            <td>
-              <div>{meal.label}</div>
-              <FoodIdea meal={meal} busy={busy} onIdea={onIdea} />
-              {meal.kind !== 'chore' && (
-                <a class="form-note" href={schedulePage(eventId, { meal: meal.id })}>
-                  {meal.ingredients.length === 0 ? 'Ingredients' : `Ingredients (${meal.ingredients.length})`}
-                </a>
-              )}
-            </td>
-            <td>
-              {meal.kind === 'chore' && meal.lead === null ? (
-                <span class="form-note">—</span>
+}) => {
+  const tally = mealTally(meals)
+
+  return (
+    <div class="meal-table-wrap">
+      <table class="meal-table">
+        <thead>
+          <tr>
+            <th scope="col">Meal</th>
+            <th scope="col">Food</th>
+            <th scope="col">Lead</th>
+            <th scope="col">Help</th>
+            <th scope="col">Cleanup</th>
+          </tr>
+        </thead>
+        <tbody>
+          {meals.map((meal, index) => (
+            <tr key={meal.id}>
+              <th scope="row">
+                {meals[index - 1]?.date === meal.date ? null : (
+                  <>
+                    {dayName(meal.date, 'short')}
+                    <br />
+                  </>
+                )}
+                <span class="meal-at">{meal.at}</span>
+              </th>
+              <td>
+                <div>{meal.label}</div>
+                <FoodIdea meal={meal} busy={busy} onIdea={onIdea} />
+                {meal.kind !== 'chore' && (
+                  <a class="form-note" href={schedulePage(eventId, { meal: meal.id })}>
+                    {meal.ingredients.length === 0
+                      ? 'Ingredients'
+                      : `Ingredients (${meal.ingredients.length})`}
+                  </a>
+                )}
+              </td>
+              <td>
+                {meal.kind === 'chore' && meal.lead === null ? (
+                  <span class="form-note">—</span>
+                ) : (
+                  <HelperStrip
+                    label={`${meal.label} on ${meal.date}`}
+                    people={meal.lead === null ? [] : [meal.lead]}
+                    max={1}
+                    candidates={attendees}
+                    shut={meal.kind === 'chore'}
+                    everyone={attendees}
+                    viewerId={viewerId}
+                    busy={busy}
+                    tally={tally}
+                    onAdd={(accountId) => onLead(meal.id, accountId)}
+                    onRemove={() => onLead(meal.id, null)}
+                  />
+                )}
+              </td>
+              {meal.kind === 'chore' && meal.helpers.length === 0 ? (
+                <td>
+                  <span class="form-note">—</span>
+                </td>
               ) : (
-                <HelperStrip
-                  label={`${meal.label} on ${meal.date}`}
-                  people={meal.lead === null ? [] : [meal.lead]}
-                  max={1}
-                  candidates={attendees}
-                  shut={meal.kind === 'chore'}
-                  everyone={attendees}
+                <Crew
+                  meal={meal}
+                  role="helper"
+                  attendees={attendees}
                   viewerId={viewerId}
                   busy={busy}
-                  onAdd={(accountId) => onLead(meal.id, accountId)}
-                  onRemove={() => onLead(meal.id, null)}
+                  joinable={meal.kind !== 'chore'}
+                  tally={tally}
+                  onStand={onStand}
                 />
               )}
-            </td>
-            {meal.kind === 'chore' && meal.helpers.length === 0 ? (
-              <td>
-                <span class="form-note">—</span>
-              </td>
-            ) : (
               <Crew
                 meal={meal}
-                role="helper"
+                role="cleanup"
                 attendees={attendees}
                 viewerId={viewerId}
                 busy={busy}
-                joinable={meal.kind !== 'chore'}
+                joinable
+                tally={tally}
                 onStand={onStand}
               />
-            )}
-            <Crew
-              meal={meal}
-              role="cleanup"
-              attendees={attendees}
-              viewerId={viewerId}
-              busy={busy}
-              joinable
-              onStand={onStand}
-            />
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 const FoodIdea = ({
   meal,
@@ -377,6 +387,7 @@ const Crew = ({
   viewerId,
   busy,
   joinable,
+  tally,
   onStand,
 }: {
   meal: Meal
@@ -385,6 +396,7 @@ const Crew = ({
   viewerId: string | undefined
   busy: boolean
   joinable: boolean
+  tally: (accountId: string) => string
   onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
@@ -401,6 +413,7 @@ const Crew = ({
         everyone={attendees}
         viewerId={viewerId}
         busy={busy}
+        tally={tally}
         onAdd={(accountId) => onStand(meal.id, role, true, accountId)}
         onRemove={(accountId) => onStand(meal.id, role, false, accountId)}
       />

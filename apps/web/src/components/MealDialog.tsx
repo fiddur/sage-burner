@@ -28,6 +28,7 @@ export const MealDialog = ({
   viewerId,
   busy,
   error,
+  tally,
   onClose,
   onLead,
   onStand,
@@ -46,6 +47,7 @@ export const MealDialog = ({
   viewerId: string | undefined
   busy: boolean
   error: string | undefined
+  tally: (accountId: string) => string
   onClose: () => void
   onLead: (accountId: string | null) => void
   onStand: (role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
@@ -140,6 +142,7 @@ export const MealDialog = ({
             everyone={attendees}
             viewerId={viewerId}
             busy={busy}
+            tally={tally}
             onAdd={onLead}
             onRemove={() => onLead(null)}
           />
@@ -154,6 +157,7 @@ export const MealDialog = ({
           viewerId={viewerId}
           busy={busy}
           joinable={meal.kind !== 'chore'}
+          tally={tally}
           onStand={onStand}
         />
       )}
@@ -165,6 +169,7 @@ export const MealDialog = ({
         viewerId={viewerId}
         busy={busy}
         joinable
+        tally={tally}
         onStand={onStand}
       />
 
@@ -197,6 +202,7 @@ const Crew = ({
   viewerId,
   busy,
   joinable,
+  tally,
   onStand,
 }: {
   meal: Meal
@@ -205,6 +211,7 @@ const Crew = ({
   viewerId: string | undefined
   busy: boolean
   joinable: boolean
+  tally: (accountId: string) => string
   onStand: (role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
 }) => (
   <>
@@ -217,6 +224,7 @@ const Crew = ({
       everyone={attendees}
       viewerId={viewerId}
       busy={busy}
+      tally={tally}
       onAdd={(accountId) => onStand(role, true, accountId)}
       onRemove={(accountId) => onStand(role, false, accountId)}
     />

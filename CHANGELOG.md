@@ -9,6 +9,9 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-10-01
 
+- **Appointing somebody to a meal shows what they already have.** The list behind 👉 on
+  the Meals page reads like `Bea (1 L · 0 H · 2 C)` — one lead, no helping, two cleanups —
+  so the jobs can be spread out without counting the table by hand.
 - **A "moved it in the schedule" line on a dream's conversation now opens** to show where
   the dream was and where it is now, in your own time zone. Dragging it back where it was
   leaves no line at all.
