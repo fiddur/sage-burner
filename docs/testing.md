@@ -259,6 +259,9 @@ phone" means 360px.
       block and they are notified, and their notification opens that dream on that burn
       rather than the Dreams page. A hand up as helper notifies nobody for
       their own click.
+- [ ] Meals: 👉 on a Lead, Help or Cleanup cell lists everybody with their count so far, as
+      `Bea (1 L · 0 H · 2 C)`, and the counts move once somebody is appointed. The same list
+      shows on a meal block opened from the schedule.
 - [ ] The meal plan draws its own kitchen lane — cooking, eating, cleanup —
       and dragging a block moves the sitting. A dream cannot be dropped into
       the kitchen lane.

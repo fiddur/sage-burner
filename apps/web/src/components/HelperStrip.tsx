@@ -26,6 +26,7 @@ export const HelperStrip = ({
   everyone,
   viewerId,
   busy,
+  tally,
   onAdd,
   onRemove,
 }: {
@@ -38,6 +39,7 @@ export const HelperStrip = ({
   everyone: readonly Face[]
   viewerId: string | undefined
   busy: boolean
+  tally?: (accountId: string) => string
   onAdd: (accountId: string) => void
   onRemove: (accountId: string) => void
 }) => {
@@ -121,7 +123,7 @@ export const HelperStrip = ({
               .sort((a, b) => nameOf(a).localeCompare(nameOf(b)))
               .map((person) => (
                 <option key={person.account_id} value={person.account_id}>
-                  {nameOf(person)}
+                  {tally === undefined ? nameOf(person) : `${nameOf(person)} (${tally(person.account_id)})`}
                 </option>
               ))}
           </select>

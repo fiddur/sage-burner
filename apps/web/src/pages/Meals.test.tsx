@@ -185,6 +185,23 @@ describe('the meal plan', () => {
     await waitFor(() => expect(joinMealCrew).toHaveBeenCalledWith('m-1', 'cleanup', { account_id: 'a-1' }))
   })
 
+  it('says in the appoint list how many leads, helps and cleanups each person has already', async () => {
+    const bea = { account_id: 'a-2', name: 'Bea' }
+    renderPage(
+      stub({}, [
+        aMeal({ id: 'm-1', lead: bea }),
+        aMeal({ id: 'm-2', date: '2026-08-02', cleanup: [bea] }),
+        aMeal({ id: 'm-3', date: '2026-08-03', cleanup: [bea] }),
+      ]),
+    )
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Appoint someone to cooking at Dinner on 2026-08-03' }),
+    )
+
+    expect(screen.getByRole('option', { name: 'Bea (1 L · 0 H · 2 C)' })).toBeTruthy()
+  })
+
   it('writes a food idea when the field is left, not on every keystroke', async () => {
     const setMealIdea = vi.fn<MealsApi['setMealIdea']>(() => Promise.resolve({ meal: aMeal() }))
     renderPage(stub({ setMealIdea }))

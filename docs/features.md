@@ -131,7 +131,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Meals: an admin sets slot templates (Lunch 13:00, Dinner 18:00, chores) and
   generates the sittings; regenerating adds what is missing and removes
   nothing. The plan is one table — food idea, lead, help, cleanup — and any
-  member takes a role, moves a sitting or writes the food idea. The kitchen
+  member takes a role, moves a sitting or writes the food idea. Appointing
+  somebody lists each name with what they already hold across the plan —
+  `(1 L · 0 H · 2 C)` for leads, helps and cleanups. The kitchen
   draws its own schedule lane from the meals. Each sitting has a card on the feed
   once somebody does something with it, headed by its slot and its day, so "is it
   vegan?" has somewhere to go for a particular Dinner rather than all three.

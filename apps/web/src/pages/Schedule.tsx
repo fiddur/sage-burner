@@ -33,6 +33,7 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { joinFirst, joinLink } from '../joining.ts'
 import { heldOr, useAction, useLoad } from '../load.ts'
+import { mealTally } from '../meal-tally.ts'
 import { dreamIdOf, openedFrom, panelIsShowing, usePanelAsPage, usePanelsInUrl } from '../panel-url.ts'
 import { pinchedZoom, touchGap } from '../pinch.ts'
 import {
@@ -379,6 +380,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         viewerId={viewerId}
         busy={busy}
         error={error}
+        tally={mealTally(meals)}
         run={run}
         onClose={() => setOpenedMeal(undefined)}
       />
@@ -817,6 +819,7 @@ const OpenedMeal = ({
   viewerId,
   busy,
   error,
+  tally,
   run,
   onClose,
 }: {
@@ -840,6 +843,7 @@ const OpenedMeal = ({
   viewerId: string | undefined
   busy: boolean
   error: string | undefined
+  tally: (accountId: string) => string
   run: (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => void
   onClose: () => void
 }) => {
@@ -856,6 +860,7 @@ const OpenedMeal = ({
       viewerId={viewerId}
       busy={busy}
       error={error}
+      tally={tally}
       onClose={onClose}
       onLead={(accountId) =>
         run(
