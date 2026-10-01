@@ -1,3 +1,5 @@
+import type { Slot } from '@sage-burner/shared'
+
 const pad = (value: number) => String(value).padStart(2, '0')
 
 export const toLocalInput = (iso: string | null): string => {
@@ -40,9 +42,24 @@ export const localDay = (iso: string, today: Date = new Date()): string => {
   return `${at.getDate()} ${MONTHS[at.getMonth()] ?? ''}${year}`.trim()
 }
 
+const clockOf = (iso: string): string => {
+  const at = new Date(iso)
+
+  return `${pad(at.getHours())}:${pad(at.getMinutes())}`
+}
+
 export const localMoment = (iso: string, today: Date = new Date()): string => {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return iso
 
-  return `${localDay(iso, today)} ${pad(at.getHours())}:${pad(at.getMinutes())}`
+  return `${localDay(iso, today)} ${clockOf(iso)}`
+}
+
+export const localSlot = ({ start, end, place }: Slot, today: Date = new Date()): string => {
+  const where = place === null ? '' : ` · ${place}`
+  if (start === null) return `not on the schedule${where}`
+
+  const until = end === null ? '' : `–${clockOf(end)}`
+
+  return `${shortDayOf(start) ?? ''} ${localDay(start, today)} ${clockOf(start)}${until}${where}`.trim()
 }

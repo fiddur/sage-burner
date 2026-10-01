@@ -2045,6 +2045,14 @@ a.person-badge:focus-visible span:last-child {
   font-size: 0.85rem;
 }
 
+.thread-moved > summary {
+  cursor: pointer;
+}
+
+.thread-moved > p {
+  margin: 0.15rem 0 0 1.25rem;
+}
+
 .thread-said {
   border-left: 2px solid var(--line);
   padding-left: 0.6rem;

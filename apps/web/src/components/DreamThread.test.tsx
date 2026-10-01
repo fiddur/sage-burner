@@ -12,6 +12,7 @@ const anEntry = (over: Partial<ThreadEntry> & Pick<ThreadEntry, 'id' | 'body'>):
   author: { account_id: 'a-1', name: 'Ada' },
   created_at: '2026-08-07T18:00:00.000Z',
   edited_at: null,
+  change: null,
   supporters: [],
   support_count: 0,
   supported_by_me: false,
@@ -91,6 +92,40 @@ describe('a conversation about a dream', () => {
     expect(document.querySelector('.thread-did')?.textContent).toContain('Ada offered this dream')
     expect(screen.queryByRole('button', { name: /Rewrite/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /Take back this comment/ })).toBeNull()
+  })
+
+  it('opens a move in the schedule on a click to show where the dream was and where it went', () => {
+    show(
+      aThread([
+        anEntry({
+          id: 't-1',
+          kind: 'scheduled',
+          body: 'moved it in the schedule',
+          change: {
+            from: { start: '2026-08-01T09:00:00.000Z', end: '2026-08-01T09:30:00.000Z', place: 'The sauna' },
+            to: { start: '2026-08-01T10:00:00.000Z', end: '2026-08-01T10:30:00.000Z', place: 'The lake' },
+          },
+        }),
+      ]),
+    )
+
+    const summary = document.querySelector('.thread-did details > summary')
+    expect(summary?.textContent).toContain('Ada moved it in the schedule')
+    expect(summary?.closest('details')?.open).toBe(false)
+
+    if (summary === null) throw new Error('no summary')
+    fireEvent.click(summary)
+
+    expect(summary.closest('details')?.open).toBe(true)
+    expect(screen.getByText(/^From Sat 1 Aug( 2026)? 11:00–11:30 · The sauna$/)).toBeTruthy()
+    expect(screen.getByText(/^To Sat 1 Aug( 2026)? 12:00–12:30 · The lake$/)).toBeTruthy()
+  })
+
+  it('draws a line that carries no change as a sentence that opens to nothing', () => {
+    show(aThread([anEntry({ id: 't-1', kind: 'scheduled', body: 'moved it' })]))
+
+    expect(document.querySelector('.thread-did')?.textContent).toContain('Ada moved it')
+    expect(document.querySelector('.thread-did details')).toBeNull()
   })
 
   it('reads as "Somebody" where the account behind a line has gone', () => {

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { fromLocalInput, localDay, localMoment, shortDayOf, todayForInput, toLocalInput } from './datetime.ts'
+import {
+  fromLocalInput,
+  localDay,
+  localMoment,
+  localSlot,
+  shortDayOf,
+  todayForInput,
+  toLocalInput,
+} from './datetime.ts'
 
 describe('today as a date input reads it', () => {
   it('is the reader’s own day, not UTC’s — the two differ for two hours every night here', () => {
@@ -95,5 +103,41 @@ describe('localMoment', () => {
 
   it('answers back what it was given when that is not a date', () => {
     expect(localMoment('not a date')).toBe('not a date')
+  })
+})
+
+describe('where a dream sat in the schedule', () => {
+  const thatYear = new Date('2026-07-01T12:00:00.000Z')
+  const nine = { start: '2026-08-01T09:00:00.000Z', end: '2026-08-01T09:30:00.000Z' }
+
+  it('names the reader’s own day and times, and the place', () => {
+    expect(localSlot({ ...nine, place: 'The sauna' }, thatYear)).toBe('Sat 1 Aug 11:00–11:30 · The sauna')
+  })
+
+  it('leaves the place out when there was none', () => {
+    expect(localSlot({ ...nine, place: null }, thatYear)).toBe('Sat 1 Aug 11:00–11:30')
+  })
+
+  it('says a dream with no time was not on the schedule, and where it was', () => {
+    expect(localSlot({ start: null, end: null, place: 'The sauna' }, thatYear)).toBe(
+      'not on the schedule · The sauna',
+    )
+  })
+
+  it('says a dream with no time and no place was not on the schedule', () => {
+    expect(localSlot({ start: null, end: null, place: null }, thatYear)).toBe('not on the schedule')
+  })
+
+  it('gives only the start when there is no end', () => {
+    expect(localSlot({ start: nine.start, end: null, place: null }, thatYear)).toBe('Sat 1 Aug 11:00')
+  })
+
+  it('crosses midnight into the reader’s next day', () => {
+    expect(
+      localSlot(
+        { start: '2026-08-01T22:30:00.000Z', end: '2026-08-01T23:00:00.000Z', place: null },
+        thatYear,
+      ),
+    ).toBe('Sun 2 Aug 00:30–01:00')
   })
 })

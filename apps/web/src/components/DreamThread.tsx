@@ -6,7 +6,7 @@ import { useState } from 'preact/hooks'
 import type { UploadImage } from '../image-upload.ts'
 import type { Mentionable } from '../mentioning.ts'
 
-import { localDay } from '../datetime.ts'
+import { localDay, localSlot } from '../datetime.ts'
 import { stillUploading } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { Destroy } from './Destroy.tsx'
@@ -166,10 +166,21 @@ export const DreamThread = ({
                 </>
               )}
             </li>
-          ) : (
+          ) : entry.change === null ? (
             <li key={entry.id} class="thread-did">
               <span aria-hidden="true">{marks[entry.kind]}</span> {nameOf(entry)} {entry.body}
               <span class="thread-when"> · {localDay(entry.created_at)}</span>
+            </li>
+          ) : (
+            <li key={entry.id} class="thread-did">
+              <details class="thread-moved">
+                <summary>
+                  <span aria-hidden="true">{marks[entry.kind]}</span> {nameOf(entry)} {entry.body}
+                  <span class="thread-when"> · {localDay(entry.created_at)}</span>
+                </summary>
+                <p>From {localSlot(entry.change.from)}</p>
+                <p>To {localSlot(entry.change.to)}</p>
+              </details>
             </li>
           ),
         )}

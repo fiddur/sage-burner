@@ -243,7 +243,9 @@ phone" means 360px.
 ## The programme
 
 - [ ] The member offers a dream with no time — it lists as offered, not as an
-      error. Another member drags it onto the grid; any member may move it.
+      error. Another member drags it onto the grid; any member may move it. The dream's
+      card says "put it in the schedule", and clicking that line opens the old and the new
+      slot in the tester's own time zone. Drag it back to the pool and the line is gone.
 - [ ] Withdraw a dream that has comments and a helper: it leaves the list, the grid and
       the feed, and turns up under "Recently withdrawn" on the Dreams page. Bring it back:
       it returns where it sat, comments and helper intact, and the thread says both acts.

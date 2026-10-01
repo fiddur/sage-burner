@@ -7,6 +7,12 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-10-01
+
+- **A "moved it in the schedule" line on a dream's conversation now opens** to show where
+  the dream was and where it is now, in your own time zone. Dragging it back where it was
+  leaves no line at all.
+
 # 2026-09-30
 
 - **Many things of one kind at once fold into one line on the feed.** Add a pile of songs and

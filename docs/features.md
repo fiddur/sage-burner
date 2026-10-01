@@ -114,7 +114,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 
 - Dreams — the workshops, ceremonies and happenings members offer each other.
   Offered without a time is the normal state; scheduling comes later, and any
-  approved member may arrange any dream on the grid.
+  approved member may arrange any dream on the grid. A move writes a line on the
+  dream's conversation that opens to show where it was and where it is now.
 - A dream carries a facilitator (assignable, must be coming), helpers with a
   hand-up control, and hearts from the people looking forward to it. A dream can
   repeat, and everything a dream needs is editable without leaving the grid.

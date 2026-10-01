@@ -619,6 +619,7 @@ describe('Dreams', () => {
               body: 'is one mat enough?',
               created_at: '2026-08-07T18:00:00.000Z',
               edited_at: null,
+              change: null,
               supporters: [],
               support_count: 0,
               supported_by_me: false,
