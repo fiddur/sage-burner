@@ -6,9 +6,10 @@ import { and, asc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
-import type { Database } from '../db/index.ts'
+import type { Database, Transaction } from '../db/index.ts'
 import type { Notifier } from '../push/notify.ts'
 
+import { attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
@@ -52,6 +53,14 @@ export const ridesFor = async (db: Database, eventId: string): Promise<RideEntry
   return rows
 }
 
+export const forgetRidesOf = (tx: Transaction, eventId: string, accountId: string): void => {
+  const mine = and(eq(ride.event_id, eventId), eq(ride.account_id, accountId))
+  const ids = tx.select({ id: ride.id }).from(ride).where(mine).all()
+
+  for (const { id } of ids) forgetThread(tx, 'ride', id)
+  tx.delete(ride).where(mine).run()
+}
+
 const openJourney = async (db: Database, now: () => Date, id: string): Promise<Ride | undefined> => {
   const [row] = await db
     .select()
@@ -93,6 +102,8 @@ export const registerRideRoutes = (
 
       const event_id = request.params.eventId
       if (!(await openEventNow(db, now, event_id))) return sendError(reply, 404)
+      const coming = await attendanceFor(db, event_id, viewer.account_id)
+      if (coming === undefined) return sendError(reply, 400, 'not_attending')
 
       const row = {
         ...body,

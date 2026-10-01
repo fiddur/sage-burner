@@ -96,7 +96,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   lodging option refuses politely, helping never runs out.
 - The rideshare board: who needs a lift, who has room, per burn, contact
   resolved from the account. Each journey carries a conversation and a card on
-  the feed, and posting one tells whoever is coming.
+  the feed, and posting one tells whoever is coming. Only somebody coming can
+  post one, and it goes when its poster stops coming.
 - The bring list: one shared list per burn of things the gathering wants and
   things people are bringing. An item with no hands up is an ask and is shown
   first; a hand makes it an offer, several hands to one thing are normal, and

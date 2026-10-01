@@ -892,6 +892,15 @@ about their own travel, and a board of journeys nobody is making any more is the
 tab this replaced. The comments go with it, which is the price of a hard delete and the
 reason the bring list does not take one.
 
+**A journey belongs to somebody coming.** Posting one asks that you have joined the burn, and
+answers `not_attending` otherwise, as every other per-burn write does. When a stay ends —
+leaving, handing a paid place over, leaving it to the hosts, or an admin taking somebody off
+— `forgetRidesOf` takes that person's journeys on that burn with it, thread and all, in the
+transaction that deletes the attendance row, the way taking one down does. It is code rather
+than a cascade because `ride` points at the account and the burn, not the stay, and the
+thread is polymorphic, so no foreign key could reach it. The `rides_of_leavers` migration
+swept out the ones already stranded.
+
 **Editing writes one line, and only when something changed.** `edited` coalesces, so going
 over the wording three times is one line rather than three; a save that changed nothing
 writes none. Notes are plain text with no mention picker, so nothing here calls `namedBy` —

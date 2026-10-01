@@ -18,6 +18,7 @@ import { NoBurn } from '../components/NoBurn.tsx'
 import { useDreamThread } from '../components/OpenedDream.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { rowsFor } from '../textarea.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
@@ -99,7 +100,7 @@ export const Rides = ({ api }: { api: RidesApi }) => {
         notes: draft.notes.trim(),
       })
       setDraft(BLANK)
-    }, 'Could not post that.')
+    }, joinFirst('Could not post that.'))
   }
 
   const { rides, attendees } = loaded.status === 'ready' ? loaded.data : { rides: [], attendees: [] }
@@ -128,7 +129,7 @@ export const Rides = ({ api }: { api: RidesApi }) => {
         talk to each other — nothing on this page books a seat.
       </p>
 
-      <ErrorText message={error} />
+      <ErrorText message={error} link={joinLink(error)} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}

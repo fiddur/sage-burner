@@ -411,6 +411,10 @@ phone" means 360px.
 - [ ] 💬 on the row opens the journey's conversation on the board; the same comments show on
       its card on the feed, and the poster is told about a comment somebody else leaves.
 - [ ] Take a journey down: it leaves the board and its card leaves the feed.
+- [ ] With a journey posted, leave the burn (or hand a paid place over): the journey leaves
+      the board and its card leaves the feed.
+- [ ] As a member who has not joined the burn, post a journey: you are told to join first,
+      with a link to your details.
 
 ## Build
 

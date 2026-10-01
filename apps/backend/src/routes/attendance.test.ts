@@ -786,7 +786,11 @@ describe('the hand-over’s own guard, under the checks that precede it', () => 
       .set({ payment_status: 'paid', payment_date: '2026-07-02' })
       .where(eq(attendance.id, theirs?.id ?? ''))
 
-    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+    const moved = handOverPlace(
+      db(),
+      { id: mine?.id ?? '', event_id: eventId, account_id: giver.id, payment_date: '2026-07-01' },
+      theirs?.id ?? '',
+    )
 
     expect(moved).toBe(false)
     expect(await rowFor(giver.id, eventId)).toBeDefined()
@@ -803,7 +807,11 @@ describe('the hand-over’s own guard, under the checks that precede it', () => 
       .set({ payment_status: 'unpaid', payment_date: null })
       .where(eq(attendance.id, mine?.id ?? ''))
 
-    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+    const moved = handOverPlace(
+      db(),
+      { id: mine?.id ?? '', event_id: eventId, account_id: giver.id, payment_date: '2026-07-01' },
+      theirs?.id ?? '',
+    )
 
     expect(moved).toBe(false)
     expect(await rowFor(giver.id, eventId)).toBeDefined()
@@ -816,7 +824,11 @@ describe('the hand-over’s own guard, under the checks that precede it', () => 
     const mine = await rowFor(giver.id, eventId)
     const theirs = await rowFor(taker.id, eventId)
 
-    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+    const moved = handOverPlace(
+      db(),
+      { id: mine?.id ?? '', event_id: eventId, account_id: giver.id, payment_date: '2026-07-01' },
+      theirs?.id ?? '',
+    )
 
     expect(moved).toBe(true)
     expect(await rowFor(giver.id, eventId)).toBeUndefined()

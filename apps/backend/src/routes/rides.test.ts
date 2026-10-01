@@ -12,7 +12,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, ride } from '../db/schema.ts'
+import { account, accountRole, attendance, event, ride, thread } from '../db/schema.ts'
 import { bell, setOn } from './threads.testing.ts'
 
 const SECRET = 's'.repeat(40)
@@ -164,6 +164,7 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
     await post(server, ada.cookie, { ...A_JOURNEY, kind: 'needs', from: 'Göteborg' })
     await post(server, ada.cookie, { ...A_JOURNEY, kind: 'offers', from: 'Malmö', seats: 3 })
 
@@ -197,6 +198,7 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount(['member'], { name: 'Ada Lovelace', contact: '070 111 22 33' })
+    await givenComing(ada.id)
     await post(server, ada.cookie)
 
     await db().update(account).set({ contact: '070 999 88 77' }).where(eq(account.id, ada.id))
@@ -210,6 +212,7 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
 
     const created = await post(server, ada.cookie)
 
@@ -222,6 +225,7 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
 
     expect((await post(server, ada.cookie, { ...A_JOURNEY, event_id: OPEN_BURN })).statusCode).toBe(400)
     expect((await post(server, ada.cookie, { ...A_JOURNEY, account_id: ada.id })).statusCode).toBe(400)
@@ -231,6 +235,7 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
 
     expect((await post(server, ada.cookie, { ...A_JOURNEY, from: '   ' })).statusCode).toBe(400)
     expect((await post(server, ada.cookie, { ...A_JOURNEY, when: '' })).statusCode).toBe(400)
@@ -241,6 +246,7 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
     const id = (await post(server, ada.cookie)).json().ride.id
 
     const changed = await patch(server, ada.cookie, id, { when: 'Saturday morning' })
@@ -253,6 +259,7 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
     const bea = await givenAccount()
     const id = (await post(server, ada.cookie)).json().ride.id
 
@@ -267,6 +274,7 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
     const id = (await post(server, ada.cookie)).json().ride.id
 
     expect((await remove(server, ada.cookie, id)).statusCode).toBe(204)
@@ -278,6 +286,7 @@ describe('the rideshare board', () => {
     const ended = randomUUID()
     await givenEvent({ id: ended, start_date: '2025-08-01', end_date: '2025-08-05' })
     const ada = await givenAccount()
+    await givenComing(ada.id, ended)
     const old = randomUUID()
     await db()
       .insert(ride)
@@ -293,8 +302,10 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
     const applicant = await givenAccount([])
     const organiser = await givenAccount(['admin'])
+    await givenComing(organiser.id)
     const id = (await post(server, ada.cookie)).json().ride.id
 
     expect((await list(server, undefined)).statusCode).toBe(401)
@@ -308,7 +319,9 @@ describe('the rideshare board', () => {
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAccount()
-    await post(server, ada.cookie)
+    await db()
+      .insert(ride)
+      .values({ ...A_JOURNEY, id: randomUUID(), event_id: eventId, account_id: ada.id, created_at: NOW })
 
     expect(await db().select().from(ride)).toHaveLength(1)
 
@@ -317,6 +330,7 @@ describe('the rideshare board', () => {
     expect(await db().select().from(ride)).toEqual([])
 
     const bob = await givenAccount()
+    await givenComing(bob.id)
     await post(server, bob.cookie)
 
     expect(await db().select().from(ride)).toHaveLength(1)
@@ -372,12 +386,36 @@ describe('the rideshare board', () => {
     const server = await build()
     await givenEvent()
     const ada = await givenAccount()
+    await givenComing(ada.id)
     const id = (await post(server, ada.cookie)).json().ride.id
 
     const answered = await patch(server, ada.cookie, id, {})
 
     expect(answered.statusCode).toBe(200)
     expect(answered.json().ride.from).toBe('Göteborg')
+  })
+
+  it('refuses a journey from somebody who is not coming, and posts nothing', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+
+    const refused = await post(server, ada.cookie)
+
+    expect(refused.statusCode).toBe(400)
+    expect(refused.json().error).toBe('not_attending')
+    expect(await db().select().from(ride)).toEqual([])
+    expect(await db().select().from(thread)).toEqual([])
+  })
+
+  it('posts the same journey once that person is coming', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+
+    expect((await post(server, ada.cookie)).statusCode).toBe(201)
+    expect(await db().select().from(ride)).toHaveLength(1)
   })
 })
 
@@ -592,5 +630,137 @@ describe('talking about a journey', () => {
     expect((await bell(server, ada.cookie)).map((one) => [one.category, one.body])).toEqual([
       ['hearted', 'Bea hearts Looking for a lift from Göteborg'],
     ])
+  })
+})
+
+describe('a journey once its poster stops coming', () => {
+  const givenPaid = async (accountId: string, eventId = OPEN_BURN) => {
+    await db().insert(attendance).values({
+      id: randomUUID(),
+      event_id: eventId,
+      account_id: accountId,
+      joined_at: NOW,
+      payment_status: 'paid',
+      payment_date: '2026-07-01',
+    })
+  }
+
+  const posters = async () =>
+    (await db().select({ account_id: ride.account_id, event_id: ride.event_id }).from(ride)).map((row) => [
+      row.account_id,
+      row.event_id,
+    ])
+
+  const rideThreads = () => db().select().from(thread).where(eq(thread.entity_type, 'ride'))
+
+  const leave = (server: FastifyInstance, cookie: string) =>
+    server.inject({ method: 'DELETE', url: `/api/events/${OPEN_BURN}/attendance/me`, headers: { cookie } })
+
+  it('takes the leaver’s journeys and their cards, and leaves somebody else’s alone', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount(['member'], { name: 'Ada' })
+    const bea = await givenAccount(['member'], { name: 'Bea' })
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await post(server, ada.cookie)
+    await post(server, ada.cookie, { ...A_JOURNEY, kind: 'offers', seats: 2 })
+    await post(server, bea.cookie)
+
+    expect((await leave(server, ada.cookie)).statusCode).toBe(204)
+
+    expect(await posters()).toEqual([[bea.id, OPEN_BURN]])
+    expect((await cards(server, bea.cookie)).map((card) => card.title)).toEqual([
+      'Looking for a lift from Göteborg',
+    ])
+    expect(await rideThreads()).toHaveLength(1)
+  })
+
+  it('keeps the journeys when leaving is refused because the place is paid', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenPaid(ada.id)
+    await post(server, ada.cookie)
+
+    expect((await leave(server, ada.cookie)).statusCode).toBe(409)
+
+    expect(await posters()).toEqual([[ada.id, OPEN_BURN]])
+    expect(await rideThreads()).toHaveLength(1)
+  })
+
+  it('takes the giver’s journeys when a paid place is handed over, and keeps the taker’s', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    const bea = await givenAccount()
+    await givenPaid(ada.id)
+    await givenComing(bea.id)
+    await post(server, ada.cookie)
+    await post(server, bea.cookie)
+
+    const handed = await server.inject({
+      method: 'POST',
+      url: `/api/events/${OPEN_BURN}/attendance/me/transfer`,
+      headers: { cookie: ada.cookie },
+      payload: { to_account_id: bea.id },
+    })
+
+    expect(handed.statusCode).toBe(204)
+    expect(await posters()).toEqual([[bea.id, OPEN_BURN]])
+    expect(await rideThreads()).toHaveLength(1)
+  })
+
+  it('takes the journeys of somebody who leaves their paid place to the hosts', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    await givenPaid(ada.id)
+    await post(server, ada.cookie)
+
+    const donated = await server.inject({
+      method: 'POST',
+      url: `/api/events/${OPEN_BURN}/attendance/me/donation`,
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(donated.statusCode).toBe(204)
+    expect(await posters()).toEqual([])
+    expect(await rideThreads()).toEqual([])
+  })
+
+  it('takes the journeys of somebody an admin takes off the burn', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAccount()
+    const organiser = await givenAccount(['admin'])
+    await givenPaid(ada.id)
+    await post(server, ada.cookie)
+
+    const removed = await server.inject({
+      method: 'DELETE',
+      url: `/api/admin/events/${OPEN_BURN}/attendance/${ada.id}`,
+      headers: { cookie: organiser.cookie },
+    })
+
+    expect(removed.statusCode).toBe(204)
+    expect(await posters()).toEqual([])
+    expect(await rideThreads()).toEqual([])
+  })
+
+  it('keeps the leaver’s journey to another burn they are still coming to', async () => {
+    const server = await build()
+    await givenEvent()
+    const other = await givenEvent({ id: randomUUID(), start_date: '2026-09-01', end_date: '2026-09-05' })
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+    await givenComing(ada.id, other)
+    await post(server, ada.cookie)
+    await post(server, ada.cookie, A_JOURNEY, other)
+
+    expect((await leave(server, ada.cookie)).statusCode).toBe(204)
+
+    expect(await posters()).toEqual([[ada.id, other]])
+    expect(await rideThreads()).toHaveLength(1)
   })
 })

@@ -327,6 +327,68 @@ describe('migrations', () => {
     expect(handle.client.prepare('select id from thread order by id').all()).toEqual([{ id: 't-song' }])
   })
 
+  const ridesOfLeavers = () =>
+    readFileSync(path.join(migrationsFolder, '20261001140000_rides_of_leavers', 'migration.sql'), 'utf8')
+
+  const givenRide = (id: string, accountId: string) => {
+    handle.client
+      .prepare(
+        'insert into ride (id, event_id, account_id, kind, "from", "when", created_at) values (?,?,?,?,?,?,?)',
+      )
+      .run(id, ids.event, accountId, 'offers', 'Göteborg', 'Friday', NOW)
+  }
+
+  const sweepWithoutCascades = () => {
+    handle.client.exec('PRAGMA foreign_keys = OFF')
+    handle.client.exec(ridesOfLeavers())
+    const dangling = handle.client.prepare('PRAGMA foreign_key_check').all()
+    handle.client.exec('PRAGMA foreign_keys = ON')
+
+    return dangling
+  }
+
+  it('sweeps out a journey whose poster is not coming, with its card and everything on it', () => {
+    seedAccount(ids.otherAccount, 'gone@example.org')
+    givenRide('r-stranded', ids.otherAccount)
+    givenThread('t-stranded', 'ride', 'r-stranded')
+    handle.client
+      .prepare('insert into thread_support (thread_id, account_id) values (?,?)')
+      .run('t-stranded', ids.account)
+    handle.client
+      .prepare('insert into thread_follow (thread_id, account_id, enabled) values (?,?,?)')
+      .run('t-stranded', ids.account, 1)
+    handle.client
+      .prepare('insert into entry_support (entry_id, account_id) values (?,?)')
+      .run('t-stranded-e', ids.account)
+
+    expect(sweepWithoutCascades()).toEqual([])
+
+    expect(handle.client.prepare('select id from ride').all()).toEqual([])
+    expect(handle.client.prepare('select id from thread').all()).toEqual([])
+    expect(handle.client.prepare('select id from thread_entry').all()).toEqual([])
+  })
+
+  it('keeps a journey whose poster is still coming, and every card of another kind', () => {
+    seedAttendance(ids.attendance, ids.account)
+    seedAccount(ids.otherAccount, 'gone@example.org')
+    givenRide('r-coming', ids.account)
+    givenRide('r-stranded', ids.otherAccount)
+    givenThread('t-coming', 'ride', 'r-coming')
+    givenThread('t-song', 'song', 'r-stranded')
+
+    expect(sweepWithoutCascades()).toEqual([])
+
+    expect(handle.client.prepare('select id from ride').all()).toEqual([{ id: 'r-coming' }])
+    expect(handle.client.prepare('select id from thread order by id').all()).toEqual([
+      { id: 't-coming' },
+      { id: 't-song' },
+    ])
+    expect(handle.client.prepare('select thread_id from thread_entry order by thread_id').all()).toEqual([
+      { thread_id: 't-coming' },
+      { thread_id: 't-song' },
+    ])
+  })
+
   const meetingCards = () =>
     readFileSync(path.join(migrationsFolder, '20260813180000_meeting_cards', 'migration.sql'), 'utf8')
 
@@ -2170,6 +2232,9 @@ describe('the ride-cards migration', () => {
     fresh.client
       .prepare('insert into account (id, email, created_at) values (?, ?, ?)')
       .run('a-1', 'ada@example.org', NOW)
+    fresh.client
+      .prepare('insert into attendance (id, event_id, account_id, joined_at) values (?, ?, ?, ?)')
+      .run('m-1', 'e-1', 'a-1', NOW)
     for (const [id, kind, from] of [
       ['r-1', 'needs', 'Göteborg'],
       ['r-2', 'offers', 'Malmö'],
