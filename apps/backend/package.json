@@ -16,16 +16,16 @@
     "pantry:import": "node src/cli/import-pantry.ts"
   },
   "dependencies": {
-    "@fastify/helmet": "^13.1.1",
-    "@fastify/proxy-addr": "^5.1.0",
-    "@fastify/static": "^10.1.3",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/proxy-addr": "^5.1.2",
+    "@fastify/static": "^10.1.6",
     "@sage-burner/shared": "workspace:*",
-    "@simplewebauthn/server": "^14.0.2",
+    "@simplewebauthn/server": "^14.0.3",
     "drizzle-orm": "1.0.0-rc.5-5935859",
-    "fastify": "^5.12.4",
-    "nodemailer": "^10.0.10",
+    "fastify": "^5.12.7",
+    "nodemailer": "^10.1.2",
     "web-push": "^3.6.7",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24",
